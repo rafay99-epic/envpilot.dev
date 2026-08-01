@@ -4,6 +4,20 @@ export const MAX_DELIVERY_ATTEMPTS = 3;
 export const MAX_RETRY_DELAY_MS = 60_000;
 const MAX_DISCORD_CONTENT_LENGTH = 1_900;
 
+/** Organization-wide destinations match every event; scoped ones match only
+ * audit events that carry the exact selected project. */
+export function matchesProjectScope(
+  webhookProjectIds: readonly string[] | null | undefined,
+  eventProjectId: string | null | undefined
+): boolean {
+  return (
+    !webhookProjectIds ||
+    (eventProjectId !== undefined &&
+      eventProjectId !== null &&
+      webhookProjectIds.includes(eventProjectId))
+  );
+}
+
 const ACTION_TITLES: Record<string, { glyph: string; title: string }> = {
   "variable.created": { glyph: "+", title: "Variable created" },
   "variable.updated": { glyph: "↻", title: "Variable updated" },

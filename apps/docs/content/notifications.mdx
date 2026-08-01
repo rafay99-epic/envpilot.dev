@@ -30,11 +30,19 @@ If the Connect buttons aren't available (a locked-down Slack workspace, or a sel
 - **Slack**: in the target channel → **Integrations → Add an app → Incoming Webhooks** → create and copy the URL (`https://hooks.slack.com/services/…`).
 - **Discord**: channel settings → **Integrations → Webhooks → New Webhook** → **Copy Webhook URL** (`https://discord.com/api/webhooks/…`).
 
-Then **Organization Settings → Integrations → Add manually**, pick the platform, paste the URL, and choose event groups. All webhook URLs — manual or OAuth-connected — are encrypted as credentials, and the UI only ever shows a masked preview.
+Then **Organization Settings → Integrations → Advanced setup**, pick the platform, paste the URL, and choose project routing. All webhook URLs — manual or OAuth-connected — are encrypted as credentials, and the UI only ever shows a masked preview.
+
+## Route projects to channels
+
+Every connected destination can receive activity from **all projects** or only a selected set of projects. Open **Manage** beside a destination to change its project routing and event groups.
+
+For example, connect the Slack `#envpilot` channel, choose **Selected projects**, and select the EnvPilot project. That channel then receives only EnvPilot project activity. Connect Slack or Discord again to route other projects to different channels.
+
+Organization-wide events that do not belong to a project, such as membership changes, are sent only to destinations configured for all projects. Existing destinations default to all projects.
 
 ## Event groups
 
-Each webhook subscribes to event groups, editable inline at any time:
+Each destination subscribes to event groups, editable through **Manage** at any time:
 
 | Group     | Covers                                                       | Default |
 | --------- | ------------------------------------------------------------ | ------- |

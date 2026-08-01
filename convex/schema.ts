@@ -634,6 +634,9 @@ export default defineSchema({
   // a non-sensitive masked preview. OAuth access tokens are discarded.
   orgWebhooks: defineTable({
     organizationId: v.id("organizations"),
+    // Optional project routing. Absent means organization-wide; when set,
+    // only audit events carrying one of these project IDs reach the endpoint.
+    projectIds: v.optional(v.array(v.id("projects"))),
     // Display label — the channel name for OAuth rows, user-chosen for manual
     name: v.string(),
     type: v.union(v.literal("slack"), v.literal("discord")),

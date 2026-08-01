@@ -85,8 +85,17 @@ export const _authorizeRequest = internalMutation({
       k: NonNullable<typeof key>,
       reason: string
     ): Promise<void> => {
+      const requestedProject = args.requirement.projectId
+        ? await ctx.db.get(args.requirement.projectId)
+        : null;
+      const projectId =
+        requestedProject?.organizationId === k.organizationId &&
+        requestedProject.deletedAt === undefined
+          ? requestedProject._id
+          : undefined;
       await createAuditLog(ctx, {
         organizationId: k.organizationId,
+        projectId,
         userId: k.createdBy,
         action: "api.request_denied",
         details: {

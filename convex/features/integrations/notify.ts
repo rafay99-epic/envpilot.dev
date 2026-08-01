@@ -4,7 +4,7 @@ import type { MutationCtx } from "../../_generated/server";
 import { internalMutation } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { checkBooleanFeature } from "../featureRegistry/gates";
-import { buildNotificationText } from "./messages";
+import { buildNotificationText, matchesProjectScope } from "./messages";
 import { rateLimiter } from "../../lib/rateLimits";
 import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { enqueueWebhookDelivery } from "./queue";
@@ -103,7 +103,10 @@ export const prepare = internalMutation({
       )
       .take(11);
     const targets = hooks.filter(
-      (hook) => hook.enabled && hook.eventGroups.includes(group)
+      (hook) =>
+        hook.enabled &&
+        hook.eventGroups.includes(group) &&
+        matchesProjectScope(hook.projectIds, audit.projectId)
     );
     if (targets.length === 0) return null;
     if (audit.action === "api.request_denied") {

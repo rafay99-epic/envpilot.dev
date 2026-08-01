@@ -17,6 +17,7 @@ import {
 } from "../featureRegistry/gates";
 import { createAuditLog } from "../../lib/audit";
 import { rateLimiter } from "../../lib/rateLimits";
+import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { WEBHOOK_EVENT_GROUPS } from "./notify";
 import { enqueueWebhookDelivery } from "./queue";
 
@@ -125,6 +126,37 @@ async function requireWebhookManager(
   return actor;
 }
 
+async function validateProjectScope(
+  ctx: MutationCtx | QueryCtx,
+  organizationId: Id<"organizations">,
+  projectIds: Id<"projects">[] | undefined
+): Promise<void> {
+  if (!projectIds) return;
+  if (projectIds.length === 0) {
+    throw new ConvexError(
+      "Select at least one project or choose all projects."
+    );
+  }
+  if (projectIds.length > 100) {
+    throw new ConvexError("Select up to 100 projects, or choose all projects.");
+  }
+  if (new Set(projectIds).size !== projectIds.length) {
+    throw new ConvexError("Each selected project must be unique.");
+  }
+  const projects = await Promise.all(projectIds.map((id) => ctx.db.get(id)));
+  for (const project of projects) {
+    if (
+      !project ||
+      project.deletedAt !== undefined ||
+      project.organizationId !== organizationId
+    ) {
+      throw new ConvexError(
+        "Select active projects from this organization only."
+      );
+    }
+  }
+}
+
 async function requireFeatureCapacity(
   ctx: MutationCtx | QueryCtx,
   organizationId: Id<"organizations">
@@ -153,17 +185,40 @@ async function requireFeatureCapacity(
   }
 }
 
+async function enforceWebhookTestRateLimit(
+  ctx: MutationCtx,
+  organizationId: Id<"organizations">
+): Promise<void> {
+  try {
+    await rateLimiter.limit(ctx, "webhookTest", {
+      key: organizationId,
+      throws: true,
+    });
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      throw new ConvexError(
+        "Too many test messages. Wait a moment and try again."
+      );
+    }
+    throw error;
+  }
+}
+
 /**
  * OAuth preflight. It fails before provider consent unless the caller can
  * manage this org and the feature has capacity, and derives the redirect slug
  * from the authorized organization instead of trusting a query parameter.
  */
 export const getConnectEligibility = query({
-  args: { organizationId: v.id("organizations") },
+  args: {
+    organizationId: v.id("organizations"),
+    projectIds: v.optional(v.array(v.id("projects"))),
+  },
   returns: v.object({ slug: v.string() }),
   handler: async (ctx, args) => {
     await requireWebhookManager(ctx, args.organizationId);
     await requireFeatureCapacity(ctx, args.organizationId);
+    await validateProjectScope(ctx, args.organizationId, args.projectIds);
     const organization = await ctx.db.get(args.organizationId);
     if (!organization) throw new ConvexError("Organization not found");
     return { slug: organization.slug };
@@ -182,6 +237,7 @@ export const create = action({
     source: v.union(v.literal("oauth"), v.literal("manual")),
     url: v.string(),
     channel: v.optional(v.string()),
+    projectIds: v.optional(v.array(v.id("projects"))),
     eventGroups: v.array(eventGroupValidator),
   },
   returns: v.id("orgWebhooks"),
@@ -192,7 +248,7 @@ export const create = action({
 
     await ctx.runQuery(
       api.features.integrations.webhooks.getConnectEligibility,
-      { organizationId: args.organizationId }
+      { organizationId: args.organizationId, projectIds: args.projectIds }
     );
 
     let vault: { id: string };
@@ -245,6 +301,7 @@ export const create = action({
           vaultRef: vault.id,
           urlPreview: maskUrl(url),
           channel: args.channel,
+          projectIds: args.projectIds,
           eventGroups: args.eventGroups,
         }
       );
@@ -280,6 +337,7 @@ export const _store = internalMutation({
     vaultRef: v.string(),
     urlPreview: v.string(),
     channel: v.optional(v.string()),
+    projectIds: v.optional(v.array(v.id("projects"))),
     eventGroups: v.array(eventGroupValidator),
   },
   returns: v.id("orgWebhooks"),
@@ -294,10 +352,8 @@ export const _store = internalMutation({
     }
     const actor = await requireWebhookManager(ctx, args.organizationId);
     await requireFeatureCapacity(ctx, args.organizationId);
-    await rateLimiter.limit(ctx, "webhookTest", {
-      key: args.organizationId,
-      throws: true,
-    });
+    await validateProjectScope(ctx, args.organizationId, args.projectIds);
+    await enforceWebhookTestRateLimit(ctx, args.organizationId);
 
     const webhookId = await ctx.db.insert("orgWebhooks", {
       organizationId: args.organizationId,
@@ -307,6 +363,7 @@ export const _store = internalMutation({
       vaultRef: args.vaultRef,
       urlPreview: args.urlPreview,
       channel: args.channel,
+      projectIds: args.projectIds,
       eventGroups: args.eventGroups,
       enabled: true,
       failCount: 0,
@@ -327,6 +384,7 @@ export const _store = internalMutation({
         type: args.type,
         source: args.source,
         channel: args.channel,
+        projectIds: args.projectIds,
         eventGroups: args.eventGroups,
       },
     });
@@ -340,6 +398,7 @@ export const update = mutation({
     webhookId: v.id("orgWebhooks"),
     name: v.optional(v.string()),
     eventGroups: v.optional(v.array(eventGroupValidator)),
+    projectIds: v.optional(v.union(v.array(v.id("projects")), v.null())),
     enabled: v.optional(v.boolean()),
   },
   returns: v.null(),
@@ -356,6 +415,11 @@ export const update = mutation({
       validateEventGroups(args.eventGroups);
       patch.eventGroups = args.eventGroups;
     }
+    if (args.projectIds !== undefined) {
+      const projectIds = args.projectIds ?? undefined;
+      await validateProjectScope(ctx, hook.organizationId, projectIds);
+      patch.projectIds = projectIds;
+    }
     if (args.enabled !== undefined) {
       const gate = await checkBooleanFeature(
         ctx.db,
@@ -368,12 +432,16 @@ export const update = mutation({
         );
       }
       patch.enabled = args.enabled;
-      if (args.enabled !== hook.enabled) {
-        patch.queueGeneration = (hook.queueGeneration ?? 0) + 1;
-        patch.nextDeliveryAt = undefined;
-        patch.deliveryEmbargoUntil = undefined;
-      }
       if (args.enabled && !hook.enabled) patch.failCount = 0;
+    }
+    const invalidatesQueue =
+      args.eventGroups !== undefined ||
+      args.projectIds !== undefined ||
+      (args.enabled !== undefined && args.enabled !== hook.enabled);
+    if (invalidatesQueue) {
+      patch.queueGeneration = (hook.queueGeneration ?? 0) + 1;
+      patch.nextDeliveryAt = undefined;
+      patch.deliveryEmbargoUntil = undefined;
     }
     if (Object.keys(patch).length === 0) return null;
 
@@ -414,6 +482,7 @@ export const remove = mutation({
         name: hook.name,
         type: hook.type,
         channel: hook.channel,
+        projectIds: hook.projectIds,
       },
     });
     await ctx.scheduler.runAfter(
@@ -447,10 +516,7 @@ export const sendTest = mutation({
     if (!hook.enabled) {
       throw new ConvexError("Resume this webhook before sending a test");
     }
-    await rateLimiter.limit(ctx, "webhookTest", {
-      key: hook.organizationId,
-      throws: true,
-    });
+    await enforceWebhookTestRateLimit(ctx, hook.organizationId);
     await enqueueWebhookDelivery(ctx, {
       webhookId: hook._id,
       text: TEST_TEXT,
@@ -468,6 +534,7 @@ export const listForOrganization = query({
       type: v.union(v.literal("slack"), v.literal("discord")),
       source: v.union(v.literal("oauth"), v.literal("manual")),
       channel: v.union(v.string(), v.null()),
+      projectIds: v.union(v.array(v.id("projects")), v.null()),
       urlPreview: v.string(),
       eventGroups: v.array(eventGroupValidator),
       enabled: v.boolean(),
@@ -493,6 +560,7 @@ export const listForOrganization = query({
       type: hook.type,
       source: hook.source,
       channel: hook.channel ?? null,
+      projectIds: hook.projectIds ?? null,
       urlPreview: hook.urlPreview,
       eventGroups: hook.eventGroups,
       enabled: hook.enabled,

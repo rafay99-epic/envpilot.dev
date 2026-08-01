@@ -6,6 +6,7 @@ import {
   failureCountAfterDelivery,
   MAX_DELIVERY_ATTEMPTS,
   MAX_RETRY_DELAY_MS,
+  matchesProjectScope,
   providerRetryDelayMilliseconds,
 } from "@convex/features/integrations/messages";
 
@@ -22,6 +23,17 @@ const baseMessage = {
 };
 
 describe("integration notification payloads", () => {
+  it("routes organization-wide and project-specific destinations correctly", () => {
+    expect(matchesProjectScope(undefined, undefined)).toBe(true);
+    expect(matchesProjectScope(undefined, "project-a")).toBe(true);
+    expect(matchesProjectScope(["project-a"], "project-a")).toBe(true);
+    expect(matchesProjectScope(["project-a", "project-b"], "project-b")).toBe(
+      true
+    );
+    expect(matchesProjectScope(["project-a"], "project-b")).toBe(false);
+    expect(matchesProjectScope(["project-a"], undefined)).toBe(false);
+  });
+
   it("builds native Slack mrkdwn and escapes user-controlled metadata", () => {
     const text = buildNotificationText({ provider: "slack", ...baseMessage });
     expect(text).toContain("*API_&lt;TOKEN&gt;*");

@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation } from "../../_generated/server";
 import { normalizeOrgRole } from "../../lib/authz";
 import { requireAuthedUser } from "../../lib/identity";
@@ -20,6 +20,14 @@ export const prepareCheckout = mutation({
   args: {
     organizationId: v.id("organizations"),
   },
+  returns: v.union(
+    v.object({ status: v.literal("already_subscribed") }),
+    v.object({
+      status: v.literal("ready"),
+      organizationId: v.id("organizations"),
+      polarCustomerId: v.union(v.string(), v.null()),
+    })
+  ),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
 
@@ -32,7 +40,7 @@ export const prepareCheckout = mutation({
       .first();
 
     if (!membership || normalizeOrgRole(membership.role) !== "owner") {
-      throw new Error("Only the organization owner can manage billing");
+      throw new ConvexError("Only the organization owner can manage billing.");
     }
 
     // The tier resolver derives an org's features from the CREATOR's
@@ -42,11 +50,11 @@ export const prepareCheckout = mutation({
     // the account the resolver actually reads.
     const organization = await ctx.db.get(args.organizationId);
     if (!organization) {
-      throw new Error("Organization not found");
+      throw new ConvexError("Organization not found.");
     }
     if (organization.createdBy !== actor._id) {
-      throw new Error(
-        "Only the organization's creating account can purchase a subscription for it — the org's tier is derived from that account"
+      throw new ConvexError(
+        "Only the account that created this organization can manage its subscription."
       );
     }
 
@@ -62,7 +70,7 @@ export const prepareCheckout = mutation({
       .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect();
     if (userSubscriptions.some(isLive)) {
-      throw new Error("You already have an active subscription");
+      return { status: "already_subscribed" as const };
     }
 
     // Fallback: check org-level subscriptions (legacy)
@@ -73,7 +81,7 @@ export const prepareCheckout = mutation({
       )
       .collect();
     if (orgSubscriptions.some(isLive)) {
-      throw new Error("Organization already has an active subscription");
+      return { status: "already_subscribed" as const };
     }
 
     // Get Polar customer — prefer user-level, fallback to org-level
@@ -92,6 +100,7 @@ export const prepareCheckout = mutation({
           .first();
 
     return {
+      status: "ready" as const,
       organizationId: args.organizationId,
       polarCustomerId:
         userCustomer?.polarCustomerId || orgCustomer?.polarCustomerId || null,

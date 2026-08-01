@@ -103,6 +103,11 @@ function OrganizationSettingsPageContent({
       : "skip"
   );
   const orgTier = (tierData?.tierName as string) ?? "free";
+  // The resolved map contains active registry rows only. Presence means the
+  // feature exists globally; its boolean value separately controls whether
+  // this tier receives the feature or sees the upgrade state.
+  const notificationsRegistered =
+    tierData?.features?.team_notifications !== undefined;
 
   // Owner-only sections stay owner-only; API Keys additionally opens up to
   // project managers and team leads (minting a project-scoped key is the
@@ -118,7 +123,7 @@ function OrganizationSettingsPageContent({
       ? [{ id: "apiKeys" as const, label: "API Keys" }]
       : []),
     // Webhook management is org.manage on the backend — owner by default
-    ...(isOwner
+    ...(isOwner && notificationsRegistered
       ? [{ id: "integrations" as const, label: "Integrations" }]
       : []),
     ...(isOwner ? [{ id: "danger" as const, label: "Danger Zone" }] : []),
@@ -330,11 +335,14 @@ function OrganizationSettingsPageContent({
             isOwner={isOwner}
           />
         )}
-        {effectiveTab === "integrations" && isOwner && organization && (
-          <IntegrationsSection
-            organizationId={organization._id as Id<"organizations">}
-          />
-        )}
+        {effectiveTab === "integrations" &&
+          isOwner &&
+          notificationsRegistered &&
+          organization && (
+            <IntegrationsSection
+              organizationId={organization._id as Id<"organizations">}
+            />
+          )}
         {effectiveTab === "danger" && isOwner && (
           <DangerZoneSettings
             organization={organization!}

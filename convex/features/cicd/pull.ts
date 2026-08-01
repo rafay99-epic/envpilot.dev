@@ -90,8 +90,21 @@ export const _authorizePull = internalMutation({
 
     if (apiKey) {
       const logApiKeyDenied = async (reason: string): Promise<void> => {
+        const scopedProjectId =
+          apiKey.scopeProjects !== "all" && apiKey.scopeProjects.length === 1
+            ? apiKey.scopeProjects[0]
+            : undefined;
+        const scopedProject = scopedProjectId
+          ? await ctx.db.get(scopedProjectId)
+          : null;
+        const projectId =
+          scopedProject?.organizationId === apiKey.organizationId &&
+          scopedProject.deletedAt === undefined
+            ? scopedProject._id
+            : undefined;
         await createAuditLog(ctx, {
           organizationId: apiKey.organizationId,
+          projectId,
           userId: apiKey.createdBy,
           action: "api.request_denied",
           details: {

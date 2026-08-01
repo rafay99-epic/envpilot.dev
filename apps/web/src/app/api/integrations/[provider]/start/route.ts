@@ -26,9 +26,9 @@ export async function GET(
     return NextResponse.json({ error: "Unknown provider" }, { status: 404 });
   }
   const provider = providerResult.data;
-  const organizationId = new URL(request.url).searchParams.get(
-    "organizationId"
-  );
+  const requestUrl = new URL(request.url);
+  const organizationId = requestUrl.searchParams.get("organizationId");
+  const wantsJson = requestUrl.searchParams.get("format") === "json";
   if (!organizationId || organizationId.length > 100) {
     return NextResponse.json(
       { error: "A valid organizationId is required" },
@@ -117,7 +117,9 @@ export async function GET(
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
   authorizeUrl.searchParams.set("state", state);
 
-  const response = NextResponse.redirect(authorizeUrl);
+  const response = wantsJson
+    ? NextResponse.json({ url: authorizeUrl.toString() })
+    : NextResponse.redirect(authorizeUrl);
   // Store the exact state in an httpOnly cookie. Matching the whole value,
   // rather than only its nonce, prevents organization/slug tampering.
   response.cookies.set(oauthStateCookie(provider), state, {

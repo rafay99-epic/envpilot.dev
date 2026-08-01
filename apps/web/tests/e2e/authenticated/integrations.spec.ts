@@ -39,8 +39,8 @@ async function openIntegrationsTab(page: Page, orgSlug: string) {
   test.skip(!gateOpen, "team_notifications is gated off for this org/tier");
 }
 
-function webhookRow(page: Page, name: string) {
-  return page.getByTestId("webhook-row").filter({ hasText: name });
+function webhookRow(page: Page, identifier: string) {
+  return page.getByTestId("webhook-row").filter({ hasText: identifier });
 }
 
 // DOM traces can snapshot a capability URL while the manual form is filled.
@@ -52,11 +52,10 @@ test.describe("Notification webhooks", () => {
     await openIntegrationsTab(page, await getOwnedOrgSlug(page));
 
     await page.getByTestId("add-webhook-manually").click();
-    await page.getByPlaceholder("#eng-alerts").fill("Invalid E2E Webhook");
     await page
       .getByPlaceholder("https://hooks.slack.com/services/...")
       .fill("https://discord.com/api/webhooks/123/abc");
-    await page.getByRole("button", { name: /^Add Webhook$/i }).click();
+    await page.getByRole("button", { name: /^Add destination$/i }).click();
 
     await expect(
       page.getByText(/Enter a Slack Incoming Webhook URL/i)
@@ -71,16 +70,16 @@ test.describe("Notification webhooks", () => {
     const configuredWebhookUrl = webhookUrl!;
     test.setTimeout(180_000);
     const clientErrors = trackClientErrors(page);
-    const webhookName = `E2E Webhook ${Date.now()}`;
+    const webhookName = `${webhookType === "discord" ? "Discord" : "Slack"} notifications`;
+    const webhookIdentifier = configuredWebhookUrl
+      .replace(/\/+$/, "")
+      .slice(-4);
     await openIntegrationsTab(page, await getOwnedOrgSlug(page));
 
     try {
       await page.getByTestId("add-webhook-manually").click();
-      if (webhookType === "discord") {
-        await page.getByRole("button", { name: /^discord$/i }).click();
-      }
       const form = page.getByTestId("manual-webhook-form");
-      await form.getByPlaceholder("#eng-alerts").fill(webhookName);
+      await form.getByLabel("Provider").selectOption(webhookType);
       await form
         .getByPlaceholder(
           webhookType === "discord"
@@ -89,42 +88,52 @@ test.describe("Notification webhooks", () => {
         )
         .fill(configuredWebhookUrl);
 
+      await form.getByRole("button", { name: /^Add destination$/i }).click();
       await expect(
-        form.getByRole("checkbox", { name: /Variables/i })
-      ).toBeChecked();
-      await expect(
-        form.getByRole("checkbox", { name: /Requests/i })
-      ).toBeChecked();
-      await expect(
-        form.getByRole("checkbox", { name: /Members/i })
-      ).not.toBeChecked();
-      await expect(
-        form.getByRole("checkbox", { name: /Security/i })
-      ).not.toBeChecked();
-
-      await form.getByRole("button", { name: /^Add Webhook$/i }).click();
-      await expect(page.getByText(/Webhook added.*queued/i)).toBeVisible({
+        page.getByText(/Destination added.*test message/i)
+      ).toBeVisible({
         timeout: 20_000,
       });
 
-      const row = webhookRow(page, webhookName);
+      const row = webhookRow(page, webhookIdentifier);
       await expect(row).toBeVisible({ timeout: 20_000 });
       await expect(row).toContainText("variables, requests");
-      await expect(row).toContainText("last sent", { timeout: 45_000 });
+      await expect(row).toContainText("sent", { timeout: 45_000 });
       expect(
         (await page.content()).includes(configuredWebhookUrl),
         "the webhook capability URL must not be rendered after submission"
       ).toBe(false);
 
-      await row.getByRole("button", { name: /^Events$/i }).click();
+      await row.getByRole("button", { name: /^Manage$/i }).click();
+      await expect(
+        row.getByRole("checkbox", { name: /Variables/i })
+      ).toBeChecked();
+      await expect(
+        row.getByRole("checkbox", { name: /Requests/i })
+      ).toBeChecked();
+      await expect(
+        row.getByRole("checkbox", { name: /Members/i })
+      ).not.toBeChecked();
+      await expect(
+        row.getByRole("checkbox", { name: /Security/i })
+      ).not.toBeChecked();
       await row.getByRole("checkbox", { name: /Members/i }).check();
-      await row.getByRole("button", { name: /^Save$/i }).click();
+      const projectsFieldset = row
+        .locator("fieldset")
+        .filter({ hasText: /^Projects/ });
+      await projectsFieldset.getByRole("combobox").selectOption("selected");
+      const projectCheckbox = projectsFieldset.getByRole("checkbox").first();
+      await expect(projectCheckbox).toBeVisible();
+      const projectName = await projectCheckbox.locator("xpath=..").innerText();
+      await projectCheckbox.check();
+      await row.getByRole("button", { name: /^Save routing$/i }).click();
       await expect(row).toContainText("variables, requests, members");
+      await expect(row).toContainText(projectName.trim());
 
       await row.getByRole("button", { name: /^Pause$/i }).click();
-      await expect(page.getByText(/Webhook paused/i)).toBeVisible();
+      await expect(page.getByText(/Destination paused/i)).toBeVisible();
       await row.getByRole("button", { name: /^Resume$/i }).click();
-      await expect(page.getByText(/Webhook re-enabled/i)).toBeVisible();
+      await expect(page.getByText(/Destination resumed/i)).toBeVisible();
 
       const previousDelivery = await row.getAttribute("data-last-sent-at");
       expect(previousDelivery).toBeTruthy();
@@ -137,11 +146,11 @@ test.describe("Notification webhooks", () => {
         })
         .not.toBe(previousDelivery);
 
-      await row.getByTitle("Remove webhook").click();
+      await row.getByTitle("Disconnect destination").click();
       const dialog = page.getByRole("dialog", {
-        name: `Remove ${webhookName}`,
+        name: `Disconnect ${webhookName}`,
       });
-      await dialog.getByRole("button", { name: /^Remove$/i }).click();
+      await dialog.getByRole("button", { name: /^Disconnect$/i }).click();
       await expect(row).toHaveCount(0, { timeout: 20_000 });
 
       expect(
@@ -149,15 +158,15 @@ test.describe("Notification webhooks", () => {
         `unexpected client-side errors: ${clientErrors.join("\n")}`
       ).toHaveLength(0);
     } finally {
-      const row = webhookRow(page, webhookName);
+      const row = webhookRow(page, webhookIdentifier);
       if ((await row.count()) > 0) {
         await row
-          .getByTitle("Remove webhook")
+          .getByTitle("Disconnect destination")
           .click()
           .catch(() => {});
         await page
-          .getByRole("dialog", { name: `Remove ${webhookName}` })
-          .getByRole("button", { name: /^Remove$/i })
+          .getByRole("dialog", { name: `Disconnect ${webhookName}` })
+          .getByRole("button", { name: /^Disconnect$/i })
           .click()
           .catch(() => {});
       }
