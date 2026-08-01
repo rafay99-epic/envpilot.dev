@@ -1,0 +1,28 @@
+apps/web/tests/e2e/logo.spec.ts
+  s_44f4aab38e60db::t_efb53edbe0d5bc 28,42-65,67-73
+  s_44f4aab38e60db::t_0d6e1d7ad6d258 21,66
+  s_44f4aab38e60db::t_b19a81c9b56bb1 30-36,38
+  s_44f4aab38e60db::t_fa426d1268e8e3 24
+  s_44f4aab38e60db::t_a165732320a2d6 40-41
+  s_44f4aab38e60db::t_0a051933b0bbda 26
+apps/web/src/app/logo/page.tsx
+  s_44f4aab38e60db::t_efb53edbe0d5bc 13,17,19-27,30-49,66,80,123-138,145-203
+  s_44f4aab38e60db::t_fa426d1268e8e3 67-68
+  s_44f4aab38e60db::t_99dddbd23b4bc9 204-206
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "3f5476a35887bf8e137193eff037fad3970f90de",
+  "prompts": {},
+  "sessions": {
+    "s_44f4aab38e60db": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fafb8-3672-7b93-852a-38c08fb69563",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
