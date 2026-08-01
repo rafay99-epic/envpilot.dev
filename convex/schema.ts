@@ -671,6 +671,11 @@ export default defineSchema({
     // Incremented on pause/resume so old scheduled work cannot cross the
     // state transition and post after a quick re-enable.
     queueGeneration: v.optional(v.number()),
+    // Short lease held only while one delivery action is allowed to perform
+    // its outbound HTTP request. This serializes posts per destination even
+    // when previously scheduled actions start late or overlap.
+    deliveryLeaseToken: v.optional(v.string()),
+    deliveryLeaseUntil: v.optional(v.number()),
     createdBy: v.id("users"),
     createdAt: v.number(),
     // Removal is two-phase: hide/disable immediately, then delete the Vault
@@ -691,6 +696,26 @@ export default defineSchema({
     // after a stale worker lease, but webhook activation forever refuses any
     // claimed pointer because a timed-out DELETE may already have committed.
     claimedAt: v.optional(v.number()),
+  }).index("by_created_at", ["createdAt"]),
+
+  // A scheduler rejection must not drop a notification. enqueue writes one
+  // of these rows only when runAfter rejects; the minute recovery job retries
+  // scheduling and removes the row atomically with a successful schedule.
+  webhookDeliveryFallbacks: defineTable({
+    webhookId: v.id("orgWebhooks"),
+    text: v.string(),
+    attempt: v.number(),
+    generation: v.number(),
+    notBefore: v.number(),
+    createdAt: v.number(),
+  }).index("by_not_before", ["notBefore"]),
+
+  // Recovery pointer for the first audit -> fanout scheduling hop. Without
+  // this, a runAfter rejection before notify.prepare would lose the entire
+  // notification even though the audit event committed successfully.
+  webhookNotificationFallbacks: defineTable({
+    auditLogId: v.id("auditLogs"),
+    createdAt: v.number(),
   }).index("by_created_at", ["createdAt"]),
 
   // ==========================================

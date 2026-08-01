@@ -401,12 +401,14 @@ export function IntegrationsSection({
         eventGroups: editGroups,
         projectIds: editAllProjects ? null : selectedProjectIds,
       });
-      setEditingId(null);
+      // A user can open another destination while this mutation is in flight.
+      // Only close the editor that initiated this save.
+      setEditingId((current) => (current === webhookId ? null : current));
       toast.success("Notification routing updated.");
     } catch (error) {
       toast.error(sanitizeConvexError(error));
     } finally {
-      setSavingId(null);
+      setSavingId((current) => (current === webhookId ? null : current));
     }
   };
 
@@ -589,10 +591,14 @@ export function IntegrationsSection({
               </div>
 
               <div className="mt-5">
-                <label className="text-sm font-medium text-zinc-300">
+                <label
+                  htmlFor="manual-project-routing"
+                  className="text-sm font-medium text-zinc-300"
+                >
                   Project routing
                 </label>
                 <TerminalSelect
+                  id="manual-project-routing"
                   value={manualAllProjects ? "all" : "selected"}
                   onChange={(event) => {
                     setManualAllProjects(event.target.value === "all");
@@ -677,6 +683,7 @@ export function IntegrationsSection({
                   key={hook._id}
                   className="py-4"
                   data-testid="webhook-row"
+                  data-webhook-id={hook._id}
                   data-last-sent-at={hook.lastSentAt ?? ""}
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -818,7 +825,14 @@ export function IntegrationsSection({
                           <legend className="text-sm font-medium text-zinc-300">
                             Projects
                           </legend>
+                          <label
+                            htmlFor={`project-routing-${hook._id}`}
+                            className="sr-only"
+                          >
+                            Project routing
+                          </label>
                           <TerminalSelect
+                            id={`project-routing-${hook._id}`}
                             value={editAllProjects ? "all" : "selected"}
                             onChange={(event) =>
                               setEditAllProjects(event.target.value === "all")

@@ -3,11 +3,15 @@ import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { internalMutation } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import { checkBooleanFeature } from "../featureRegistry/gates";
+import {
+  checkBooleanFeature,
+  checkNumericLimit,
+} from "../featureRegistry/gates";
 import { buildNotificationText, matchesProjectScope } from "./messages";
 import { rateLimiter } from "../../lib/rateLimits";
 import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { enqueueWebhookDelivery } from "./queue";
+import { MAX_WEBHOOKS_PER_ORGANIZATION } from "../../lib/integrationLimits";
 
 export const WEBHOOK_EVENT_GROUPS = [
   "variables",
@@ -64,6 +68,10 @@ export async function scheduleWebhookNotification(
     );
   } catch (error) {
     console.error("Webhook notification scheduling failed", error);
+    await ctx.db.insert("webhookNotificationFallbacks", {
+      auditLogId,
+      createdAt: Date.now(),
+    });
   }
 }
 
@@ -78,6 +86,35 @@ function parseDetails(value: string | undefined): Record<string, unknown> {
     return {};
   }
 }
+
+export const recoverPendingNotifications = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const pending = await ctx.db
+      .query("webhookNotificationFallbacks")
+      .withIndex("by_created_at")
+      .take(50);
+    for (const item of pending) {
+      const audit = await ctx.db.get(item.auditLogId);
+      if (!audit || !isNotifiableAction(audit.action)) {
+        await ctx.db.delete(item._id);
+        continue;
+      }
+      try {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.features.integrations.notify.prepare,
+          { auditLogId: item.auditLogId }
+        );
+        await ctx.db.delete(item._id);
+      } catch (error) {
+        console.error("Webhook notification recovery scheduling failed", error);
+      }
+    }
+    return null;
+  },
+});
 
 export const prepare = internalMutation({
   args: { auditLogId: v.id("auditLogs") },
@@ -94,14 +131,28 @@ export const prepare = internalMutation({
     );
     if (!gate.allowed) return null;
 
-    // The tier limit is 10. The bounded read also protects deployments with
-    // stale or manually inserted rows without making fanout unbounded.
+    const plan = await checkNumericLimit(
+      ctx.db,
+      audit.organizationId,
+      "team_notifications_limit",
+      0
+    );
+    const fanoutLimit = Math.min(
+      MAX_WEBHOOKS_PER_ORGANIZATION,
+      plan.limit === null
+        ? MAX_WEBHOOKS_PER_ORGANIZATION
+        : Math.max(0, Math.floor(plan.limit))
+    );
+    if (fanoutLimit === 0) return null;
+
+    // Read at most the resolved plan allowance. Legacy over-cap data therefore
+    // cannot produce an extra (11th on the Pro plan) outbound delivery.
     const hooks = await ctx.db
       .query("orgWebhooks")
       .withIndex("by_organization_and_deleted_at", (q) =>
         q.eq("organizationId", audit.organizationId).eq("deletedAt", undefined)
       )
-      .take(11);
+      .take(fanoutLimit);
     const targets = hooks.filter(
       (hook) =>
         hook.enabled &&

@@ -110,6 +110,21 @@ crons.interval(
   {}
 );
 
+// Retry notification deliveries retained after a transient scheduler failure.
+crons.interval(
+  "recover pending notification deliveries",
+  { minutes: 1 },
+  internal.features.integrations.queue.recoverPendingDeliveries,
+  {}
+);
+
+crons.interval(
+  "recover pending audit notifications",
+  { minutes: 1 },
+  internal.features.integrations.notify.recoverPendingNotifications,
+  {}
+);
+
 // Auto-cancel machine-originated variable requests pending > 30 days —
 // abandoned agent runs are routine and must not rot the reviewer feed.
 crons.daily(

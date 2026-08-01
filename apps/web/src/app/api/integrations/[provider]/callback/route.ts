@@ -7,18 +7,20 @@ import type { Id } from "@convex/_generated/dataModel";
 import { sanitizeConvexError } from "@/lib/error-messages";
 import {
   decodeOAuthState,
+  integrationAppUrlSupportsProvider,
   integrationProviderSchema,
   oauthStateCookie,
+  parseIntegrationAppUrl,
   type IntegrationProvider,
 } from "@/lib/integration-oauth";
+import {
+  isDefinitiveConvexFailure,
+  rollbackProvisionedWebhook,
+  type ProvisionedWebhook,
+} from "@/lib/integration-provider-cleanup";
 
 const DEFAULT_EVENT_GROUPS = ["variables", "requests"] as const;
 const OAUTH_TIMEOUT_MS = 10_000;
-
-type ProvisionedWebhook = {
-  url: string;
-  channel?: string;
-};
 
 function settingsRedirect(
   appUrl: URL,
@@ -128,20 +130,33 @@ export async function GET(
       { status: 500 }
     );
   }
-  let appUrl: URL;
-  try {
-    appUrl = new URL(configuredAppUrl);
-  } catch {
+  const appUrl = parseIntegrationAppUrl(configuredAppUrl);
+  if (!appUrl) {
     return NextResponse.json(
       { error: "NEXT_PUBLIC_APP_URL is invalid" },
       { status: 500 }
     );
   }
+  if (!integrationAppUrlSupportsProvider(appUrl, provider)) {
+    return NextResponse.json(
+      {
+        error:
+          provider === "slack"
+            ? "Slack OAuth requires an HTTPS NEXT_PUBLIC_APP_URL"
+            : "Discord OAuth requires HTTPS except on localhost",
+      },
+      { status: 400 }
+    );
+  }
 
   const url = new URL(request.url);
   const rawState = url.searchParams.get("state") ?? "";
+  const state = decodeOAuthState(rawState);
+  if (!state || state.provider !== provider) {
+    return NextResponse.json({ error: "Invalid OAuth state" }, { status: 400 });
+  }
   const cookieStore = await cookies();
-  const cookieName = oauthStateCookie(provider);
+  const cookieName = oauthStateCookie(provider, state.nonce);
   const storedState = cookieStore.get(cookieName)?.value;
   const clearState = (response: NextResponse) => {
     response.cookies.set(cookieName, "", {
@@ -151,19 +166,14 @@ export async function GET(
     return response;
   };
 
-  // Match the exact opaque value before parsing any redirect metadata.
+  // The state is parsed only to select its nonce-scoped cookie. Matching the
+  // exact opaque value still protects every redirect field from tampering and
+  // lets concurrent connections to the same provider complete independently.
   if (!storedState || rawState !== storedState) {
     return clearState(
       NextResponse.json({ error: "Invalid OAuth state" }, { status: 400 })
     );
   }
-  const state = decodeOAuthState(rawState);
-  if (!state || state.provider !== provider) {
-    return clearState(
-      NextResponse.json({ error: "Invalid OAuth state" }, { status: 400 })
-    );
-  }
-
   const code = url.searchParams.get("code");
   if (url.searchParams.get("error") || !code || code.length > 4_096) {
     return clearState(
@@ -173,6 +183,7 @@ export async function GET(
     );
   }
 
+  let provisionedWebhook: ProvisionedWebhook | null = null;
   try {
     const convex = createAuthedConvexClient(accessToken);
     // Consent may have taken minutes. Revalidate role, tier, and remaining
@@ -186,18 +197,20 @@ export async function GET(
       `/api/integrations/${provider}/callback`,
       appUrl
     ).toString();
-    const webhook: ProvisionedWebhook =
+    provisionedWebhook =
       provider === "slack"
         ? await exchangeSlack(code, redirectUri)
         : await exchangeDiscord(code, redirectUri);
 
     await convex.action(api.features.integrations.webhooks.create, {
       organizationId: state.organizationId as Id<"organizations">,
-      name: webhook.channel ?? (provider === "slack" ? "Slack" : "Discord"),
+      name:
+        provisionedWebhook.channel ??
+        (provider === "slack" ? "Slack" : "Discord"),
       type: provider,
       source: "oauth",
-      url: webhook.url,
-      channel: webhook.channel,
+      url: provisionedWebhook.url,
+      channel: provisionedWebhook.channel,
       eventGroups: [...DEFAULT_EVENT_GROUPS],
     });
 
@@ -205,9 +218,22 @@ export async function GET(
       settingsRedirect(appUrl, state.slug, { connected: provider })
     );
   } catch (error) {
-    // Do not delete a provider webhook here. A lost response after a committed
-    // Convex action is indistinguishable from a failed write; deleting on an
-    // ambiguous error could leave a live row pointing at dead credentials.
+    // Explicit ConvexError data proves the action completed with a rejected
+    // write, so compensate provider provisioning. A generic/transport error
+    // remains ambiguous and must not delete a possibly committed destination.
+    if (
+      provider === "discord" &&
+      provisionedWebhook &&
+      isDefinitiveConvexFailure(error)
+    ) {
+      const rolledBack = await rollbackProvisionedWebhook(
+        provider,
+        provisionedWebhook
+      );
+      if (!rolledBack) {
+        console.error(`${provider} OAuth provider cleanup failed`);
+      }
+    }
     console.error(`${provider} OAuth callback failed`, error);
     return clearState(
       settingsRedirect(appUrl, state.slug, {

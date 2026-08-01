@@ -64,6 +64,35 @@ function escapeDiscord(value: string): string {
   return value.replace(/([\\`*_{}[\]()#+\-.!|>~])/g, "\\$1");
 }
 
+const LINK_TARGET_ESCAPES: Record<string, string> = {
+  "\\": "%5C",
+  "[": "%5B",
+  "]": "%5D",
+  "(": "%28",
+  ")": "%29",
+  "<": "%3C",
+  ">": "%3E",
+  "|": "%7C",
+};
+
+/** Keep link targets inside Slack/Discord's link delimiters. Only absolute
+ * HTTP(S) application links are rendered; malformed or active-content URLs
+ * are omitted instead of being emitted as clickable Markdown. */
+function safeLinkTarget(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return undefined;
+    }
+    return url.href.replace(
+      /[\\[\]()<>|]/g,
+      (character) => LINK_TARGET_ESCAPES[character] ?? character
+    );
+  } catch {
+    return undefined;
+  }
+}
+
 function firstString(
   details: Record<string, unknown> | undefined,
   keys: string[]
@@ -172,10 +201,12 @@ export function buildNotificationText(input: {
   if (subjectText) headline += `: ${bold(escape(subjectText))}`;
   if (envs.length > 0) headline += ` (${escape(envs.join(", "))})`;
 
-  const link =
-    input.provider === "slack"
-      ? `<${input.link}|View in EnvPilot>`
-      : `[View in EnvPilot](${input.link})`;
+  const linkTarget = safeLinkTarget(input.link);
+  const link = linkTarget
+    ? input.provider === "slack"
+      ? `<${linkTarget}|View in EnvPilot>`
+      : `[View in EnvPilot](${linkTarget})`
+    : undefined;
   const context = [
     input.projectName ? escape(input.projectName) : undefined,
     input.action === "api.request_denied"

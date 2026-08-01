@@ -1710,15 +1710,12 @@ function BillingSettings({
   const sub = subscription?.subscription;
   const hasBillingCustomer = subscription?.hasBillingCustomer ?? false;
   const isActive = sub?.status === "active";
-  const isLivePro =
-    subscription?.tier === "pro" &&
-    (sub?.status === "active" || sub?.status === "trialing");
   const isRevoked = sub?.status === "revoked" || sub?.status === "canceled";
   const isCancelingAtEnd = sub?.cancelAtPeriodEnd ?? false;
 
   return (
     <div className="space-y-6">
-      {alreadyProNotice && isLivePro && (
+      {alreadyProNotice && (
         <div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3 text-sm text-green-300">
           <Check className="h-4 w-4 shrink-0" />
           You&apos;re already on the Pro plan. Your subscription is active.

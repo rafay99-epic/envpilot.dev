@@ -8,7 +8,7 @@ import { internal } from "../../_generated/api";
 import { rateLimiter } from "../../lib/rateLimits";
 import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { checkBooleanFeature } from "../featureRegistry/gates";
-import { createAuditLog } from "../../lib/audit";
+import { createAuditLog, resolveAuditProjectId } from "../../lib/audit";
 
 /**
  * CI/CD secret pull — the GitHub Action's read path.
@@ -94,14 +94,11 @@ export const _authorizePull = internalMutation({
           apiKey.scopeProjects !== "all" && apiKey.scopeProjects.length === 1
             ? apiKey.scopeProjects[0]
             : undefined;
-        const scopedProject = scopedProjectId
-          ? await ctx.db.get(scopedProjectId)
-          : null;
-        const projectId =
-          scopedProject?.organizationId === apiKey.organizationId &&
-          scopedProject.deletedAt === undefined
-            ? scopedProject._id
-            : undefined;
+        const projectId = await resolveAuditProjectId(
+          ctx.db,
+          apiKey.organizationId,
+          scopedProjectId
+        );
         await createAuditLog(ctx, {
           organizationId: apiKey.organizationId,
           projectId,

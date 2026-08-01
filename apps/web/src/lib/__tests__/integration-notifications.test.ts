@@ -130,6 +130,36 @@ describe("integration notification payloads", () => {
     expect(text).toContain("key owner Key Creator");
     expect(text).not.toContain("by Key Creator");
   });
+
+  it.each(["slack", "discord"] as const)(
+    "keeps hostile delimiters inside the %s link target",
+    (provider) => {
+      const text = buildNotificationText({
+        provider,
+        ...baseMessage,
+        link: "https://envpilot.dev/organizations/acme)|<https://evil.test/[x]",
+      });
+
+      expect(text).toContain(
+        "https://envpilot.dev/organizations/acme%29%7C%3Chttps://evil.test/%5Bx%5D"
+      );
+      expect(text).not.toContain(")|<https://evil.test");
+    }
+  );
+
+  it.each(["slack", "discord"] as const)(
+    "omits non-HTTP %s link targets",
+    (provider) => {
+      const text = buildNotificationText({
+        provider,
+        ...baseMessage,
+        link: "javascript:alert(1)",
+      });
+
+      expect(text).not.toContain("javascript:");
+      expect(text).not.toContain("View in EnvPilot");
+    }
+  );
 });
 
 describe("webhook delivery retry policy", () => {

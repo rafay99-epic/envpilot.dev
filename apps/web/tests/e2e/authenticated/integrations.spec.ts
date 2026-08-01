@@ -39,8 +39,19 @@ async function openIntegrationsTab(page: Page, orgSlug: string) {
   test.skip(!gateOpen, "team_notifications is gated off for this org/tier");
 }
 
-function webhookRow(page: Page, identifier: string) {
-  return page.getByTestId("webhook-row").filter({ hasText: identifier });
+async function webhookIds(page: Page): Promise<string[]> {
+  return await page.getByTestId("webhook-row").evaluateAll((rows) =>
+    rows.flatMap((row) => {
+      const id = (row as HTMLElement).dataset.webhookId;
+      return id ? [id] : [];
+    })
+  );
+}
+
+function webhookRow(page: Page, webhookId: string) {
+  return page.locator(
+    `[data-testid="webhook-row"][data-webhook-id="${webhookId}"]`
+  );
 }
 
 // DOM traces can snapshot a capability URL while the manual form is filled.
@@ -71,10 +82,9 @@ test.describe("Notification webhooks", () => {
     test.setTimeout(180_000);
     const clientErrors = trackClientErrors(page);
     const webhookName = `${webhookType === "discord" ? "Discord" : "Slack"} notifications`;
-    const webhookIdentifier = configuredWebhookUrl
-      .replace(/\/+$/, "")
-      .slice(-4);
     await openIntegrationsTab(page, await getOwnedOrgSlug(page));
+    const existingWebhookIds = new Set(await webhookIds(page));
+    let createdWebhookId: string | null = null;
 
     try {
       await page.getByTestId("add-webhook-manually").click();
@@ -95,7 +105,22 @@ test.describe("Notification webhooks", () => {
         timeout: 20_000,
       });
 
-      const row = webhookRow(page, webhookIdentifier);
+      await expect
+        .poll(
+          async () =>
+            (await webhookIds(page)).filter(
+              (webhookId) => !existingWebhookIds.has(webhookId)
+            ),
+          {
+            timeout: 20_000,
+            message: "exactly one new webhook should be created",
+          }
+        )
+        .toHaveLength(1);
+      [createdWebhookId] = (await webhookIds(page)).filter(
+        (webhookId) => !existingWebhookIds.has(webhookId)
+      );
+      const row = webhookRow(page, createdWebhookId!);
       await expect(row).toBeVisible({ timeout: 20_000 });
       await expect(row).toContainText("variables, requests");
       await expect(row).toContainText("sent", { timeout: 45_000 });
@@ -147,7 +172,7 @@ test.describe("Notification webhooks", () => {
         .not.toBe(previousDelivery);
 
       await row.getByTitle("Disconnect destination").click();
-      const dialog = page.getByRole("dialog", {
+      const dialog = row.getByRole("dialog", {
         name: `Disconnect ${webhookName}`,
       });
       await dialog.getByRole("button", { name: /^Disconnect$/i }).click();
@@ -158,17 +183,20 @@ test.describe("Notification webhooks", () => {
         `unexpected client-side errors: ${clientErrors.join("\n")}`
       ).toHaveLength(0);
     } finally {
-      const row = webhookRow(page, webhookIdentifier);
-      if ((await row.count()) > 0) {
+      const cleanupIds = createdWebhookId
+        ? [createdWebhookId]
+        : (await webhookIds(page)).filter(
+            (webhookId) => !existingWebhookIds.has(webhookId)
+          );
+      for (const webhookId of cleanupIds) {
+        const row = webhookRow(page, webhookId);
+        if ((await row.count()) === 0) continue;
+        await row.getByTitle("Disconnect destination").click();
         await row
-          .getByTitle("Disconnect destination")
-          .click()
-          .catch(() => {});
-        await page
           .getByRole("dialog", { name: `Disconnect ${webhookName}` })
           .getByRole("button", { name: /^Disconnect$/i })
-          .click()
-          .catch(() => {});
+          .click();
+        await expect(row).toHaveCount(0, { timeout: 20_000 });
       }
     }
   });

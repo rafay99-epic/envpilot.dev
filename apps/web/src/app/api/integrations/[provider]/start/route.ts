@@ -6,8 +6,11 @@ import { createAuthedConvexClient } from "@/lib/convex-client";
 import { sanitizeConvexError } from "@/lib/error-messages";
 import {
   encodeOAuthState,
+  integrationAppUrlSupportsProvider,
+  integrationEligibilityErrorStatus,
   integrationProviderSchema,
   oauthStateCookie,
+  parseIntegrationAppUrl,
 } from "@/lib/integration-oauth";
 
 export async function GET(
@@ -43,6 +46,20 @@ export async function GET(
       { organizationId: organizationId as Id<"organizations"> }
     );
   } catch (error) {
+    const status = integrationEligibilityErrorStatus(error);
+    if (status === 400) {
+      return NextResponse.json(
+        { error: "A valid organizationId is required" },
+        { status: 400 }
+      );
+    }
+    if (status === 502) {
+      console.error("Integration eligibility lookup failed", error);
+      return NextResponse.json(
+        { error: "Could not verify integration access. Try again." },
+        { status: 502 }
+      );
+    }
     return NextResponse.json(
       { error: sanitizeConvexError(error) },
       { status: 403 }
@@ -56,23 +73,20 @@ export async function GET(
       { status: 500 }
     );
   }
-  let appUrl: URL;
-  try {
-    appUrl = new URL(configuredAppUrl);
-    if (appUrl.protocol !== "http:" && appUrl.protocol !== "https:") {
-      throw new Error("unsupported protocol");
-    }
-  } catch {
+  const appUrl = parseIntegrationAppUrl(configuredAppUrl);
+  if (!appUrl) {
     return NextResponse.json(
       { error: "NEXT_PUBLIC_APP_URL is invalid" },
       { status: 500 }
     );
   }
-  if (provider === "slack" && appUrl.protocol !== "https:") {
+  if (!integrationAppUrlSupportsProvider(appUrl, provider)) {
     return NextResponse.json(
       {
         error:
-          "Slack OAuth requires an HTTPS NEXT_PUBLIC_APP_URL. Use trusted local HTTPS, a temporary HTTPS tunnel, or add a Slack webhook manually.",
+          provider === "slack"
+            ? "Slack OAuth requires an HTTPS NEXT_PUBLIC_APP_URL. Use trusted local HTTPS, a temporary HTTPS tunnel, or add a Slack webhook manually."
+            : "Discord OAuth requires HTTPS except on localhost.",
       },
       { status: 400 }
     );
@@ -82,12 +96,13 @@ export async function GET(
     `/api/integrations/${provider}/callback`,
     appUrl
   ).toString();
-  const state = encodeOAuthState({
+  const oauthState = {
     provider,
     organizationId,
     slug: eligibility.slug,
     nonce: crypto.randomUUID(),
-  });
+  };
+  const state = encodeOAuthState(oauthState);
 
   let authorizeUrl: URL;
   if (provider === "slack") {
@@ -122,7 +137,7 @@ export async function GET(
     : NextResponse.redirect(authorizeUrl);
   // Store the exact state in an httpOnly cookie. Matching the whole value,
   // rather than only its nonce, prevents organization/slug tampering.
-  response.cookies.set(oauthStateCookie(provider), state, {
+  response.cookies.set(oauthStateCookie(provider, oauthState.nonce), state, {
     httpOnly: true,
     secure: appUrl.protocol === "https:",
     sameSite: "lax",

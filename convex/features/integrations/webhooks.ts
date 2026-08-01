@@ -6,20 +6,22 @@ import {
   query,
 } from "../../_generated/server";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
-import { api, internal } from "../../_generated/api";
+import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import { assertOrgMembership, hasCapability } from "../../lib/authz";
 import {
   checkBooleanFeature,
-  checkNumericLimit,
+  checkCountedLimit,
   countConfiguredWebhooks,
 } from "../featureRegistry/gates";
+import { resolveOrgGateContext } from "../featureRegistry/resolver";
 import { createAuditLog } from "../../lib/audit";
 import { rateLimiter } from "../../lib/rateLimits";
 import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { WEBHOOK_EVENT_GROUPS } from "./notify";
 import { enqueueWebhookDelivery } from "./queue";
+import { MAX_WEBHOOKS_PER_ORGANIZATION } from "../../lib/integrationLimits";
 
 const eventGroupValidator = v.union(
   v.literal("variables"),
@@ -97,8 +99,13 @@ function validateUrl(type: WebhookType, rawUrl: string): URL {
 }
 
 function maskUrl(url: URL): string {
-  const raw = url.toString().replace(/\/+$/, "");
-  return `${url.host}/••••${raw.slice(-4)}`;
+  return `${url.host}/••••`;
+}
+
+function safeStoredPreview(type: WebhookType): string {
+  // Legacy rows included the capability URL's last four characters. Never
+  // return that stored suffix, even before those rows are rewritten.
+  return type === "slack" ? "hooks.slack.com/••••" : "discord.com/••••";
 }
 
 async function requireWebhookManager(
@@ -161,22 +168,36 @@ async function requireFeatureCapacity(
   ctx: MutationCtx | QueryCtx,
   organizationId: Id<"organizations">
 ): Promise<void> {
+  const gateContext = await resolveOrgGateContext(ctx.db, organizationId);
   const gate = await checkBooleanFeature(
     ctx.db,
     organizationId,
-    "team_notifications"
+    "team_notifications",
+    gateContext
   );
   if (!gate.allowed) {
     throw new ConvexError(
       "Slack & Discord notifications are available on the Pro plan."
     );
   }
-  const count = await countConfiguredWebhooks(ctx.db, organizationId);
-  const limit = await checkNumericLimit(
+  const globalCount = await ctx.db
+    .query("orgWebhooks")
+    .withIndex("by_organization_and_deleted_at", (q) =>
+      q.eq("organizationId", organizationId).eq("deletedAt", undefined)
+    )
+    .take(MAX_WEBHOOKS_PER_ORGANIZATION);
+  if (globalCount.length >= MAX_WEBHOOKS_PER_ORGANIZATION) {
+    throw new ConvexError(
+      `This organization has reached the maximum of ${MAX_WEBHOOKS_PER_ORGANIZATION} notification destinations.`
+    );
+  }
+  const limit = await checkCountedLimit(
     ctx.db,
     organizationId,
     "team_notifications_limit",
-    count
+    (resolvedLimit) =>
+      countConfiguredWebhooks(ctx.db, organizationId, resolvedLimit),
+    gateContext
   );
   if (!limit.allowed) {
     throw new ConvexError(
@@ -225,6 +246,22 @@ export const getConnectEligibility = query({
   },
 });
 
+/** Consume test-message quota before the external Vault write begins. */
+export const _reserveCreate = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    projectIds: v.optional(v.array(v.id("projects"))),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await requireWebhookManager(ctx, args.organizationId);
+    await requireFeatureCapacity(ctx, args.organizationId);
+    await validateProjectScope(ctx, args.organizationId, args.projectIds);
+    await enforceWebhookTestRateLimit(ctx, args.organizationId);
+    return null;
+  },
+});
+
 /**
  * Encrypt the webhook capability URL in WorkOS Vault before storing metadata.
  * The database and every client query only ever see an opaque Vault reference.
@@ -246,8 +283,8 @@ export const create = action({
     validateEventGroups(args.eventGroups);
     const url = validateUrl(args.type, args.url);
 
-    await ctx.runQuery(
-      api.features.integrations.webhooks.getConnectEligibility,
+    await ctx.runMutation(
+      internal.features.integrations.webhooks._reserveCreate,
       { organizationId: args.organizationId, projectIds: args.projectIds }
     );
 
@@ -259,6 +296,7 @@ export const create = action({
         organizationId: args.organizationId,
         projectId: args.organizationId,
         environment: "integrations",
+        idempotencyKey: crypto.randomUUID(),
       });
     } catch (error) {
       console.error("Webhook Vault create failed", error);
@@ -353,7 +391,6 @@ export const _store = internalMutation({
     const actor = await requireWebhookManager(ctx, args.organizationId);
     await requireFeatureCapacity(ctx, args.organizationId);
     await validateProjectScope(ctx, args.organizationId, args.projectIds);
-    await enforceWebhookTestRateLimit(ctx, args.organizationId);
 
     const webhookId = await ctx.db.insert("orgWebhooks", {
       organizationId: args.organizationId,
@@ -442,6 +479,8 @@ export const update = mutation({
       patch.queueGeneration = (hook.queueGeneration ?? 0) + 1;
       patch.nextDeliveryAt = undefined;
       patch.deliveryEmbargoUntil = undefined;
+      patch.deliveryLeaseToken = undefined;
+      patch.deliveryLeaseUntil = undefined;
     }
     if (Object.keys(patch).length === 0) return null;
 
@@ -472,6 +511,8 @@ export const remove = mutation({
       queueGeneration: (hook.queueGeneration ?? 0) + 1,
       nextDeliveryAt: undefined,
       deliveryEmbargoUntil: undefined,
+      deliveryLeaseToken: undefined,
+      deliveryLeaseUntil: undefined,
     });
     await createAuditLog(ctx, {
       organizationId: hook.organizationId,
@@ -552,7 +593,7 @@ export const listForOrganization = query({
       .withIndex("by_organization_and_deleted_at", (q) =>
         q.eq("organizationId", args.organizationId).eq("deletedAt", undefined)
       )
-      .take(11);
+      .take(MAX_WEBHOOKS_PER_ORGANIZATION);
 
     return hooks.map((hook) => ({
       _id: hook._id,
@@ -561,7 +602,7 @@ export const listForOrganization = query({
       source: hook.source,
       channel: hook.channel ?? null,
       projectIds: hook.projectIds ?? null,
-      urlPreview: hook.urlPreview,
+      urlPreview: safeStoredPreview(hook.type),
       eventGroups: hook.eventGroups,
       enabled: hook.enabled,
       failCount: hook.failCount,

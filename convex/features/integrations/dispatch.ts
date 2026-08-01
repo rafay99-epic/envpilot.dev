@@ -23,6 +23,7 @@ import { enqueueWebhookDelivery } from "./queue";
 
 export const MAX_CONSECUTIVE_FAILURES = 20;
 export const WEBHOOK_TIMEOUT_MS = 10_000;
+const DELIVERY_LEASE_MS = WEBHOOK_TIMEOUT_MS + 5_000;
 const CLEANUP_BATCH_SIZE = 25;
 const MAX_CLEANUP_DRAIN_DEPTH = 20;
 const ORPHAN_GRACE_MS = 10 * 60 * 1_000;
@@ -68,18 +69,20 @@ export const deliver = internalAction({
     } catch {
       url = "";
     }
-    // Vault reads are external and can take seconds. Revalidate the queue
-    // generation, pause/delete state, feature gate, and any newly-set embargo
-    // after decryption and immediately before the outbound POST.
-    const currentTarget = await ctx.runQuery(
-      internal.features.integrations.dispatch._getDeliveryTarget,
-      { webhookId: args.webhookId, generation: args.generation }
+    // Claim the endpoint only after the potentially slow Vault read. This
+    // mutation revalidates all state and permits exactly one action at a time
+    // to enter the outbound HTTP section for this destination.
+    const leaseToken = crypto.randomUUID();
+    const claim = await ctx.runMutation(
+      internal.features.integrations.dispatch._claimDelivery,
+      {
+        webhookId: args.webhookId,
+        generation: args.generation,
+        leaseToken,
+      }
     );
-    if (!currentTarget) return null;
-    if (
-      currentTarget.deliveryEmbargoUntil !== undefined &&
-      currentTarget.deliveryEmbargoUntil > Date.now()
-    ) {
+    if (!claim) return null;
+    if (claim.state === "defer") {
       await ctx.runMutation(
         internal.features.integrations.dispatch._scheduleRetry,
         {
@@ -87,13 +90,13 @@ export const deliver = internalAction({
           text: args.text,
           attempt,
           generation: args.generation,
-          notBefore: currentTarget.deliveryEmbargoUntil,
+          notBefore: claim.notBefore,
         }
       );
       return null;
     }
     const request = buildWebhookRequest({
-      provider: currentTarget.type,
+      provider: claim.type,
       url,
       text: args.text,
     });
@@ -112,7 +115,7 @@ export const deliver = internalAction({
       });
       status = res.status;
       retryAfter = res.headers.get("Retry-After");
-      if (status === 429 && currentTarget.type === "discord") {
+      if (status === 429 && claim.type === "discord") {
         const data = (await res.json().catch(() => null)) as {
           retry_after?: unknown;
         } | null;
@@ -154,6 +157,7 @@ export const deliver = internalAction({
           generation: args.generation,
           notBefore,
           setEmbargo: status === 429,
+          releaseLeaseToken: leaseToken,
         }
       );
       return null;
@@ -175,9 +179,55 @@ export const deliver = internalAction({
         webhookId: args.webhookId,
         status,
         generation: args.generation,
+        leaseToken,
       }
     );
     return null;
+  },
+});
+
+export const _claimDelivery = internalMutation({
+  args: {
+    webhookId: v.id("orgWebhooks"),
+    generation: v.optional(v.number()),
+    leaseToken: v.string(),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({ state: v.literal("defer"), notBefore: v.number() }),
+    v.object({
+      state: v.literal("ready"),
+      vaultRef: v.string(),
+      type: v.union(v.literal("slack"), v.literal("discord")),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const hook = await ctx.db.get(args.webhookId);
+    if (!hook || hook.deletedAt !== undefined || !hook.enabled) return null;
+    if ((args.generation ?? 0) !== (hook.queueGeneration ?? 0)) return null;
+    const gate = await checkBooleanFeature(
+      ctx.db,
+      hook.organizationId,
+      "team_notifications"
+    );
+    if (!gate.allowed) return null;
+
+    const now = Date.now();
+    const notBefore = Math.max(
+      hook.deliveryEmbargoUntil ?? 0,
+      hook.deliveryLeaseUntil ?? 0
+    );
+    if (notBefore > now) return { state: "defer" as const, notBefore };
+
+    await ctx.db.patch(args.webhookId, {
+      deliveryLeaseToken: args.leaseToken,
+      deliveryLeaseUntil: now + DELIVERY_LEASE_MS,
+    });
+    return {
+      state: "ready" as const,
+      vaultRef: hook.vaultRef,
+      type: hook.type,
+    };
   },
 });
 
@@ -220,6 +270,7 @@ export const _scheduleRetry = internalMutation({
     generation: v.optional(v.number()),
     notBefore: v.number(),
     setEmbargo: v.optional(v.boolean()),
+    releaseLeaseToken: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -232,10 +283,22 @@ export const _scheduleRetry = internalMutation({
     ) {
       return null;
     }
+    if (
+      args.releaseLeaseToken !== undefined &&
+      hook.deliveryLeaseToken !== args.releaseLeaseToken
+    ) {
+      return null;
+    }
+    const patch: Record<string, number | undefined> = {};
     if (args.setEmbargo && args.notBefore > (hook.deliveryEmbargoUntil ?? 0)) {
-      await ctx.db.patch(args.webhookId, {
-        deliveryEmbargoUntil: args.notBefore,
-      });
+      patch.deliveryEmbargoUntil = args.notBefore;
+    }
+    if (args.releaseLeaseToken !== undefined) {
+      patch.deliveryLeaseToken = undefined;
+      patch.deliveryLeaseUntil = undefined;
+    }
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(args.webhookId, patch);
     }
     await enqueueWebhookDelivery(ctx, {
       webhookId: args.webhookId,
@@ -280,17 +343,23 @@ export const _recordDelivery = internalMutation({
     webhookId: v.id("orgWebhooks"),
     status: v.number(),
     generation: v.optional(v.number()),
+    leaseToken: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const hook = await ctx.db.get(args.webhookId);
     if (!hook || hook.deletedAt !== undefined) return null;
     if ((args.generation ?? 0) !== (hook.queueGeneration ?? 0)) return null;
+    if (hook.deliveryLeaseToken !== args.leaseToken) return null;
 
     // Provider throttling proves the endpoint still exists. Record it for the
     // UI, but never count it toward dead-endpoint auto-disable.
     if (args.status === 429) {
-      await ctx.db.patch(args.webhookId, { lastStatus: args.status });
+      await ctx.db.patch(args.webhookId, {
+        lastStatus: args.status,
+        deliveryLeaseToken: undefined,
+        deliveryLeaseUntil: undefined,
+      });
       return null;
     }
 
@@ -300,6 +369,8 @@ export const _recordDelivery = internalMutation({
       failCount,
       lastStatus: args.status,
       ...(ok ? { lastSentAt: Date.now() } : {}),
+      deliveryLeaseToken: undefined,
+      deliveryLeaseUntil: undefined,
       // A dead endpoint auto-disables instead of being hammered forever;
       // re-enabling from the UI resets the counter.
       ...(failCount >= MAX_CONSECUTIVE_FAILURES ? { enabled: false } : {}),
