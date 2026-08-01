@@ -1,0 +1,68 @@
+convex/features/integrations/webhooks.ts
+  s_44f4aab38e60db::t_cf03afe0aa3adb 140-142
+  s_44f4aab38e60db::t_8bd8f28f0e9d53 129-131,133,157-159,213-214,216,437-438,440-444
+  s_44f4aab38e60db::t_6528bcfff816c9 132,134-135,139,143-156,215,221,240,251,304,340,355,366,387,401,418-421,439,485,537,563
+  s_44f4aab38e60db::t_f334196c0bcb00 20,188-206,356,422,445,519
+  s_44f4aab38e60db::t_715231a8c48e46 136-138
+apps/web/src/lib/__tests__/integration-notifications.test.ts
+  s_44f4aab38e60db::t_6528bcfff816c9 29-34
+  s_44f4aab38e60db::t_8bd8f28f0e9d53 9,26-28,35-36
+apps/web/src/components/integrations/IntegrationsSection.tsx
+  s_44f4aab38e60db::t_bbf872ffd1b05f 563,566-568
+  s_44f4aab38e60db::t_aac21bba7aa8d6 668
+  s_44f4aab38e60db::t_bd25718d76d49f 340
+  s_44f4aab38e60db::t_86a16cf7f3518d 3,5-15,20-22,26,29,33-36,43,46,56-74,79-138,148-150,158-160,164-184,187-190,198-199,202,213,215-216,218-222,225,227-233,240-246,249,274-275,277-281,283,287,291-292,294,296-300,306-310,325-327,331-334,345,347-350,352-354,356-362,367,373-376,381,385-389,397-399,406-411,413-418,427-435,437-463,467-485,487,489-495,498-505,507-516,518-535,540-562,564-565,569-592,595-611,613-619,621-628,631,635-636,638-641,645,647-665,667,669,672,675-682,684,686-688,690-691,694,697-698,700,702-706,709,714,716,719-723,726,728-729,736-779,781-790,794-795,797,800,805-806,808-811,817,820-821,823-825,827,837,839-844,850-894,896-897
+  s_44f4aab38e60db::t_715231a8c48e46 161-163,236-238,370-372,464-466
+  s_44f4aab38e60db::t_f334196c0bcb00 248,250-270,311-324,328,335-339,341-344,346,355
+  s_44f4aab38e60db::t_b2413a9ebde2a7 536-539
+  s_44f4aab38e60db::t_734744180501b7 247
+  s_44f4aab38e60db::t_80462fbb496b60 329-330
+convex/schema.ts
+  s_44f4aab38e60db::t_6528bcfff816c9 638-639
+  s_44f4aab38e60db::t_8bd8f28f0e9d53 637
+apps/web/src/app/(dashboard)/organizations/[slug]/settings/page.tsx
+  s_44f4aab38e60db::t_5785d3937f73f1 106-110,126,338-345
+apps/web/src/app/api/integrations/[provider]/start/route.ts
+  s_44f4aab38e60db::t_f334196c0bcb00 29-31,120-122
+convex/features/api/authorize.ts
+  s_44f4aab38e60db::t_f334196c0bcb00 88-95,98
+apps/web/src/app/(dashboard)/dashboard/settings/page.tsx
+  s_44f4aab38e60db::t_f334196c0bcb00 1713-1715,1721
+  s_44f4aab38e60db::t_88f3b533db7b1f 137,1571,1575,1722-1727
+convex/features/integrations/notify.ts
+  s_44f4aab38e60db::t_8bd8f28f0e9d53 7,106-108
+  s_44f4aab38e60db::t_6528bcfff816c9 109
+apps/web/tests/e2e/authenticated/integrations.spec.ts
+  s_44f4aab38e60db::t_516f73f45fffb5 58,73,82,91,101,107-119,129,134,136,149,151,153,164,168-169
+  s_44f4aab38e60db::t_367a1ab31c1dfa 121-124,126-128,131
+  s_44f4aab38e60db::t_aac21bba7aa8d6 42-43,98,161
+  s_44f4aab38e60db::t_715231a8c48e46 74-76,93-94,125
+convex/features/billing/checkout.ts
+  s_44f4aab38e60db::t_88f3b533db7b1f 1,23-30,43,53,56-57,73,84,103
+convex/features/cicd/pull.ts
+  s_44f4aab38e60db::t_f334196c0bcb00 93-104,107
+convex/features/integrations/messages.ts
+  s_44f4aab38e60db::t_6528bcfff816c9 10,13-18
+  s_44f4aab38e60db::t_8bd8f28f0e9d53 7-9,11-12,19-20
+apps/web/src/app/api/checkout/route.ts
+  s_44f4aab38e60db::t_715231a8c48e46 148-150,153
+  s_44f4aab38e60db::t_88f3b533db7b1f 8,146-147,151-152,154-155,157-162
+apps/docs/content/notifications.mdx
+  s_44f4aab38e60db::t_cf03afe0aa3adb 33-41,45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "e50bf11751cd43e81f2f7e48f592940cda0b1596",
+  "prompts": {},
+  "sessions": {
+    "s_44f4aab38e60db": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fafb8-3672-7b93-852a-38c08fb69563",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
