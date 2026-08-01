@@ -44,6 +44,7 @@ const FOOTER_COLUMNS: FooterColumn[] = [
       { label: "CLI Reference", href: `${SITE_URLS.docs}/cli` },
       { label: "VS Code Extension", href: `${SITE_URLS.docs}/extension` },
       { label: "Security", href: `${SITE_URLS.docs}/security` },
+      { label: "Brand Assets", href: "/logo" },
       { label: "Source (GitHub)", href: SITE_URLS.github, external: true },
     ],
   },

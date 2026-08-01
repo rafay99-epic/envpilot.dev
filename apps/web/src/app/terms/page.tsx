@@ -25,6 +25,7 @@ const SECTIONS = [
   { id: "billing", label: "Billing" },
   { id: "ip", label: "Intellectual Property" },
   { id: "privacy", label: "Privacy" },
+  { id: "integrations", label: "Third-Party Integrations" },
   { id: "audit-logging", label: "Audit Logging" },
   { id: "availability", label: "Availability" },
   { id: "warranties", label: "Warranties" },
@@ -43,7 +44,7 @@ export default function TermsOfServicePage() {
       <PageHero eyebrow="terms" title="Terms of Service" align="left">
         <span className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 font-mono text-xs text-zinc-400">
           <span className="text-green-500">&#10095;</span>
-          Effective: March 10, 2026 &middot; Last updated: July 12, 2026
+          Effective: March 10, 2026 &middot; Last updated: August 2, 2026
         </span>
       </PageHero>
 
@@ -304,7 +305,7 @@ export default function TermsOfServicePage() {
                   period. When you cancel, you keep Pro access for the remainder
                   of the period you have already paid for &mdash; no money is
                   lost. Refunds may be issued where required by applicable
-                  consumer protection law (see Section 16).
+                  consumer protection law (see Section 17).
                 </p>
               </Subsection>
 
@@ -365,9 +366,58 @@ export default function TermsOfServicePage() {
               </p>
             </Section>
 
+            <Section id="integrations" n={10} title="Third-Party Integrations">
+              <Subsection title="10.1 Connecting Slack and Discord">
+                <p>
+                  The Service allows authorized Organization members to connect
+                  Slack channels and Discord channels as notification
+                  destinations. By connecting a destination, you authorize
+                  Envpilot to create or receive an incoming webhook credential
+                  from the selected provider and to send Organization activity
+                  notifications to that destination on your behalf.
+                </p>
+              </Subsection>
+
+              <Subsection title="10.2 Notification Content">
+                <p>
+                  Integration notifications may include project names,
+                  environment names, variable key names, access-request
+                  activity, actor or key-owner identity, invitee or member email
+                  addresses, shared-account names, API-key names, device names,
+                  roles, and a link back to Envpilot. Envpilot does not include
+                  environment variable or secret values in Slack or Discord
+                  notifications.
+                </p>
+              </Subsection>
+
+              <Subsection title="10.3 Your Responsibilities">
+                <p>
+                  You are responsible for selecting appropriate channels,
+                  limiting channel membership, maintaining permission to use the
+                  connected Slack workspace or Discord server, and ensuring that
+                  notification recipients are authorized to view the project
+                  metadata delivered there. You must not connect a destination
+                  that you do not control or have permission to use.
+                </p>
+              </Subsection>
+
+              <Subsection title="10.4 Provider Services and Disconnection">
+                <p>
+                  Slack and Discord are independent third-party services
+                  governed by their own terms and privacy policies. We are not
+                  responsible for provider outages, delivery delays, workspace
+                  or server administration, or retention of messages already
+                  delivered to a provider. You may pause or disconnect a
+                  destination through Organization Settings. Disconnection stops
+                  future delivery but does not delete messages previously
+                  delivered to Slack or Discord.
+                </p>
+              </Subsection>
+            </Section>
+
             <Section
               id="audit-logging"
-              n={10}
+              n={11}
               title="Audit Logging and Monitoring"
             >
               <p>
@@ -379,8 +429,8 @@ export default function TermsOfServicePage() {
               </p>
             </Section>
 
-            <Section id="availability" n={11} title="Service Availability">
-              <Subsection title="11.1 Availability">
+            <Section id="availability" n={12} title="Service Availability">
+              <Subsection title="12.1 Availability">
                 <p>
                   We use commercially reasonable efforts to maintain
                   availability but do not guarantee uninterrupted or error-free
@@ -389,7 +439,7 @@ export default function TermsOfServicePage() {
                 </p>
               </Subsection>
 
-              <Subsection title="11.2 Modifications">
+              <Subsection title="12.2 Modifications">
                 <p>
                   We may modify, suspend, or discontinue any part of the Service
                   at any time. For material changes affecting paying
@@ -398,7 +448,7 @@ export default function TermsOfServicePage() {
               </Subsection>
             </Section>
 
-            <Section id="warranties" n={12} title="Disclaimer of Warranties">
+            <Section id="warranties" n={13} title="Disclaimer of Warranties">
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
                 <p className="text-xs uppercase tracking-wider text-amber-400">
                   THE SERVICE IS PROVIDED &ldquo;AS IS&rdquo; AND &ldquo;AS
@@ -416,7 +466,7 @@ export default function TermsOfServicePage() {
               </div>
             </Section>
 
-            <Section id="liability" n={13} title="Limitation of Liability">
+            <Section id="liability" n={14} title="Limitation of Liability">
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
                 <p className="text-xs uppercase tracking-wider text-amber-400">
                   TO THE MAXIMUM EXTENT PERMITTED BY LAW, ENVPILOT SHALL NOT BE
@@ -441,7 +491,7 @@ export default function TermsOfServicePage() {
               </div>
             </Section>
 
-            <Section id="indemnification" n={14} title="Indemnification">
+            <Section id="indemnification" n={15} title="Indemnification">
               <p>
                 You agree to indemnify, defend, and hold harmless Envpilot and
                 its officers, directors, employees, agents, and licensors from
@@ -452,15 +502,15 @@ export default function TermsOfServicePage() {
               </p>
             </Section>
 
-            <Section id="termination" n={15} title="Term and Termination">
-              <Subsection title="15.1 Term">
+            <Section id="termination" n={16} title="Term and Termination">
+              <Subsection title="16.1 Term">
                 <p>
                   These Terms remain in effect while you have an account with
                   the Service.
                 </p>
               </Subsection>
 
-              <Subsection title="15.2 Termination by You">
+              <Subsection title="16.2 Termination by You">
                 <p>
                   You may terminate your account at any time. We will delete
                   your personal data within 30 days, subject to retention
@@ -468,7 +518,7 @@ export default function TermsOfServicePage() {
                 </p>
               </Subsection>
 
-              <Subsection title="15.3 Termination by Us">
+              <Subsection title="16.3 Termination by Us">
                 <p>
                   We may suspend or terminate your access immediately if: (a)
                   you breach these Terms; (b) required by law; (c) your account
@@ -479,21 +529,24 @@ export default function TermsOfServicePage() {
                 </p>
               </Subsection>
 
-              <Subsection title="15.4 Effect of Termination">
+              <Subsection title="16.4 Effect of Termination">
                 <p>
                   Upon termination, your right to use the Service ceases
-                  immediately. Sections that by nature should survive (including
-                  Sections 6.1, 8, 12, 13, 14, 17, and 18) will survive.
+                  immediately. Provisions that by their nature should survive
+                  termination&mdash;including ownership, intellectual property,
+                  privacy, disclaimers, limitations of liability,
+                  indemnification, consumer protection, dispute resolution, and
+                  general provisions&mdash;will survive.
                 </p>
               </Subsection>
             </Section>
 
             <Section
               id="consumer-protection"
-              n={16}
+              n={17}
               title="Consumer Protection"
             >
-              <Subsection title="16.1 EU and UK">
+              <Subsection title="17.1 EU and UK">
                 <p>
                   If you are a consumer in the EU or UK, nothing in these Terms
                   affects your statutory rights under mandatory consumer
@@ -503,7 +556,7 @@ export default function TermsOfServicePage() {
                 </p>
               </Subsection>
 
-              <Subsection title="16.2 Australia and New Zealand">
+              <Subsection title="17.2 Australia and New Zealand">
                 <p>
                   If you are a consumer under the Australian Consumer Law or NZ
                   Consumer Guarantees Act 1993, you have certain non-excludable
@@ -512,7 +565,7 @@ export default function TermsOfServicePage() {
                 </p>
               </Subsection>
 
-              <Subsection title="16.3 Japan">
+              <Subsection title="17.3 Japan">
                 <p>
                   If you are a consumer in Japan, the Consumer Contract Act (Act
                   No. 61 of 2000) applies to the extent that it cannot be
@@ -523,10 +576,10 @@ export default function TermsOfServicePage() {
 
             <Section
               id="governing-law"
-              n={17}
+              n={18}
               title="Governing Law and Disputes"
             >
-              <Subsection title="17.1 Governing Law">
+              <Subsection title="18.1 Governing Law">
                 <p>
                   These Terms are governed by the laws of the State of Delaware,
                   United States, without regard to conflict of law provisions.
@@ -534,7 +587,7 @@ export default function TermsOfServicePage() {
                 </p>
               </Subsection>
 
-              <Subsection title="17.2 Dispute Resolution">
+              <Subsection title="18.2 Dispute Resolution">
                 <p>
                   Before initiating legal proceedings, you agree to attempt
                   informal resolution by contacting{" "}
@@ -550,7 +603,7 @@ export default function TermsOfServicePage() {
                 </p>
               </Subsection>
 
-              <Subsection title="17.3 Class Action Waiver">
+              <Subsection title="18.3 Class Action Waiver">
                 <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
                   <p className="text-xs uppercase tracking-wider text-amber-400">
                     TO THE EXTENT PERMITTED BY LAW, YOU AND ENVPILOT EACH WAIVE
@@ -561,7 +614,7 @@ export default function TermsOfServicePage() {
                 </div>
               </Subsection>
 
-              <Subsection title="17.4 EU/UK Consumers">
+              <Subsection title="18.4 EU/UK Consumers">
                 <p>
                   EU consumers may bring proceedings before local courts and use
                   the European Commission&apos;s Online Dispute Resolution
@@ -571,8 +624,8 @@ export default function TermsOfServicePage() {
               </Subsection>
             </Section>
 
-            <Section id="general" n={18} title="General Provisions">
-              <Subsection title="18.1 Entire Agreement">
+            <Section id="general" n={19} title="General Provisions">
+              <Subsection title="19.1 Entire Agreement">
                 <p>
                   These Terms, together with our Privacy Policy, constitute the
                   entire agreement between you and Envpilot regarding the
@@ -580,7 +633,7 @@ export default function TermsOfServicePage() {
                 </p>
               </Subsection>
 
-              <Subsection title="18.2 Severability">
+              <Subsection title="19.2 Severability">
                 <p>
                   If any provision is held invalid or unenforceable, it will be
                   enforced to the maximum extent permissible, and the remaining
@@ -588,21 +641,21 @@ export default function TermsOfServicePage() {
                 </p>
               </Subsection>
 
-              <Subsection title="18.3 Waiver">
+              <Subsection title="19.3 Waiver">
                 <p>
                   Our failure to enforce any right or provision will not
                   constitute a waiver of that right or provision.
                 </p>
               </Subsection>
 
-              <Subsection title="18.4 Assignment">
+              <Subsection title="19.4 Assignment">
                 <p>
                   You may not assign these Terms without our written consent. We
                   may assign without restriction.
                 </p>
               </Subsection>
 
-              <Subsection title="18.5 Force Majeure">
+              <Subsection title="19.5 Force Majeure">
                 <p>
                   Neither party is liable for failure or delay due to causes
                   beyond reasonable control, including natural disasters, war,
@@ -611,7 +664,7 @@ export default function TermsOfServicePage() {
                 </p>
               </Subsection>
 
-              <Subsection title="18.6 Changes to These Terms">
+              <Subsection title="19.6 Changes to These Terms">
                 <p>
                   We may modify these Terms at any time. We will notify you of
                   material changes at least 30 days before they take effect.
@@ -620,7 +673,7 @@ export default function TermsOfServicePage() {
               </Subsection>
             </Section>
 
-            <Section id="contact" n={19} title="Contact">
+            <Section id="contact" n={20} title="Contact">
               <p>For questions about these Terms:</p>
               <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
                 <p className="flex items-center gap-2 text-zinc-200">
