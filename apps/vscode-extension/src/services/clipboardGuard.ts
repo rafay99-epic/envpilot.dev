@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { pathKey } from "../utils/paths";
+import * as output from "../utils/outputChannel";
 import { shouldBlock, type ClipboardGuardScope } from "../utils/clipboardScope";
 import type { ProtectionMode } from "./fileProtection";
 
@@ -146,11 +147,19 @@ export class ClipboardGuardService {
     }
 
     this.syncContextKey();
-    await vscode.commands.executeCommand(
-      action === "cut"
-        ? "editor.action.clipboardCutAction"
-        : "editor.action.clipboardCopyAction"
-    );
+    try {
+      await vscode.commands.executeCommand(
+        action === "cut"
+          ? "editor.action.clipboardCutAction"
+          : "editor.action.clipboardCopyAction"
+      );
+    } catch (err) {
+      // Must not become an unhandled rejection — surface it in the output
+      // channel so a failing re-dispatch is diagnosable.
+      output.warn(
+        `Clipboard ${action} re-dispatch failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   }
 
   private normalizePath(filePath: string): string {
