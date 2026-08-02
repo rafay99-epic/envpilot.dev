@@ -154,3 +154,22 @@ export {
   useAuditLogsForExport,
   useAuditMutations,
 } from "./useAuditLogs";
+
+// Secret file hooks
+export {
+  useSecretFiles,
+  useDeletedSecretFiles,
+  useSecretFileGrants,
+  useUploadSecretFile,
+  useGetSecretFileContent,
+  useUpdateSecretFile,
+  useDeleteSecretFile,
+  useRestoreSecretFile,
+  useGrantSecretFileAccess,
+  useRevokeSecretFileAccess,
+  fileToBase64,
+  downloadBase64,
+  formatBytes,
+  type SecretFile,
+  type DeletedSecretFile,
+} from "./useSecretFiles";

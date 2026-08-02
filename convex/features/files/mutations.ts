@@ -9,6 +9,7 @@ import {
 } from "../featureRegistry/gates";
 import { resolveOrgGateContext } from "../featureRegistry/resolver";
 import { createAuditLog } from "../../lib/audit";
+import { requireAuthedUser } from "../../lib/identity";
 import { authorizeFileAccess, requireFileAccess } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import {
@@ -60,7 +61,7 @@ function assertWithinEnvironmentScope(
  * blobs. Returns the normalized values the caller must then persist, so the
  * normalization cannot drift between the check and the insert.
  */
-export const preflightUpload = mutation({
+export const preflightUpload = internalMutation({
   args: {
     projectId: v.id("projects"),
     userId: v.id("users"),
@@ -184,7 +185,7 @@ export const preflightUpload = mutation({
  * Re-runs the path-conflict check: preflight ran before the (slow) encrypt,
  * so a concurrent upload could have taken the path in between.
  */
-export const create = mutation({
+export const create = internalMutation({
   args: {
     projectId: v.id("projects"),
     createdBy: v.id("users"),
@@ -288,7 +289,7 @@ export const create = mutation({
  * key material into a fresh blob, and only then does this swap the pointers.
  * That is what makes nonce reuse unreachable.
  */
-export const replaceContent = mutation({
+export const replaceContent = internalMutation({
   args: {
     fileId: v.id("projectFiles"),
     userId: v.id("users"),
@@ -359,7 +360,6 @@ export const replaceContent = mutation({
 export const update = mutation({
   args: {
     fileId: v.id("projectFiles"),
-    userId: v.id("users"),
     name: v.optional(v.string()),
     path: v.optional(v.string()),
     mode: v.optional(v.string()),
@@ -369,7 +369,11 @@ export const update = mutation({
   returns: v.id("projectFiles"),
   handler: async (ctx, args) => {
     const now = Date.now();
-    const { fileId, userId, ...updates } = args;
+    // Actor comes from the verified JWT, NEVER from an argument: this
+    // mutation is callable directly by the browser, so a client-supplied
+    // userId would let any member act as anyone else.
+    const userId = (await requireAuthedUser(ctx))._id;
+    const { fileId, ...updates } = args;
 
     const file = await ctx.db.get(fileId);
     if (!file || file.deletedAt) {
@@ -486,11 +490,11 @@ export const update = mutation({
 export const remove = mutation({
   args: {
     fileId: v.id("projectFiles"),
-    deletedBy: v.id("users"),
   },
   returns: v.id("projectFiles"),
   handler: async (ctx, args) => {
     const now = Date.now();
+    const deletedBy = (await requireAuthedUser(ctx))._id;
 
     const file = await ctx.db.get(args.fileId);
     if (!file) {
@@ -503,7 +507,7 @@ export const remove = mutation({
 
     // Role-only, no grant fallback — parity with accounts.remove.
     await authorizeFileAccess(ctx, {
-      userId: args.deletedBy,
+      userId: deletedBy,
       projectId: file.projectId,
       action: "project:delete_file",
       preloadedProject: project,
@@ -526,14 +530,14 @@ export const remove = mutation({
       await ctx.db.patch(perm._id, {
         isActive: false,
         revokedAt: now,
-        revokedBy: args.deletedBy,
+        revokedBy: deletedBy,
       });
     }
 
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
       projectId: file.projectId,
-      userId: args.deletedBy,
+      userId: deletedBy,
       action: "file.deleted",
       details: {
         fileId: args.fileId,
@@ -560,11 +564,11 @@ export const remove = mutation({
 export const restore = mutation({
   args: {
     fileId: v.id("projectFiles"),
-    restoredBy: v.id("users"),
   },
   returns: v.id("projectFiles"),
   handler: async (ctx, args) => {
     const now = Date.now();
+    const restoredBy = (await requireAuthedUser(ctx))._id;
 
     const file = await ctx.db.get(args.fileId);
     if (!file) {
@@ -590,7 +594,7 @@ export const restore = mutation({
     }
 
     await authorizeFileAccess(ctx, {
-      userId: args.restoredBy,
+      userId: restoredBy,
       projectId: file.projectId,
       action: "project:delete_file",
       preloadedProject: project,
@@ -616,7 +620,7 @@ export const restore = mutation({
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
       projectId: file.projectId,
-      userId: args.restoredBy,
+      userId: restoredBy,
       action: "file.restored",
       details: {
         fileId: args.fileId,
@@ -677,13 +681,13 @@ export const grantAccess = mutation({
   args: {
     fileId: v.id("projectFiles"),
     userId: v.id("users"),
-    grantedBy: v.id("users"),
     permission: v.union(v.literal("read"), v.literal("write")),
     expiresAt: v.optional(v.number()),
   },
   returns: v.id("filePermissions"),
   handler: async (ctx, args) => {
     const now = Date.now();
+    const grantedBy = (await requireAuthedUser(ctx))._id;
 
     const file = await ctx.db.get(args.fileId);
     if (!file || file.deletedAt) {
@@ -695,7 +699,7 @@ export const grantAccess = mutation({
     }
 
     await authorizeFileAccess(ctx, {
-      userId: args.grantedBy,
+      userId: grantedBy,
       projectId: file.projectId,
       action: "project:manage_file_permissions",
       preloadedProject: project,
@@ -728,7 +732,7 @@ export const grantAccess = mutation({
         await ctx.db.patch(grant._id, {
           isActive: false,
           revokedAt: now,
-          revokedBy: args.grantedBy,
+          revokedBy: grantedBy,
         });
       }
     }
@@ -737,7 +741,7 @@ export const grantAccess = mutation({
       fileId: args.fileId,
       userId: args.userId,
       permission: args.permission,
-      grantedBy: args.grantedBy,
+      grantedBy: grantedBy,
       grantedAt: now,
       expiresAt: args.expiresAt,
       isActive: true,
@@ -746,7 +750,7 @@ export const grantAccess = mutation({
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
       projectId: file.projectId,
-      userId: args.grantedBy,
+      userId: grantedBy,
       action: "file.permission_granted",
       details: {
         fileId: args.fileId,
@@ -767,11 +771,11 @@ export const revokeAccess = mutation({
   args: {
     fileId: v.id("projectFiles"),
     userId: v.id("users"),
-    revokedBy: v.id("users"),
   },
   returns: v.number(),
   handler: async (ctx, args) => {
     const now = Date.now();
+    const revokedBy = (await requireAuthedUser(ctx))._id;
 
     const file = await ctx.db.get(args.fileId);
     if (!file) {
@@ -783,7 +787,7 @@ export const revokeAccess = mutation({
     }
 
     await authorizeFileAccess(ctx, {
-      userId: args.revokedBy,
+      userId: revokedBy,
       projectId: file.projectId,
       action: "project:manage_file_permissions",
       preloadedProject: project,
@@ -802,7 +806,7 @@ export const revokeAccess = mutation({
       await ctx.db.patch(grant._id, {
         isActive: false,
         revokedAt: now,
-        revokedBy: args.revokedBy,
+        revokedBy: revokedBy,
       });
       revoked += 1;
     }
@@ -811,7 +815,7 @@ export const revokeAccess = mutation({
       await createAuditLog(ctx, {
         organizationId: project.organizationId,
         projectId: file.projectId,
-        userId: args.revokedBy,
+        userId: revokedBy,
         action: "file.permission_revoked",
         details: {
           fileId: args.fileId,

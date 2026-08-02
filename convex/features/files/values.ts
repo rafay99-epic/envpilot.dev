@@ -149,7 +149,7 @@ export const uploadFile = action({
     // or leaves a trace. Returns the normalized values so the check and the
     // insert cannot disagree about what the path is.
     const preflight: PreflightResult = await ctx.runMutation(
-      api.features.files.mutations.preflightUpload,
+      internal.features.files.mutations.preflightUpload,
       {
         projectId: args.projectId,
         userId,
@@ -196,16 +196,19 @@ export const uploadFile = action({
         const previous: {
           previousVaultRef: string;
           previousStorageId: Id<"_storage">;
-        } = await ctx.runMutation(api.features.files.mutations.replaceContent, {
-          fileId: args.replaceFileId,
-          userId,
-          size: plaintext.length,
-          sha256,
-          digestSalt,
-          vaultRef,
-          storageId,
-          contentType: args.contentType,
-        });
+        } = await ctx.runMutation(
+          internal.features.files.mutations.replaceContent,
+          {
+            fileId: args.replaceFileId,
+            userId,
+            size: plaintext.length,
+            sha256,
+            digestSalt,
+            vaultRef,
+            storageId,
+            contentType: args.contentType,
+          }
+        );
         // The row now points at the new pair, so the old one is unreachable
         // and safe to destroy. Order is blob then key: a crash in between
         // leaves a key to nothing, never bytes with a live key.
@@ -217,7 +220,7 @@ export const uploadFile = action({
       }
 
       const fileId: Id<"projectFiles"> = await ctx.runMutation(
-        api.features.files.mutations.create,
+        internal.features.files.mutations.create,
         {
           projectId: args.projectId,
           createdBy: userId,
