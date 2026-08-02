@@ -4,6 +4,9 @@ import * as output from "../utils/outputChannel";
 import { shouldBlock, type ClipboardGuardScope } from "../utils/clipboardScope";
 import type { ProtectionMode } from "./fileProtection";
 
+/** Command the guarded keybindings point at. Never invoked directly. */
+export const CLIPBOARD_BLOCKED_COMMAND = "envpilot.clipboardBlocked";
+
 /**
  * ClipboardGuardService prevents copying secret values from managed .env files.
  *
@@ -14,71 +17,50 @@ import type { ProtectionMode } from "./fileProtection";
  * - "readonly-roles": only strict-readonly / readonly-with-request files
  * - "off": never block
  *
- * Implementation: Overrides the built-in copy/cut commands, but only runs the
- * custom guard logic for protected files. For every other file, the override
- * delegates straight back to VS Code's built-in `default:` command so normal
- * editing keeps native copy/cut semantics (box selection, HTML clipboard
- * payloads, notebook cells, diff editor, etc.).
+ * Implementation: the `envpilot.clipboardBlocked` context key is kept in sync
+ * with "is the active editor a protected file". Keybindings contributed in
+ * package.json bind cmd/ctrl+C and cmd/ctrl+X to CLIPBOARD_BLOCKED_COMMAND
+ * under `when: editorTextFocus && envpilot.clipboardBlocked`, so outside a
+ * protected file VS Code never routes a keystroke to this extension at all.
+ *
+ * INVARIANT — never register, override, or shadow the built-in clipboard
+ * commands (`editor.action.clipboardCopyAction` & co.), not even temporarily.
+ * Two prior designs did and both killed copy editor-wide: a global override
+ * delegating unprotected files to `default:<command>` (silent async failure),
+ * then a focus-scoped override relying on dispose() to restore the built-in
+ * (not honored on Cursor, a VS Code fork — the built-in stayed dead after the
+ * first protected file was focused). The keybinding layer is the only
+ * interception; if the context key ever goes stale, the handler below fails
+ * OPEN by re-dispatching the real copy/cut, so the worst possible bug is one
+ * warning toast too many in a .env file — never a broken editor.
+ *
+ * Known bypass, accepted: context-menu Copy and the Edit menu invoke the
+ * built-in command directly and are not intercepted. The guard is a nudge
+ * against accidental clipboard exposure, not a security boundary — the file
+ * is plaintext on disk and readable by any other tool anyway.
  */
 export class ClipboardGuardService {
   private protectedFiles = new Map<string, ProtectionMode>();
   private disposables: vscode.Disposable[] = [];
 
   /**
-   * Register clipboard interception for protected .env files.
-   * Must be called during extension activation.
+   * Register the guard. Must be called during extension activation.
    */
   activate(): void {
-    const overrides: Array<
-      [string, Parameters<typeof vscode.commands.registerTextEditorCommand>[1]]
-    > = [
-      [
-        "editor.action.clipboardCopyAction",
-        (editor) =>
-          void this.handleCopy(editor, "editor.action.clipboardCopyAction"),
-      ],
-      [
-        "editor.action.clipboardCopyWithSyntaxHighlightingAction",
-        (editor) =>
-          void this.handleCopy(
-            editor,
-            "editor.action.clipboardCopyWithSyntaxHighlightingAction"
-          ),
-      ],
-      [
-        "editor.action.clipboardCutAction",
-        (editor, edit) => void this.handleCut(editor, edit),
-      ],
-    ];
-
-    let failed = false;
-    for (const [command, callback] of overrides) {
-      // Registration throws if another extension already registered the same
-      // command — degrade to a warning instead of failing activation.
-      try {
-        this.disposables.push(
-          vscode.commands.registerTextEditorCommand(command, callback)
-        );
-      } catch (err) {
-        failed = true;
-        output.error(
-          `Failed to register clipboard override ${command}: ${err instanceof Error ? err.message : String(err)}`
-        );
-      }
-    }
-    if (failed) {
-      vscode.window.showWarningMessage(
-        "Envpilot: Another extension conflicts with clipboard protection. Copying from protected .env files may not be blocked."
-      );
-    }
-  }
-
-  /**
-   * Delegate to VS Code's built-in copy/cut command for an unprotected file,
-   * so ordinary editing keeps native behavior instead of our reimplementation.
-   */
-  private async delegateToDefault(command: string): Promise<void> {
-    await vscode.commands.executeCommand(`default:${command}`);
+    this.disposables.push(
+      vscode.commands.registerCommand(
+        CLIPBOARD_BLOCKED_COMMAND,
+        (args?: { action?: "copy" | "cut" }) =>
+          void this.handleGuardedKey(args?.action === "cut" ? "cut" : "copy")
+      ),
+      vscode.window.onDidChangeActiveTextEditor(() => this.syncContextKey()),
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("envpilot.clipboardGuard.scope")) {
+          this.syncContextKey();
+        }
+      })
+    );
+    this.syncContextKey();
   }
 
   /**
@@ -88,6 +70,7 @@ export class ClipboardGuardService {
    */
   protectFile(filePath: string, mode: ProtectionMode): void {
     this.protectedFiles.set(this.normalizePath(filePath), mode);
+    this.syncContextKey();
   }
 
   /**
@@ -95,6 +78,7 @@ export class ClipboardGuardService {
    */
   unprotectFile(filePath: string): void {
     this.protectedFiles.delete(this.normalizePath(filePath));
+    this.syncContextKey();
   }
 
   /**
@@ -108,6 +92,7 @@ export class ClipboardGuardService {
     }
     this.protectedFiles.delete(oldKey);
     this.protectedFiles.set(this.normalizePath(newPath), mode);
+    this.syncContextKey();
   }
 
   /**
@@ -124,65 +109,55 @@ export class ClipboardGuardService {
       .get<ClipboardGuardScope>("clipboardGuard.scope", "all-managed");
   }
 
-  /**
-   * Check if copy/cut should be blocked for the given editor's file.
-   */
-  private isFileProtected(editor: vscode.TextEditor): boolean {
-    const filePath = this.normalizePath(editor.document.uri.fsPath);
-    return shouldBlock(this.getScope(), this.protectedFiles.get(filePath));
+  /** Whether the active editor's file should block copy/cut right now. */
+  private activeEditorBlocked(): boolean {
+    const editor = vscode.window.activeTextEditor;
+    const mode = editor
+      ? this.protectedFiles.get(this.normalizePath(editor.document.uri.fsPath))
+      : undefined;
+    return shouldBlock(this.getScope(), mode);
   }
 
   /**
-   * Handle copy command — block if file is protected, otherwise delegate to
-   * the built-in copy command so unrelated files keep native behavior.
+   * Publish the block state of the active editor as the context key the
+   * package.json keybindings' `when` clause reads. Idempotent — called on
+   * every editor change, setting change, and protect/unprotect.
    */
-  private async handleCopy(
-    editor: vscode.TextEditor,
-    command: string
-  ): Promise<void> {
-    try {
-      if (!this.isFileProtected(editor)) {
-        await this.delegateToDefault(command);
-        return;
-      }
+  private syncContextKey(): void {
+    void vscode.commands.executeCommand(
+      "setContext",
+      "envpilot.clipboardBlocked",
+      this.activeEditorBlocked()
+    );
+  }
 
-      vscode.window.showWarningMessage(
-        "Envpilot: Copying from protected .env files is not allowed. Secret values are managed securely."
+  /**
+   * A guarded keystroke landed. Re-verify against live state instead of
+   * trusting the context key: if the file really blocks, warn; if the key was
+   * stale, repair it and re-dispatch the REAL copy/cut so the user's
+   * keystroke is never swallowed. Safe to dispatch directly — the built-in
+   * command is never overridden, so there is no recursion.
+   */
+  private async handleGuardedKey(action: "copy" | "cut"): Promise<void> {
+    if (this.activeEditorBlocked()) {
+      void vscode.window.showWarningMessage(
+        `Envpilot: ${action === "cut" ? "Cutting" : "Copying"} from protected .env files is not allowed. Secret values are managed securely.`
       );
-    } catch (err) {
-      // A clipboard/command API failure should degrade gracefully rather
-      // than surfacing a confusing error on an otherwise-normal file.
-      output.warn(
-        `Clipboard copy failed: ${err instanceof Error ? err.message : String(err)}`
-      );
+      return;
     }
-  }
 
-  /**
-   * Handle cut command — block if file is protected, otherwise delegate to
-   * the built-in cut command so unrelated files keep native behavior.
-   */
-  private async handleCut(
-    editor: vscode.TextEditor,
-    // The built-in cut command is delegated to for unprotected files, so the
-    // edit builder VS Code supplies for this text-editor command is unused —
-    // kept to satisfy the `registerTextEditorCommand` callback signature.
-    _edit: vscode.TextEditorEdit
-  ): Promise<void> {
+    this.syncContextKey();
     try {
-      if (!this.isFileProtected(editor)) {
-        await this.delegateToDefault("editor.action.clipboardCutAction");
-        return;
-      }
-
-      vscode.window.showWarningMessage(
-        "Envpilot: Cutting from protected .env files is not allowed. Secret values are managed securely."
+      await vscode.commands.executeCommand(
+        action === "cut"
+          ? "editor.action.clipboardCutAction"
+          : "editor.action.clipboardCopyAction"
       );
     } catch (err) {
-      // A clipboard/command API failure should degrade gracefully rather
-      // than surfacing a confusing error on an otherwise-normal file.
+      // Must not become an unhandled rejection — surface it in the output
+      // channel so a failing re-dispatch is diagnosable.
       output.warn(
-        `Clipboard cut failed: ${err instanceof Error ? err.message : String(err)}`
+        `Clipboard ${action} re-dispatch failed: ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }
@@ -198,5 +173,10 @@ export class ClipboardGuardService {
     }
     this.disposables = [];
     this.protectedFiles.clear();
+    void vscode.commands.executeCommand(
+      "setContext",
+      "envpilot.clipboardBlocked",
+      false
+    );
   }
 }

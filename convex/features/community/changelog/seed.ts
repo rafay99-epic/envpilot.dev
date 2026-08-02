@@ -1416,4 +1416,29 @@ The bug only existed in production, where the platform redacts internal error de
 - Existing Pro subscribers are returned to billing with a friendly "already on Pro" notice instead of a raw checkout error
 - The landing page now showcases Slack, Discord, GitHub Actions, MCP, the read-only REST API, and the engineering blog as connected Envpilot workflows`,
   },
+
+  // ============================================================
+  // VS Code extension v1.16.1 — Clipboard Guard Fix (2026-08-02)
+  // ============================================================
+  {
+    title: "VS Code Extension: Copy Works Everywhere Again",
+    version: "v1.16.1",
+    type: "fix",
+    publishedAt: ts("2026-08-02T16:30:00Z"),
+    content: `The clipboard guard was supposed to stop secrets being copied out of managed \`.env\` files. Instead it disabled copy and cut in **every** file — TypeScript, C#, project files, anything — in every window, whether or not a project was linked. This release fixes that.
+
+### What Was Wrong
+- The guard replaced VS Code's built-in copy, cut, and copy-with-syntax-highlighting commands globally the moment the extension started
+- Unprotected files were meant to be handed back to the editor's own copy command, but that hand-off ran asynchronously outside the editor's clipboard gesture and failed silently — so \`Cmd+C\` did nothing at all
+- Setting \`envpilot.clipboardGuard.scope\` to \`off\` did not help, because the replacement command was still installed; disabling the whole extension was the only workaround
+
+### What Changed
+- The guard no longer registers, overrides, or shadows VS Code's built-in clipboard commands under any circumstance — outside a protected \`.env\` file the extension is not in the copy path at all
+- Interception is now a \`when\`-clause keybinding tied to a context key that tracks the active editor, so it exists only while a protected file is focused
+- If that context key is ever stale, the handler fails open and re-runs the real copy or cut instead of swallowing the keystroke — a broken clipboard is no longer a possible outcome
+- Cursor and other VS Code forks are fixed too; the previous design left copy dead on those after the first \`.env\` file was opened
+
+### Known Limitation
+Right-click → Copy and the Edit menu inside a protected \`.env\` file are not intercepted. Covering them requires overriding built-in commands, which is exactly what caused this bug. The clipboard guard is a safeguard against accidental exposure, not a security boundary — \`.env\` files remain readable by any other tool on the machine, and real enforcement lives in role-based access control, the commit guard, and the audit log.`,
+  },
 ];
