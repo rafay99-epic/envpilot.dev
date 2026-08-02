@@ -57,7 +57,7 @@ export function useSecretFiles(projectId: Id<"projects"> | undefined) {
 
 export function useDeletedSecretFiles(projectId: Id<"projects"> | undefined) {
   return useQuery(
-    convexApi.features.files.queries.listDeleted,
+    convexApi.features.files.queries.getDeleted,
     projectId ? { projectId } : "skip"
   ) as DeletedSecretFile[] | undefined;
 }

@@ -132,7 +132,12 @@ export function ignoreSecretFilePaths(root: string, paths: string[]): string[] {
   const existing = new Set(
     content.split("\n").map((line) => line.trim().replace(/^\/+/, ""))
   );
-  const missing = paths.filter((p) => !existing.has(p));
+  // The atomic write leaves a `<dest>.envpilot-<pid>.tmp` beside the target
+  // for an instant. The catch path unlinks it, but a SIGKILL mid-write would
+  // not — and that temp file holds plaintext. Ignore the pattern so a
+  // survivor is never offerable to git.
+  const TEMP_PATTERN = "*.envpilot-*.tmp";
+  const missing = [...paths, TEMP_PATTERN].filter((p) => !existing.has(p));
   if (missing.length === 0) return [];
 
   const block = `${
@@ -179,12 +184,15 @@ export async function materialiseSecretFiles(
     }
   }
 
-  if (pending.length === 0) return result;
-
+  // Every path, not just the pending ones: a file that is already in sync
+  // still needs its path ignored (it may have been written by another client
+  // or restored from a backup into a repo whose .gitignore predates it).
   ignoreSecretFilePaths(
     root,
-    pending.map((f) => f.path)
+    files.map((f) => f.path)
   );
+
+  if (pending.length === 0) return result;
 
   for (const file of pending) {
     try {

@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import inquirer from "inquirer";
-import { basename } from "node:path";
+import { basename, isAbsolute } from "node:path";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import {
   success,
@@ -180,11 +180,16 @@ const pullCommand = new Command("pull")
 
       const root = process.cwd();
 
+      // Read each local file ONCE. statusOf hashes the file on disk, so
+      // calling it in both the conflict filter and the write loop hashed
+      // every keystore twice per pull.
+      const statuses = new Map(files.map((f) => [f._id, statusOf(f, root)]));
+
       // Refuse silently-destructive overwrites. A local keystore that differs
       // may be someone's debug copy; losing it without a word is worse than
       // making them pass --force.
       const conflicts = files.filter(
-        (file) => statusOf(file, root) === "modified"
+        (file) => statuses.get(file._id) === "modified"
       );
       if (conflicts.length > 0 && !options.force) {
         warning("These local files differ from the server:");
@@ -208,7 +213,7 @@ const pullCommand = new Command("pull")
       blank();
       let written = 0;
       for (const file of files) {
-        if (statusOf(file, root) === "in-sync") {
+        if (statuses.get(file._id) === "in-sync") {
           console.log(
             `  ${chalk.dim("=")} ${file.path} ${chalk.dim("(unchanged)")}`
           );
@@ -285,7 +290,15 @@ const addCommand = new Command("add")
       }
 
       const contents = readFileSync(localPath);
-      const destination = options.path ?? localPath.replace(/^\.\//, "");
+      // Destination defaults to the local path made relative. An absolute
+      // source ("envpilot files add /tmp/upload.jks") has no meaningful
+      // in-project location, so fall back to the bare filename rather than
+      // sending an absolute path the server will reject.
+      const destination =
+        options.path ??
+        (isAbsolute(localPath)
+          ? basename(localPath)
+          : localPath.replace(/^\.\//, ""));
       const name = options.name ?? basename(localPath);
 
       const result = await withSpinner(`Uploading ${name}...`, () =>

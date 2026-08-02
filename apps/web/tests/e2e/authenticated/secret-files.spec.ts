@@ -114,9 +114,19 @@ test.describe("secret files", () => {
         await setFixture(page, "service-account.json", '{"e2e":"prod"}');
         await page.locator("#secret-file-name").fill(prodName);
         await page.locator("#secret-file-path").fill(sharedPath);
-        // Swap development off, production on.
-        await page.getByRole("checkbox").nth(0).uncheck();
-        await page.getByRole("checkbox").nth(2).check();
+        // Swap development off, production on. Scoped by label text rather
+        // than index — a positional selector silently retargets the moment
+        // another checkbox appears in the drawer.
+        await page
+          .locator("label")
+          .filter({ hasText: /^development$/ })
+          .getByRole("checkbox")
+          .uncheck();
+        await page
+          .locator("label")
+          .filter({ hasText: /^production$/ })
+          .getByRole("checkbox")
+          .check();
         await page.getByRole("button", { name: "Upload", exact: true }).click();
         await expect(fileRow(page, prodName)).toBeVisible({ timeout: 15_000 });
       }).toPass({ timeout: 60_000 });

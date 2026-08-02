@@ -101,6 +101,14 @@ export const preflightUpload = internalMutation({
       if (!existing || existing.deletedAt) {
         throw new ConvexError("File not found");
       }
+      // The file being replaced MUST belong to the project whose org supplies
+      // the vault key context below. Without this, a caller with write access
+      // in two projects could replace project B's file while the new vault
+      // object is created under project A's key context — the ref would
+      // resolve, but the object would sit in the wrong cryptographic scope.
+      if (existing.projectId !== args.projectId) {
+        throw new ConvexError("File does not belong to this project");
+      }
       await requireFileAccess(ctx, args.userId, existing, "write", project);
     } else {
       // Capability: project.files.create (assignment-gated)
@@ -130,18 +138,23 @@ export const preflightUpload = internalMutation({
 
     // Byte limit before count limit: a single oversized upload should say so
     // rather than blaming the file count.
+    //
+    // Resolve the limit with a zero count and compare the size HERE, rather
+    // than passing the size as the count. checkNumericLimit answers
+    // "current < limit", which is right for "how many do I already have" but
+    // off by one for a size: a file of exactly the limit would be rejected by
+    // a limit that claims to allow it.
     const byteGate = await checkNumericLimit(
       ctx.db,
       project.organizationId,
       "secret_files_max_bytes",
-      args.size,
+      0,
       gate
     );
-    if (!byteGate.allowed) {
-      const limit = byteGate.limit ?? 0;
+    if (byteGate.limit !== null && args.size > byteGate.limit) {
       throw new ConvexError(
         `File is too large (${Math.ceil(args.size / 1024)} KB). Your plan allows up to ${Math.floor(
-          limit / 1024
+          byteGate.limit / 1024
         )} KB per file.`
       );
     }

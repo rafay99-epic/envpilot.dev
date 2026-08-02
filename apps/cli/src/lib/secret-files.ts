@@ -134,9 +134,13 @@ export function ignoreSecretFilePaths(root: string, paths: string[]): string[] {
     content.split("\n").map((line) => line.trim().replace(/^\/+/, ""))
   );
 
-  const missing = paths
-    .map((p) => p.split(sep).join("/"))
-    .filter((p) => !existing.has(p));
+  // The atomic write leaves a `<dest>.envpilot-<pid>.tmp` beside the target
+  // for an instant. The catch path unlinks it, but a SIGKILL mid-write would
+  // not — and that temp file holds plaintext. Ignore the pattern so a
+  // survivor is never offerable to git.
+  const TEMP_PATTERN = "*.envpilot-*.tmp";
+  const wanted = [...paths.map((p) => p.split(sep).join("/")), TEMP_PATTERN];
+  const missing = wanted.filter((p) => !existing.has(p));
   if (missing.length === 0) return [];
 
   const block = `${content.endsWith("\n") || content === "" ? "" : "\n"}\n# Envpilot secret files\n${missing.join("\n")}\n`;

@@ -11,6 +11,7 @@ import {
   RotateCcw,
   Trash2,
   UserRound,
+  FileKey,
 } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -69,8 +70,14 @@ export default function TrashPage({ params }: TrashPageProps) {
       : "skip"
   );
 
+  const deletedFiles = useQuery(
+    api.features.files.queries.getDeleted,
+    projectId && convexUserId ? { projectId } : "skip"
+  );
+
   const restoreVariable = useMutation(api.features.variables.mutations.restore);
   const restoreAccount = useMutation(api.features.accounts.mutations.restore);
+  const restoreFile = useMutation(api.features.files.mutations.restore);
   const emptyTrash = useAction(api.features.vault.gc.emptyProjectTrash);
 
   const [restoringId, setRestoringId] = useState<string | null>(null);
@@ -85,10 +92,13 @@ export default function TrashPage({ params }: TrashPageProps) {
   const loading =
     project === undefined ||
     deletedVariables === undefined ||
-    deletedAccounts === undefined;
+    deletedAccounts === undefined ||
+    deletedFiles === undefined;
 
   const totalCount =
-    (deletedVariables?.length ?? 0) + (deletedAccounts?.length ?? 0);
+    (deletedVariables?.length ?? 0) +
+    (deletedAccounts?.length ?? 0) +
+    (deletedFiles?.length ?? 0);
 
   async function handleRestoreVariable(
     variableId: Id<"environmentVariables">,
@@ -128,12 +138,27 @@ export default function TrashPage({ params }: TrashPageProps) {
     }
   }
 
+  async function handleRestoreFile(fileId: Id<"projectFiles">, name: string) {
+    setRestoringId(fileId);
+    try {
+      await restoreFile({ fileId });
+      toast.success(`Restored ${name}`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to restore file"
+      );
+    } finally {
+      setRestoringId(null);
+    }
+  }
+
   async function handleEmptyTrash() {
     if (!projectId) return;
     setEmptying(true);
     try {
       const result = await emptyTrash({ projectId });
-      const purged = result.purgedVariables + result.purgedAccounts;
+      const purged =
+        result.purgedVariables + result.purgedAccounts + result.purgedFiles;
       if (result.skipped > 0) {
         toast.warning(
           `Permanently deleted ${purged} item${purged === 1 ? "" : "s"}; ${result.skipped} could not be purged and will be retried automatically.`
@@ -323,6 +348,63 @@ export default function TrashPage({ params }: TrashPageProps) {
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                     >
                       {restoringId === account._id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      )}
+                      Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {deletedFiles && deletedFiles.length > 0 && (
+            <section className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="flex items-center gap-2 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+                <FileKey className="h-4 w-4 text-zinc-400" />
+                <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+                  Secret files
+                </h2>
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  {deletedFiles.length}
+                </span>
+              </div>
+              <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {deletedFiles.map((file) => (
+                  <div
+                    key={file._id}
+                    className="flex items-center justify-between gap-4 px-6 py-3"
+                  >
+                    <div className="min-w-0 flex-1 opacity-60">
+                      <span className="text-sm font-semibold text-zinc-500 line-through dark:text-zinc-400">
+                        {file.name}
+                      </span>
+                      <p className="truncate font-mono text-xs text-zinc-500 dark:text-zinc-500">
+                        {file.path}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                        Deleted {pluralDays(daysAgo(file.deletedAt))} ago
+                        {" — "}
+                        <span
+                          className={
+                            daysLeft(file.deletedAt) <= 1
+                              ? "font-medium text-red-500"
+                              : ""
+                          }
+                        >
+                          {pluralDays(daysLeft(file.deletedAt))} left
+                        </span>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRestoreFile(file._id, file.name)}
+                      disabled={restoringId === file._id || emptying}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    >
+                      {restoringId === file._id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <RotateCcw className="h-3.5 w-3.5" />

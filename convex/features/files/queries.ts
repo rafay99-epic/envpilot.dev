@@ -236,7 +236,7 @@ export const get = query({
 });
 
 /** Trash listing — soft-deleted files still inside the retention window. */
-export const listDeleted = query({
+export const getDeleted = query({
   args: { projectId: v.id("projects") },
   returns: v.array(
     v.object({

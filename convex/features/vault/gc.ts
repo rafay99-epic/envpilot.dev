@@ -527,6 +527,13 @@ export const listProjectTrash = internalQuery({
         vaultRefs: v.array(v.string()),
       })
     ),
+    files: v.array(
+      v.object({
+        id: v.id("projectFiles"),
+        vaultRefs: v.array(v.string()),
+        storageId: v.id("_storage"),
+      })
+    ),
   }),
   handler: async (ctx, args) => {
     const variableDocs = await ctx.db
@@ -562,7 +569,20 @@ export const listProjectTrash = internalQuery({
       vaultRefs: [account.vaultRef],
     }));
 
-    return { variables, accounts };
+    const fileDocs = await ctx.db
+      .query("projectFiles")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).gt("deletedAt", 0)
+      )
+      .take(PURGE_BATCH_SIZE);
+
+    const files = fileDocs.map((file) => ({
+      id: file._id,
+      vaultRefs: [file.vaultRef],
+      storageId: file.storageId,
+    }));
+
+    return { variables, accounts, files };
   },
 });
 
@@ -618,6 +638,30 @@ export const hardDeleteTrashedAccount = internalMutation({
 });
 
 /** Audit record for a user-initiated empty-trash run. */
+/**
+ * Hard-delete a TRASHED secret file regardless of retention age, AFTER its
+ * blob and vault object are gone. Same still-trashed guard as the other two.
+ */
+export const hardDeleteTrashedFile = internalMutation({
+  args: { fileId: v.id("projectFiles") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const file = await ctx.db.get(args.fileId);
+    if (!file || file.deletedAt === undefined) return false;
+
+    const permissions = await ctx.db
+      .query("filePermissions")
+      .withIndex("by_file", (q) => q.eq("fileId", args.fileId))
+      .collect();
+    for (const perm of permissions) {
+      await ctx.db.delete(perm._id);
+    }
+
+    await ctx.db.delete(args.fileId);
+    return true;
+  },
+});
+
 export const recordTrashEmptied = internalMutation({
   args: {
     projectId: v.id("projects"),
@@ -625,6 +669,9 @@ export const recordTrashEmptied = internalMutation({
     userId: v.id("users"),
     purgedVariables: v.number(),
     purgedAccounts: v.number(),
+    // Optional so a web build deployed before this convex deploy keeps
+    // working — it simply records nothing for files.
+    purgedFiles: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -636,6 +683,7 @@ export const recordTrashEmptied = internalMutation({
       details: JSON.stringify({
         purgedVariables: args.purgedVariables,
         purgedAccounts: args.purgedAccounts,
+        purgedFiles: args.purgedFiles ?? 0,
       }),
       createdAt: Date.now(),
     });
@@ -654,6 +702,7 @@ export const emptyProjectTrash = action({
   returns: v.object({
     purgedVariables: v.number(),
     purgedAccounts: v.number(),
+    purgedFiles: v.number(),
     skipped: v.number(),
   }),
   handler: async (ctx, args) => {
@@ -672,6 +721,7 @@ export const emptyProjectTrash = action({
 
     let purgedVariables = 0;
     let purgedAccounts = 0;
+    let purgedFiles = 0;
     let skipped = 0;
 
     for (let round = 0; round < MAX_RESCHEDULE_DEPTH; round++) {
@@ -679,9 +729,14 @@ export const emptyProjectTrash = action({
         internal.features.vault.gc.listProjectTrash,
         { projectId: args.projectId }
       );
-      if (batch.variables.length === 0 && batch.accounts.length === 0) break;
+      if (
+        batch.variables.length === 0 &&
+        batch.accounts.length === 0 &&
+        batch.files.length === 0
+      )
+        break;
 
-      const purgedBeforeRound = purgedVariables + purgedAccounts;
+      const purgedBeforeRound = purgedVariables + purgedAccounts + purgedFiles;
 
       for (const variable of batch.variables) {
         let allDeleted = true;
@@ -719,10 +774,41 @@ export const emptyProjectTrash = action({
         else skipped++;
       }
 
+      // Secret files: blob first, then the vault key, then the row — the same
+      // ordering the scheduled sweep uses, for the same reason.
+      for (const file of batch.files) {
+        const blobDeleted = await ctx.storage
+          .delete(file.storageId)
+          .then(() => true)
+          .catch(() => false);
+        if (!blobDeleted) {
+          skipped++;
+          continue;
+        }
+        let allDeleted = true;
+        for (const ref of file.vaultRefs) {
+          const ok = await deleteVaultObject(ref, apiKey);
+          if (!ok) allDeleted = false;
+        }
+        if (!allDeleted) {
+          skipped++;
+          continue;
+        }
+        const deleted = await ctx.runMutation(
+          internal.features.vault.gc.hardDeleteTrashedFile,
+          { fileId: file.id }
+        );
+        if (deleted) purgedFiles++;
+        else skipped++;
+      }
+
       // A round that purged nothing means every remaining doc is failing its
       // Vault delete — stop instead of spinning on the same skips (the
       // scheduled GC retries them).
-      if (purgedVariables + purgedAccounts === purgedBeforeRound) {
+      if (
+        purgedVariables + purgedAccounts + purgedFiles ===
+        purgedBeforeRound
+      ) {
         break;
       }
     }
@@ -733,8 +819,9 @@ export const emptyProjectTrash = action({
       userId: authz.userId,
       purgedVariables,
       purgedAccounts,
+      purgedFiles,
     });
 
-    return { purgedVariables, purgedAccounts, skipped };
+    return { purgedVariables, purgedAccounts, purgedFiles, skipped };
   },
 });
