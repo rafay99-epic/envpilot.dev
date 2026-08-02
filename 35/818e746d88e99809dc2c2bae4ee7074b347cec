@@ -1,0 +1,47 @@
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/trash/page.tsx
+  s_e94a11bf9b2f48::t_cfedd2ffb4a307 141,147-149
+  s_e94a11bf9b2f48::t_623b5884376ea4 14
+  s_e94a11bf9b2f48::t_bfae31cf06c6ac 73-77,80,95-96,99-101,142-146,160-161,362-407,416
+  s_e94a11bf9b2f48::t_7ede727a249a9f 150-154,408-415,417-418
+apps/web/tests/e2e/authenticated/secret-files.spec.ts
+  s_e94a11bf9b2f48::t_cfedd2ffb4a307 117-129
+apps/cli/src/lib/secret-files.test.ts
+  s_e94a11bf9b2f48::t_cfedd2ffb4a307 2-9
+  s_e94a11bf9b2f48::t_c479afc65c5c58 1,10-265
+convex/features/vault/gc.ts
+  s_e94a11bf9b2f48::t_e84b9a77941721 530-536,572-585,641-664,705,724,732-737,739,777-801
+  s_e94a11bf9b2f48::t_62a6c4c02a5baf 808-811
+  s_e94a11bf9b2f48::t_9e6b865f6e1b88 672-674,686,822
+  s_e94a11bf9b2f48::t_5cfdafb61851bd 825
+  s_e94a11bf9b2f48::t_9df31000aac70a 802-804
+apps/cli/src/lib/secret-files.ts
+  s_e94a11bf9b2f48::t_2ee24d1f64a3a2 137-143
+apps/cli/src/commands/files.ts
+  s_e94a11bf9b2f48::t_331ca5176089ba 4,183-187,192,216,293-301
+convex/features/files/mutations.ts
+  s_e94a11bf9b2f48::t_551cbf61e7433c 104-111
+  s_e94a11bf9b2f48::t_0e3bed1ffe65a9 141-146,151,154,157
+apps/vscode-extension/src/services/secretFiles.ts
+  s_e94a11bf9b2f48::t_2ee24d1f64a3a2 135-140,187-189,192,195
+  s_e94a11bf9b2f48::t_1a06707d1878e8 196
+apps/web/src/hooks/useSecretFiles.ts
+  s_e94a11bf9b2f48::t_bfae31cf06c6ac 60
+convex/features/files/queries.ts
+  s_e94a11bf9b2f48::t_bfae31cf06c6ac 239
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "35818e746d88e99809dc2c2bae4ee7074b347cec",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
