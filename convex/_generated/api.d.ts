@@ -110,6 +110,7 @@ import type * as lib_authHelpers from "../lib/authHelpers.js";
 import type * as lib_authz from "../lib/authz.js";
 import type * as lib_capabilities from "../lib/capabilities.js";
 import type * as lib_identity from "../lib/identity.js";
+import type * as lib_integrationLimits from "../lib/integrationLimits.js";
 import type * as lib_rateLimits from "../lib/rateLimits.js";
 import type * as lib_roleCompat from "../lib/roleCompat.js";
 import type * as lib_roleProfiles from "../lib/roleProfiles.js";
@@ -225,6 +226,7 @@ declare const fullApi: ApiFromModules<{
   "lib/authz": typeof lib_authz;
   "lib/capabilities": typeof lib_capabilities;
   "lib/identity": typeof lib_identity;
+  "lib/integrationLimits": typeof lib_integrationLimits;
   "lib/rateLimits": typeof lib_rateLimits;
   "lib/roleCompat": typeof lib_roleCompat;
   "lib/roleProfiles": typeof lib_roleProfiles;
