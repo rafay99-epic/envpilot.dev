@@ -1,0 +1,23 @@
+apps/web/src/lib/versions.ts
+  s_0a5f4315dae50f::t_76a5052a22fb8e 19
+convex/features/community/changelog/seed.ts
+  s_0a5f4315dae50f::t_0627b7e6e7cf40 1419-1443
+apps/vscode-extension/package.json
+  s_0a5f4315dae50f::t_76a5052a22fb8e 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "06d4d8d935a14687e94e79093f153fe386505214",
+  "prompts": {},
+  "sessions": {
+    "s_0a5f4315dae50f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e338fce-6b19-4d9a-8121-0d177f1b612a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
