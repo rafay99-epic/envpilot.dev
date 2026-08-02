@@ -2,7 +2,7 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects. Real-time revocation, clipboard protection, commit guard, and role-based access.",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "MIT",
@@ -49,6 +49,11 @@
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
+      {
+        "command": "envpilot.clipboardBlocked",
+        "title": "Copy Blocked (Protected .env File)",
+        "category": "Envpilot"
+      },
       {
         "command": "envpilot.signIn",
         "title": "Sign In",
@@ -202,7 +207,30 @@
         "when": "envpilot.isAuthenticated && !envpilot.hasLinkedProject"
       }
     ],
+    "keybindings": [
+      {
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "command": "envpilot.clipboardBlocked",
+        "when": "editorTextFocus && envpilot.clipboardBlocked"
+      },
+      {
+        "key": "ctrl+x",
+        "mac": "cmd+x",
+        "command": "envpilot.clipboardBlocked",
+        "when": "editorTextFocus && envpilot.clipboardBlocked",
+        "args": {
+          "action": "cut"
+        }
+      }
+    ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "envpilot.clipboardBlocked",
+          "when": "false"
+        }
+      ],
       "view/title": [
         {
           "command": "envpilot.refresh",

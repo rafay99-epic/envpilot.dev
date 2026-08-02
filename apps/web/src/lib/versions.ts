@@ -16,7 +16,7 @@
 export const APP_VERSIONS = {
   web: "1.54.0",
   cli: "1.19.0",
-  extension: "1.16.0",
+  extension: "1.17.0",
   // Registry-native floors: 1.18.0 (CLI) / 1.15.0 (extension) are the first
   // builds that call the real features/* Convex paths and consume
   // capability-driven role metadata. Everything below called the legacy root
