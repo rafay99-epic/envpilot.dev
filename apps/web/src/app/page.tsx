@@ -23,7 +23,7 @@ const softwareAppSchema = {
   applicationCategory: "DeveloperApplication",
   operatingSystem: "macOS, Linux, Windows, Web",
   description:
-    "Stop pasting .env files into Slack. Envpilot keeps your team's environment variables in sync — CLI, VS Code extension, and web dashboard with role-based access control.",
+    "Stop pasting .env files into Slack. Envpilot securely connects environment variables to CLI, VS Code, GitHub Actions, REST API and MCP clients, with secret-safe Slack and Discord notifications.",
   offers: {
     "@type": "Offer",
     price: "0",

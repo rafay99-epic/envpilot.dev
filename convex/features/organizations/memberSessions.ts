@@ -3,6 +3,7 @@ import { mutation, query, type MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import { assertOrgAction, assertCanManageUserAsync } from "../../lib/authz";
+import { createAuditLog } from "../../lib/audit";
 
 /**
  * Deactivate every active device session (CLI tokens + extension project
@@ -245,17 +246,16 @@ export const revokeMemberCliToken = mutation({
 
     await ctx.db.patch(args.tokenId, { isActive: false, revokedAt: now });
 
-    await ctx.db.insert("auditLogs", {
+    await createAuditLog(ctx, {
       organizationId: args.organizationId,
       userId: actor._id,
       action: "access.token_revoked",
-      details: JSON.stringify({
+      details: {
         tokenId: args.tokenId,
         targetUserId: token.userId,
         deviceName: token.deviceName,
         type: "cli",
-      }),
-      createdAt: now,
+      },
     });
 
     // The caller (Next.js route with the WorkOS SDK) revokes this WorkOS
@@ -333,18 +333,18 @@ export const revokeMemberExtensionSession = mutation({
       expiresAt: revocationExpiresAt,
     });
 
-    await ctx.db.insert("auditLogs", {
+    await createAuditLog(ctx, {
       organizationId: args.organizationId,
+      projectId: access.projectId,
       userId: actor._id,
       action: "access.extension_unlinked",
-      details: JSON.stringify({
+      details: {
         projectAccessId: args.projectAccessId,
         targetUserId: access.userId,
         projectId: access.projectId,
         deviceName: access.deviceName,
         type: "extension",
-      }),
-      createdAt: now,
+      },
     });
 
     return { success: true };
@@ -408,17 +408,16 @@ export const revokeAllMemberSessions = mutation({
       "All sessions revoked by administrator"
     );
 
-    await ctx.db.insert("auditLogs", {
+    await createAuditLog(ctx, {
       organizationId: args.organizationId,
       userId: actor._id,
       action: "access.token_revoked",
-      details: JSON.stringify({
+      details: {
         targetUserId: args.targetUserId,
         revokedCliTokens: revokedCliCount,
         revokedExtensionSessions: revokedExtensionCount,
         type: "all",
-      }),
-      createdAt: now,
+      },
     });
 
     return {

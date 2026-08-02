@@ -1384,4 +1384,36 @@ The bug only existed in production, where the platform redacts internal error de
 ### Docs
 - Both MCP tool tables now show the API-key resource each tool requires, and a required-scopes callout sits next to the setup instructions`,
   },
+
+  // ============================================================
+  // v1.54.0 — Slack & Discord Notifications (2026-08-02)
+  // ============================================================
+  {
+    title: "Slack & Discord Notifications with Project-Level Routing",
+    version: "v1.54.0",
+    type: "feature",
+    publishedAt: ts("2026-08-02T05:00:00Z"),
+    content: `Envpilot can now send organization activity to the Slack and Discord channels where each team already works—without ever placing secret values in a message.
+
+### Connect a Channel
+- Connect Slack or Discord through a one-click OAuth flow and choose the destination channel during authorization
+- Connect the same provider more than once when different teams or projects need separate destinations
+- Manual webhook setup remains available as an advanced fallback
+
+### Route Only What Matters
+- Send activity from every project or select the exact projects assigned to a destination
+- Choose event groups independently: variable changes, access requests, member activity, and security events
+- Pause or resume a destination, send a test notification, update its routing, or remove it from one management view
+
+### Secret-Safe by Design
+- Notifications contain useful context such as project, environment, variable name, actor, and outcome—but never the secret value
+- Provider webhook URLs are encrypted in the vault instead of being stored in plaintext
+- Delivery is queued, rate-limited, retried safely, and automatically disabled after repeated permanent failures
+
+### Production Polish
+- The Integrations tab disappears completely when the feature gate is disabled and respects plan availability when enabled
+- Slack and Discord use their real product marks, with clear loading, empty, success, and error states throughout setup
+- Existing Pro subscribers are returned to billing with a friendly "already on Pro" notice instead of a raw checkout error
+- The landing page now showcases Slack, Discord, GitHub Actions, MCP, the read-only REST API, and the engineering blog as connected Envpilot workflows`,
+  },
 ];

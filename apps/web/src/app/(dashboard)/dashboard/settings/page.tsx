@@ -134,6 +134,7 @@ export default function SettingsPage() {
           <BillingSettings
             organizationId={organization?.id}
             organizationSlug={organization?.slug ?? undefined}
+            alreadyProNotice={searchParams.get("notice") === "already-pro"}
           />
         )}
       </div>
@@ -1567,9 +1568,11 @@ const CANCEL_REASONS = [
 function BillingSettings({
   organizationId,
   organizationSlug,
+  alreadyProNotice,
 }: {
   organizationId: string | undefined;
   organizationSlug: string | null | undefined;
+  alreadyProNotice: boolean;
 }) {
   const { data: subscription, isLoading } = useSubscription(organizationId);
   const portalMutation = useCreatePortalSession();
@@ -1712,6 +1715,13 @@ function BillingSettings({
 
   return (
     <div className="space-y-6">
+      {alreadyProNotice && (
+        <div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3 text-sm text-green-300">
+          <Check className="h-4 w-4 shrink-0" />
+          You&apos;re already on the Pro plan. Your subscription is active.
+        </div>
+      )}
+
       {/* Subscription Details */}
       <TerminalCard>
         <div className="flex items-center gap-3">

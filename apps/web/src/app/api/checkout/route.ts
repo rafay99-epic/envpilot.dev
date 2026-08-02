@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/nextjs";
 import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { isPaymentsEnabled } from "@/lib/polar";
+import { sanitizeConvexError } from "@/lib/error-messages";
 
 /**
  * GET /api/checkout?tier=<tier-name>   (default: "pro")
@@ -142,17 +143,23 @@ export async function GET(req: Request) {
   // Authorization + double-subscribe guard (Convex verifies the caller is
   // the org's creating account and has no live subscription).
   try {
-    await createAuthedConvexClient(workosAccessToken!).mutation(
-      api.features.billing.checkout.prepareCheckout,
-      { organizationId: primaryOrg._id }
-    );
+    const checkoutState = await createAuthedConvexClient(
+      workosAccessToken!
+    ).mutation(api.features.billing.checkout.prepareCheckout, {
+      organizationId: primaryOrg._id,
+    });
+    if (checkoutState.status === "already_subscribed") {
+      return NextResponse.redirect(
+        new URL("/dashboard/settings?tab=billing&notice=already-pro", origin)
+      );
+    }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Checkout is not available";
-    // Convex prefixes mutation errors; keep just the human-readable tail.
-    const clean =
-      message.split("Uncaught Error:").pop()?.trim() ?? "Checkout failed";
-    return redirectWithError(clean);
+    const clean = sanitizeConvexError(error);
+    return redirectWithError(
+      clean && clean !== "Server Error"
+        ? clean
+        : "Checkout isn't available right now. Please try again."
+    );
   }
 
   // --- Ensure Polar customer exists BEFORE checkout ---

@@ -525,6 +525,7 @@ async function updateCore(
     action: auditAction,
     details: {
       key: variable.key,
+      environments: updates.environments ?? variable.environments,
       newVersion,
       previousVersion: variable.version,
       changeReason,
@@ -892,6 +893,7 @@ export const restore = mutation({
       action: "variable.restored",
       details: {
         key: variable.key,
+        environments: variable.environments,
         deletedAt: variable.deletedAt,
         restoredAt: now,
       },
@@ -978,6 +980,7 @@ export const rollback = mutation({
       action: "variable.rollback",
       details: {
         key: variable.key,
+        environments: targetVersionRecord.environments,
         rollbackToVersion: args.targetVersion,
         previousVersion: variable.version,
         newVersion,

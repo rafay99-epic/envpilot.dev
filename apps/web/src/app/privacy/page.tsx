@@ -22,6 +22,7 @@ const SECTIONS = [
   { id: "data-security", label: "Data Security" },
   { id: "legal-bases", label: "Legal Bases (GDPR)" },
   { id: "third-parties", label: "Third-Party Processors" },
+  { id: "connected-services", label: "Slack & Discord" },
   { id: "international-transfers", label: "International Transfers" },
   { id: "cookies", label: "Cookies" },
   { id: "data-retention", label: "Data Retention" },
@@ -38,7 +39,7 @@ export default function PrivacyPolicyPage() {
       <PageHero eyebrow="privacy" title="Privacy Policy" align="left">
         <span className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 font-mono text-xs text-zinc-400">
           <span className="text-green-500">&#10095;</span>
-          Effective: March 10, 2026 &middot; Last updated: July 12, 2026
+          Effective: March 10, 2026 &middot; Last updated: August 2, 2026
         </span>
       </PageHero>
 
@@ -170,6 +171,22 @@ export default function PrivacyPolicyPage() {
                   provided), and vote data.
                 </p>
               </Subsection>
+
+              <Subsection title="3.8 Integration Data">
+                <p>
+                  When an authorized Organization member connects Slack or
+                  Discord, the provider may return an authorization code, access
+                  or refresh token, and workspace, server, user, or channel
+                  identifiers while the connection is completed. We use these
+                  values transiently to provision the incoming webhook and do
+                  not retain them. We retain the provider type, channel name,
+                  selected project and event preferences, delivery status, and
+                  incoming webhook URL. The webhook URL is a sensitive
+                  credential: it is encrypted in WorkOS Vault, while our
+                  database stores only an opaque vault reference and a masked
+                  preview.
+                </p>
+              </Subsection>
             </Section>
 
             <Section id="how-we-use-data" n={4} title="How We Use Your Data">
@@ -191,6 +208,11 @@ export default function PrivacyPolicyPage() {
                 <Li>
                   <Term>Communications:</Term> send team invitations and
                   account-related notifications.
+                </Li>
+                <Li>
+                  <Term>Connected services:</Term> deliver the Organization
+                  activity notifications you configure to selected Slack or
+                  Discord channels.
                 </Li>
                 <Li>
                   <Term>Product improvement:</Term> analyze usage patterns in
@@ -322,6 +344,24 @@ export default function PrivacyPolicyPage() {
                       <td className="px-4 py-3">Application hosting</td>
                       <td className="px-4 py-3">Server logs, IP addresses</td>
                     </tr>
+                    <tr>
+                      <td className="px-4 py-3 text-green-400">Slack</td>
+                      <td className="px-4 py-3">
+                        User-configured channel notifications
+                      </td>
+                      <td className="px-4 py-3">
+                        Project activity metadata; never secret values
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-3 text-green-400">Discord</td>
+                      <td className="px-4 py-3">
+                        User-configured channel notifications
+                      </td>
+                      <td className="px-4 py-3">
+                        Project activity metadata; never secret values
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -332,8 +372,61 @@ export default function PrivacyPolicyPage() {
             </Section>
 
             <Section
-              id="international-transfers"
+              id="connected-services"
               n={8}
+              title="Slack and Discord Integrations"
+            >
+              <Subsection title="8.1 Authorization and Access">
+                <p>
+                  Envpilot requests only the permission required to create an
+                  incoming webhook for the channel you select. The integration
+                  does not request permission to read channel history, direct
+                  messages, files, user profiles, or existing messages. OAuth
+                  authorization codes, access or refresh tokens, and provider
+                  identifiers returned during setup are used transiently to
+                  complete the connection and are not retained. We retain only
+                  the resulting encrypted incoming webhook credential and the
+                  connection settings described above.
+                </p>
+              </Subsection>
+
+              <Subsection title="8.2 Notification Data">
+                <p>
+                  Depending on the event groups selected by your Organization,
+                  notifications may contain project and environment names,
+                  variable key names, access-request activity, actor or
+                  key-owner identity, invitee or member email addresses,
+                  shared-account names, API-key names, device names, roles, and
+                  a link back to Envpilot. Secret and environment variable
+                  values are never included in Slack or Discord notifications.
+                </p>
+              </Subsection>
+
+              <Subsection title="8.3 Provider Processing">
+                <p>
+                  We send notifications to Slack or Discord only when your
+                  Organization enables and configures that destination. Once a
+                  message is delivered, the provider and the administrators of
+                  the receiving workspace or server control its storage, access,
+                  retention, and deletion under their own policies.
+                </p>
+              </Subsection>
+
+              <Subsection title="8.4 Disconnecting an Integration">
+                <p>
+                  Authorized Organization members may pause or delete a
+                  destination at any time. Deleting it removes the Envpilot
+                  configuration and schedules deletion of its encrypted webhook
+                  credential. It does not remove messages previously delivered
+                  to the provider; contact the relevant workspace or server
+                  administrator to manage those messages.
+                </p>
+              </Subsection>
+            </Section>
+
+            <Section
+              id="international-transfers"
+              n={9}
               title="International Data Transfers"
             >
               <p>
@@ -360,7 +453,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </Section>
 
-            <Section id="cookies" n={9} title="Cookies and Tracking">
+            <Section id="cookies" n={10} title="Cookies and Tracking">
               <p>
                 We use only strictly necessary cookies required for the Service
                 to function:
@@ -404,7 +497,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </Section>
 
-            <Section id="data-retention" n={10} title="Data Retention">
+            <Section id="data-retention" n={11} title="Data Retention">
               <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
                 <ul className="space-y-2 pl-4">
                   <Li>
@@ -431,12 +524,18 @@ export default function PrivacyPolicyPage() {
                     <Term>Invitation records:</Term> expired/declined
                     invitations retained 90 days, then deleted.
                   </Li>
+                  <Li>
+                    <Term>Integration credentials:</Term> retained while the
+                    destination remains connected. Deletion removes the Envpilot
+                    record and schedules deletion of the encrypted webhook
+                    credential.
+                  </Li>
                 </ul>
               </div>
             </Section>
 
-            <Section id="your-rights" n={11} title="Your Rights">
-              <Subsection title="11.1 GDPR Rights (EEA/UK)">
+            <Section id="your-rights" n={12} title="Your Rights">
+              <Subsection title="12.1 GDPR Rights (EEA/UK)">
                 <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
                   <p>You have the right to:</p>
                   <ul className="mt-2 space-y-1 pl-4">
@@ -472,7 +571,7 @@ export default function PrivacyPolicyPage() {
                 </div>
               </Subsection>
 
-              <Subsection title="11.2 U.S. State Privacy Laws">
+              <Subsection title="12.2 U.S. State Privacy Laws">
                 <p>
                   If you reside in California (CCPA/CPRA), Virginia (VCDPA),
                   Colorado (CPA), Connecticut (CTDPA), or other U.S. states with
@@ -494,7 +593,7 @@ export default function PrivacyPolicyPage() {
                 </p>
               </Subsection>
 
-              <Subsection title="11.3 Asia-Pacific Privacy Laws">
+              <Subsection title="12.3 Asia-Pacific Privacy Laws">
                 <ul className="mt-2 space-y-2 pl-4">
                   <Li>
                     <Term>Japan (APPI):</Term> You may request disclosure,
@@ -518,7 +617,7 @@ export default function PrivacyPolicyPage() {
                 </ul>
               </Subsection>
 
-              <Subsection title="11.4 How to Exercise Your Rights">
+              <Subsection title="12.4 How to Exercise Your Rights">
                 <p>
                   Contact us at{" "}
                   <a
@@ -534,7 +633,7 @@ export default function PrivacyPolicyPage() {
               </Subsection>
             </Section>
 
-            <Section id="childrens-privacy" n={12} title="Children's Privacy">
+            <Section id="childrens-privacy" n={13} title="Children's Privacy">
               <p>
                 The Service is not directed at individuals under 16 years of age
                 (or the applicable minimum age in your jurisdiction). We do not
@@ -546,7 +645,7 @@ export default function PrivacyPolicyPage() {
 
             <Section
               id="breach-notification"
-              n={13}
+              n={14}
               title="Data Breach Notification"
             >
               <p>
@@ -559,7 +658,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </Section>
 
-            <Section id="changes" n={14} title="Changes to This Policy">
+            <Section id="changes" n={15} title="Changes to This Policy">
               <p>
                 We may update this Privacy Policy from time to time. We will
                 notify you of material changes by posting the updated policy
@@ -570,7 +669,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </Section>
 
-            <Section id="contact" n={15} title="Contact">
+            <Section id="contact" n={16} title="Contact">
               <p>
                 For questions, concerns, or requests related to this Privacy
                 Policy or your personal data:

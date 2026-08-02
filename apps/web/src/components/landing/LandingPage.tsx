@@ -7,6 +7,9 @@ import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import {
   ArrowRight,
+  BookOpen,
+  Bot,
+  Braces,
   Check,
   Copy,
   Eye,
@@ -156,8 +159,9 @@ function Hero() {
           className="mx-auto mt-6 max-w-2xl font-mono text-sm leading-relaxed text-zinc-500 md:text-base"
         >
           Envpilot keeps your team&apos;s environment variables in sync — CLI,
-          VS Code extension, and web dashboard. Encrypted end to end, open
-          source (MIT). Free for small teams, no credit card.
+          VS Code, GitHub Actions, the REST API, MCP clients, and the web
+          dashboard. Send secret-safe activity alerts to Slack or Discord.
+          Encrypted end to end, open source (MIT), and free for small teams.
         </motion.p>
 
         <motion.div
@@ -239,7 +243,12 @@ const PROOF_BADGES = [
   {
     strong: "MCP",
     label: "server for AI agents",
-    href: `${SITE_URLS.docs}/mcp-server`,
+    href: "/#integrations",
+  },
+  {
+    strong: "Slack + Discord",
+    label: "project-aware alerts",
+    href: "/#integrations",
   },
   {
     strong: "changelog",
@@ -648,10 +657,10 @@ function Platform() {
           eyebrow="platform"
           title={
             <>
-              Three surfaces, <span className="text-green-400">one vault</span>
+              One vault, <span className="text-green-400">every workflow</span>
             </>
           }
-          description="Terminal, IDE, or browser — your secrets stay encrypted and in sync everywhere your team works."
+          description="Work from the terminal, IDE, or browser — then carry the same scoped access into CI, AI tools, and team channels."
         />
 
         <Stagger className="mt-14 grid gap-4 md:grid-cols-3">
@@ -686,6 +695,195 @@ function Platform() {
               </motion.div>
             </StaggerItem>
           ))}
+        </Stagger>
+      </div>
+    </section>
+  );
+}
+
+/* ─────────────────────────── integrations ─────────────────────────── */
+
+function SlackDiscordMarks() {
+  return (
+    <div className="flex -space-x-2" aria-label="Slack and Discord">
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-zinc-950 bg-white p-2">
+        <svg viewBox="0 0 54 54" className="h-full w-full" aria-hidden="true">
+          <path
+            d="M11.379 33.9993c0 3.1365-2.53388 5.6514-5.6514 5.6514-3.11752 0-5.67038-2.5339-5.67038-5.6514 0-3.1176 2.53388-5.6514 5.6514-5.6514H11.36v5.6514h.019Z"
+            fill="#E01E5A"
+          />
+          <path
+            d="M14.1962 33.9997c0-3.1365 2.5339-5.6514 5.6514-5.6514s5.6514 2.5339 5.6514 5.6514v14.1356c0 3.1365-2.5339 5.6514-5.6514 5.6514s-5.6514-2.5149-5.6514-5.6514V33.9997Z"
+            fill="#E01E5A"
+          />
+          <path
+            d="M19.8662 11.2673c-3.1366 0-5.6514-2.53383-5.6514-5.65136 0-3.11752 2.5338-5.6513938 5.6514-5.6513938 3.1175 0 5.6513 2.5338738 5.6513 5.6513938v5.65136h-5.6513Z"
+            fill="#36C5F0"
+          />
+          <path
+            d="M19.8682 14.1334c3.1365 0 5.6514 2.5339 5.6514 5.6514s-2.5339 5.6514-5.6514 5.6514H5.67566c-3.1365 0-5.6513985-2.5339-5.6513985-5.6514s2.5338785-5.6514 5.6513985-5.6514H19.8682Z"
+            fill="#36C5F0"
+          />
+          <path
+            d="M42.5323 19.7853c0-3.1365 2.5339-5.6514 5.6514-5.6514s5.6514 2.5339 5.6514 5.6514-2.5339 5.6514-5.6514 5.6514h-5.6514v-5.6514Z"
+            fill="#2EB67D"
+          />
+          <path
+            d="M39.7126 19.7934c0 3.1365-2.5339 5.6514-5.6514 5.6514s-5.6514-2.5338-5.6514-5.6514V5.61986c0-3.1365 2.5338-5.6513999 5.6514-5.6513999 3.1175 0 5.6514 2.5148999 5.6514 5.6513999V19.7934Z"
+            fill="#2EB67D"
+          />
+          <path
+            d="M34.0376 42.482c3.1365 0 5.6514 2.5338 5.6514 5.6514 0 3.1175-2.5338 5.6514-5.6514 5.6514-3.1175 0-5.6514-2.5339-5.6514-5.6514V42.482h5.6514Z"
+            fill="#ECB22E"
+          />
+          <path
+            d="M34.0381 39.6507c-3.1365 0-5.6514-2.5339-5.6514-5.6514s2.5339-5.6514 5.6514-5.6514h14.1925c3.1365 0 5.6514 2.5339 5.6514 5.6514s-2.5338 5.6514-5.6514 5.6514H34.0381Z"
+            fill="#ECB22E"
+          />
+        </svg>
+      </span>
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-zinc-950 bg-[#5865F2] p-2">
+        <svg viewBox="0 0 64 48" className="h-full w-full" aria-hidden="true">
+          <path
+            d="M40.575 0c-.6188 1.09866-1.1744 2.2352-1.6796 3.397-4.7987-.71981-9.6858-.71981-14.4972 0C23.9057 2.2352 23.3374 1.09866 22.7186 0 18.2104.770324 13.8157 2.12155 9.64839 4.02841 1.38951 16.2652-.845688 28.1863.265599 39.9432 5.10222 43.517 10.5197 46.2447 16.2909 47.9874c1.3007-1.7427 2.4498-3.5991 3.4348-5.5312-1.8689-.6946-3.6748-1.5659-5.4049-2.5762.4547-.3283.8967-.6693 1.326-.9976 10.1405 4.7735 21.8848 4.7735 32.0379 0 .4294.3536.8714.6946 1.326.9976-1.7301 1.0229-3.5359 1.8816-5.4176 2.5888.985 1.9321 2.1342 3.7885 3.4349 5.5312 5.7711-1.7427 11.1887-4.4452 16.0253-8.0189C64.3666 26.3299 60.8055 14.5099 53.6452 4.04104 49.4905 2.13418 45.0959.782952 40.5876.0252565L40.575 0ZM21.1401 32.7072c-3.1192 0-5.708-2.8287-5.708-6.3268 0-3.498 2.4878-6.3394 5.6954-6.3394s5.7585 2.854 5.7079 6.3394c-.0505 3.4854-2.513 6.3268-5.6953 6.3268Zm21.0387 0c-3.1318 0-5.6954-2.8287-5.6954-6.3268 0-3.498 2.4878-6.3394 5.6954-6.3394s5.7458 2.854 5.6953 6.3394c-.0505 3.4854-2.513 6.3268-5.6953 6.3268Z"
+            fill="white"
+          />
+        </svg>
+      </span>
+    </div>
+  );
+}
+
+const CONNECTIONS = [
+  {
+    title: "GitHub Actions",
+    eyebrow: "CI/CD",
+    description:
+      "Pull variables into jobs with envpilot-action@v1. Values are masked before export, while tokens remain read-only, scoped, and revocable.",
+    detail: "Scoped tokens · masked logs · zero committed .env files",
+    href: "https://github.com/rafay99-epic/envpilot-action",
+    cta: "View the action",
+    icon: Github,
+  },
+  {
+    title: "MCP server",
+    eyebrow: "AI agents",
+    description:
+      "Give Claude, Codex, Cursor, and other MCP clients audited access to only the projects and operations you approve.",
+    detail: "Scoped API keys · audited tools · no .env in the repo",
+    href: "/sign-up",
+    cta: "Create a scoped key",
+    icon: Bot,
+  },
+  {
+    title: "Giving AI access without giving it your .env",
+    eyebrow: "From the blog",
+    description:
+      "A practical look at scoped, read-only, audited secret access over MCP—and what an agent should never be able to do.",
+    detail: "Guide · MCP · security · July 23, 2026",
+    href: `${SITE_URLS.blog}/giving-claude-code-secrets-without-your-dotenv`,
+    cta: "Read the article",
+    icon: BookOpen,
+  },
+];
+
+function IntegrationLink({ href, label }: { href: string; label: string }) {
+  const external = !href.startsWith("/");
+
+  return (
+    <a
+      href={href}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noopener noreferrer" : undefined}
+      className="group mt-6 inline-flex items-center gap-2 font-mono text-xs font-semibold text-green-400 transition-colors hover:text-green-300"
+    >
+      {label}
+      <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+    </a>
+  );
+}
+
+function Integrations() {
+  return (
+    <section id="integrations" className="relative overflow-hidden py-28">
+      <AuroraGlow className="opacity-40" />
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+        <SectionHeading
+          eyebrow="connected workflows"
+          title={
+            <>
+              Envpilot goes where the{" "}
+              <span className="text-green-400">work happens</span>
+            </>
+          }
+          description="Deployments, AI agents, and team channels use the same scoped access model and audit trail—without spreading secret values around."
+        />
+
+        <Stagger className="mt-14 grid border-y border-zinc-800/80 lg:grid-cols-2">
+          <StaggerItem className="border-b border-zinc-800/80 p-7 lg:border-r lg:p-10">
+            <SlackDiscordMarks />
+            <p className="mt-7 font-mono text-[11px] uppercase tracking-[0.18em] text-green-400">
+              Team notifications
+            </p>
+            <h3 className="mt-2 font-sans text-xl font-semibold text-zinc-100">
+              Slack & Discord
+            </h3>
+            <p className="mt-3 max-w-lg text-sm leading-relaxed text-zinc-500">
+              Connect a channel in one click. Route variable, access-request,
+              member, and security activity by project—never secret values.
+            </p>
+            <p className="mt-5 font-mono text-[11px] text-zinc-600">
+              Per-project routing · pause and resume · test delivery
+            </p>
+            <IntegrationLink href="/sign-up" label="Connect your team" />
+          </StaggerItem>
+
+          {CONNECTIONS.map((connection, index) => (
+            <StaggerItem
+              key={connection.title}
+              className={`border-b border-zinc-800/80 p-7 lg:p-10 ${
+                index === 1 ? "lg:border-r" : ""
+              }`}
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/80 text-green-400">
+                <connection.icon className="h-4.5 w-4.5" aria-hidden="true" />
+              </span>
+              <p className="mt-7 font-mono text-[11px] uppercase tracking-[0.18em] text-green-400">
+                {connection.eyebrow}
+              </p>
+              <h3 className="mt-2 font-sans text-xl font-semibold text-zinc-100">
+                {connection.title}
+              </h3>
+              <p className="mt-3 max-w-lg text-sm leading-relaxed text-zinc-500">
+                {connection.description}
+              </p>
+              <p className="mt-5 font-mono text-[11px] text-zinc-600">
+                {connection.detail}
+              </p>
+              <IntegrationLink href={connection.href} label={connection.cta} />
+            </StaggerItem>
+          ))}
+
+          <StaggerItem className="border-b border-zinc-800/80 p-7 lg:col-span-2 lg:p-10">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/80 text-green-400">
+              <Braces className="h-4.5 w-4.5" aria-hidden="true" />
+            </span>
+            <p className="mt-7 font-mono text-[11px] uppercase tracking-[0.18em] text-green-400">
+              Custom integrations
+            </p>
+            <h3 className="mt-2 font-sans text-xl font-semibold text-zinc-100">
+              REST API
+            </h3>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-zinc-500">
+              Pull scoped organization, project, variable, and shared-account
+              data into internal tools and custom workflows through the
+              read-only public API.
+            </p>
+            <p className="mt-5 font-mono text-[11px] text-zinc-600">
+              Bearer API keys · project and resource scopes · rate-limited
+            </p>
+            <IntegrationLink href="/sign-up" label="Create an API key" />
+          </StaggerItem>
         </Stagger>
       </div>
     </section>
@@ -1209,6 +1407,7 @@ export default function LandingPage({
       <Workflow />
       <FeaturesBento />
       <Platform />
+      <Integrations />
       <TrustSection />
       <Pricing pricingData={pricingData} paymentsEnabled={paymentsEnabled} />
       <Faq />

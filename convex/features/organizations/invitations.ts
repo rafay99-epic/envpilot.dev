@@ -18,6 +18,7 @@ import {
 } from "../../lib/authz";
 import { requireAuthedUser, getAuthedUser } from "../../lib/identity";
 import { voidTombstones } from "./tombstones";
+import { createAuditLog } from "../../lib/audit";
 
 /**
  * Invitation Queries and Mutations
@@ -243,16 +244,15 @@ export const create = mutation({
       createdAt: now,
     });
 
-    await ctx.db.insert("auditLogs", {
+    await createAuditLog(ctx, {
       organizationId: args.organizationId,
       userId: actor._id,
       action: "invitation.sent",
-      details: JSON.stringify({
+      details: {
         email: args.email,
         role: args.role,
         environments: args.environments ?? "all",
-      }),
-      createdAt: now,
+      },
     });
 
     return { invitationId, token };

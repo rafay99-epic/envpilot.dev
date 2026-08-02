@@ -22,6 +22,7 @@ export default authkitMiddleware({
       "/wishlist",
       "/privacy",
       "/terms",
+      "/logo",
       "/support",
       "/contact",
       "/pricing",

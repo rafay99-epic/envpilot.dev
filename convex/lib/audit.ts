@@ -1,6 +1,11 @@
 import { v } from "convex/values";
-import { mutation, MutationCtx } from "../_generated/server";
+import {
+  mutation,
+  type DatabaseReader,
+  type MutationCtx,
+} from "../_generated/server";
 import { Id, Doc } from "../_generated/dataModel";
+import { scheduleWebhookNotification } from "../features/integrations/notify";
 
 /**
  * Audit Log Helper Functions
@@ -84,6 +89,10 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "account.permission_granted": "info",
   "account.permission_revoked": "warning",
   "account.permission_updated": "info",
+  // Notification webhooks
+  "integration.webhook_created": "info",
+  "integration.webhook_updated": "info",
+  "integration.webhook_deleted": "warning",
 };
 
 // Resource type mapping for different action types
@@ -184,6 +193,10 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "account.permission_granted": "account",
   "account.permission_revoked": "account",
   "account.permission_updated": "account",
+  // Notification webhooks (org-scoped config)
+  "integration.webhook_created": "organization",
+  "integration.webhook_updated": "organization",
+  "integration.webhook_deleted": "organization",
 };
 
 export interface AuditLogInput {
@@ -205,6 +218,24 @@ export interface AuditLogInput {
 }
 
 /**
+ * Resolve an untrusted project candidate for an organization-scoped audit row.
+ * Invalid, deleted, and cross-organization projects deliberately collapse to
+ * `undefined` so audit enrichment can never attach another tenant's project.
+ */
+export async function resolveAuditProjectId(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">,
+  projectId: Id<"projects"> | undefined
+): Promise<Id<"projects"> | undefined> {
+  if (projectId === undefined) return undefined;
+  const project = await db.get(projectId);
+  return project?.organizationId === organizationId &&
+    project.deletedAt === undefined
+    ? project._id
+    : undefined;
+}
+
+/**
  * Create an audit log entry with auto-derived metadata
  */
 export async function createAuditLog(
@@ -220,7 +251,7 @@ export async function createAuditLog(
   // Auto-derive resource type if not provided
   const resourceType = input.resourceType ?? ACTION_RESOURCE_MAP[input.action];
 
-  return await ctx.db.insert("auditLogs", {
+  const auditLogId = await ctx.db.insert("auditLogs", {
     organizationId: input.organizationId,
     projectId: input.projectId,
     variableId: input.variableId,
@@ -237,6 +268,8 @@ export async function createAuditLog(
     geoLocation: input.geoLocation,
     createdAt: now,
   });
+  await scheduleWebhookNotification(ctx, auditLogId, input.action);
+  return auditLogId;
 }
 
 /**
@@ -309,9 +342,11 @@ export async function logVariableAccess(
     action,
     details: {
       variableKey: input.variableKey,
+      key: input.variableKey,
       accessType: input.accessType,
       isSensitive: input.isSensitive,
       environment: input.environment,
+      environments: input.environment ? [input.environment] : [],
     },
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
