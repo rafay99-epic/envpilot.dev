@@ -1,0 +1,44 @@
+convex/features/files/values.ts
+  s_e94a11bf9b2f48::t_c0dc828a99a27b 152,223
+  s_e94a11bf9b2f48::t_89e5180800625b 199-211
+apps/web/src/components/files/file-permissions-drawer.tsx
+  s_e94a11bf9b2f48::t_642dccf1ae8490 46-47,120-121
+  s_e94a11bf9b2f48::t_10ff67bf28615d 1-31,36-45,48-119,122-196
+  s_e94a11bf9b2f48::t_89e5180800625b 32-35
+apps/web/src/components/files/file-list-item.tsx
+  s_e94a11bf9b2f48::t_cd0748b7c496ce 1-198
+apps/web/src/hooks/index.ts
+  s_e94a11bf9b2f48::t_8b85b4e8342c86 157-175
+apps/web/src/components/dashboard/dashboard-nav.tsx
+  s_e94a11bf9b2f48::t_8b85b4e8342c86 9,230-233
+  s_e94a11bf9b2f48::t_89f3c562e415c6 234
+apps/web/src/components/files/index.ts
+  s_e94a11bf9b2f48::t_747a3bc80fbad0 1-3
+convex/features/files/mutations.ts
+  s_e94a11bf9b2f48::t_c0dc828a99a27b 12,64,188,292,372-376,497,510,533,540,571,597,623,690,702,735,744,753,778,790,809,818
+apps/web/src/hooks/useSecretFiles.ts
+  s_e94a11bf9b2f48::t_0115a7f7fc0791 1-164
+apps/web/src/components/files/file-form-drawer.tsx
+  s_e94a11bf9b2f48::t_e405e54299fb8a 3,34-51,59-65
+  s_e94a11bf9b2f48::t_0aa8bda6637f1e 1-2,4-33,52-58,66-326
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/files/page.tsx
+  s_e94a11bf9b2f48::t_89e5180800625b 210
+  s_e94a11bf9b2f48::t_642dccf1ae8490 197,199,340,347,350
+  s_e94a11bf9b2f48::t_e2821c16a3d7e1 1-196,198,200-209,211-339,341-346,348-349,351-354
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "62e00219e6c0b48967c9e136fe70f24c42d3cb5e",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
