@@ -10,6 +10,11 @@ import {
   diff as showDiff,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
+import {
+  ignoreSecretFilePaths,
+  statusOf,
+  writeSecretFile,
+} from "../lib/secret-files.js";
 import { isAuthenticated } from "../lib/config.js";
 import {
   readProjectConfig,
@@ -100,6 +105,10 @@ export const pullCommand = new Command("pull")
     "AWS Parameter Store path prefix (default: /project-name)"
   )
   .option("--dry-run", "Show what would be downloaded without writing")
+  .option(
+    "--files",
+    "Also materialise secret files (keystores, SSH keys, certificates)"
+  )
   .option("--project <name-or-id>", "Pull a specific linked project")
   .option("--all", "Pull all linked projects")
   .action(async (options) => {
@@ -242,6 +251,7 @@ async function pullSingleProject(
     format?: string;
     prefix?: string;
     dryRun?: boolean;
+    files?: boolean;
   }
 ): Promise<void> {
   checkTrackedFiles();
@@ -263,6 +273,65 @@ async function pullSingleProject(
     },
     outputPath,
     options
+  );
+
+  if (options.files && !options.dryRun) {
+    await pullSecretFiles(project.projectId, environment, options.force);
+  }
+}
+
+/**
+ * Materialise a project's secret files alongside the .env.
+ *
+ * Deliberately additive and opt-in: `pull` has always produced exactly one
+ * file, and silently scattering keystores through someone's tree would be a
+ * surprising change of contract. The work itself is the same as
+ * `envpilot files pull`.
+ */
+async function pullSecretFiles(
+  projectId: string,
+  environment: string,
+  force?: boolean
+): Promise<void> {
+  const client = createAPIClient();
+  const files = await client.listSecretFiles(projectId, environment);
+  if (files.length === 0) return;
+
+  const root = process.cwd();
+
+  const conflicts = files.filter((file) => statusOf(file, root) === "modified");
+  if (conflicts.length > 0 && !force) {
+    console.log();
+    warning(
+      "Secret files skipped — these local copies differ from the server:"
+    );
+    for (const file of conflicts) console.log(`    ${file.path}`);
+    info("Re-run with --force to replace them.");
+    return;
+  }
+
+  // .gitignore before the write, never after.
+  ignoreSecretFilePaths(
+    root,
+    files.map((f) => f.path)
+  );
+
+  console.log();
+  let written = 0;
+  for (const file of files) {
+    if (statusOf(file, root) === "in-sync") continue;
+    const content = await client.getSecretFileContent(file._id);
+    writeSecretFile(
+      root,
+      content.path,
+      Buffer.from(content.content, "base64"),
+      content.mode
+    );
+    written += 1;
+    console.log(`  ${chalk.green("✓")} ${file.path}  ${file.mode}`);
+  }
+  success(
+    `${written} secret file${written === 1 ? "" : "s"} written, ${files.length - written} unchanged`
   );
 }
 
