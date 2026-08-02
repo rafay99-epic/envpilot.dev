@@ -1,0 +1,63 @@
+apps/web/src/lib/__tests__/role-parity.test.ts
+  s_e94a11bf9b2f48::t_3f38e106bbd5e9 84-87,102-105,119-122,130
+convex/features/files/mutations.ts
+  s_e94a11bf9b2f48::t_04cf76842ba5f5 1-406,411-444,447-829
+  s_e94a11bf9b2f48::t_54cc4948ffdc10 407-410,445-446
+convex/lib/capabilities.ts
+  s_e94a11bf9b2f48::t_94bc4dcbd1b5eb 297-300
+  s_e94a11bf9b2f48::t_04d5162141e8d2 164-182
+convex/lib/roleProfiles.ts
+  s_e94a11bf9b2f48::t_c9f2ed64de5b94 68-70,115-117,147-149,176,208-210
+convex/_generated/api.d.ts
+  s_e94a11bf9b2f48::t_6787f80478a8f8 58-63,180-185
+convex/lib/seedData.ts
+  s_e94a11bf9b2f48::t_aa6aa8bf98e860 235-261
+convex/features/files/values.ts
+  s_e94a11bf9b2f48::t_a906566822ad66 41-74,136-138,151,196-198,219,269-270,275
+  s_e94a11bf9b2f48::t_da963c854cdcde 1-6,15-40,75-135,139-150,152-195,209-218,220-268,271-274,276-306
+  s_e94a11bf9b2f48::t_54cc4948ffdc10 7-14,199-208
+convex/features/featureRegistry/gates.ts
+  s_e94a11bf9b2f48::t_aa6aa8bf98e860 367-402
+convex/features/files/helpers.ts
+  s_e94a11bf9b2f48::t_b86381da31f210 1-194
+convex/lib/authz.ts
+  s_e94a11bf9b2f48::t_0b7bd1d9c3dbe4 843-903
+convex/lib/authHelpers.ts
+  s_e94a11bf9b2f48::t_543ed3888a0aef 7,153-214,217,220
+  s_e94a11bf9b2f48::t_3d6dd6297a9cc8 215-216,218-219
+convex/features/files/blobStore.ts
+  s_e94a11bf9b2f48::t_b071e805fe26da 1-68
+convex/features/vault/gc.ts
+  s_e94a11bf9b2f48::t_b8570fe68fcf3c 76-82,122-138,215-244,340,358,371,417-450,453-454,470
+convex/schema.ts
+  s_e94a11bf9b2f48::t_eb9916ca5ee5ac 1146-1147
+  s_e94a11bf9b2f48::t_85f12fb3b41606 1106-1114
+  s_e94a11bf9b2f48::t_2d3ace12b4127e 540-639
+convex/features/files/queries.ts
+  s_e94a11bf9b2f48::t_47b1f20cddef6a 1-278,282-398
+  s_e94a11bf9b2f48::t_54cc4948ffdc10 279-281
+convex/lib/audit.ts
+  s_e94a11bf9b2f48::t_eb9916ca5ee5ac 29-30
+  s_e94a11bf9b2f48::t_e742d6c7ece899 93-100,205-212
+convex/features/files/crypto.ts
+  s_e94a11bf9b2f48::t_f6a7af72fce348 1-56,72-103,105-111,119,121,123-154,156-160,162,164-166
+  s_e94a11bf9b2f48::t_25f81f7924e424 57-71,104,112-118,120,122,155,161,163
+convex/features/admin/migrations.ts
+  s_e94a11bf9b2f48::t_aa6aa8bf98e860 526-528,563-565
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "78004bdb0a5470aa732d176c59e47aaffef72034",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
