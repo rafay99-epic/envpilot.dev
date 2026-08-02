@@ -1,0 +1,306 @@
+import { v } from "convex/values";
+import { ConvexError } from "convex/values";
+import { action } from "../../_generated/server";
+import type { ActionCtx } from "../../_generated/server";
+import { api, internal } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
+import {
+  digest,
+  fromBase64,
+  newDigestSalt,
+  open,
+  seal,
+  toBase64,
+} from "./crypto";
+import * as blobStore from "./blobStore";
+
+/**
+ * Composed secret-file actions — the ONLY place plaintext and key material
+ * meet.
+ *
+ * Both the browser and the session-authenticated clients (CLI, VS Code
+ * extension) call these directly with a WorkOS JWT, exactly as they already
+ * call features/variables/values:pullValues. There is no Next.js hop for
+ * session auth; `/api/v1/files` exists only for `envpk_` API keys, and it
+ * calls the same actions underneath.
+ *
+ * WRITE ORDER (non-negotiable):
+ *   1. preflight — authz, tier gates, path conflict. Zero side effects.
+ *   2. seal      — fresh AES key, fresh nonce, ciphertext in memory.
+ *   3. blob      — ciphertext into storage.
+ *   4. vault     — key material into WorkOS Vault.
+ *   5. row       — pointers into Convex.
+ * A failure at any step destroys what the earlier steps created, so a
+ * rejected upload never leaves an orphaned blob or a live key to nothing.
+ *
+ * Reads never degrade: a missing blob or a failed decrypt THROWS. A partial
+ * or zero-byte signing key is worse than a failed pull, because it fails
+ * later and somewhere confusing.
+ */
+
+interface PreflightResult {
+  name: string;
+  path: string;
+  mode: string;
+  organizationId: Id<"organizations">;
+}
+
+interface UploadResult {
+  fileId: Id<"projectFiles">;
+  size: number;
+  sha256: string;
+}
+
+interface FileContentRefs {
+  vaultRef: string;
+  storageId: Id<"_storage">;
+  name: string;
+  path: string;
+  mode: string;
+  size: number;
+  sha256: string;
+  contentType?: string;
+}
+
+interface FileContentResult {
+  name: string;
+  path: string;
+  mode: string;
+  size: number;
+  sha256: string;
+  contentType?: string;
+  content: string;
+}
+
+/** Resolve the caller's convex user _id from the verified JWT. Never an arg. */
+async function requireCurrentUserId(ctx: ActionCtx): Promise<Id<"users">> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    throw new ConvexError(
+      "Unauthenticated: no verified user identity on request"
+    );
+  }
+  const user = await ctx.runQuery(api.features.users.users.getByWorkosId, {
+    workosId: identity.subject,
+  });
+  if (!user) {
+    throw new ConvexError("User not found");
+  }
+  return user._id;
+}
+
+/** Destroy a (blob, vault) pair. Best effort — GC reconciles stragglers. */
+async function discardPair(
+  ctx: ActionCtx,
+  pair: { storageId?: Id<"_storage">; vaultRef?: string }
+): Promise<void> {
+  if (pair.storageId) {
+    await blobStore.del(ctx, pair.storageId);
+  }
+  if (pair.vaultRef) {
+    try {
+      await ctx.runAction(internal.features.vault.vault.deleteSecret, {
+        vaultRef: pair.vaultRef,
+      });
+    } catch {
+      // Best effort — an orphaned key unlocks nothing.
+    }
+  }
+}
+
+/**
+ * Upload a new secret file, or replace an existing file's contents.
+ *
+ * `content` is base64. The binding size limit is Convex's 16 MiB function
+ * argument ceiling (~12 MB of file after base64 inflation); the tier's
+ * `secret_files_max_bytes` is enforced well below that in preflight.
+ */
+export const uploadFile = action({
+  args: {
+    projectId: v.id("projects"),
+    name: v.string(),
+    path: v.string(),
+    content: v.string(),
+    mode: v.optional(v.string()),
+    contentType: v.optional(v.string()),
+    description: v.optional(v.string()),
+    environments: v.array(v.string()),
+    // Present to replace an existing file's contents in place.
+    replaceFileId: v.optional(v.id("projectFiles")),
+  },
+  returns: v.object({
+    fileId: v.id("projectFiles"),
+    size: v.number(),
+    sha256: v.string(),
+  }),
+  // Explicit return type: the handler calls api.features.files.* — which
+  // includes this action — so inference would be circular (TS7022).
+  handler: async (ctx, args): Promise<UploadResult> => {
+    const userId = await requireCurrentUserId(ctx);
+
+    let plaintext: Uint8Array;
+    try {
+      plaintext = fromBase64(args.content);
+    } catch {
+      throw new ConvexError("File content is not valid base64");
+    }
+
+    // STEP 1 — everything that can say no, before anything that costs money
+    // or leaves a trace. Returns the normalized values so the check and the
+    // insert cannot disagree about what the path is.
+    const preflight: PreflightResult = await ctx.runMutation(
+      api.features.files.mutations.preflightUpload,
+      {
+        projectId: args.projectId,
+        userId,
+        name: args.name,
+        path: args.path,
+        mode: args.mode,
+        environments: args.environments,
+        size: plaintext.length,
+        replaceFileId: args.replaceFileId,
+      }
+    );
+
+    // STEP 2 — fresh key, fresh nonce, every time. Never an in-place
+    // re-encrypt, so (key, iv) reuse is unreachable rather than guarded.
+    const digestSalt = newDigestSalt();
+    const sha256 = await digest(plaintext, digestSalt);
+    const sealed = await seal(plaintext);
+
+    // STEP 3 — ciphertext to the blob store.
+    const storageId = await blobStore.put(ctx, sealed.ciphertext);
+
+    // STEP 4 — key material to WorkOS Vault. Convex never holds both.
+    let vaultRef: string;
+    try {
+      const vault = await ctx.runAction(
+        internal.features.vault.vault.createSecret,
+        {
+          name: `file:${preflight.path}`,
+          value: sealed.keyMaterial,
+          organizationId: preflight.organizationId,
+          projectId: args.projectId,
+          environment: "file",
+        }
+      );
+      vaultRef = vault.id;
+    } catch (vaultError) {
+      await discardPair(ctx, { storageId });
+      throw vaultError;
+    }
+
+    // STEP 5 — pointers into Convex.
+    try {
+      if (args.replaceFileId) {
+        const previous: {
+          previousVaultRef: string;
+          previousStorageId: Id<"_storage">;
+        } = await ctx.runMutation(api.features.files.mutations.replaceContent, {
+          fileId: args.replaceFileId,
+          userId,
+          size: plaintext.length,
+          sha256,
+          digestSalt,
+          vaultRef,
+          storageId,
+          contentType: args.contentType,
+        });
+        // The row now points at the new pair, so the old one is unreachable
+        // and safe to destroy. Order is blob then key: a crash in between
+        // leaves a key to nothing, never bytes with a live key.
+        await discardPair(ctx, {
+          storageId: previous.previousStorageId,
+          vaultRef: previous.previousVaultRef,
+        });
+        return { fileId: args.replaceFileId, size: plaintext.length, sha256 };
+      }
+
+      const fileId: Id<"projectFiles"> = await ctx.runMutation(
+        api.features.files.mutations.create,
+        {
+          projectId: args.projectId,
+          createdBy: userId,
+          name: preflight.name,
+          path: preflight.path,
+          mode: preflight.mode,
+          contentType: args.contentType,
+          description: args.description,
+          environments: args.environments,
+          size: plaintext.length,
+          sha256,
+          digestSalt,
+          vaultRef,
+          storageId,
+        }
+      );
+      return { fileId, size: plaintext.length, sha256 };
+    } catch (mutationError) {
+      await discardPair(ctx, { storageId, vaultRef });
+      throw mutationError;
+    }
+  },
+});
+
+/**
+ * Decrypt and return ONE file. Audited on every call.
+ *
+ * One file per call by design: it bounds the response against Convex's
+ * 16 MiB return ceiling, keeps a single huge file from breaking a pull of
+ * all the others, and makes the audit trail per-file rather than per-batch.
+ * Callers that only need to know whether their copy is stale should use the
+ * `list` query and compare `sha256` — no decrypt required.
+ */
+export const getFileContent = action({
+  args: {
+    fileId: v.id("projectFiles"),
+    // Free-form provenance for the audit row: "web", "cli", "extension".
+    source: v.optional(v.string()),
+  },
+  returns: v.object({
+    name: v.string(),
+    path: v.string(),
+    mode: v.string(),
+    size: v.number(),
+    sha256: v.string(),
+    contentType: v.optional(v.string()),
+    content: v.string(),
+  }),
+  // Explicit return type — see uploadFile.
+  handler: async (ctx, args): Promise<FileContentResult> => {
+    const userId = await requireCurrentUserId(ctx);
+
+    // Authorization happens inside the internal query, which also hands back
+    // the refs that the metadata queries deliberately never expose.
+    const file: FileContentRefs = await ctx.runQuery(
+      internal.features.files.queries._getForContent,
+      { fileId: args.fileId, userId }
+    );
+
+    const ciphertext = await blobStore.get(ctx, file.storageId);
+    const keyMaterial = await ctx.runAction(
+      internal.features.vault.vault.readSecret,
+      { vaultRef: file.vaultRef }
+    );
+
+    // A tampered or truncated blob throws here — the GCM tag is a free
+    // integrity check and the throw is the whole point. Never caught.
+    const plaintext = await open(ciphertext, keyMaterial);
+
+    await ctx.runMutation(internal.features.files.mutations.logDownload, {
+      fileId: args.fileId,
+      userId,
+      source: args.source ?? "web",
+    });
+
+    return {
+      name: file.name,
+      path: file.path,
+      mode: file.mode,
+      size: file.size,
+      sha256: file.sha256,
+      contentType: file.contentType,
+      content: toBase64(plaintext),
+    };
+  },
+});

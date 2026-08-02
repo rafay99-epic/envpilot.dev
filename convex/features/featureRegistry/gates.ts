@@ -364,3 +364,39 @@ export async function countActiveAccounts(
   }
   return count;
 }
+
+/**
+ * Count active (non-deleted) secret files across an organization's projects.
+ *
+ * Same limit-first fan-out as countActiveAccounts: pass the resolved tier
+ * limit to stop as soon as capacity is provably full instead of scanning
+ * every project. Unlimited (Pro) tiers early-return in checkCountedLimit
+ * before this runs at all.
+ */
+export async function countActiveFiles(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">,
+  limit?: number
+): Promise<number> {
+  const allProjects = await db
+    .query("projects")
+    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+    .collect();
+  const projects = allProjects.filter((p) => p.deletedAt === undefined);
+
+  let count = 0;
+  for (const project of projects) {
+    if (limit !== undefined && count >= limit) break;
+
+    const remaining = limit === undefined ? undefined : limit - count;
+    count += await countMatchingUpTo(
+      () =>
+        db
+          .query("projectFiles")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id)),
+      (f) => f.deletedAt === undefined,
+      remaining
+    );
+  }
+  return count;
+}

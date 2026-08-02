@@ -840,3 +840,64 @@ export async function getAccountAccess(
     getGrant: () => getActiveAccountGrant(ctx, userId, account._id),
   });
 }
+
+/**
+ * The active per-file grant for a user, or null.
+ *
+ * Exact mirror of getActiveAccountGrant: a (file, user) pair can accumulate
+ * several rows as revoked history builds up, so scan for the live one rather
+ * than trusting `.first()`.
+ */
+export async function getActiveFileGrant(
+  ctx: MutationCtx | QueryCtx,
+  userId: Id<"users">,
+  fileId: Id<"projectFiles">
+): Promise<Doc<"filePermissions"> | null> {
+  const grants = await ctx.db
+    .query("filePermissions")
+    .withIndex("by_file_and_user", (q) =>
+      q.eq("fileId", fileId).eq("userId", userId)
+    )
+    .collect();
+
+  return (
+    grants.find(
+      (g) => g.isActive && (!g.expiresAt || g.expiresAt > Date.now())
+    ) ?? null
+  );
+}
+
+/**
+ * Compute a user's effective access to a single secret file.
+ *
+ *   "write" — can replace the contents or edit the metadata
+ *   "read"  — can download it
+ *   null    — no access
+ *
+ * EXACT mirror of getAccountAccess, which is itself a mirror of
+ * getVariableAccess. Same environment-scope-first ordering: an out-of-scope
+ * file is invisible to a scoped developer even when a grant exists.
+ */
+export async function getFileAccess(
+  ctx: MutationCtx | QueryCtx,
+  userId: Id<"users">,
+  file: Doc<"projectFiles">,
+  // Caller-supplied project doc when it was already fetched, avoiding a
+  // duplicate read of the same row. Falls back to fetching when omitted.
+  preloadedProject?: Doc<"projects"> | null
+): Promise<"write" | "read" | null> {
+  const project =
+    preloadedProject !== undefined
+      ? preloadedProject
+      : await ctx.db.get(file.projectId);
+  if (!project || project.deletedAt) return null;
+
+  return resolveResourceAccess(ctx, {
+    userId,
+    projectId: file.projectId,
+    organizationId: project.organizationId,
+    resourceEnvironments: file.environments,
+    blanketWrite: "project.files.update",
+    getGrant: () => getActiveFileGrant(ctx, userId, file._id),
+  });
+}
