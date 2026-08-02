@@ -1,0 +1,34 @@
+apps/cli/src/lib/api.ts
+  s_e94a11bf9b2f48::t_cab15227a52487 215-244,348-375
+  s_e94a11bf9b2f48::t_5c0744e6e5956e 978-1020
+apps/cli/src/lib/secret-files.ts
+  s_e94a11bf9b2f48::t_551c48366ee179 34-37
+  s_e94a11bf9b2f48::t_fed9b0d6d458bf 1-33,38-145
+apps/cli/src/lib/command-catalog.ts
+  s_e94a11bf9b2f48::t_3c00e8c0e6dc84 15,501-503,505-512,522-530,540-541
+  s_e94a11bf9b2f48::t_551c48366ee179 513-521,531-539
+  s_e94a11bf9b2f48::t_c59eee161e97cf 504
+  s_e94a11bf9b2f48::t_35f4420369a688 542
+apps/cli/src/commands/files.ts
+  s_e94a11bf9b2f48::t_0c3e033abec273 1-5,14-26,32-211,215-384,388-401
+  s_e94a11bf9b2f48::t_551c48366ee179 6-13,27-31,212-214,385-387
+apps/cli/src/commands/pull.ts
+  s_e94a11bf9b2f48::t_b8d7ca251c0339 13-17,108-111,254,277-304,308-335
+  s_e94a11bf9b2f48::t_551c48366ee179 305-307
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "17164b1561d7863295baa86ea997919d18b8bbcd",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
