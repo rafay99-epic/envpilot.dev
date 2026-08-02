@@ -1,0 +1,20 @@
+apps/vscode-extension/src/services/clipboardGuard.ts
+  s_0a5f4315dae50f::t_406580c242a6c3 150-162
+  s_0a5f4315dae50f::t_46f69df2e26fb9 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "dceb7e32c6a678cc39e3d43c4b825e4d4f02f509",
+  "prompts": {},
+  "sessions": {
+    "s_0a5f4315dae50f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e338fce-6b19-4d9a-8121-0d177f1b612a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
