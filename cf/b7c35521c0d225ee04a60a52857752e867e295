@@ -1,0 +1,29 @@
+convex/features/community/changelog/seed.ts
+  s_44f4aab38e60db::t_b6c403e4fe8eed 1387-1418
+apps/web/src/components/landing/LandingPage.tsx
+  s_44f4aab38e60db::t_8d4e9bb16f9af5 10-11,246-251,660,663,704-710,743-746,751-778,781,786-789,791-814,817-863,890-891,1410
+  s_44f4aab38e60db::t_b6c403e4fe8eed 12,162-164,866-886
+  s_44f4aab38e60db::t_36a9b2bfb5d02a 779-780,782-785
+  s_44f4aab38e60db::t_eb4081baaada10 711-742,747-750,790,815-816
+  s_44f4aab38e60db::t_1636a9d9b7afad 864-865
+  s_44f4aab38e60db::t_438174aee6796a 887-889
+  s_44f4aab38e60db::t_a536a1ea6c54dc 892
+apps/web/src/app/page.tsx
+  s_44f4aab38e60db::t_b6c403e4fe8eed 26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "cfb7c35521c0d225ee04a60a52857752e867e295",
+  "prompts": {},
+  "sessions": {
+    "s_44f4aab38e60db": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fafb8-3672-7b93-852a-38c08fb69563",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
