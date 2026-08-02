@@ -1,0 +1,27 @@
+apps/web/tests/e2e/authenticated/trash-restore.spec.ts
+  s_e94a11bf9b2f48::t_8d4ff57b5b8ecf 72-76
+convex/_generated/api.d.ts
+  s_e94a11bf9b2f48::t_5f7fa4500414ce 58-60,180-182
+convex/features/files/queries.ts
+  s_e94a11bf9b2f48::t_69d335d287f969 257,260-275
+apps/web/tests/e2e/authenticated/secret-files.spec.ts
+  s_e94a11bf9b2f48::t_c9cc79f12bef4a 177-182
+  s_e94a11bf9b2f48::t_2e6cf696e892c8 216-225
+  s_e94a11bf9b2f48::t_5cf531fae6db88 39-65,127-128,142-143,165-166,168-170,172-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "5ca0aade36f9b51b91868bd36b6e8f9ce667b2c0",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
