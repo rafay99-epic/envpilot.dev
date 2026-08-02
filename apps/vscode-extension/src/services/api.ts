@@ -21,6 +21,36 @@ import type {
 } from "../types";
 
 // ============================================================================
+/** Metadata row from features/files/queries:list. Never contains content. */
+export type SecretFileRow = {
+  _id: string;
+  name: string;
+  path: string;
+  mode: string;
+  contentType?: string;
+  size: number;
+  sha256: string;
+  digestSalt: string;
+  description?: string;
+  environments: string[];
+  projectId: string;
+  version: number;
+  createdAt: number;
+  updatedAt: number;
+  access: "read" | "write";
+};
+
+/** One decrypted secret file. `content` is base64. */
+export type SecretFileContent = {
+  name: string;
+  path: string;
+  mode: string;
+  size: number;
+  sha256: string;
+  contentType?: string;
+  content: string;
+};
+
 // Convex row shapes (typed against the confirmed Stage-2 contract; anyApi is
 // untyped so results are cast to these).
 // ============================================================================
@@ -220,6 +250,28 @@ export class ApiService {
     const client = new ConvexHttpClient(url);
     client.setAuth(token);
     return client;
+  }
+
+  /**
+   * List a project's secret files. METADATA ONLY — no decryption, no vault
+   * read, no download audit entry. The drift badge runs entirely on this.
+   */
+  async listSecretFiles(
+    projectId: string,
+    environment?: string
+  ): Promise<SecretFileRow[]> {
+    return this.convexQuery<SecretFileRow[]>(
+      anyApi.features.files.queries.list,
+      { projectId, ...(environment ? { environment } : {}) }
+    );
+  }
+
+  /** Decrypt ONE secret file. Audited server-side on every call. */
+  async getSecretFileContent(fileId: string): Promise<SecretFileContent> {
+    return this.convexAction<SecretFileContent>(
+      anyApi.features.files.values.getFileContent,
+      { fileId, source: "extension" }
+    );
   }
 
   private async convexQuery<T>(

@@ -20,6 +20,7 @@ import {
   getDisplayPath,
   isPathInside,
 } from "../utils/paths";
+import { materialiseSecretFiles } from "./secretFiles";
 import { SingleFlight } from "../utils/singleFlight";
 import { envFileNamesFor } from "../utils/envFiles";
 import { recordManagedFile, forgetManagedFile } from "../utils/managedFiles";
@@ -386,6 +387,11 @@ export class SyncService {
       // Write to .env file
       await this.writeEnvFile(project, variables);
 
+      // Materialise secret files alongside the .env. Files already in sync
+      // are skipped without a fetch, so a routine sync of an up-to-date
+      // workspace performs zero decrypts and writes zero audit rows.
+      await this.syncSecretFiles(project);
+
       // Update last synced timestamp
       await this.storage.updateLinkedProject(
         project.projectId,
@@ -448,6 +454,55 @@ export class SyncService {
    * Write environment variables to the .env file
    * Validates that the target path is within the workspace to prevent path traversal
    */
+  /**
+   * Pull the project's secret files into the workspace.
+   *
+   * Deliberately non-fatal: a keystore that cannot be written must not fail
+   * the variable sync that already succeeded. Conflicts and failures are
+   * surfaced as warnings so they are visible rather than silent.
+   */
+  private async syncSecretFiles(project: LinkedProject): Promise<void> {
+    const root = project.workspacePath;
+    if (!root) return;
+
+    try {
+      const result = await materialiseSecretFiles(
+        this.api,
+        project.projectId,
+        project.environment,
+        root
+      );
+
+      if (result.conflicts.length > 0) {
+        void vscode.window.showWarningMessage(
+          `Envpilot: ${result.conflicts.length} secret file(s) differ locally and were not overwritten: ${result.conflicts.join(", ")}`
+        );
+      }
+      if (result.failed.length > 0) {
+        void vscode.window.showWarningMessage(
+          `Envpilot: could not write ${result.failed.length} secret file(s). ${result.failed[0]?.message ?? ""}`
+        );
+      }
+      for (const written of result.written) {
+        // Register with the clipboard guard so these paths get the same
+        // copy/cut protection the synced .env already has. Secret files are
+        // always at least read-only on disk (0600/0400), so the strictest
+        // mode is the honest one.
+        this.clipboardGuard?.protectFile(
+          path.join(root, written),
+          "strict-readonly"
+        );
+      }
+    } catch (error) {
+      // Secret files are additive: never let them break variable sync.
+      console.warn(
+        `[envpilot] secret file sync failed: ${
+          error instanceof Error ? error.message : "unknown"
+        }`
+      );
+    }
+  }
+
   private async writeEnvFile(
     project: LinkedProject,
     variables: EnvironmentVariable[]
