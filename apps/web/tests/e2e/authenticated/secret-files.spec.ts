@@ -36,6 +36,33 @@ async function setFixture(
     mimeType: "application/octet-stream",
     buffer: Buffer.from(body, "utf-8"),
   });
+  // Picking a file makes the drawer pre-fill name and path from the filename.
+  // Wait for that to land before typing over it: filling a React controlled
+  // input while a setState from the change handler is still in flight
+  // interleaves the two values and submits a mangled path.
+  await expect(page.locator("#secret-file-path")).toHaveValue(filename, {
+    timeout: 10_000,
+  });
+}
+
+/**
+ * Set a controlled input and prove the value stuck.
+ *
+ * fill() dispatches one input event; if React re-renders from other state in
+ * the same tick the field can end up with a spliced value. Asserting inside
+ * toPass retries the whole set until the DOM agrees.
+ */
+async function setField(
+  page: Page,
+  selector: string,
+  value: string
+): Promise<void> {
+  const field = page.locator(selector);
+  await expect(async () => {
+    await field.fill("");
+    await field.fill(value);
+    await expect(field).toHaveValue(value, { timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
 }
 
 test.describe("secret files", () => {
@@ -97,8 +124,8 @@ test.describe("secret files", () => {
         if (await fileRow(page, devName).count()) return;
         await uploadButton.click();
         await setFixture(page, "service-account.json", '{"e2e":true}');
-        await page.locator("#secret-file-name").fill(devName);
-        await page.locator("#secret-file-path").fill(sharedPath);
+        await setField(page, "#secret-file-name", devName);
+        await setField(page, "#secret-file-path", sharedPath);
         await page.getByRole("button", { name: "Upload", exact: true }).click();
         await expect(fileRow(page, devName)).toBeVisible({ timeout: 15_000 });
       }).toPass({ timeout: 60_000 });
@@ -112,8 +139,8 @@ test.describe("secret files", () => {
         if (await fileRow(page, prodName).count()) return;
         await uploadButton.click();
         await setFixture(page, "service-account.json", '{"e2e":"prod"}');
-        await page.locator("#secret-file-name").fill(prodName);
-        await page.locator("#secret-file-path").fill(sharedPath);
+        await setField(page, "#secret-file-name", prodName);
+        await setField(page, "#secret-file-path", sharedPath);
         // Swap development off, production on. Scoped by label text rather
         // than index — a positional selector silently retargets the moment
         // another checkbox appears in the drawer.
@@ -135,14 +162,24 @@ test.describe("secret files", () => {
       // ── The same path in an OVERLAPPING environment is rejected ──
       await uploadButton.click();
       await setFixture(page, "service-account.json", '{"e2e":"clash"}');
-      await page.locator("#secret-file-name").fill(`E2E Clash ${stamp}`);
-      await page.locator("#secret-file-path").fill(sharedPath);
+      await setField(page, "#secret-file-name", `E2E Clash ${stamp}`);
+      await setField(page, "#secret-file-path", sharedPath);
       await page.getByRole("button", { name: "Upload", exact: true }).click();
+      // Scope to the drawer's own error paragraph. The same text also lands in
+      // a toast and (in dev) the Next.js error overlay, which makes a bare
+      // getByText a strict-mode violation.
       await expect(
-        page.getByText(/already exists at/i),
+        page.locator("form p.border-red-200").filter({
+          hasText: /already exists at/i,
+        }),
         "an overlapping (path, environment) pair must be refused"
       ).toBeVisible({ timeout: 20_000 });
-      await page.getByRole("button", { name: "Cancel" }).click();
+      // Close via the drawer header, not the Cancel button: an error toast
+      // renders bottom-right and intercepts pointer events over the footer.
+      await page
+        .locator('div.max-w-md button[aria-label="Close"]')
+        .first()
+        .click();
 
       // ── Download returns the decrypted bytes ──
       const downloadPromise = page.waitForEvent("download", {
@@ -176,6 +213,15 @@ test.describe("secret files", () => {
       }
     }
 
-    expect(clientErrors, "no client-side errors during the flow").toEqual([]);
+    // The overlap step deliberately provokes a rejected upload, so its
+    // ConvexError legitimately reaches the console. Everything else must be
+    // clean.
+    const unexpected = clientErrors.filter(
+      (entry) => !/already exists at/i.test(entry)
+    );
+    expect(
+      unexpected,
+      "no unexpected client-side errors during the flow"
+    ).toEqual([]);
   });
 });

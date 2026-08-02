@@ -254,16 +254,25 @@ export const getDeleted = query({
 
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
-      throw new ConvexError("Project not found");
+      return [];
     }
 
-    // Only roles that can delete/restore may see the trash at all.
-    await authorizeFileAccess(ctx, {
-      userId: user._id,
-      projectId: args.projectId,
-      action: "project:delete_file",
-      preloadedProject: project,
-    });
+    // Only roles that can delete/restore see trashed files — but RETURN empty
+    // rather than throw. The trash page renders variables, accounts, and files
+    // together and gates its loading state on all three queries resolving; a
+    // throwing query here leaves the whole page stuck on its spinner for
+    // anyone without this capability, instead of just hiding one section.
+    // Mirrors accounts.getDeleted exactly.
+    try {
+      await authorizeFileAccess(ctx, {
+        userId: user._id,
+        projectId: args.projectId,
+        action: "project:delete_file",
+        preloadedProject: project,
+      });
+    } catch {
+      return [];
+    }
 
     const retentionMs = PURGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
     const cutoff = Date.now() - retentionMs;
