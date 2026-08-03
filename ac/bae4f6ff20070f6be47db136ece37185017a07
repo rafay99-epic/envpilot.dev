@@ -1,0 +1,39 @@
+convex/features/files/helpers.ts
+  s_e94a11bf9b2f48::t_67530e83c47358 4,38
+  s_e94a11bf9b2f48::t_5fadc523d16fac 208-211
+apps/vscode-extension/src/utils/managedFiles.ts
+  s_e94a11bf9b2f48::t_953ee3387187da 129-133,135,137-138,144-149,151-162,171,179-180,190,196-204,208
+  s_e94a11bf9b2f48::t_5b4b4f04bc8884 393-431,434,436,438-442
+convex/features/files/queries.ts
+  s_e94a11bf9b2f48::t_67530e83c47358 8,36-37
+convex/lib/rateLimits.ts
+  s_e94a11bf9b2f48::t_67530e83c47358 64-68,73
+  s_e94a11bf9b2f48::t_29c4c779585fe7 3
+convex/features/files/mutations.ts
+  s_e94a11bf9b2f48::t_e549cfc3b60db9 3,296-310
+  s_e94a11bf9b2f48::t_7dc2c62d2750fd 311-313
+convex/features/api/reads.ts
+  s_e94a11bf9b2f48::t_67530e83c47358 59
+  s_e94a11bf9b2f48::t_29c4c779585fe7 2
+apps/vscode-extension/src/utils/managedFiles.test.ts
+  s_e94a11bf9b2f48::t_b375005cae1ac7 370-383,390-432
+  s_e94a11bf9b2f48::t_b8c5113cbe1cf7 273-281,294,323,341,353,384-389
+convex/lib/fileLimits.ts
+  s_e94a11bf9b2f48::t_67530e83c47358 1-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "acbae4f6ff20070f6be47db136ece37185017a07",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
