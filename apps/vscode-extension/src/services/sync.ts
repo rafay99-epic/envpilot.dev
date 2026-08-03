@@ -390,7 +390,11 @@ export class SyncService {
       // Materialise secret files alongside the .env. Files already in sync
       // are skipped without a fetch, so a routine sync of an up-to-date
       // workspace performs zero decrypts and writes zero audit rows.
-      await this.syncSecretFiles(project);
+      await this.syncSecretFiles(
+        project.projectId,
+        [project.environment],
+        project.workspacePath
+      );
 
       // Update last synced timestamp
       await this.storage.updateLinkedProject(
@@ -461,15 +465,26 @@ export class SyncService {
    * the variable sync that already succeeded. Conflicts and failures are
    * surfaced as warnings so they are visible rather than silent.
    */
-  private async syncSecretFiles(project: LinkedProject): Promise<void> {
-    const root = project.workspacePath;
+  private async syncSecretFiles(
+    projectId: string,
+    environments: string[],
+    root: string | undefined
+  ): Promise<void> {
     if (!root) return;
+
+    // A secret file has ONE path, but a directory can be linked to several
+    // environments — and the same path may legitimately exist in more than
+    // one (a dev and a prod google-services.json). Writing both into one
+    // directory would race them onto the same file, so materialise exactly
+    // the first environment, the same way the CLI scopes to one.
+    const environment = environments[0];
+    if (!environment) return;
 
     try {
       const result = await materialiseSecretFiles(
         this.api,
-        project.projectId,
-        project.environment,
+        projectId,
+        environment,
         root
       );
 
@@ -1116,6 +1131,15 @@ export class SyncService {
             project.projectId
           )
         )
+      );
+
+      // Secret files land in the SAME directory as the .env files. This path
+      // (not syncProject) is what modern multi-directory links run through,
+      // so the files step has to live here too.
+      await this.syncSecretFiles(
+        project.projectId,
+        directory.environments,
+        directory.directoryPath
       );
 
       // Remove a stale merged file left over from the old single-file scheme
