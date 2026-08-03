@@ -16,13 +16,13 @@ import { getWorkerProjectSlug, trackClientErrors } from "./support";
 test.skip(!hasE2ECredentials, SKIP_REASON);
 
 /**
- * Each FileListItem renders as a bordered `rounded-lg` card
- * (apps/web/src/components/files/file-list-item.tsx). Filtering on the card
- * class plus the unique timestamped name avoids matching the page container,
- * which also contains the name as a text substring.
+ * Each FileListItem renders as `<div className="px-6 py-4">` inside the list
+ * container (apps/web/src/components/files/file-list-item.tsx), matching the
+ * accounts row. Scoping on that class pair avoids matching ancestor
+ * containers that also contain the name as a text substring.
  */
 function fileRow(page: Page, name: string): Locator {
-  return page.locator("div.rounded-lg.border").filter({ hasText: name });
+  return page.locator("div.px-6.py-4").filter({ hasText: name });
 }
 
 /** Attach an in-memory fixture to the drawer's file input. */
@@ -102,11 +102,11 @@ test.describe("secret files", () => {
     // The feature is tier-gated. If it is off for this org there is no upload
     // button and nothing further to drive — the page-load assertion above
     // still covers the structural case, so skip rather than fail.
-    const uploadButton = page.getByRole("button", { name: "Upload file" });
+    const uploadButton = page.getByRole("button", { name: "Add File" });
     const hasUpload = await uploadButton.isVisible().catch(() => false);
     test.skip(
       !hasUpload,
-      "Upload file button not visible — secret_files may be gated off for this org/tier, or the signed-in role cannot upload"
+      "Add File button not visible — secret_files may be gated off for this org/tier, or the signed-in role cannot upload"
     );
 
     const stamp = Date.now();
@@ -126,7 +126,10 @@ test.describe("secret files", () => {
         await setFixture(page, "service-account.json", '{"e2e":true}');
         await setField(page, "#secret-file-name", devName);
         await setField(page, "#secret-file-path", sharedPath);
-        await page.getByRole("button", { name: "Upload", exact: true }).click();
+        await page
+          .locator("form")
+          .getByRole("button", { name: "Upload File" })
+          .click();
         await expect(fileRow(page, devName)).toBeVisible({ timeout: 15_000 });
       }).toPass({ timeout: 60_000 });
       devCreated = true;
@@ -141,20 +144,21 @@ test.describe("secret files", () => {
         await setFixture(page, "service-account.json", '{"e2e":"prod"}');
         await setField(page, "#secret-file-name", prodName);
         await setField(page, "#secret-file-path", sharedPath);
-        // Swap development off, production on. Scoped by label text rather
-        // than index — a positional selector silently retargets the moment
-        // another checkbox appears in the drawer.
+        // Environments are pill toggles (same control the account drawer
+        // uses). aria-pressed carries the state, so toggle by name.
+        const form = page.locator("form");
+        await form.getByRole("button", { name: "development" }).click();
+        await form.getByRole("button", { name: "production" }).click();
+        await expect(
+          form.getByRole("button", { name: "production" })
+        ).toHaveAttribute("aria-pressed", "true");
+        await expect(
+          form.getByRole("button", { name: "development" })
+        ).toHaveAttribute("aria-pressed", "false");
         await page
-          .locator("label")
-          .filter({ hasText: /^development$/ })
-          .getByRole("checkbox")
-          .uncheck();
-        await page
-          .locator("label")
-          .filter({ hasText: /^production$/ })
-          .getByRole("checkbox")
-          .check();
-        await page.getByRole("button", { name: "Upload", exact: true }).click();
+          .locator("form")
+          .getByRole("button", { name: "Upload File" })
+          .click();
         await expect(fileRow(page, prodName)).toBeVisible({ timeout: 15_000 });
       }).toPass({ timeout: 60_000 });
       prodCreated = true;
@@ -164,22 +168,22 @@ test.describe("secret files", () => {
       await setFixture(page, "service-account.json", '{"e2e":"clash"}');
       await setField(page, "#secret-file-name", `E2E Clash ${stamp}`);
       await setField(page, "#secret-file-path", sharedPath);
-      await page.getByRole("button", { name: "Upload", exact: true }).click();
+      await page
+        .locator("form")
+        .getByRole("button", { name: "Upload File" })
+        .click();
       // Scope to the drawer's own error paragraph. The same text also lands in
       // a toast and (in dev) the Next.js error overlay, which makes a bare
       // getByText a strict-mode violation.
       await expect(
-        page.locator("form p.border-red-200").filter({
+        page.locator("form div.bg-red-50").filter({
           hasText: /already exists at/i,
         }),
         "an overlapping (path, environment) pair must be refused"
       ).toBeVisible({ timeout: 20_000 });
-      // Close via the drawer header, not the Cancel button: an error toast
-      // renders bottom-right and intercepts pointer events over the footer.
-      await page
-        .locator('div.max-w-md button[aria-label="Close"]')
-        .first()
-        .click();
+      // DrawerPanel closes on Escape — more robust than clicking the footer,
+      // which an error toast can cover.
+      await page.keyboard.press("Escape");
 
       // ── Download returns the decrypted bytes ──
       const downloadPromise = page.waitForEvent("download", {

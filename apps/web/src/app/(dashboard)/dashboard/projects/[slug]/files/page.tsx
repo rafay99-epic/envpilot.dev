@@ -41,7 +41,7 @@ interface FilesPageProps {
  * Secret files are the artifacts that are not strings: keystores, SSH keys,
  * service-account JSON, provisioning profiles. Each carries a destination
  * path and a POSIX mode, so `envpilot pull`, the VS Code extension, and CI
- * can put it exactly where the build expects without anyone remembering.
+ * put it exactly where the build expects without anyone remembering.
  *
  * Contents are never rendered here — download only, and every download is
  * audited server-side.
@@ -75,99 +75,70 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
 
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
   const [selectedEnvironment, setSelectedEnvironment] = useState("all");
-  const [showDrawer, setShowDrawer] = useState(false);
+  const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [editingFile, setEditingFile] = useState<SecretFile | null>(null);
   const [replaceMode, setReplaceMode] = useState(false);
   const [deletingFile, setDeletingFile] = useState<SecretFile | null>(null);
   const [permissionsFile, setPermissionsFile] = useState<SecretFile | null>(
     null
   );
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
 
   const fileList = files ?? [];
-  const { allowed: withinLimit } = useFeatureGate(orgId, "secret_files_limit", {
-    currentCount: fileList.length,
-  });
+  const { allowed: canCreateGate } = useFeatureGate(
+    orgId,
+    "secret_files_limit",
+    { currentCount: fileList.length }
+  );
 
-  const filtered = fileList.filter(
+  const filteredFiles = fileList.filter(
     (f) =>
       selectedEnvironment === "all" ||
       f.environments.includes(selectedEnvironment)
   );
 
-  const openCreate = () => {
+  const closeDrawers = () => {
+    setShowCreateDrawer(false);
     setEditingFile(null);
     setReplaceMode(false);
-    setFormError(null);
-    setShowDrawer(true);
-  };
-
-  const openEdit = (file: SecretFile) => {
-    setEditingFile(file);
-    setReplaceMode(false);
-    setFormError(null);
-    setShowDrawer(true);
-  };
-
-  const openReplace = (file: SecretFile) => {
-    setEditingFile(file);
-    setReplaceMode(true);
-    setFormError(null);
-    setShowDrawer(true);
   };
 
   const handleSubmit = async (data: FileFormData) => {
     if (!projectId) return;
-    setIsSubmitting(true);
-    setFormError(null);
-    try {
-      if (editingFile && !replaceMode) {
-        await updateFile({
-          fileId: editingFile._id,
-          name: data.name,
-          path: data.path,
-          mode: data.mode,
-          description: data.description,
-          environments: data.environments,
-        });
-        setNotice(`Updated ${data.name}`);
-      } else {
-        if (!data.file) {
-          setFormError("Choose a file to upload");
-          return;
-        }
-        const content = await fileToBase64(data.file);
-        await uploadFile({
-          projectId,
-          name: data.name,
-          path: data.path,
-          mode: data.mode,
-          content,
-          contentType: data.file.type || undefined,
-          description: data.description || undefined,
-          environments: data.environments,
-          replaceFileId: replaceMode ? editingFile?._id : undefined,
-        });
-        setNotice(
-          replaceMode
-            ? `Replaced contents of ${editingFile?.name}`
-            : `Uploaded ${data.name}`
-        );
-      }
-      setShowDrawer(false);
-      setEditingFile(null);
-      setReplaceMode(false);
-    } catch (e) {
-      const message =
-        e instanceof Error ? e.message : "Could not save the file";
-      log.error("secret file save failed", { message });
-      setFormError(message);
-    } finally {
-      setIsSubmitting(false);
+    setError(null);
+
+    if (editingFile && !replaceMode) {
+      await updateFile({
+        fileId: editingFile._id,
+        name: data.name,
+        path: data.path,
+        mode: data.mode,
+        description: data.description,
+        environments: data.environments,
+      });
+      setNotice(`Updated ${data.name}`);
+    } else {
+      if (!data.file) throw new Error("Choose a file to upload");
+      const content = await fileToBase64(data.file);
+      await uploadFile({
+        projectId,
+        name: data.name,
+        path: data.path,
+        mode: data.mode,
+        content,
+        contentType: data.file.type || undefined,
+        description: data.description || undefined,
+        environments: data.environments,
+        replaceFileId: replaceMode ? editingFile?._id : undefined,
+      });
+      setNotice(
+        replaceMode
+          ? `Replaced contents of ${editingFile?.name}`
+          : `Uploaded ${data.name}`
+      );
     }
+    closeDrawers();
   };
 
   const handleDownload = async (file: SecretFile) => {
@@ -205,9 +176,13 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
     }
   };
 
-  if (isLoadingProject) return <TerminalLoading />;
-  if (project === null) {
-    return <p className="p-6 text-sm text-zinc-500">Project not found.</p>;
+  if (isLoadingProject) return <TerminalLoading fullPage />;
+  if (!project) {
+    return (
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        Project not found.
+      </p>
+    );
   }
 
   return (
@@ -216,123 +191,158 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
       featureKey="secret_files"
       featureName="Secret Files"
     >
-      <div className="space-y-4 p-4 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="flex items-center gap-2 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              <FileKey className="h-5 w-5 text-green-600 dark:text-green-500" />
-              Secret Files
-            </h1>
-            <p className="mt-0.5 text-xs text-zinc-500">
-              Keystores, SSH keys, and certificates — encrypted, versioned, and
-              written to their path by the CLI, the extension, and CI.
-            </p>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2">
+            <FileKey className="h-6 w-6 text-zinc-400" />
+            <div>
+              <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+                Secret Files
+              </h1>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Keystores, SSH keys, and certificates for {project.name} —
+                encrypted, versioned, and written to their path on pull.
+              </p>
+            </div>
           </div>
-
-          {canCreate && (
-            <button
-              type="button"
-              onClick={openCreate}
-              disabled={!withinLimit}
-              title={
-                withinLimit
-                  ? "Upload a secret file"
-                  : "Secret file limit reached for your plan"
-              }
-              className="inline-flex items-center gap-2 rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-            >
-              <Plus className="h-4 w-4" />
-              Upload file
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="file-env-filter" className="sr-only">
-            Filter by environment
-          </label>
-          <select
-            id="file-env-filter"
-            value={selectedEnvironment}
-            onChange={(e) => setSelectedEnvironment(e.target.value)}
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
-          >
-            <option value="all">All environments</option>
-            {ENVIRONMENTS.map((env) => (
-              <option key={env} value={env}>
-                {env}
-              </option>
-            ))}
-          </select>
-          <span className="text-xs text-zinc-500">
-            {filtered.length} file{filtered.length === 1 ? "" : "s"}
-          </span>
         </div>
 
         {notice && (
-          <p className="rounded border border-green-200 bg-green-50 p-2 text-xs text-green-700 dark:border-green-900 dark:bg-green-900/20 dark:text-green-400">
-            {notice}
-          </p>
-        )}
-        {error && (
-          <p className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-900/20 dark:text-red-400">
-            {error}
-          </p>
-        )}
-
-        {isLoadingFiles ? (
-          <TerminalLoading />
-        ) : filtered.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-zinc-300 p-10 text-center dark:border-zinc-700">
-            <FileKey className="mx-auto h-8 w-8 text-zinc-400" />
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              No secret files yet.
-            </p>
-            <p className="mt-1 text-xs text-zinc-500">
-              Upload a keystore or an SSH key and every clone of this project
-              can build without asking anyone for it.
+          <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/40 dark:bg-green-900/20">
+            <p className="text-sm text-green-700 dark:text-green-400">
+              {notice}
             </p>
           </div>
-        ) : (
-          <AnimatedList className="space-y-2">
-            {filtered.map((file) => (
-              <FileListItem
-                key={file._id}
-                file={file}
-                onDownload={() => handleDownload(file)}
-                onReplace={() => openReplace(file)}
-                onEdit={() => openEdit(file)}
-                onDelete={() => setDeletingFile(file)}
-                onManagePermissions={() => setPermissionsFile(file)}
-                isDownloading={downloadingIds.has(file._id)}
-                canEdit={canUpdate || file.access === "write"}
-                canDelete={canDelete}
-                canManagePermissions={canManagePermissions}
-              />
-            ))}
-          </AnimatedList>
         )}
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-900/20">
+            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+          </div>
+        )}
+
+        {/* Environment filter */}
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Environment:
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelectedEnvironment("all")}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                selectedEnvironment === "all"
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              }`}
+            >
+              All
+            </button>
+            {ENVIRONMENTS.map((env) => (
+              <button
+                key={env}
+                onClick={() => setSelectedEnvironment(env)}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                  selectedEnvironment === env
+                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                }`}
+              >
+                {env}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* List */}
+        <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+            <div>
+              <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+                Files
+              </h2>
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                {filteredFiles.length} file
+                {filteredFiles.length !== 1 ? "s" : ""}
+                {selectedEnvironment !== "all" && ` in ${selectedEnvironment}`}
+              </p>
+            </div>
+            {canCreate && (
+              <button
+                onClick={() => setShowCreateDrawer(true)}
+                disabled={!canCreateGate}
+                title={
+                  !canCreateGate
+                    ? "Secret file limit reached. Upgrade to add more."
+                    : undefined
+                }
+                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
+                <Plus className="h-4 w-4" />
+                Add File
+              </button>
+            )}
+          </div>
+
+          <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            {isLoadingFiles ? (
+              <TerminalLoading />
+            ) : filteredFiles.length === 0 ? (
+              <div className="px-6 py-12 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+                  <FileKey className="h-6 w-6 text-zinc-400" />
+                </div>
+                <h3 className="mt-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                  No secret files yet
+                </h3>
+                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                  {canCreate
+                    ? "Upload a keystore or an SSH key and every clone of this project can build without asking anyone for it."
+                    : "No secret files available for this environment."}
+                </p>
+              </div>
+            ) : (
+              <AnimatedList className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {filteredFiles.map((file) => (
+                  <FileListItem
+                    key={file._id}
+                    file={file}
+                    onDownload={() => handleDownload(file)}
+                    onReplace={() => {
+                      setReplaceMode(true);
+                      setEditingFile(file);
+                    }}
+                    onEdit={() => {
+                      setReplaceMode(false);
+                      setEditingFile(file);
+                    }}
+                    onDelete={() => setDeletingFile(file)}
+                    onManagePermissions={() => setPermissionsFile(file)}
+                    isDownloading={downloadingIds.has(file._id)}
+                    canEdit={canUpdate || file.access === "write"}
+                    canDelete={canDelete}
+                    canManagePermissions={canManagePermissions}
+                  />
+                ))}
+              </AnimatedList>
+            )}
+          </div>
+        </div>
       </div>
 
       <FileFormDrawer
-        open={showDrawer}
-        editing={editingFile}
-        replaceMode={replaceMode}
-        isSubmitting={isSubmitting}
-        error={formError}
-        onClose={() => {
-          setShowDrawer(false);
-          setEditingFile(null);
-          setReplaceMode(false);
-        }}
+        isOpen={showCreateDrawer || editingFile !== null}
+        onClose={closeDrawers}
         onSubmit={handleSubmit}
+        file={editingFile}
+        replaceMode={replaceMode}
       />
 
       {permissionsFile && (
         <FilePermissionsDrawer
+          isOpen
+          onClose={() => setPermissionsFile(null)}
           file={permissionsFile}
           currentUserId={convexUserId as Id<"users"> | undefined}
-          onClose={() => setPermissionsFile(null)}
         />
       )}
 

@@ -1,16 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Download,
-  FileKey,
-  Loader2,
-  Lock,
-  Pencil,
-  Trash2,
-  Upload,
-  Users,
-} from "lucide-react";
+import { Download, Loader2, Pencil, Trash2, Upload, Users } from "lucide-react";
 import { formatBytes, type SecretFile } from "@/hooks/useSecretFiles";
 
 interface FileListItemProps {
@@ -26,6 +16,7 @@ interface FileListItemProps {
   canManagePermissions?: boolean;
 }
 
+/** Same environment palette the variables and accounts rows use. */
 function envBadgeClasses(env: string): string {
   return env === "production"
     ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
@@ -46,8 +37,6 @@ export function FileListItem({
   canDelete = false,
   canManagePermissions = false,
 }: FileListItemProps) {
-  const [showDetails, setShowDetails] = useState(false);
-
   const formatDate = (timestamp: number) =>
     new Intl.DateTimeFormat("en-US", {
       dateStyle: "short",
@@ -57,86 +46,67 @@ export function FileListItem({
   const isWritable = file.access === "write";
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900/50 dark:hover:border-zinc-700">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <FileKey className="h-4 w-4 shrink-0 text-green-600 dark:text-green-500" />
-            <span className="truncate font-medium text-zinc-900 dark:text-zinc-100">
-              {file.name}
-            </span>
-            {!isWritable && (
-              <span className="inline-flex items-center gap-1 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                <Lock className="h-3 w-3" />
-                read-only
+    <div className="px-6 py-4">
+      <div className="flex items-center justify-between">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                {file.name}
               </span>
-            )}
-          </div>
-
-          {/* The path IS the feature — it is what makes a pulled file land in
-              the right place without anyone remembering where it goes. */}
-          <button
-            type="button"
-            onClick={() => setShowDetails((v) => !v)}
-            className="mt-1 block max-w-full truncate text-left font-mono text-xs text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-            title={file.path}
-          >
-            {file.path}
-          </button>
-
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {file.environments.map((env) => (
+              {/* The destination path is the feature — mono, like the
+                  account row treats its URL. */}
               <span
-                key={env}
-                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${envBadgeClasses(env)}`}
+                className="max-w-[280px] truncate font-mono text-xs text-zinc-500 dark:text-zinc-400"
+                title={file.path}
               >
-                {env}
+                {file.path}
               </span>
-            ))}
-            <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-              {formatBytes(file.size)}
-            </span>
-            <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-              {file.mode}
-            </span>
-          </div>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  isWritable
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                }`}
+              >
+                {file.access}
+              </span>
+            </div>
 
-          {showDetails && (
-            <dl className="mt-3 space-y-1 border-t border-zinc-200 pt-3 text-xs dark:border-zinc-800">
-              {file.description && (
-                <div className="flex gap-2">
-                  <dt className="shrink-0 text-zinc-500">Description</dt>
-                  <dd className="text-zinc-700 dark:text-zinc-300">
-                    {file.description}
-                  </dd>
-                </div>
-              )}
-              <div className="flex gap-2">
-                <dt className="shrink-0 text-zinc-500">Checksum</dt>
-                {/* Salted digest of the plaintext. Clients compare their local
-                    copy against this without ever decrypting anything. */}
-                <dd className="truncate font-mono text-zinc-700 dark:text-zinc-300">
-                  {file.sha256.slice(0, 24)}…
-                </dd>
+            {file.description && (
+              <p className="mt-1 truncate text-sm text-zinc-600 dark:text-zinc-400">
+                {file.description}
+              </p>
+            )}
+
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap gap-1">
+                {file.environments.map((env) => (
+                  <span
+                    key={env}
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${envBadgeClasses(env)}`}
+                  >
+                    {env}
+                  </span>
+                ))}
               </div>
-              <div className="flex gap-2">
-                <dt className="shrink-0 text-zinc-500">Version</dt>
-                <dd className="text-zinc-700 dark:text-zinc-300">
-                  v{file.version} · updated {formatDate(file.updatedAt)}
-                </dd>
-              </div>
-            </dl>
-          )}
+              <span className="font-mono text-xs text-zinc-400 dark:text-zinc-500">
+                {formatBytes(file.size)} · {file.mode}
+              </span>
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                Updated {formatDate(file.updatedAt)}
+              </span>
+            </div>
+          </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex items-center gap-1">
           <button
-            type="button"
             onClick={onDownload}
             disabled={isDownloading}
-            title="Download (audited)"
             aria-label={`Download ${file.name}`}
-            className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+            title="Download (audited)"
+            className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
           >
             {isDownloading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -148,20 +118,18 @@ export function FileListItem({
           {canEdit && isWritable && (
             <>
               <button
-                type="button"
                 onClick={onReplace}
-                title="Replace contents"
                 aria-label={`Replace ${file.name}`}
-                className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                title="Replace contents"
+                className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
               >
                 <Upload className="h-4 w-4" />
               </button>
               <button
-                type="button"
                 onClick={onEdit}
-                title="Edit details"
                 aria-label={`Edit ${file.name}`}
-                className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                title="Edit details"
+                className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
               >
                 <Pencil className="h-4 w-4" />
               </button>
@@ -170,11 +138,10 @@ export function FileListItem({
 
           {canManagePermissions && (
             <button
-              type="button"
               onClick={onManagePermissions}
-              title="Manage access"
               aria-label={`Manage access for ${file.name}`}
-              className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              title="Manage access"
+              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
             >
               <Users className="h-4 w-4" />
             </button>
@@ -182,11 +149,10 @@ export function FileListItem({
 
           {canDelete && (
             <button
-              type="button"
               onClick={onDelete}
-              title="Move to trash"
               aria-label={`Delete ${file.name}`}
-              className="rounded p-1.5 text-zinc-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+              title="Move to trash"
+              className="rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
             >
               <Trash2 className="h-4 w-4" />
             </button>
