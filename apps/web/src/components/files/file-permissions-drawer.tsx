@@ -120,7 +120,7 @@ export function FilePermissionsDrawer({
             ))}
           </select>
 
-          <div className="mt-3 flex items-end gap-3">
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex-1">
               <label
                 htmlFor="file-grant-permission"
@@ -144,7 +144,7 @@ export function FilePermissionsDrawer({
               type="button"
               onClick={handleGrant}
               disabled={!selectedUser || busy}
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               Grant

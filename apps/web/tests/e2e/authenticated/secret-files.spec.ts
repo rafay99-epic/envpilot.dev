@@ -16,13 +16,14 @@ import { getWorkerProjectSlug, trackClientErrors } from "./support";
 test.skip(!hasE2ECredentials, SKIP_REASON);
 
 /**
- * Each FileListItem renders as `<div className="px-6 py-4">` inside the list
- * container (apps/web/src/components/files/file-list-item.tsx), matching the
- * accounts row. Scoping on that class pair avoids matching ancestor
- * containers that also contain the name as a text substring.
+ * Each FileListItem renders as `<div className="px-4 py-4 sm:px-6">` inside
+ * the list container (apps/web/src/components/files/file-list-item.tsx) —
+ * the base padding is the mobile one, widened from `sm` up. Scoping on that
+ * class pair avoids matching ancestor containers that also contain the name
+ * as a text substring.
  */
 function fileRow(page: Page, name: string): Locator {
-  return page.locator("div.px-6.py-4").filter({ hasText: name });
+  return page.locator("div.px-4.py-4").filter({ hasText: name });
 }
 
 /** Attach an in-memory fixture to the drawer's file input. */

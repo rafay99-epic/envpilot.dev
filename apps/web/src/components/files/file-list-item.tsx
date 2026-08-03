@@ -46,8 +46,8 @@ export function FileListItem({
   const isWritable = file.access === "write";
 
   return (
-    <div className="px-6 py-4">
-      <div className="flex items-center justify-between">
+    <div className="px-4 py-4 sm:px-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
@@ -57,7 +57,7 @@ export function FileListItem({
               {/* The destination path is the feature — mono, like the
                   account row treats its URL. */}
               <span
-                className="max-w-[280px] truncate font-mono text-xs text-zinc-500 dark:text-zinc-400"
+                className="max-w-full truncate font-mono text-xs text-zinc-500 sm:max-w-[280px] dark:text-zinc-400"
                 title={file.path}
               >
                 {file.path}
@@ -100,7 +100,7 @@ export function FileListItem({
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1 sm:shrink-0">
           <button
             onClick={onDownload}
             disabled={isDownloading}

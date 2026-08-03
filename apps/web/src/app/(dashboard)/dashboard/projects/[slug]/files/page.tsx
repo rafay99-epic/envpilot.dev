@@ -226,7 +226,7 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
           <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Environment:
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setSelectedEnvironment("all")}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -255,7 +255,7 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
 
         {/* List */}
         <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+          <div className="flex flex-col gap-3 border-b border-zinc-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-zinc-800">
             <div>
               <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
                 Files
@@ -275,7 +275,7 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
                     ? "Secret file limit reached. Upgrade to add more."
                     : undefined
                 }
-                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:justify-start dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
               >
                 <Plus className="h-4 w-4" />
                 Add File
@@ -287,7 +287,7 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
             {isLoadingFiles ? (
               <TerminalLoading />
             ) : filteredFiles.length === 0 ? (
-              <div className="px-6 py-12 text-center">
+              <div className="px-4 py-12 text-center sm:px-6">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
                   <FileKey className="h-6 w-6 text-zinc-400" />
                 </div>
