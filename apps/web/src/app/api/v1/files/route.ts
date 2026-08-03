@@ -56,6 +56,12 @@ export async function GET(request: Request) {
     searchParams.get("metadataOnly") === "1" ||
     searchParams.get("metadataOnly") === "true";
   const paths = searchParams.getAll("path");
+  // The Envpilot Action identifies itself so a github_action-scoped key
+  // authorizes correctly; other REST clients omit it and fall back to the
+  // rest_api inference in authorize.ts.
+  const surfaceParam = searchParams.get("surface");
+  const surface =
+    surfaceParam === "github_action" ? "github_action" : undefined;
 
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!convexUrl) {
@@ -78,6 +84,7 @@ export async function GET(request: Request) {
         environment,
         metadataOnly,
         ...(paths.length > 0 ? { paths } : {}),
+        ...(surface ? { surface } : {}),
       }
     );
     return NextResponse.json({
@@ -96,16 +103,20 @@ export async function GET(request: Request) {
         { status: 401 }
       );
     }
-    if (/not scoped to|scope/i.test(message)) {
+    if (/not scoped to|scope|not enabled for this surface/i.test(message)) {
       return NextResponse.json({ error: message }, { status: 403 });
     }
     if (/pro plan|tier/i.test(message)) {
       return NextResponse.json({ error: message }, { status: 403 });
     }
     if (/rate ?limit/i.test(message)) {
+      // Surface the limiter's cooldown so a CI client can wait it out
+      // rather than retrying straight into another 429.
+      const retryMatch = /retry (?:after |in )?(\d+)/i.exec(message);
+      const retryAfter = retryMatch ? retryMatch[1] : "60";
       return NextResponse.json(
         { error: "Rate limit exceeded — retry shortly" },
-        { status: 429 }
+        { status: 429, headers: { "Retry-After": retryAfter } }
       );
     }
     if (/project not found/i.test(message)) {

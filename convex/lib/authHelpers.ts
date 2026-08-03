@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
@@ -174,7 +175,7 @@ export async function authorizeFileAccess(
   // Verify user exists
   const user = await ctx.db.get(args.userId);
   if (!user) {
-    throw new Error("Not authorized");
+    throw new ConvexError("Not authorized");
   }
 
   return await assertProjectAction(
@@ -208,12 +209,12 @@ export async function requireFileAccess(
   // Verify user exists
   const user = await ctx.db.get(userId);
   if (!user) {
-    throw new Error("Not authorized");
+    throw new ConvexError("Not authorized");
   }
 
   const access = await getFileAccess(ctx, userId, file, preloadedProject);
   if (!access || (minimum === "write" && access !== "write")) {
-    throw new Error("Insufficient permissions");
+    throw new ConvexError("Insufficient permissions");
   }
 
   return access;

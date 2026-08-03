@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   chmodSync,
   mkdtempSync,
+  symlinkSync,
   mkdirSync,
   readFileSync,
   rmSync,
@@ -9,6 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { webcrypto } from "node:crypto";
 
@@ -78,9 +80,36 @@ function row(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe("path containment", () => {
   it("accepts a normal nested path", () => {
+    // Compare against the REAL root: containment now resolves symlinks, and
+    // on macOS /tmp is itself a symlink to /private/tmp.
     expect(resolveInsideRoot(root, "android/app/upload.jks")).toBe(
-      join(root, "android/app/upload.jks")
+      join(realpathSync.native(root), "android/app/upload.jks")
     );
+  });
+
+  it("refuses a path that escapes through a symlinked directory", () => {
+    // The lexical check passes here — "link/escaped.key" normalises inside
+    // the root — so only resolving the real ancestor catches it.
+    const outside = mkdtempSync(join(tmpdir(), "envpilot-outside-"));
+    try {
+      symlinkSync(outside, join(root, "link"));
+      expect(() => resolveInsideRoot(root, "link/escaped.key")).toThrow(
+        /symlink|outside/
+      );
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses to write through a symlinked destination", () => {
+    const outside = mkdtempSync(join(tmpdir(), "envpilot-outside-"));
+    try {
+      writeFileSync(join(outside, "target"), "x");
+      symlinkSync(join(outside, "target"), join(root, "decoy.key"));
+      expect(() => resolveInsideRoot(root, "decoy.key")).toThrow(/symlink/);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
   });
 
   it("refuses traversal, absolute paths, and the root itself", () => {
@@ -253,8 +282,12 @@ describe("full encrypt → transport → disk round trip", () => {
 });
 
 describe("gitignore", () => {
-  it("is a no-op when the repo has no .gitignore", () => {
-    expect(ignoreSecretFilePaths(root, ["a.key"])).toEqual([]);
+  it("creates .gitignore when the repo has none", () => {
+    // Returning early here left secrets untracked-and-offerable in exactly
+    // the repo most likely to commit one by accident.
+    const added = ignoreSecretFilePaths(root, ["a.key"]);
+    expect(added).toContain("a.key");
+    expect(readFileSync(join(root, ".gitignore"), "utf-8")).toContain("a.key");
   });
 
   it("appends missing paths plus the temp-file pattern, and is idempotent", () => {

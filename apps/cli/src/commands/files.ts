@@ -250,12 +250,14 @@ const pullCommand = new Command("pull")
 
       blank();
       let written = 0;
+      let repaired = 0;
       for (const file of files) {
         if (statuses.get(file._id) === "in-sync") {
           // Content matches, so no fetch and no decrypt — but repair the
           // permissions if something loosened them since the last pull.
           if (!modeMatches(root, file.path, file.mode)) {
             applyMode(root, file.path, file.mode);
+            repaired += 1;
             console.log(
               `  ${chalk.yellow("~")} ${file.path} ${chalk.dim(
                 `(permissions restored to ${file.mode})`
@@ -285,8 +287,13 @@ const pullCommand = new Command("pull")
       }
 
       blank();
+      const repairedCount = repaired;
       success(
-        `${written} file${written === 1 ? "" : "s"} written, ${files.length - written} unchanged`
+        `${written} file${written === 1 ? "" : "s"} written` +
+          (repairedCount > 0
+            ? `, ${repairedCount} permission${repairedCount === 1 ? "" : "s"} repaired`
+            : "") +
+          `, ${files.length - written - repairedCount} unchanged`
       );
     } catch (err) {
       handleError(err);
@@ -421,7 +428,10 @@ const getCommand = new Command("get")
 const rmCommand = new Command("rm")
   .description("Move a secret file to the trash")
   .argument("<path>", "The secret file's destination path")
-  .option("-e, --env <environment>", "Environment (defaults to the linked one)")
+  .option(
+    "-e, --env <environment>",
+    "Environment used to FIND the file (defaults to the linked one). Deletion always trashes the whole file, including its other environments."
+  )
   .option("-y, --yes", "Skip the confirmation prompt")
   .option("--project <name-or-id>", "Use a specific linked project")
   .action(async (targetPath, options) => {
@@ -451,7 +461,10 @@ const rmCommand = new Command("rm")
           {
             type: "confirm",
             name: "confirmed",
-            message: `Move "${match.name}" (${match.path}, ${env}) to trash?`,
+            message:
+              match.environments.length > 1
+                ? `"${match.name}" (${match.path}) belongs to ${match.environments.join(", ")}. Deleting trashes it for ALL of them — continue?`
+                : `Move "${match.name}" (${match.path}, ${env}) to trash?`,
             default: false,
           },
         ]);

@@ -1,4 +1,14 @@
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  realpathSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { randomBytes } from "node:crypto";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import * as core from "@actions/core";
 import { buildDotenvContent } from "./dotenv.js";
@@ -27,18 +37,58 @@ function writeSecretFile(root: string, file: EnvpilotFile): void {
   if (isAbsolute(file.path)) {
     throw new Error("refusing an absolute path");
   }
-  const absoluteRoot = resolve(root);
+  const absoluteRoot = realpathSync.native(resolve(root));
   const destination = resolve(absoluteRoot, file.path);
-  const rel = relative(absoluteRoot, destination);
-  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+  const contained = (candidate: string): boolean => {
+    const rel = relative(absoluteRoot, candidate);
+    return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+  };
+  if (!contained(destination)) {
     throw new Error("refusing a path outside the workspace");
   }
 
+  // Lexical containment is not enough: a directory inside the workspace can
+  // be a symlink pointing out of it, and the normalised path still looks
+  // contained. Resolve the deepest EXISTING ancestor for real.
+  let ancestor = dirname(destination);
+  while (!existsSync(ancestor) && contained(ancestor)) {
+    ancestor = dirname(ancestor);
+  }
+  if (existsSync(ancestor)) {
+    const realAncestor = realpathSync.native(ancestor);
+    if (realAncestor !== absoluteRoot && !contained(realAncestor)) {
+      throw new Error("refusing a path that escapes through a symlink");
+    }
+  }
+  try {
+    if (lstatSync(destination).isSymbolicLink()) {
+      throw new Error("refusing to write through a symlink");
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+
+  // A pre-existing file keeps its old (possibly world-readable) mode while
+  // new secret contents land in it, so stage into a fresh exclusive temp at
+  // the restrictive mode and rename over the target instead.
   mkdirSync(dirname(destination), { recursive: true });
   const mode = file.mode === "0400" ? 0o400 : 0o600;
-  // Create at the restrictive mode rather than widening later — a runner is
-  // shared infrastructure and there must be no readable window.
-  writeFileSync(destination, Buffer.from(file.content, "base64"), { mode });
+  const temp = `${destination}.envpilot-${process.pid}-${randomBytes(8).toString("hex")}.tmp`;
+  try {
+    writeFileSync(temp, Buffer.from(file.content, "base64"), {
+      mode,
+      flag: "wx",
+    });
+    chmodSync(temp, mode);
+    renameSync(temp, destination);
+  } catch (error) {
+    try {
+      unlinkSync(temp);
+    } catch {
+      // Nothing useful to do — the write already failed.
+    }
+    throw error;
+  }
   chmodSync(destination, mode);
 }
 

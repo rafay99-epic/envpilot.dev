@@ -241,6 +241,28 @@ export const create = internalMutation({
       throw new ConvexError(filePathConflictMessage(args.path, clashes));
     }
 
+    // Re-check the count INSIDE the transaction. preflight runs before the
+    // (slow) encrypt, so two concurrent uploads can both pass it and both
+    // land — overshooting the tier limit. The action already destroys the
+    // blob and vault object when this mutation rejects.
+    const insertGate = await resolveOrgGateContext(
+      ctx.db,
+      project.organizationId
+    );
+    const countGate = await checkCountedLimit(
+      ctx.db,
+      project.organizationId,
+      "secret_files_limit",
+      (limit) => countActiveFiles(ctx.db, project.organizationId, limit),
+      insertGate
+    );
+    if (!countGate.allowed) {
+      throw new ConvexError(
+        countGate.reason ??
+          `Secret file limit reached (${countGate.current}/${countGate.limit}). Upgrade your tier for more.`
+      );
+    }
+
     const fileId = await ctx.db.insert("projectFiles", {
       name: args.name,
       path: args.path,
@@ -717,6 +739,12 @@ export const grantAccess = mutation({
       action: "project:manage_file_permissions",
       preloadedProject: project,
     });
+
+    // A falsy expiry is treated as "no expiry" by every grant reader, so
+    // expiresAt: 0 would grant permanent access instead of instant denial.
+    if (args.expiresAt !== undefined && args.expiresAt <= now) {
+      throw new ConvexError("Grant expiry must be in the future");
+    }
 
     const target = await ctx.db.get(args.userId);
     if (!target) {

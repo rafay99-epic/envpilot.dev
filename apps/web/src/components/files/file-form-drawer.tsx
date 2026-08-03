@@ -303,10 +303,10 @@ export function FileFormDrawer({
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <fieldset>
+              <legend className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Environments <span className="text-red-500">*</span>
-              </label>
+              </legend>
               <div className="mt-2 flex flex-wrap gap-2">
                 {ENVIRONMENTS.map((env) => (
                   <button
@@ -327,7 +327,7 @@ export function FileFormDrawer({
                 The same path may exist in other environments, as long as they
                 do not overlap with these.
               </p>
-            </div>
+            </fieldset>
           </>
         )}
 

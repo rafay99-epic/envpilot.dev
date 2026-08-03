@@ -23,7 +23,12 @@ import {
 import { materialiseSecretFiles } from "./secretFiles";
 import { SingleFlight } from "../utils/singleFlight";
 import { envFileNamesFor } from "../utils/envFiles";
-import { recordManagedFile, forgetManagedFile } from "../utils/managedFiles";
+import {
+  recordManagedFile,
+  forgetManagedFile,
+  readManifest,
+  getManifestPath,
+} from "../utils/managedFiles";
 import { captureError } from "../utils/sentry";
 import {
   normalizeOrgRole,
@@ -501,9 +506,15 @@ export class SyncService {
             // differ, because a keystore is 0600/0400 rather than 0644/0444.
             //
             // 1. Manifest — so uninstall/purge and rename tracking see it.
+            // MUST hash the same representation the purge/unsync paths
+            // read back (`fs.readFile(path, "utf-8")`). Recording a base64
+            // hash meant the two never matched, so every secret file was
+            // "hand-edited" to the purge and survived uninstall. Binary
+            // content decodes lossily on both sides — identically — so the
+            // hashes still agree.
             await recordManagedFile(
               file.absolutePath,
-              contents.toString("base64"),
+              contents.toString("utf-8"),
               undefined,
               "strict-readonly"
             );
@@ -708,6 +719,10 @@ export class SyncService {
    * permissive project would unmask another project's secrets.
    */
   canRevealSecrets(projectIds: string[]): boolean {
+    // Capability maps are cached per project from the last pull, and
+    // apiService.clearCache() drops them on sign-out and account switch —
+    // so after a transition this reads an empty cache and fails closed
+    // until the new session's first sync repopulates it.
     if (projectIds.length === 0) return false;
     return projectIds.every(
       (id) =>
@@ -1437,30 +1452,31 @@ export class SyncService {
     projectId: string,
     directory: LinkedDirectory
   ): Promise<void> {
-    const environment = directory.environments[0];
-    if (!environment) return;
+    void projectId;
 
-    let files: Awaited<ReturnType<ApiService["listSecretFiles"]>>;
+    // Enumerate from the LOCAL manifest, never the API. Cleanup runs when
+    // access is revoked or a project is unlinked — exactly when the listing
+    // endpoint rejects the caller — and the previous version swallowed that
+    // failure and reported success, leaving decrypted keystores on disk.
+    const platformPath = toPlatformPath(directory.directoryPath);
+    const normalizedDir = path.resolve(platformPath);
+    // The .env files this directory owns are handled by
+    // deleteEnvFileFromDirectory; everything else it manages is a secret file.
+    const envFiles = new Set(envFileNamesFor(directory).values());
+    envFiles.add(directory.targetFile);
+
+    let entries: Awaited<ReturnType<typeof readManifest>>;
     try {
-      files = await this.api.listSecretFiles(projectId, environment);
+      entries = await readManifest(getManifestPath());
     } catch {
-      // Access may already be revoked — nothing further we can enumerate.
       return;
     }
 
-    const platformPath = toPlatformPath(directory.directoryPath);
-    const normalizedDir = path.resolve(platformPath);
-
-    for (const file of files) {
-      const filePath = path.resolve(platformPath, file.path);
-
-      // Never touch anything outside the linked directory.
-      if (
-        !filePath.startsWith(normalizedDir + path.sep) &&
-        filePath !== normalizedDir
-      ) {
-        continue;
-      }
+    for (const entry of entries) {
+      const filePath = path.resolve(entry.path);
+      const rel = path.relative(normalizedDir, filePath);
+      if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) continue;
+      if (envFiles.has(rel)) continue;
 
       this.fileProtection?.unwatchFile(filePath);
       this.clipboardGuard?.unprotectFile(filePath);

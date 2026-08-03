@@ -15,7 +15,14 @@
  * (same convention as clipboardScope.ts and envFiles.ts).
  */
 
-export type CloakFormat = "env" | "json" | "yaml" | "toml" | "pem" | "opaque";
+export type CloakFormat =
+  | "env"
+  | "json"
+  | "yaml"
+  | "toml"
+  | "properties"
+  | "pem"
+  | "opaque";
 
 /** A half-open [start, end) character span on a given zero-based line. */
 export interface CloakRange {
@@ -33,6 +40,10 @@ const ENV_LINE = /^\s*[A-Za-z_][A-Za-z0-9_.]*\s*=(.*)$/;
 
 /** `key: value` (YAML), allowing a leading list dash. */
 const YAML_LINE = /^(\s*(?:-\s+)?(?:"[^"]*"|'[^']*'|[\w.\-/]+)\s*:\s+)(\S.*)$/;
+
+/** `key = value` or `key: value` (.properties / .ini accept both). */
+const PROPERTIES_LINE =
+  /^(\s*(?:"[^"]*"|'[^']*'|[\w.\-]+)\s*[=:]\s*)(\S.*?)\s*$/;
 
 /** `key = value` (TOML). Section headers are skipped by the caller. */
 const TOML_LINE = /^(\s*(?:"[^"]*"|'[^']*'|[\w.\-]+)\s*=\s*)(\S.*?)\s*$/;
@@ -63,7 +74,7 @@ export function detectCloakFormat(
   if (/\.(json|jsonc)$/.test(name)) return "json";
   if (/\.(ya?ml)$/.test(name)) return "yaml";
   if (/\.toml$/.test(name)) return "toml";
-  if (/\.(properties|ini|cfg|conf)$/.test(name)) return "toml";
+  if (/\.(properties|ini|cfg|conf)$/.test(name)) return "properties";
   if (/\.(plist|xml)$/.test(name)) return "opaque";
 
   switch (languageId) {
@@ -74,8 +85,9 @@ export function detectCloakFormat(
       return "yaml";
     case "toml":
       return "toml";
-    case "dotenv":
     case "properties":
+      return "properties";
+    case "dotenv":
       return "env";
     default:
       return "opaque";
@@ -120,6 +132,51 @@ function jsonValueEnd(text: string, from: number): number | null {
   return i;
 }
 
+/**
+ * Scalars inside an inline container, e.g. the elements of
+ * `["a", "b"]` or the values of `{"k": "v"}` written on one line.
+ *
+ * Fails closed: any element that cannot be read as a scalar is skipped by
+ * the scanner, and the enclosing key/value pass masks whatever it can.
+ */
+function inlineScalarRanges(
+  line: number,
+  text: string,
+  from: number
+): CloakRange[] {
+  const ranges: CloakRange[] = [];
+  let i = from;
+  let depth = 0;
+
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === "[" || ch === "{") {
+      depth += 1;
+      i += 1;
+      continue;
+    }
+    if (ch === "]" || ch === "}") {
+      depth -= 1;
+      i += 1;
+      if (depth <= 0) break;
+      continue;
+    }
+    if (ch === "," || ch === ":" || /\s/.test(ch)) {
+      i += 1;
+      continue;
+    }
+    const end = jsonValueEnd(text, i);
+    if (end === null || end <= i) {
+      i += 1;
+      continue;
+    }
+    ranges.push({ line, start: i, end });
+    i = end;
+  }
+
+  return ranges;
+}
+
 /** Value ranges on one JSON line — handles pretty-printed and minified. */
 function jsonRangesForLine(line: number, text: string): CloakRange[] {
   const ranges: CloakRange[] = [];
@@ -130,7 +187,15 @@ function jsonRangesForLine(line: number, text: string): CloakRange[] {
   while ((m = keyed.exec(text)) !== null) {
     const valueStart = m.index + m[0].length;
     const end = jsonValueEnd(text, valueStart);
-    if (end === null || end <= valueStart) continue;
+    if (end === null) {
+      // Structural opener. Its inline elements still have to be masked —
+      // `"scopes": ["secret-a", "secret-b"]` on one line would otherwise
+      // stay fully readable.
+      ranges.push(...inlineScalarRanges(line, text, valueStart));
+      keyed.lastIndex = valueStart + 1;
+      continue;
+    }
+    if (end <= valueStart) continue;
     ranges.push({ line, start: valueStart, end });
     consumed.push([m.index, end]);
     keyed.lastIndex = end;
@@ -168,6 +233,10 @@ export function computeCloakRanges(
 ): CloakRange[] {
   const ranges: CloakRange[] = [];
   let inPemBody = false;
+  /** Indentation of an open YAML block scalar (`key: |`), else null. */
+  let yamlBlockIndent: number | null = null;
+  /** True while inside an unterminated TOML array or multiline string. */
+  let tomlContinuation = false;
 
   for (let line = 0; line < lines.length; line += 1) {
     const text = lines[line];
@@ -206,6 +275,16 @@ export function computeCloakRanges(
       }
 
       case "yaml": {
+        // A block scalar's body is the secret; only its opener is structure.
+        // Without tracking indentation the whole key material stayed visible.
+        if (yamlBlockIndent !== null) {
+          if (indentOf(text) > yamlBlockIndent) {
+            ranges.push({ line, start: indentOf(text), end: text.length });
+            break;
+          }
+          yamlBlockIndent = null;
+        }
+
         const trimmed = text.trimStart();
         // Comments and document markers carry no secret.
         if (trimmed.startsWith("#") || trimmed.startsWith("---")) break;
@@ -217,24 +296,59 @@ export function computeCloakRanges(
           }
           break;
         }
-        // A block scalar indicator (| or >) is structure; its indented body
-        // is masked by the plain-line fallback on the following lines.
-        if (isStructural(m[2]) || m[2] === "|" || m[2] === ">") break;
+        // A block scalar indicator (|, >, with optional chomping/indent
+        // markers) is structure — remember its indentation so every body
+        // line below is masked until the block dedents.
+        if (/^[|>][+-]?\d*$/.test(m[2].trim())) {
+          yamlBlockIndent = indentOf(text);
+          break;
+        }
+        if (isStructural(m[2])) break;
         ranges.push({ line, start: m[1].length, end: text.length });
         break;
       }
 
-      case "toml": {
+      case "toml":
+      case "properties": {
+        // Continuation of a multi-line array or """string""" — every line
+        // of it is value, so mask it and keep going until it closes.
+        if (tomlContinuation) {
+          ranges.push({ line, start: indentOf(text), end: text.length });
+          if (/(\]|""")\s*$/.test(text)) tomlContinuation = false;
+          break;
+        }
+
         const trimmed = text.trimStart();
         if (trimmed.startsWith("#") || trimmed.startsWith(";")) break;
         // [section] headers are structure.
         if (trimmed.startsWith("[")) break;
-        const m = TOML_LINE.exec(text);
-        if (!m || isStructural(m[2])) break;
+
+        const m =
+          format === "properties"
+            ? PROPERTIES_LINE.exec(text)
+            : TOML_LINE.exec(text);
+        if (!m) break;
+
+        // Check for a multi-line opener BEFORE the structural test: a bare
+        // `[` or `"""` at the end of the line is an OPENER, not an empty
+        // container, and treating it as structure left its whole body
+        // visible on the lines below.
+        const value = m[2];
+        const opensArray = value.startsWith("[") && !/\]\s*$/.test(value);
+        const opensString =
+          value.startsWith('"""') && !/"""\s*$/.test(value.slice(3));
+        if (opensArray || opensString) {
+          tomlContinuation = true;
+          // The opener itself carries no secret; the body below does.
+          break;
+        }
+
+        if (isStructural(value)) break;
+
         ranges.push({
           line,
           start: m[1].length,
-          end: m[1].length + m[2].length,
+          end: m[1].length + value.length,
         });
         break;
       }

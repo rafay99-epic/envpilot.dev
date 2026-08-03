@@ -296,7 +296,14 @@ const gateFeatureArg = v.optional(
 // (surface absent + no mcp gateFeature = "rest_api"), which also covers
 // calls from web builds predating this field.
 const surfaceArg = v.optional(
-  v.union(v.literal("rest_api"), v.literal("mcp_server"))
+  v.union(
+    v.literal("rest_api"),
+    v.literal("mcp_server"),
+    // The files route IS the Action's pull path, so a github_action-scoped
+    // key has to be able to present that surface — otherwise the scope the
+    // key form now allows would be denied at CI time.
+    v.literal("github_action")
+  )
 );
 
 export const getOrganization = action({
@@ -903,6 +910,21 @@ export const getProjectFiles = action({
       if (wanted && !wanted.has(row.path)) return false;
       return true;
     });
+
+    // Convex caps a function return at 16 MiB and base64 inflates by 1.33x.
+    // Each file is individually within its tier limit, but several together
+    // can blow the ceiling and fail the WHOLE pull with an opaque
+    // serialization error. Refuse up front with a message that says what to
+    // do instead.
+    const MAX_CONTENT_BYTES = 8 * 1024 * 1024;
+    if (!metadataOnly) {
+      const total = filtered.reduce((n, r) => n + r.size, 0);
+      if (total > MAX_CONTENT_BYTES) {
+        throw new ConvexError(
+          `Requested secret files total ${Math.ceil(total / 1024 / 1024)} MB, over the ${MAX_CONTENT_BYTES / 1024 / 1024} MB per-request cap — pass \`paths\` to fetch them individually.`
+        );
+      }
+    }
 
     const results: Array<{
       name: string;

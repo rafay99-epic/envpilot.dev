@@ -204,6 +204,84 @@ describe("pem", () => {
   });
 });
 
+describe("leaks that review caught", () => {
+  it("masks elements of an inline JSON array", () => {
+    // The keyed opener is structural, so the elements on the same line were
+    // sailing straight through.
+    const out = render("json", '  "scopes": ["sk_live_aaa", "sk_live_bbb"],');
+    expect(out).toContain('"scopes"');
+    expect(out).toContain("[");
+    expect(out).not.toContain("sk_live_aaa");
+    expect(out).not.toContain("sk_live_bbb");
+  });
+
+  it("masks values of an inline JSON object", () => {
+    const out = render(
+      "json",
+      '  "creds": { "user": "root", "pass": "s3cret" }'
+    );
+    expect(out).toContain('"creds"');
+    expect(out).not.toContain("root");
+    expect(out).not.toContain("s3cret");
+  });
+
+  it("masks a YAML block scalar body until it dedents", () => {
+    const src = [
+      "signing:",
+      "  private_key: |",
+      "    LINE-ONE-SECRET",
+      "    LINE-TWO-SECRET",
+      "  alias: upload",
+    ].join("\n");
+    const out = render("yaml", src);
+    expect(out).toContain("private_key: |");
+    expect(out).not.toContain("LINE-ONE-SECRET");
+    expect(out).not.toContain("LINE-TWO-SECRET");
+    // The block ended, so the next key is parsed normally again.
+    expect(out).toContain("alias:");
+    expect(out).not.toContain("upload");
+  });
+
+  it("handles a chomping indicator on the block scalar", () => {
+    const out = render("yaml", "key: |-\n  SECRET-BODY");
+    expect(out).not.toContain("SECRET-BODY");
+  });
+
+  it("masks a multi-line TOML array", () => {
+    const src = [
+      "tokens = [",
+      '  "sk_live_aaa",',
+      '  "sk_live_bbb",',
+      "]",
+    ].join("\n");
+    const out = render("toml", src);
+    expect(out).toContain("tokens = ");
+    expect(out).not.toContain("sk_live_aaa");
+    expect(out).not.toContain("sk_live_bbb");
+  });
+
+  it("masks a TOML multiline string", () => {
+    const src = ['key = """', "SECRET-BODY", '"""'].join("\n");
+    const out = render("toml", src);
+    expect(out).not.toContain("SECRET-BODY");
+  });
+
+  it("masks colon-separated .properties secrets", () => {
+    // .properties/.ini accept `:` as well as `=`; the TOML parser only took
+    // `=`, so these stayed fully visible.
+    const out = render("properties", "db.password: hunter2\napi.key=sk_live_x");
+    expect(out).toContain("db.password");
+    expect(out).toContain("api.key");
+    expect(out).not.toContain("hunter2");
+    expect(out).not.toContain("sk_live_x");
+  });
+
+  it("routes .properties and .ini to their own parser", () => {
+    expect(detectCloakFormat("/a/app.properties")).toBe("properties");
+    expect(detectCloakFormat("/a/app.ini")).toBe("properties");
+  });
+});
+
 describe("opaque", () => {
   it("masks everything when there is no structure worth keeping", () => {
     const out = render("opaque", "binary-ish\nbytes");

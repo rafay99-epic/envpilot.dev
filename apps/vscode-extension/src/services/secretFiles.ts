@@ -1,7 +1,9 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   chmodSync,
   existsSync,
+  lstatSync,
+  realpathSync,
   mkdirSync,
   readFileSync,
   renameSync,
@@ -65,22 +67,58 @@ export function localDigest(
 }
 
 /**
- * Resolve a server-supplied path inside the workspace, refusing escapes.
+ * Resolve `filePath` under `root`, refusing anything that escapes.
  *
- * The server validates paths, but this process is what actually writes into
- * someone's workspace — a server bug or a tampered response must not be able
- * to reach outside it.
+ * Lexical resolve()/relative() is not enough on its own: an intermediate
+ * directory inside the repo can be a SYMLINK pointing outside it, and the
+ * normalised string still looks contained. Since the path comes from the
+ * server and this function is the client-side hardening against a tampered
+ * or buggy response, the deepest EXISTING ancestor is realpath'd and
+ * re-checked before the write.
  */
 export function resolveInsideRoot(root: string, filePath: string): string {
   if (isAbsolute(filePath)) {
     throw new Error(`Refusing to write an absolute path: ${filePath}`);
   }
-  const absoluteRoot = resolve(root);
+  const absoluteRoot = realpathSync.native(resolve(root));
   const destination = resolve(absoluteRoot, filePath);
-  const rel = relative(absoluteRoot, destination);
-  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
-    throw new Error(`Refusing to write outside the workspace: ${filePath}`);
+
+  const contained = (candidate: string): boolean => {
+    const rel = relative(absoluteRoot, candidate);
+    return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+  };
+
+  if (!contained(destination)) {
+    throw new Error(
+      `Refusing to write outside the project directory: ${filePath}`
+    );
   }
+
+  // Walk up to the deepest ancestor that exists and resolve it for real.
+  // A symlinked parent that escapes the root is rejected here even though
+  // the lexical check above passed.
+  let ancestor = dirname(destination);
+  while (!existsSync(ancestor) && contained(ancestor)) {
+    ancestor = dirname(ancestor);
+  }
+  if (existsSync(ancestor)) {
+    const realAncestor = realpathSync.native(ancestor);
+    if (realAncestor !== absoluteRoot && !contained(realAncestor)) {
+      throw new Error(
+        `Refusing to write through a symlink that escapes the project: ${filePath}`
+      );
+    }
+  }
+
+  // The destination itself must not be a symlink pointing elsewhere.
+  try {
+    if (lstatSync(destination).isSymbolicLink()) {
+      throw new Error(`Refusing to write through a symlink: ${filePath}`);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+
   return destination;
 }
 
@@ -92,11 +130,25 @@ export function statusOf(file: SecretFileRow, root: string): FileStatus {
   } catch {
     return "missing";
   }
-  if (!existsSync(destination)) return "missing";
-  const local = readFileSync(destination);
-  return localDigest(local, file.digestSalt) === file.sha256
-    ? "in-sync"
-    : "modified";
+  // A directory, FIFO, or symlink at the recorded path is NOT something to
+  // silently overwrite, and an unreadable file must not abort the whole
+  // sync — both report as a local conflict so the rest still proceeds.
+  let stats;
+  try {
+    stats = lstatSync(destination);
+  } catch {
+    return "missing";
+  }
+  if (!stats.isFile()) return "modified";
+
+  try {
+    const local = readFileSync(destination);
+    return localDigest(local, file.digestSalt) === file.sha256
+      ? "in-sync"
+      : "modified";
+  } catch {
+    return "modified";
+  }
 }
 
 function numericMode(mode: string): number {
@@ -139,9 +191,12 @@ function writeSecretFile(
   mkdirSync(dirname(destination), { recursive: true });
 
   const target = numericMode(mode);
-  const temp = `${destination}.envpilot-${process.pid}.tmp`;
+  // Unpredictable name + O_EXCL: a predictable temp path can be pre-created
+  // as a symlink by another local user, and a plain write would then follow
+  // it and deliver the plaintext secret somewhere else entirely.
+  const temp = `${destination}.envpilot-${process.pid}-${randomBytes(8).toString("hex")}.tmp`;
   try {
-    writeFileSync(temp, contents, { mode: 0o600 });
+    writeFileSync(temp, contents, { mode: 0o600, flag: "wx" });
     chmodSync(temp, target);
     renameSync(temp, destination);
   } catch (error) {
@@ -166,9 +221,12 @@ function writeSecretFile(
  */
 export function ignoreSecretFilePaths(root: string, paths: string[]): string[] {
   const gitignorePath = join(root, ".gitignore");
-  if (!existsSync(gitignorePath)) return [];
-
-  const content = readFileSync(gitignorePath, "utf-8");
+  // Create it when absent. Returning early left every pulled secret
+  // untracked-and-offerable in a repo that simply had no .gitignore yet —
+  // exactly the repo most likely to commit one by accident.
+  const content = existsSync(gitignorePath)
+    ? readFileSync(gitignorePath, "utf-8")
+    : "";
   const existing = new Set(
     content.split("\n").map((line) => line.trim().replace(/^\/+/, ""))
   );

@@ -7,6 +7,7 @@ import {
 } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { requireAuthedUser } from "../../lib/identity";
+import { del as blobStoreDel } from "../files/blobStore";
 import { assertProjectAction } from "../../lib/authz";
 
 /**
@@ -420,10 +421,9 @@ export const purgeExpiredBatch = internalAction({
     // leave readable ciphertext whose key is gone from our records but whose
     // blob is still served, which is the one state worth designing out.
     for (const file of batch.files) {
-      const blobDeleted = await ctx.storage
-        .delete(file.storageId)
-        .then(() => true)
-        .catch(() => false);
+      // Through the seam, not ctx.storage directly — otherwise swapping the
+      // blob backend would silently orphan every ciphertext the GC purges.
+      const blobDeleted = await blobStoreDel(ctx, file.storageId);
       if (!blobDeleted) {
         skipped++;
         continue;

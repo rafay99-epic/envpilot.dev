@@ -393,9 +393,34 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
             skipped++;
           }
         } else {
-          // Seeded custom roles (editor/viewer): insert-only — the admin
-          // panel owns them after the first seed.
-          skipped++;
+          // Seeded custom roles (editor/viewer): the admin panel owns their
+          // METADATA after the first seed, but capabilities merge the same
+          // way system roles do. Without this a newly shipped capability
+          // never reaches an existing Editor row, so those users silently
+          // lack the feature forever. Merge only fills keys the row has
+          // never seen — every explicit admin choice is preserved.
+          const mergedCaps = mergeSystemRoleCapabilities(
+            role.capabilities,
+            existing.capabilities as Record<string, boolean>
+          ) as Record<string, boolean>;
+          const normalize = (caps: Record<string, boolean>) =>
+            JSON.stringify(
+              Object.keys(caps)
+                .sort()
+                .map((k) => [k, caps[k]])
+            );
+          if (
+            normalize(existing.capabilities as Record<string, boolean>) !==
+            normalize(mergedCaps)
+          ) {
+            await ctx.db.patch(existing._id, {
+              capabilities: mergedCaps,
+              updatedAt: now,
+            });
+            updated++;
+          } else {
+            skipped++;
+          }
         }
         continue;
       }

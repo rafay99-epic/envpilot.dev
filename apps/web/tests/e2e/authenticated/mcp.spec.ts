@@ -183,6 +183,8 @@ test.describe.serial("MCP server (/api/mcp)", () => {
         "envpilot_get_variable",
         "envpilot_get_variables",
         "envpilot_list_accounts",
+        "envpilot_list_files",
+        "envpilot_get_file",
         "envpilot_list_projects",
         "envpilot_request_variable",
         "envpilot_search",

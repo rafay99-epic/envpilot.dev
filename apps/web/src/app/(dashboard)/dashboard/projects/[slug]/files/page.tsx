@@ -106,7 +106,10 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
 
   const handleSubmit = async (data: FileFormData) => {
     if (!projectId) return;
+    // Clear both, so a stale failure banner cannot sit alongside a later
+    // success (or vice versa).
     setError(null);
+    setNotice(null);
 
     if (editingFile && !replaceMode) {
       await updateFile({
@@ -144,6 +147,7 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
   const handleDownload = async (file: SecretFile) => {
     setDownloadingIds((prev) => new Set(prev).add(file._id));
     setError(null);
+    setNotice(null);
     try {
       const result = await getFileContent({ fileId: file._id, source: "web" });
       // Name the download after the path's basename, not the display name —
@@ -166,6 +170,8 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
 
   const handleDelete = async () => {
     if (!deletingFile) return;
+    setError(null);
+    setNotice(null);
     try {
       await deleteFile({ fileId: deletingFile._id });
       setNotice(`Moved ${deletingFile.name} to trash`);

@@ -77,6 +77,8 @@ export async function pullFiles(
   const url = new URL("/api/v1/files", params.apiUrl);
   url.searchParams.set("environment", params.environment);
   url.searchParams.set("project", params.project);
+  // Identify the surface so a github_action-scoped key authorizes here.
+  url.searchParams.set("surface", "github_action");
 
   const response = await fetch(url, {
     method: "GET",

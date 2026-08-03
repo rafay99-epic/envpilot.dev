@@ -253,7 +253,9 @@ async function sweepStaleTemp(targetPath: string): Promise<void> {
   // directory for every leftover belonging to this file rather than stat-ing
   // one fixed name. Each still holds plaintext, so none may be left behind.
   const dir = path.dirname(targetPath);
-  const prefix = `${path.basename(targetPath)}.tmp-envpilot`;
+  // Include the separator that begins the generated suffix so a user's own
+  // file merely starting with this name is never swept.
+  const prefix = `${path.basename(targetPath)}.tmp-envpilot.`;
 
   let entries: string[];
   try {
@@ -527,7 +529,19 @@ export async function activate(context: vscode.ExtensionContext) {
     // Value cloaking commands
     vscode.commands.registerCommand(
       "envpilot.toggleCloaking",
-      wrapCommand(async () => cloakService.toggle())
+      wrapCommand(async () => {
+        // Same gate as reveal: turning cloaking off unmasks every managed
+        // file indefinitely, which is strictly more permissive than a
+        // 30-second reveal. Gating one and not the other left the
+        // restriction trivially bypassable.
+        if (!(await canRevealSecrets())) {
+          vscode.window.showWarningMessage(
+            "Envpilot: your role does not allow unmasking secret values."
+          );
+          return;
+        }
+        await cloakService.toggle();
+      })
     ),
     vscode.commands.registerCommand(
       "envpilot.revealValues",
@@ -548,7 +562,18 @@ export async function activate(context: vscode.ExtensionContext) {
     // Hover "Reveal value" link (role-checked; not surfaced in the palette)
     vscode.commands.registerCommand(
       "envpilot.revealHoverValue",
-      wrapCommand(async (args) => revealHoverValue(apiService, args))
+      wrapCommand(async (args) => {
+        // The hover link reveals a single value, which is the same
+        // disclosure the palette command performs — gate it identically or
+        // the role restriction is bypassable one value at a time.
+        if (!(await canRevealSecrets())) {
+          vscode.window.showWarningMessage(
+            "Envpilot: your role does not allow revealing secret values."
+          );
+          return;
+        }
+        return revealHoverValue(apiService, args);
+      })
     )
   );
 
@@ -672,6 +697,9 @@ export async function activate(context: vscode.ExtensionContext) {
     // variables from a stale cache — the refetch hits the server, which
     // denies the revoked caller.
     apiService.clearCache();
+    // Capabilities just went stale — re-resolve the reveal gate so a previous
+    // account's permission cannot linger in the palette.
+    void refreshRevealContext();
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
@@ -840,6 +868,9 @@ async function handleSignOut(): Promise<void> {
   await authService.signOut();
   clearSentryUser();
   apiService.clearCache();
+  // Capabilities just went stale — re-resolve the reveal gate so a previous
+  // account's permission cannot linger in the palette.
+  void refreshRevealContext();
   syncService.stopPeriodicSync();
   realTimeSyncService.stopRealTimeSync();
   projectsTreeProvider.refresh();
@@ -964,6 +995,9 @@ async function switchToAccount(accountId: string): Promise<void> {
   }
 
   apiService.clearCache();
+  // Capabilities just went stale — re-resolve the reveal gate so a previous
+  // account's permission cannot linger in the palette.
+  void refreshRevealContext();
   // The Convex socket is still authenticated as the PREVIOUS account — force
   // it to re-run the token fetch so subscriptions come up under the new one.
   convexService?.reauthenticate();
@@ -1032,6 +1066,9 @@ async function handleSignOutAll(): Promise<void> {
   // bypasses authService.signOut() (which only removes the active account
   // and shows a single-account message).
   apiService.clearCache();
+  // Capabilities just went stale — re-resolve the reveal gate so a previous
+  // account's permission cannot linger in the palette.
+  void refreshRevealContext();
   syncService.stopPeriodicSync();
   realTimeSyncService.stopRealTimeSync();
   vscode.commands.executeCommand(
@@ -1717,6 +1754,9 @@ async function handlePullVariables(): Promise<void> {
 function handleRefresh(): void {
   // Manual refresh should always hit the server, not the response cache
   apiService.clearCache();
+  // Capabilities just went stale — re-resolve the reveal gate so a previous
+  // account's permission cannot linger in the palette.
+  void refreshRevealContext();
   projectsTreeProvider.refresh();
   variablesTreeProvider.refresh();
   statusBarProvider.update();

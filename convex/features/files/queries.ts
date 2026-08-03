@@ -158,7 +158,16 @@ export const list = query({
       } else {
         const grant = grantsByFile.get(file._id as string);
         if (grant) {
-          access = grant.permission;
+          // Cap exactly as getFileAccess does. An unassigned member (the
+          // viewer-sharing path), or one whose role lacks grant fallback,
+          // resolves to read even holding a write grant — surfacing "write"
+          // here would render replace/edit controls the server refuses.
+          const grantFallback =
+            assignmentBypassed ||
+            (assignment !== null &&
+              hasCapability(profile, "access.grant_fallback"));
+          access =
+            grantFallback && grant.permission === "write" ? "write" : "read";
         } else if (blanketRead) {
           access = "read";
         }

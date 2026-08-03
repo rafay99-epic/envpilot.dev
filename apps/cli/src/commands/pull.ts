@@ -290,13 +290,25 @@ async function pullSingleProject(
 async function pullSecretFiles(
   projectId: string,
   environment: string,
-  force?: boolean
+  force?: boolean,
+  dryRun?: boolean
 ): Promise<void> {
   const client = createAPIClient();
   const files = await client.listSecretFiles(projectId, environment);
   if (files.length === 0) return;
 
   const root = process.cwd();
+
+  // --dry-run still previews WHICH files would be written and their current
+  // drift, it just never downloads content or touches the disk.
+  if (dryRun) {
+    console.log();
+    info(`${files.length} secret file(s) for ${environment}:`);
+    for (const file of files) {
+      console.log(`    ${statusOf(file, root).padEnd(9)} ${file.path}`);
+    }
+    return;
+  }
 
   const conflicts = files.filter((file) => statusOf(file, root) === "modified");
   if (conflicts.length > 0 && !force) {
@@ -368,11 +380,12 @@ async function pullProject(
 ): Promise<void> {
   await pullProjectVariables(project, outputPath, options);
 
-  if (options.files && !options.dryRun) {
+  if (options.files) {
     await pullSecretFiles(
       project.projectId,
       project.environment,
-      options.force
+      options.force,
+      options.dryRun
     );
   }
 }
