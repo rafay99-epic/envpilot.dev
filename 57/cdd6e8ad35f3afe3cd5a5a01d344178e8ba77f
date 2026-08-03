@@ -1,0 +1,22 @@
+apps/vscode-extension/src/services/secretFiles.ts
+  s_e94a11bf9b2f48::t_2e469e6240ba8f 235-237,251,254-256,262-281
+  s_e94a11bf9b2f48::t_08a0e0683e7a34 282-284
+apps/vscode-extension/src/services/secretFiles.test.ts
+  s_e94a11bf9b2f48::t_a9b64a528d74b5 1-187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "57cdd6e8ad35f3afe3cd5a5a01d344178e8ba77f",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
