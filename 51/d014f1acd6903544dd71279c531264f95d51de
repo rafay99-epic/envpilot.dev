@@ -1,0 +1,67 @@
+apps/cli/src/lib/api.ts
+  s_e94a11bf9b2f48::t_8472dfc923edbc 376-380,1026-1034
+  s_e94a11bf9b2f48::t_55c0b8915cc7e7 1035-1036
+apps/web/src/hooks/useSecretFiles.ts
+  s_e94a11bf9b2f48::t_4aaff65fed06fc 68
+  s_e94a11bf9b2f48::t_d0653fccce068f 58-67,69-70
+convex/features/files/helpers.ts
+  s_e94a11bf9b2f48::t_f2813bf13e541a 96-98,100,106,186-204
+apps/web/src/lib/__tests__/secret-file-crypto.test.ts
+  s_e94a11bf9b2f48::t_9be1056a093101 123-156
+convex/features/api/reads.ts
+  s_e94a11bf9b2f48::t_af7f76a5f28530 2-6,285-316,1017-1028
+apps/vscode-extension/src/services/sync.ts
+  s_e94a11bf9b2f48::t_bb4f46a83db025 483-490,509,543-547
+convex/features/files/mutations.ts
+  s_e94a11bf9b2f48::t_b7ef53976cefb6 684-685,703-707
+apps/web/src/components/files/file-form-drawer.tsx
+  s_e94a11bf9b2f48::t_9a5727d79a700c 6-10
+apps/web/src/components/files/file-permissions-drawer.tsx
+  s_e94a11bf9b2f48::t_d9d1368ec26bc9 64-65,123,128-129,131
+  s_e94a11bf9b2f48::t_4aaff65fed06fc 124-127
+apps/web/src/components/variables/variable-form.tsx
+  s_e94a11bf9b2f48::t_9a5727d79a700c 4-8
+apps/web/src/lib/__tests__/secret-file-path.test.ts
+  s_e94a11bf9b2f48::t_1175287b863a9f 2-54
+  s_e94a11bf9b2f48::t_6eab58d7d13263 1,55-56
+convex/lib/rateLimits.ts
+  s_e94a11bf9b2f48::t_b7ef53976cefb6 38-56
+convex/features/files/queries.ts
+  s_e94a11bf9b2f48::t_4aaff65fed06fc 8
+  s_e94a11bf9b2f48::t_08cbf26254eb3d 248-286
+  s_e94a11bf9b2f48::t_10e4cfdb0b6447 287-290
+convex/features/featureRegistry/gates.ts
+  s_e94a11bf9b2f48::t_af7f76a5f28530 371-378,395-409
+convex/features/files/values.ts
+  s_e94a11bf9b2f48::t_b7ef53976cefb6 16,141-146,282-285,307
+apps/web/src/components/variables/bulk-paste-form.tsx
+  s_e94a11bf9b2f48::t_9a5727d79a700c 4-8
+apps/cli/src/commands/files.ts
+  s_e94a11bf9b2f48::t_18b738feaf0133 389,414-430,435,451-455,481-490,496-498,510-518
+  s_e94a11bf9b2f48::t_9c307cacbaca6f 519
+apps/web/src/components/accounts/account-form-drawer.tsx
+  s_e94a11bf9b2f48::t_c5b4526e8321b1 6-10
+convex/features/files/crypto.ts
+  s_e94a11bf9b2f48::t_f2813bf13e541a 144-152,155-173,175,177-178,182,188
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/files/page.tsx
+  s_e94a11bf9b2f48::t_d0653fccce068f 14,89-93
+  s_e94a11bf9b2f48::t_4aaff65fed06fc 280-281
+apps/web/src/constants/project.ts
+  s_e94a11bf9b2f48::t_e8cf18a2e2818d 59-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "51d014f1acd6903544dd71279c531264f95d51de",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
