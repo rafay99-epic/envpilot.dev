@@ -1,0 +1,54 @@
+---
+title: Projects
+description: List the projects a key can reach, or fetch one by slug.
+icon: plug
+---
+
+# Projects
+
+## List projects
+
+<Endpoint method="GET" path="/v1/projects" resource="projects" />
+
+Every project in the key's scope, with resource counts. Projects outside scope are silently omitted — an empty match is `200` with an empty list, never an error.
+
+```bash
+curl https://www.envpilot.dev/api/v1/projects \
+  -H "Authorization: Bearer envpk_..."
+```
+
+```json
+{
+  "projects": [
+    {
+      "id": "proj_1",
+      "name": "Backend",
+      "slug": "backend",
+      "variableCount": 42,
+      "accountCount": 3
+    }
+  ]
+}
+```
+
+## Get one project
+
+<Endpoint method="GET" path="/v1/projects/{slug}" resource="projects" />
+
+```bash
+curl https://www.envpilot.dev/api/v1/projects/backend \
+  -H "Authorization: Bearer envpk_..."
+```
+
+A slug that does not exist and a slug outside the key's scope both return `404`. That is deliberate: a key must not be able to confirm the existence of a project it cannot read.
+
+## Limits
+
+- Requires the `projects` resource.
+- Metadata bucket: 120 requests/min per key.
+- Counts are of **active** resources; trashed items are not included.
+- No pagination — see [bounded reads](/api/overview).
+
+## Next
+
+- [Variables](/api/variables) · [Accounts](/api/accounts) · [Files](/api/files)

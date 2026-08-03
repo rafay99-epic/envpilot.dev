@@ -1,0 +1,56 @@
+---
+title: Action security
+description: The masking invariant, what a leaked CI key can and cannot do, and how to revoke it.
+icon: github
+---
+
+# Action security
+
+## Masking comes first
+
+Every pulled value is registered with GitHub's log masking (`core.setSecret`) **before** anything exports or writes it. Order matters: a value exported first and masked second is a value that can appear in a log line in between.
+
+Because masking happens at the runner level, a later step that accidentally echoes a variable prints `***`. Empty values are skipped — masking the empty string would redact every subsequent character of the log.
+
+Secret file **contents** are never logged at all. Only name, path and size reach the log, because masking a multi-megabyte binary is not meaningful.
+
+## What the key can do
+
+| Can                                          | Cannot                                           |
+| -------------------------------------------- | ------------------------------------------------ |
+| Read variables in its scope                  | Create, edit, or delete anything                 |
+| Read secret files, with the `files` resource | File a variable [request](/platform/requests)    |
+| Nothing else                                 | Reach projects or environments outside its scope |
+
+The Action is the narrowest surface Envpilot has. CI reads; it does not negotiate.
+
+## Scope it tightly
+
+- One project, one environment per key wherever practical.
+- Add the `files` resource only to keys that pull files.
+- Give a key an expiry if the pipeline is temporary.
+- Prefer separate keys per repository, so revoking one does not break the others.
+
+## Revocation
+
+Revoke in **Organization → Settings → API Keys**. The next pull is rejected immediately — there is no cached-authorization window and no grace period. Unknown, revoked, and expired keys all get the same uniform answer, so a scanner cannot use the error to tell which it is holding.
+
+## Every pull is audited
+
+Each value-returning request is written to the audit log against the key: which project, which environment, which resource. If a key is compromised, the audit log tells you exactly what it read and when. Denials are logged too.
+
+## Runners are ephemeral
+
+GitHub-hosted runners are destroyed after the job, so pulled values do not persist — **unless you make them persist**. Uploading an artifact containing a dotenv file, caching a directory that holds a keystore, or writing to a mounted volume all outlive the job.
+
+## Limits
+
+- Log masking protects the log, not a file you upload.
+- Self-hosted runners are not ephemeral. Clean them up yourself, and prefer `env-file` paths inside the workspace so a checkout wipe removes them.
+- Rate limits apply per key, not per repository — several workflows sharing one key share its bucket.
+- A key with a tier downgrade behind it stops working: the `public_api` gate is re-checked on every request, not at creation.
+
+## See also
+
+- [API authentication](/api/authentication) — the full key model
+- [Rate limits](/limits/rate-limits)

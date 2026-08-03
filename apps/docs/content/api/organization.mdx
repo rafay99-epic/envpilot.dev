@@ -1,0 +1,32 @@
+---
+title: Organization
+description: Read the key's own organization metadata.
+icon: plug
+---
+
+# Organization
+
+<Endpoint method="GET" path="/v1/organization" resource="any key" />
+
+Returns metadata for the organization the key belongs to. Works with **any** valid key regardless of resource scope — this is discovery-level information the key holder already has.
+
+```bash
+curl https://www.envpilot.dev/api/v1/organization \
+  -H "Authorization: Bearer envpk_..."
+```
+
+```json
+{
+  "id": "org_abc123",
+  "name": "Acme Inc",
+  "slug": "acme",
+  "plan": "pro"
+}
+```
+
+## Limits
+
+- No parameters. There is nothing to filter.
+- Counts against the metadata bucket (120/min per key).
+- Not audited — no secret material is returned.
+- A key cannot see any organization other than its own.

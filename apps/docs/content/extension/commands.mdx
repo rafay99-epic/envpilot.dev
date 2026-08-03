@@ -1,0 +1,51 @@
+---
+title: Commands
+description: Every Envpilot command in the VS Code palette, generated from the extension manifest.
+icon: puzzle
+version: "{{extensionVersion}}"
+---
+
+# Commands
+
+Everything below is available from the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) by typing **Envpilot**.
+
+<Callout type="info" title="Generated from the manifest">
+  This table is generated from `contributes.commands` in the extension's
+  `package.json`. It cannot list a command that does not ship, and it cannot
+  miss one that does.
+</Callout>
+
+{/* generated:extension-commands start */}
+
+| Command palette entry                  | Command id                    |
+| -------------------------------------- | ----------------------------- |
+| Envpilot: Sign In                      | `envpilot.signIn`             |
+| Envpilot: Sign Out                     | `envpilot.signOut`            |
+| Envpilot: Link Project                 | `envpilot.linkProject`        |
+| Envpilot: Unlink Project               | `envpilot.unlinkProject`      |
+| Envpilot: Pull Variables               | `envpilot.pullVariables`      |
+| Envpilot: Refresh                      | `envpilot.refresh`            |
+| Envpilot: Open Dashboard               | `envpilot.openDashboard`      |
+| Envpilot: Show Status                  | `envpilot.showStatus`         |
+| Envpilot: Add Directory                | `envpilot.addDirectory`       |
+| Envpilot: Remove Directory             | `envpilot.removeDirectory`    |
+| Envpilot: Select Environments          | `envpilot.selectEnvironments` |
+| Envpilot: Request Variable             | `envpilot.requestVariable`    |
+| Envpilot: Install Commit Guard Hook    | `envpilot.installCommitGuard` |
+| Envpilot: Remove Commit Guard Hook     | `envpilot.removeCommitGuard`  |
+| Envpilot: Open Dashboard Panel         | `envpilot.openDashboardPanel` |
+| Envpilot: Switch Account               | `envpilot.switchAccount`      |
+| Envpilot: Sign Out of All Accounts     | `envpilot.signOutAll`         |
+| Envpilot: Toggle Value Cloaking        | `envpilot.toggleCloaking`     |
+| Envpilot: Reveal Values for 30 Seconds | `envpilot.revealValues`       |
+
+{/* generated:extension-commands end */}
+
+## Keybindings
+
+`Cmd+C` / `Ctrl+C` and `Cmd+X` / `Ctrl+X` are intercepted inside Envpilot-managed files when the [clipboard guard](/extension/protection) is active. The binding is scoped by a context key, so it never affects any other file you have open.
+
+## Limits
+
+- There is no command to upload a [secret file](/platform/secret-files) — the extension writes them, the CLI and dashboard manage them.
+- Commands that reveal values check your role at invocation, so a keybinding or URI cannot bypass the palette's visibility rules.

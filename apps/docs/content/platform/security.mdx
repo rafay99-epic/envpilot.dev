@@ -1,0 +1,95 @@
+---
+title: Security
+description: Encryption at rest, envelope encryption for files, instant revocation, the audit trail, and what stays your responsibility.
+icon: shield
+---
+
+# Security
+
+Secrets are encrypted at rest with per-organization key isolation, access is enforced per secret, and every action is attributed in an audit log.
+
+## Encryption at rest
+
+Variable values are encrypted with **AES-256** in [WorkOS Vault](https://workos.com/vault). Envpilot's database stores only vault reference ids — never plaintext. Each secret carries its own encryption context derived from organization, project, and (optionally) environment, so secrets are cryptographically isolated across organizations.
+
+[Secret files](/platform/secret-files) go further, using **envelope encryption**: the file is sealed with a fresh AES-256-GCM key, the ciphertext lands in Convex file storage, and the key material lands in Vault. Neither store alone can read the file. See [Data model](/platform/data-model).
+
+## What the application layer holds
+
+1. You create or update a variable; the value goes to Vault under your organization's key context.
+2. Vault encrypts and returns a reference id.
+3. Envpilot stores the reference id.
+4. An authorized read sends the reference id back to Vault.
+5. Vault decrypts and returns the value.
+
+At no point does the application layer keep an unencrypted secret in persistent storage. A database dump is a list of key names and pointers.
+
+## Access control
+
+Three layers, in order:
+
+1. **Organization role** — one capability set per member ([Roles & permissions](/platform/rbac))
+2. **Project assignment** — where the role applies, with optional environment scope
+3. **Per-secret grants** — read or write on an individual variable or file, with optional expiry
+
+A developer who needs something they cannot see files a [request](/platform/requests) rather than escalating their own role.
+
+## Instant revocation
+
+Revoking access takes effect everywhere, not on the next login:
+
+- **CLI** — the next call returns 401 and local tokens are cleared.
+- **VS Code** — the revocation arrives over the live connection within seconds and the extension deletes the synced `.env` files it wrote (`envpilot.preventCopyOnRevoke`).
+- **Dashboard** — the variable disappears from view.
+- **API keys** — revoked keys fail their very next request; there is no cached-authorization window.
+
+[Security Hold](/platform/rbac#security-hold) does all of the above at once, org-wide, without deleting the membership.
+
+## Audit trail
+
+Over 40 action types are recorded — variable reads, writes and deletions, secret-file downloads, permission grants and revocations, authentication events, invitations and role changes, CLI and extension sessions, and every API-key use that returned secret material.
+
+Each entry carries the actor, IP address, user agent, and timestamp. Denials are logged too: the authorizer returns denials rather than throwing, precisely so the audit write survives the refusal. Logs can be filtered in the dashboard and exported as JSON.
+
+Retention is tier-dependent: **7 days** on Free, **365 days** on Pro (`audit_log_retention_days`).
+
+## Authentication
+
+| Surface             | Method                                                                              |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| Web dashboard       | WorkOS AuthKit SSO — Google, GitHub, email                                          |
+| CLI                 | Device-code flow: one-time code, browser confirmation, polling; tokens auto-refresh |
+| VS Code extension   | OAuth in the browser; the session is stored in VS Code's secure credential storage  |
+| REST / MCP / Action | API key (`envpk_…`) — SHA-256 hash stored, plaintext shown once                     |
+
+Sessions use short-lived access tokens with automatic refresh, and individual sessions can be revoked from Settings.
+
+## What stays on your side
+
+Once a pull completes, plaintext is on your disk under your control. Envpilot's local defences are real but they are defences of last resort:
+
+- The CLI writes secrets only where you asked, and adds pulled paths to `.gitignore` before writing.
+- The VS Code extension ships a dual-layer [commit guard](/extension/protection) — a staging-time block plus a git pre-commit hook — along with clipboard protection and value cloaking.
+- `envpilot run` avoids the problem entirely by injecting secrets into a child process without writing a file.
+- All API traffic is HTTPS with TLS 1.2+.
+
+<Callout type="warning" title="Envpilot cannot un-leak a pulled secret">
+  If a secret reaches a laptop, a CI log, or a screen share, rotation is the
+  only real remedy. That is why [rotation reminders](/platform/rotation) exist,
+  and why the GitHub Action masks every value in workflow logs before exporting
+  it.
+</Callout>
+
+## Limits
+
+- **Audit retention** is 7 days on Free, 365 on Pro.
+- **Metadata-only reads are not audited individually** — they carry no secret exposure, and logging them would drown the signal.
+- Envpilot cannot revoke a secret that has already left a machine: rotation is the remedy.
+- SSO is registered as a feature but is **not enabled on any tier** today.
+- Self-hosting is not offered; the encryption model assumes WorkOS Vault.
+
+## See also
+
+- [Data model](/platform/data-model) · [Secret files](/platform/secret-files)
+- [API authentication](/api/authentication) — the machine-credential contract
+- [Rate limits](/limits/rate-limits)

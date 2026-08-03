@@ -1,0 +1,47 @@
+---
+title: Dashboard overview
+description: Sign in, read the home page, and find the audit log and analytics.
+icon: monitor
+---
+
+# Dashboard overview
+
+The dashboard at [envpilot.dev](https://www.envpilot.dev) is the full management surface. Sign in through WorkOS AuthKit (Google, GitHub, or email), then use the sidebar to move between projects, team, audit trail, and settings.
+
+## Home
+
+`/dashboard` shows a status summary (project, variable, team and event counts), a **Getting Started** checklist for new organizations, **Recent Projects**, a **Recent Activity** feed linking into the audit log, and a **Team Members** panel.
+
+Two widgets appear when your plan enables them:
+
+- **Expiring Secrets** — variables with a [rotation schedule](/platform/rotation) expiring within 7 days.
+- **Shared secrets** — a summary of your active [share links](/platform/sharing).
+
+## Projects list
+
+`/dashboard/projects` lists every project you can reach. **Create Project** offers a framework template (Next.js, T3 Stack, Django, Rails, and around twenty more) that pre-fills a starter variable set with placeholders.
+
+## Audit log
+
+`/dashboard/audit` is a searchable log of every recorded action — variable reads and writes, secret-file downloads, permission changes, authentication, team changes, billing and CI/CD events, across 14 categories.
+
+Filter by free text, category, and date range (24h / 7d / 30d / 90d), then export the filtered result as CSV or JSON.
+
+Retention follows your plan: **7 days on Free, 365 on Pro** (`audit_log_retention_days`).
+
+## Analytics
+
+`/dashboard/analytics` (Project Manager and above) shows six panels: activity overview, project activity, variable changes by project, team activity, resource breakdown, and security insights — security-event, sensitive-access and permission-change counts.
+
+The 7/30/90-day selector is capped by your plan's analytics retention (7 days Free, 30 Pro).
+
+## Limits
+
+- What you see is what your role allows; nothing hints at projects you cannot reach.
+- Search across variables is server-side and capped at the first 100 matches, with a banner when you hit it.
+- Analytics and audit ranges are truncated by tier retention, not just by the selector.
+
+## Next
+
+- [Working in a project](/dashboard/project)
+- [Organization administration](/dashboard/organization)

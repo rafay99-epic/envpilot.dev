@@ -1,0 +1,50 @@
+---
+title: Troubleshooting
+description: The symptoms that look like bugs and usually aren't, and what to check when something really is wrong.
+icon: puzzle
+---
+
+# Troubleshooting
+
+## Nothing syncs and no error appears
+
+Check workspace trust. In **Restricted Mode** the extension never writes secrets — sync, pull and link are all disabled until you trust the workspace. Cleanup still runs, which is why previously synced files may vanish while nothing new arrives.
+
+## Variables I expect are missing
+
+You receive what your role can read, and nothing signals that more exists. Confirm with **Envpilot: Show Status** which project and environment the directory is linked to, then check [Roles & permissions](/platform/rbac). If you genuinely need a key you cannot see, run **Envpilot: Request Variable**.
+
+## My `.env` keeps reverting
+
+That is the edit watcher. Managed files are restored from the server when hand-edited — the write path is the dashboard, the CLI, or an approved request. If you meant to change the value, [`envpilot secrets set`](/cli/secrets) does it in one command.
+
+## Copy does nothing in a `.env`
+
+The [clipboard guard](/extension/protection) is blocking it. Change `envpilot.clipboardGuard.scope` if your team wants a looser policy — `readonly-roles` limits blocking to read-only files, `off` disables it.
+
+## Values show as `••••••`
+
+Cloaking. **Envpilot: Reveal Values for 30 Seconds**, or toggle it off — both need the reveal capability. If you get "your role does not allow unmasking secret values", ask an organization owner; it is a role capability, not a setting.
+
+## Secret files did not appear
+
+- Only the **first** linked environment's files are materialised into a directory.
+- A locally modified copy is treated as a conflict and left alone, so an old hand-placed keystore blocks the new one. Move it aside and sync again.
+- Uploading is not possible from the editor — use [`envpilot files add`](/cli/files) or the dashboard.
+
+## Suddenly signed out, files deleted
+
+Access was revoked, or a [Security Hold](/platform/rbac#security-hold) was applied. Both are immediate and both trigger local cleanup by design. Ask an organization owner.
+
+## An upgrade prompt blocks everything
+
+Your extension version is below the server's supported minimum. Update from the Marketplace; there is no override, because the older build calls contracts that no longer exist.
+
+## Still stuck
+
+- **Envpilot: Show Status** — session, links, sync state
+- **Envpilot: Refresh** — re-read state without pulling
+- **Envpilot: Sign Out of All Accounts**, then sign in again — clears a wedged session
+- The Output panel's Envpilot channel carries the extension's own log
+
+If a problem survives that, the CLI is a useful second opinion: `envpilot whoami` and `envpilot list linked` answer the same questions from outside the editor.

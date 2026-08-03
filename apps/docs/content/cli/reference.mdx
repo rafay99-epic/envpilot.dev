@@ -1,0 +1,427 @@
+---
+title: Command reference
+description: Every CLI command, argument, and example — generated from the CLI's own command catalog.
+icon: terminal
+version: "{{cliVersion}}"
+---
+
+# Command reference
+
+Complete surface of `@envpilot/cli` v{{cliVersion}}.
+
+<Callout type="info" title="Generated, not transcribed">
+  The tables and details below are generated from
+  `apps/cli/src/lib/command-catalog.ts` — the same catalog that registers the
+  commands and powers `envpilot man` and the terminal UI. A command cannot exist
+  without appearing here, and this page cannot drift from the binary: CI fails
+  if it does.
+</Callout>
+
+Run `envpilot man <command>` for the same information offline.
+
+{/* generated:cli-commands start */}
+
+| Command                       | Group       | What it does                                                                                                                                       |
+| ----------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `envpilot`                    | Get Started | Open the Ink-powered terminal dashboard for discovering and running commands. Aliases: `envpilot ui, envpilot dashboard`.                          |
+| `envpilot ui`                 | Get Started | Open the interactive Ink-powered terminal UI. Aliases: `envpilot dashboard`.                                                                       |
+| `envpilot sync`               | Sync        | Authenticate, select a project, pull variables, and set up local protection in one flow.                                                           |
+| `envpilot man`                | Get Started | Show the CLI manual page with commands, workflows, and security guidance.                                                                          |
+| `envpilot login`              | Get Started | Authenticate the CLI against the Envpilot web app.                                                                                                 |
+| `envpilot init`               | Get Started | Link the current directory to a project and choose a default environment.                                                                          |
+| `envpilot pull`               | Sync        | Download project variables into a local file or export format.                                                                                     |
+| `envpilot push`               | Sync        | Upload local variables back to Envpilot, writing only the keys you have access to.                                                                 |
+| `envpilot request`            | Sync        | Submit a request to create a new environment variable for review (developers only).                                                                |
+| `envpilot requests`           | Browse      | List variable requests, or approve/reject/cancel them without leaving the terminal.                                                                |
+| `envpilot secrets`            | Sync        | Change one secret without pull/edit/push. Two-step by default: key first, value prompted MASKED (never in shell history). Aliases: `envpilot var`. |
+| `envpilot diff`               | Browse      | Show which variable keys differ between two environments (add --values to compare values).                                                         |
+| `envpilot run`                | Sync        | Inject project secrets into a child process without writing a .env file (envpilot run -- bun dev).                                                 |
+| `envpilot list`               | Browse      | List organizations, projects, variables, or linked projects from the terminal.                                                                     |
+| `envpilot list organizations` | Browse      | List organizations available to the current user. Aliases: `envpilot list orgs`.                                                                   |
+| `envpilot list projects`      | Browse      | Browse projects in the active organization.                                                                                                        |
+| `envpilot list variables`     | Browse      | Inspect variables for a project with environment and tag filtering. Aliases: `envpilot list vars`.                                                 |
+| `envpilot list linked`        | Browse      | Show projects linked in the current directory.                                                                                                     |
+| `envpilot switch`             | Project     | Switch the active organization, project, environment, or linked project.                                                                           |
+| `envpilot usage`              | Browse      | Inspect current plan usage and feature availability for the active organization.                                                                   |
+| `envpilot whoami`             | Account     | Show the authenticated user, API target, and current active CLI context.                                                                           |
+| `envpilot accounts`           | Account     | List authenticated accounts and switch or remove them without logging out.                                                                         |
+| `envpilot files`              | Project     | Manage secret files — keystores, SSH keys, certificates, and service-account JSON — that cannot live in a .env.                                    |
+| `envpilot config`             | Account     | Inspect or update local CLI configuration such as the active API URL.                                                                              |
+| `envpilot logout`             | Account     | Revoke the current CLI session and clear local auth state.                                                                                         |
+| `envpilot unlink`             | Project     | Remove a linked project from the current directory without deleting local env files.                                                               |
+
+## Command details
+
+### `envpilot`
+
+Open the Ink-powered terminal dashboard for discovering and running commands.
+
+```bash
+envpilot
+envpilot ui
+envpilot dashboard
+```
+
+- This is the default when you run `envpilot` with no subcommand.
+- Supports search, keyboard navigation, and command launch.
+
+### `envpilot ui`
+
+Open the interactive Ink-powered terminal UI.
+
+```bash
+envpilot ui
+envpilot dashboard
+```
+
+- Use this when you want the UI explicitly instead of relying on the default no-arg launcher.
+
+### `envpilot sync`
+
+Authenticate, select a project, pull variables, and set up local protection in one flow.
+
+**Arguments** — `[--organization <id>] [--project <id>] [--env <environment>]`
+
+```bash
+envpilot sync
+envpilot sync --env production
+```
+
+- Best first-run workflow for local setup.
+- Reuses the existing login, init, and pull logic under the hood.
+
+### `envpilot man`
+
+Show the CLI manual page with commands, workflows, and security guidance.
+
+**Arguments** — `[command]`
+
+```bash
+envpilot man
+envpilot man pull
+```
+
+- Use this to see the supported command set.
+- Supports per-command manual sections.
+
+### `envpilot login`
+
+Authenticate the CLI against the Envpilot web app.
+
+**Arguments** — `[--api-url <url>] [--no-browser]`
+
+```bash
+envpilot login
+envpilot login --no-browser
+```
+
+- Opens the web authentication page by default.
+- Required before organization or project commands will work.
+
+### `envpilot init`
+
+Link the current directory to a project and choose a default environment.
+
+**Arguments** — `[--organization <id>] [--project <id>] [--env <environment>]`
+
+```bash
+envpilot init
+envpilot init --add
+```
+
+- Creates or updates the local `.envpilot` file.
+- Supports linking multiple projects with `--add`.
+
+### `envpilot pull`
+
+Download project variables into a local file or export format.
+
+**Arguments** — `[--env <environment>] [--file <path>] [--format <format>]`
+
+```bash
+envpilot pull
+envpilot pull --env staging --dry-run
+```
+
+- Supports `.env`, JSON, YAML, Vercel, Netlify, AWS, and Docker Compose formats.
+- Can pull the active linked project or all linked projects.
+
+### `envpilot push`
+
+Upload local variables back to Envpilot, writing only the keys you have access to.
+
+**Arguments** — `[--env <environment>] [--file <path>] [--merge|--replace]`
+
+```bash
+envpilot push
+envpilot push --replace
+```
+
+- Owners, project managers, and team leads write across the project; developers write only the variables they hold a write grant for.
+- Keys you cannot write are skipped — push does not create approval requests.
+- Compares local and remote variables before applying changes.
+
+### `envpilot request`
+
+Submit a request to create a new environment variable for review (developers only).
+
+**Arguments** — `[--project <name-or-id>]`
+
+```bash
+envpilot request
+envpilot request --project api
+```
+
+- Only assigned developers can submit requests — owners, project managers, and team leads create variables directly.
+- Environment choices are limited to the developer's assigned environment scope.
+- An owner, project manager, or team lead must approve the request before the variable is created.
+
+### `envpilot requests`
+
+List variable requests, or approve/reject/cancel them without leaving the terminal.
+
+**Arguments** — `[list] [--project <p>] [--status <s>] [--json] | approve <id> [--value <v>|--value-stdin] [--reason <t>] | reject <id> [--reason <t>] | cancel <id>`
+
+```bash
+envpilot requests
+envpilot requests --status pending
+envpilot requests approve <id>
+envpilot requests approve <id> --value sk_live_…
+envpilot requests reject <id> --reason "use the shared key"
+envpilot requests cancel <id>
+```
+
+- Reviewers (owner, assigned project manager/team lead) see every request; developers see only their own.
+- --status/--json apply to listing only; --value/--value-stdin/--reason apply to review subcommands only.
+- Approving a machine (valueless) request prompts MASKED for the value; --value-stdin reads it from stdin for CI (keeps it out of argv), --value is a last resort that lands in shell history.
+- Get the \<id> from the ID column of `envpilot requests`.
+
+### `envpilot secrets`
+
+Change one secret without pull/edit/push. Two-step by default: key first, value prompted MASKED (never in shell history).
+
+**Arguments** — `set [<key>|<key=value>] [-e <env>] [-p <project>] [-d <text>] [--sensitive] [--all-envs] | rm <key> [-e <env>] [-p <project>] [--yes]`
+
+```bash
+envpilot secrets set
+envpilot secrets set STRIPE_SECRET_KEY --env production
+envpilot secrets set API_URL=https://api.example.com
+envpilot secrets rm OLD_FLAG --env staging --yes
+```
+
+- Interactive by default: the key is validated first, then the value is prompted masked so it never lands in shell history — KEY=VALUE inline is for CI and prints a history warning.
+- Role-aware: direct-write roles set immediately; request-only roles are offered the request workflow instead (a reviewer approves with `requests approve`).
+- Plan limits are enforced server-side and reported readably; check `envpilot usage` for your tier.
+- set upserts one key in one environment (merge); updating a value shared across environments requires confirmation (--all-envs non-interactively).
+- rm on a single-environment secret moves it to trash (recoverable from the dashboard); on a shared secret it only removes THIS environment — the value stays live in the others.
+- `envpilot var …` still works as an alias.
+
+### `envpilot diff`
+
+Show which variable keys differ between two environments (add --values to compare values).
+
+**Arguments** — `<envA> <envB> [--values] [--project <name-or-id>] [--json]`
+
+```bash
+envpilot diff staging production
+envpilot diff development staging --values
+```
+
+- Default is a metadata-only key comparison; --values decrypts both environments.
+
+### `envpilot run`
+
+Inject project secrets into a child process without writing a .env file (envpilot run -- bun dev).
+
+**Arguments** — `[--env <environment>] [--project <name-or-id>] [--keep-existing] [--print] -- <command> [args...]`
+
+```bash
+envpilot run -- bun dev
+envpilot run --env production -- node server.js
+envpilot run --project api -- pnpm test
+envpilot run --print
+envpilot run --keep-existing -- bun dev
+```
+
+- Use `--` to separate envpilot flags from the command to execute.
+- Secrets override existing shell vars by default; pass --keep-existing to flip.
+- On Windows, the command is run through the shell so .cmd / .bat files resolve.
+- Signals (SIGINT, SIGTERM, SIGHUP, SIGQUIT) are forwarded to the child process.
+- Use --print to inspect what would be injected without executing anything.
+
+### `envpilot list`
+
+List organizations, projects, variables, or linked projects from the terminal.
+
+**Arguments** — `[resource]`
+
+```bash
+envpilot list
+envpilot list projects
+envpilot list variables
+```
+
+- Default resource is `projects`.
+- Use `linked` to inspect local `.envpilot` project links.
+
+### `envpilot list organizations`
+
+List organizations available to the current user.
+
+```bash
+envpilot list organizations
+envpilot list orgs --json
+```
+
+- Useful for discovering organization IDs and roles.
+
+### `envpilot list projects`
+
+Browse projects in the active organization.
+
+**Arguments** — `[--organization <id>] [--json]`
+
+```bash
+envpilot list projects
+envpilot list projects --json
+```
+
+- Shows project roles when available.
+- Useful for selecting project IDs for automation and scripts.
+
+### `envpilot list variables`
+
+Inspect variables for a project with environment and tag filtering.
+
+**Arguments** — `[--project <id>] [--env <environment>] [--tag <name>]`
+
+```bash
+envpilot list variables
+envpilot list variables --env production --show-values
+```
+
+- Values are masked by default.
+- Designed to mirror the web app’s searchable variable surface.
+
+### `envpilot list linked`
+
+Show projects linked in the current directory.
+
+```bash
+envpilot list linked
+```
+
+- Shows the active linked project and environment mapping.
+
+### `envpilot switch`
+
+Switch the active organization, project, environment, or linked project.
+
+**Arguments** — `[--organization <id>] [--project <id>] [--env <environment>] [--active <name-or-id>]`
+
+```bash
+envpilot switch --env production
+envpilot switch --active api
+```
+
+- Updates local CLI state without rewriting the whole project config.
+- Supports both linked projects and remote project lookup.
+
+### `envpilot usage`
+
+Inspect current plan usage and feature availability for the active organization.
+
+**Arguments** — `[--organization <id>] [--json]`
+
+```bash
+envpilot usage
+envpilot usage --json
+```
+
+- Shows project, member, and variable limits.
+- Useful for CLI feature-gate troubleshooting.
+
+### `envpilot whoami`
+
+Show the authenticated user, API target, and current active CLI context.
+
+```bash
+envpilot whoami
+```
+
+- Validates the current access token against the website.
+- Useful for debugging stale auth or wrong API URL targets.
+
+### `envpilot accounts`
+
+List authenticated accounts and switch or remove them without logging out.
+
+**Arguments** — `[list|switch <identifier>|remove <identifier>]`
+
+```bash
+envpilot accounts
+envpilot accounts switch you@example.com
+envpilot accounts remove you@example.com
+```
+
+- Identifiers can be an account id or the account's email (case-insensitive).
+- Switching accounts does not log anyone out; use `envpilot logout` to remove the active session.
+
+### `envpilot files`
+
+Manage secret files — keystores, SSH keys, certificates, and service-account JSON — that cannot live in a .env.
+
+**Arguments** — `[list|status|pull|add <file>|get <path>|rm <path>]`
+
+```bash
+envpilot files list
+envpilot files status
+envpilot files pull
+envpilot files add ./upload.jks --path android/app/upload.jks -e production
+```
+
+- `list` and `status` are metadata-only: nothing is decrypted and no download is recorded.
+- `pull` refuses to overwrite a local file that differs from the server unless you pass --force.
+- Pulled paths are added to .gitignore before the files are written.
+- Every download of file contents is audited.
+
+### `envpilot config`
+
+Inspect or update local CLI configuration such as the active API URL.
+
+**Arguments** — `[list|get|set|path|reset]`
+
+```bash
+envpilot config
+envpilot config path
+```
+
+- Useful for local development against non-production API URLs.
+- Shows both global and project-level config paths.
+
+### `envpilot logout`
+
+Revoke the current CLI session and clear local auth state.
+
+```bash
+envpilot logout
+```
+
+- Best way to reset a stale CLI session cleanly.
+- Clears local tokens even if the revoke call fails.
+
+### `envpilot unlink`
+
+Remove a linked project from the current directory without deleting local env files.
+
+**Arguments** — `[project] [--force]`
+
+```bash
+envpilot unlink
+envpilot unlink api --force
+```
+
+- Updates `.envpilot` and active-project state.
+- Leaves existing `.env` files on disk.
+
+{/* generated:cli-commands end */}

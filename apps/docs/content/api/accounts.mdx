@@ -1,0 +1,35 @@
+---
+title: Shared accounts
+description: Read the credentials your team shares for third-party services.
+icon: plug
+---
+
+# Shared accounts
+
+<Endpoint
+  method="GET"
+  path="/v1/projects/{slug}/accounts"
+  resource="accounts"
+/>
+
+[Shared accounts](/platform/shared-accounts) are credentials for a third-party service that a team shares — distinct from variables, which are configuration your app reads.
+
+## Parameters
+
+| Query param     | Required | What it does                                        |
+| --------------- | -------- | --------------------------------------------------- |
+| `environment`   | No       | Filter to one environment                           |
+| `metadata_only` | No       | `true` returns account names only, no secret values |
+
+```bash
+curl "https://www.envpilot.dev/api/v1/projects/backend/accounts?environment=production" \
+  -H "Authorization: Bearer envpk_..."
+```
+
+## Limits
+
+- Requires the `accounts` resource; the project must be in the key's scope.
+- **Rate**: metadata reads use the 120/min bucket; value pulls use the 30/min bucket.
+- Value pulls are audited against the key.
+- Read-only — accounts are created and rotated by humans in the dashboard.
+- The same bounded-read and fail-loud rules apply as for [variables](/api/variables).

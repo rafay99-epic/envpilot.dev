@@ -1,0 +1,187 @@
+---
+title: MCP setup
+description: Mint a scoped key, keep it out of your config files, and rotate it without editing a single client.
+icon: zap
+---
+
+# MCP setup
+
+## Create an MCP key
+
+Create a dedicated key in **Organization → Settings → API Keys → New API Key**:
+
+1. Give the key a recognizable name, such as `codex-development`.
+2. Select the **MCP server** surface. Deselect REST API and GitHub Action unless this same credential genuinely needs them.
+3. Select only the projects the client needs. **All projects** also includes projects created in the future and is owner-only.
+4. Select only the environments the client needs. A development-only agent should not receive production access.
+5. Select the resources required by its tools:
+
+| Resource    | MCP tools enabled                                                                                                                         |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `projects`  | `envpilot_list_projects`; project-name and project-slug matches from `envpilot_search`                                                    |
+| `variables` | `envpilot_get_variables`, `envpilot_get_variable`; variable-key matches from `envpilot_search` (which also needs `projects` to enumerate) |
+| `accounts`  | `envpilot_list_accounts`                                                                                                                  |
+| `files`     | `envpilot_list_files`, `envpilot_get_file`                                                                                                |
+| `requests`  | `envpilot_request_variable`, `envpilot_get_request_status`                                                                                |
+
+For the common project-discovery and variable-read workflow, select `projects` and `variables`. Most assistants begin with `envpilot_list_projects`; without `projects`, that opening call is denied. An accounts-only or requests-only key is still valid, but only for the corresponding tools.
+
+<Callout type="warning" title="Think twice before granting `files`">
+  `files` lets an agent fetch a signing keystore or a private key in full. A
+  leaked string can be rotated in minutes; a leaked signing key is a different
+  kind of day. Grant it only to a key whose agent genuinely runs builds, and
+  never alongside **All projects**.
+</Callout>
+
+6. Choose an expiry, create the key, and copy the `envpk_...` value immediately.
+
+Project, environment, resource, and surface scopes are **immutable**. You cannot widen or edit them after creation; create a replacement key when the required access changes. The plaintext is also displayed **once**: Envpilot stores only its SHA-256 hash and cannot recover a lost key.
+
+## Endpoint
+
+```
+https://www.envpilot.dev/api/mcp
+```
+
+Transport is Streamable HTTP (the current MCP spec transport for remote servers). Auth is a plain bearer token — the same `envpk_...` API key you'd use for the REST API:
+
+```
+Authorization: Bearer envpk_your_key_here
+```
+
+## Set ENVPILOT_API_KEY
+
+Keep the plaintext out of MCP config files and repositories. Put it in the environment of the process that starts the client, then make the client reference the variable by name.
+
+### macOS
+
+For the current Terminal session (zsh), enter the key at the hidden prompt so it does not appear in shell history:
+
+```bash
+read -rs "ENVPILOT_API_KEY?Envpilot API key: "; echo
+export ENVPILOT_API_KEY
+```
+
+This value disappears when the shell exits. For future terminal sessions, have a password manager inject it or edit a user-only shell startup file (do not build the line with a shell command that would record the key in history):
+
+```bash
+# ~/.zshrc
+export ENVPILOT_API_KEY='envpk_your_key_here'
+```
+
+A literal export in a startup file is persistent but is plaintext on disk; never put it in a repository, and restrict the file to your user:
+
+```bash
+chmod 600 ~/.zshrc
+```
+
+Apps opened from Finder, the Dock, or Spotlight do not inherit variables from `~/.zshrc`. To make the current login session pass the already-exported value to **newly launched** GUI apps:
+
+```bash
+launchctl setenv ENVPILOT_API_KEY "$ENVPILOT_API_KEY"
+```
+
+Fully quit and reopen Codex, Cursor, or the IDE afterward. `launchctl setenv` lasts only for the current login session; after logout or restart, set it again (preferably from a login automation that reads a keychain or password manager—do not embed the raw key in a LaunchAgent plist). Do not run `launchctl getenv ENVPILOT_API_KEY` without redirecting it, because that prints the secret.
+
+### Linux
+
+For the current bash session:
+
+```bash
+read -rsp "Envpilot API key: " ENVPILOT_API_KEY; echo
+export ENVPILOT_API_KEY
+```
+
+For future terminal sessions, have a secret manager inject it or edit the appropriate user-only login file (do not build the line with a shell command that would record the key in history):
+
+```bash
+# ~/.profile
+export ENVPILOT_API_KEY='envpk_your_key_here'
+```
+
+A literal export is stored as plaintext, so keep the file private:
+
+```bash
+chmod 600 ~/.profile
+```
+
+A desktop launcher inherits the graphical login session, not an interactive shell's `.bashrc`. The simplest safe option is to launch the app from a terminal that already has the variable. On systemd-based desktops, you can also import the current value into the user and D-Bus activation environments:
+
+```bash
+systemctl --user import-environment ENVPILOT_API_KEY
+dbus-update-activation-environment --systemd ENVPILOT_API_KEY
+```
+
+Then fully quit and reopen the app. For persistence, configure the variable through your desktop login environment or secret manager and sign out and back in; do not put the raw key in a `.desktop` launcher.
+
+### Windows PowerShell
+
+Set the key for the current PowerShell process without echoing the input:
+
+```powershell
+$secret = Read-Host "Envpilot API key" -AsSecureString
+$pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+try {
+  $env:ENVPILOT_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)
+} finally {
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
+}
+Remove-Variable secret, pointer
+```
+
+Child processes launched from that PowerShell window inherit it. To persist the current value for your Windows user:
+
+```powershell
+[Environment]::SetEnvironmentVariable(
+  "ENVPILOT_API_KEY",
+  $env:ENVPILOT_API_KEY,
+  "User"
+)
+```
+
+The User-scope value is stored in your Windows profile and is available only to **new** processes. Fully quit and reopen terminals, Codex, Cursor, and IDE windows; already-running processes keep their old environment.
+
+### WSL
+
+Windows and WSL have separate process environments. A Windows User-scope variable does not automatically configure clients running inside WSL, and a variable exported in WSL does not configure Windows GUI apps. Set `ENVPILOT_API_KEY` separately inside the WSL distribution using the Linux instructions, then start the WSL-hosted client from a new WSL shell.
+
+### Check presence without printing the key
+
+Use a boolean check—never `echo`, `printenv`, `Get-ChildItem Env:`, or an unredirected `launchctl getenv` for a secret:
+
+```bash
+if [ -n "${ENVPILOT_API_KEY:-}" ]; then
+  echo "ENVPILOT_API_KEY is set"
+else
+  echo "ENVPILOT_API_KEY is not set"
+fi
+```
+
+```powershell
+if ([string]::IsNullOrEmpty($env:ENVPILOT_API_KEY)) {
+  "ENVPILOT_API_KEY is not set"
+} else {
+  "ENVPILOT_API_KEY is set"
+}
+```
+
+A repository `.env` or `.env.local` file does **not** automatically configure an MCP client. Those files are conventions loaded only by frameworks or commands that explicitly read them. Codex, Claude Code, Cursor, and desktop launchers inspect their own process environment; they do not source arbitrary repository dotenv files. Keeping the MCP credential outside the repository also prevents an agent from reading the very key that controls its access.
+
+## Rotating or updating a key
+
+A key's projects, environments, resources, and surfaces are fixed at creation. To recover a lost key, rotate a credential, or grant different access (for example, adding the `projects` resource or MCP surface), create a new key with the complete intended scope.
+
+1. Store the new value in the same environment-variable source. If you set both a persistent value and a current-session value, update both—an already-running shell or GUI process keeps the old value.
+2. For macOS GUI clients, update `launchctl`; for Linux desktop clients, update the login/user environment; for Windows, update the User-scope value. WSL remains separate.
+3. Fully quit and restart the client. The saved Claude Code, Codex, and Cursor configurations still reference the same variable name and need no secret edit.
+4. Confirm `/mcp` or the client's MCP panel lists the Envpilot tools, then make a permitted tool call.
+5. Revoke the old key in **Organization → Settings → API Keys**.
+
+Revocation is instant—anything still using the old key stops on its next call. If you previously pasted a key directly into Claude Code, remove and re-add the server (`claude mcp remove envpilot`) or edit the saved entry; `claude mcp add` does not overwrite an existing server name.
+
+## Limits
+
+- **Scope cannot be widened.** Adding a project, environment or resource means a new key and a client restart.
+- **The key is shown once.** Store it in an environment variable, never in a config file you commit.
+- **Pro plan** (`mcp_server`), re-checked on every tool call.
+- Hosted Claude connectors cannot carry a fixed bearer key — see [Connecting a client](/mcp/clients).

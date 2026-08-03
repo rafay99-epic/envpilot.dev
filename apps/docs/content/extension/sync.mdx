@@ -1,0 +1,84 @@
+---
+title: Linking & sync
+description: Link a project, sync several directories in one workspace, and control what happens when files already exist or access disappears.
+icon: puzzle
+---
+
+# Linking & sync
+
+## Link a project
+
+<Steps>
+
+### Run Envpilot: Link Project
+
+From the command palette.
+
+### Choose the target
+
+Organization → project → which environments to sync.
+
+### Files appear
+
+Variables are written to your target file (`envpilot.targetFile`, default `.env.local`), and any [secret files](/platform/secret-files) for that environment are materialised at their recorded paths.
+
+</Steps>
+
+**Envpilot: Unlink Project** removes the link. **Envpilot: Pull Variables** syncs on demand; **Envpilot: Refresh** re-reads state without pulling.
+
+## What sync does
+
+- On workspace open (`envpilot.autoSync`), the latest variables are pulled and written.
+- A live connection keeps values current while the window is open; a background check (`envpilot.syncInterval`, default 300 s) catches permission changes.
+- Real-time subscriptions pause after the window has been unfocused for `envpilot.idlePauseMinutes` (default 10) and resume the moment focus returns. Set it to `0` to never pause.
+- When access is revoked, the extension deletes the synced `.env` files it wrote (`envpilot.preventCopyOnRevoke`).
+
+## Secret files in the workspace
+
+Secret files sync alongside variables and receive the same treatment as a managed `.env`: recorded in the manifest, protected from clipboard copy, watched for unauthorised edits, and written with their own mode (`0600` or `0400`) rather than a `.env`'s.
+
+Two behaviours to know:
+
+- **One environment per directory.** A file has exactly one path, so a directory linked to several environments materialises the **first** one. A dev and a prod `google-services.json` cannot both land in the same folder.
+- **Local edits are not silently overwritten.** A locally modified secret file is reported as a conflict and left alone. The exception is the edit watcher: if you hand-edit a managed secret file, the extension reverts that one file, because reverting an unauthorised edit is the whole point of the watcher.
+
+## Several directories, one workspace
+
+Link different directories to different projects or environments; each syncs independently.
+
+```
+my-monorepo/
+├── apps/api/.env          ← production
+├── apps/web/.env.local    ← development
+└── packages/sdk/.env      ← staging
+```
+
+Manage them with **Envpilot: Add Directory** and **Envpilot: Remove Directory**, and pick environments per link with **Envpilot: Select Environments**.
+
+## When a file already exists
+
+`envpilot.defaultConflictResolution` decides what happens when a target file is already there:
+
+| Value       | Behaviour                             |
+| ----------- | ------------------------------------- |
+| `prompt`    | Ask every time (default)              |
+| `overwrite` | Replace the existing file             |
+| `backup`    | Back it up, then replace              |
+| `merge`     | Merge with the existing file          |
+| `skip`      | Leave the conflicting directory alone |
+
+## Cleaning up on close
+
+Synced files can be removed when the workspace closes, so a laptop left open in a café is not a `.env` archive. The per-project default and per-member override (`vscodeAutoUnsyncOnClose`) are Pro-gated (`vscode_unsync_customization`); cleanup after a crash runs regardless of trust state.
+
+## Limits
+
+- Sync writes what your role can read. Nothing indicates that other variables exist.
+- Restricted Mode disables writing entirely — trust the workspace first.
+- `envpilot.syncInterval` is a permission check, not a value poll; values arrive over the live connection.
+- One target file per linked directory.
+
+## Next
+
+- [Protection](/extension/protection)
+- [Settings reference](/extension/settings)

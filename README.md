@@ -62,7 +62,7 @@ breach yields zero plaintext secrets.
 | VS Code extension | [Marketplace](https://marketplace.visualstudio.com/items?itemName=EnvPilot.envpilot) · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot) |
 | GitHub Action     | [`rafay99-epic/envpilot-action@v1`](https://github.com/rafay99-epic/envpilot-action)                                                                |
 | REST API          | [API docs](https://docs.envpilot.dev)                                                                                                               |
-| MCP server        | [MCP docs](https://docs.envpilot.dev/mcp-server)                                                                                                    |
+| MCP server        | [MCP docs](https://docs.envpilot.dev/mcp/overview)                                                                                                  |
 
 **Built for AI agents**
 

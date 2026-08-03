@@ -1,0 +1,73 @@
+---
+title: Shared Accounts
+description: Store a team's shared service-login credentials (username + password) on a project — separate from environment variables, with the same encryption and access control.
+icon: users
+---
+
+# Shared Accounts
+
+Not every credential your team shares is an environment variable. A login for a third-party vendor dashboard, a shared admin account for a SaaS tool, a support portal your whole team needs into — these are username/password pairs, not `KEY=value` secrets. Shared Accounts are Envpilot's object for exactly that: a project-scoped credential vault distinct from your variables.
+
+## How it's stored
+
+An account record (`projectAccounts`) holds non-secret metadata directly in Convex — name, an optional website URL, an optional description, and which environments it applies to. The credentials themselves (username and password) are serialized as JSON (`{"username", "password"}`) and encrypted into WorkOS Vault; Convex stores only the opaque vault reference, never the plaintext values. This mirrors exactly how environment variable values are stored — same vault, same never-touches-the-database guarantee.
+
+## Environment scoping
+
+Every account belongs to one or more of a project's environments (development, staging, production), just like variables. A scoped Developer whose project assignment restricts them to specific environments can only see and manage accounts that fall inside that scope — an account tagged production-only stays invisible to someone scoped to development.
+
+## Who can create and access accounts
+
+Access follows the same role model as variables:
+
+- **Owners** (Admins) have write access to every account in the org.
+- **Project Managers / Team Leads** assigned to a project have write access to its accounts.
+- **Developers** assigned to a project see account metadata for everything, but only get the actual credentials (the vault reference) for accounts they hold an explicit grant on. Creating an account automatically grants its creator write access if their role doesn't already have blanket write.
+- **Unassigned org members** see nothing unless an account has been explicitly shared with them.
+
+Grants are per-account, read or write, and can carry an optional expiry — set from the account's **Share → Team member** tab, alongside revoking existing grants. This is a separate mechanism from [external share links](/platform/sharing), which hand a one-time or time-limited view to someone outside the organization entirely (the same drawer's **External link** tab).
+
+## Dashboard flow
+
+From a project's **Accounts** page:
+
+- **Add Account** opens a form for name, website URL, description, username, password, and which environments it applies to.
+- Each account row supports **Edit** (update metadata or rotate the credentials — see below), **Delete** (soft delete), **Share** (external link), and, for anyone who can manage permissions, granting/revoking team-member access.
+- A **Reveal** action fetches and displays the current credentials for anyone with read access; every reveal is logged (see Audit below).
+- An environment filter narrows the list to one environment at a time.
+
+## Rotating credentials
+
+There's no scheduled rotation cron for accounts the way there is for [variable expiry](/platform/variables) — rotation here means manually updating the stored username/password. Editing an account with new credentials rewrites the vault object in place (same reference, new version) after snapshotting the previous value; if the metadata update that follows fails for any reason, the previous credentials are restored so Vault and the account record never drift apart. The audit trail records that credentials changed without ever recording the values themselves.
+
+## Deletion, trash, and restore
+
+Deleting an account soft-deletes it: it disappears from the active list, all of its active permission grants are revoked, and any live external share links pointing at it are revoked too — a deleted account can't leave a working share link behind. It stays recoverable from the project's **Trash** page for 7 days, after which it (and its vault object) is purged permanently. Restoring an account clears the deletion but does **not** re-grant previously revoked permissions or shares — those have to be re-created deliberately.
+
+## Tier limits
+
+Shared Accounts are available on both tiers, capped by count:
+
+| Gate                                   | Free    | Pro       |
+| -------------------------------------- | ------- | --------- |
+| `shared_accounts` (feature on/off)     | Enabled | Enabled   |
+| `shared_accounts_limit` (max accounts) | 5       | Unlimited |
+
+See [Plans & Feature Availability](/limits/plans) for the full tier matrix.
+
+## Audit trail
+
+Every account lifecycle event is audited as a sensitive-data action: creation, updates (with which fields changed, and whether credentials were part of the change), deletion, restore, and every credential reveal (who, when, and — where available — IP/user agent). Audit entries never contain the credential values themselves.
+
+## Limits
+
+- Available on both tiers, capped at **5 accounts on Free**, unlimited on Pro (`shared_accounts_limit`).
+- Credentials are a username/password pair plus metadata — not arbitrary files. For those, see [secret files](/platform/secret-files).
+- Deletion is a soft delete with the same **7-day** trash window as variables.
+- Machine credentials can read accounts with the `accounts` resource; nothing machine-driven can create or rotate one.
+
+## See also
+
+- [Roles & Permissions](/platform/rbac) — the underlying role and grant model shared with variables.
+- [Secret Sharing Links](/platform/sharing) — sending an account's credentials to someone outside the org.
+- [Security](/platform/security) — Envpilot's encryption and access-control architecture.

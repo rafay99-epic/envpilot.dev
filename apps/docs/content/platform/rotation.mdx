@@ -1,0 +1,44 @@
+---
+title: Rotation & expiry
+description: Put a variable on a rotation schedule and let Envpilot chase the reminders — plus the tier gates that cap how many variables can do it.
+icon: file-text
+---
+
+# Rotation & expiry
+
+Credentials that never rotate are credentials that leak eventually. A variable can carry a rotation schedule, and Envpilot handles the nagging.
+
+## Setting a schedule
+
+Set `rotationFrequencyDays` (1–3650) when creating or updating a variable, from the dashboard's variable drawer. Enabling it stamps an `expiresAt` timestamp and a `rotationStatus` of `active`.
+
+## What the scheduler does
+
+An hourly job walks every rotation-enabled variable and:
+
+- moves it to **`expiring_soon`** once it is within **7 days** of expiry, and emails a reminder,
+- sends a second reminder at the **1-day** mark,
+- moves it to **`expired`** once the timestamp passes, with a final email.
+
+No variable gets more than one reminder per 24 hours, so a long-expired secret does not turn into an hourly mail loop.
+
+## Seeing what's due
+
+The dashboard surfaces an "expiring soon" list scoped to what you can actually see: an environment-scoped developer only sees variables inside their scope, never the whole project.
+
+## Limits
+
+| Gate                                                     | Free                      | Pro       |
+| -------------------------------------------------------- | ------------------------- | --------- |
+| `secret_rotation` — feature on/off                       | Disabled                  | Enabled   |
+| `secret_rotation_limit` — max rotation-enabled variables | 7 (unreachable while off) | Unlimited |
+
+Rotation is one of the features that carries **two** gates, because each enabled variable costs recurring compute: the hourly scan reads it and may send mail. On Free the boolean gate is off, so no schedule can be created regardless of the numeric cap.
+
+Rotation does **not** rotate anything for you. It reminds a human to rotate the credential at the provider and update the value here — Envpilot never contacts your upstream vendor.
+
+## See also
+
+- [Variables](/platform/variables) — version history, rollback, trash
+- [Plans & limits](/limits/plans) — the full tier matrix
+- [Notifications](/integrations/notifications) — routing these events to Slack or Discord

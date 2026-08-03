@@ -14,12 +14,18 @@ export const dynamic = "force-static";
 export async function GET() {
   const docs = getAllDocs();
 
+  // Grouped by section so the list reads as the site's structure, not a
+  // flat dump — the sections are already in reading order.
   const docLinks = docs
-    .map(
-      (doc) =>
-        `- [${doc.title}](${SITE_URLS.docs}/${doc.slug}): ${doc.description}`
-    )
-    .join("\n");
+    .reduce<{ section: string; lines: string[] }[]>((groups, doc) => {
+      const line = `- [${doc.title}](${SITE_URLS.docs}/${doc.slug}): ${doc.description}`;
+      const last = groups[groups.length - 1];
+      if (last && last.section === doc.section) last.lines.push(line);
+      else groups.push({ section: doc.section, lines: [line] });
+      return groups;
+    }, [])
+    .map((group) => `### ${group.section}\n\n${group.lines.join("\n")}`)
+    .join("\n\n");
 
   const text = `# Envpilot
 
@@ -27,10 +33,12 @@ export async function GET() {
 
 Envpilot is a platform for managing, sharing, and syncing environment variables across development teams. Secrets are encrypted at rest using AES-256 via WorkOS Vault with per-organization key isolation. Access is controlled through two-tier role-based permissions (organization roles + project roles) with optional per-variable grants.
 
-The platform has three client surfaces:
-- **CLI** (\`@envpilot/cli\`) — pull, push, and manage variables from the terminal
+The platform has five client surfaces:
+- **CLI** (\`@envpilot/cli\`) — pull, push, run, and manage secret files from the terminal
 - **VS Code Extension** — real-time sync inside VS Code and Cursor
 - **Web Dashboard** — full management UI at envpilot.dev
+- **REST API + GitHub Action** — read-only machine access with org-scoped API keys
+- **MCP Server** — scoped, audited secret access for coding agents
 
 ## Key Links
 
@@ -58,10 +66,10 @@ Three environments per project: development, staging, production.
 
 ## Roles
 
-Organization: Admin, Team Lead, Member
-Project: Manager, Developer, Viewer
+One capability-backed role per member: Owner, Project Manager, Team Lead, Editor, Developer, Viewer.
+Project assignments decide where the role applies, with optional environment scope.
 
-Admins and Team Leads push directly. Developers create approval requests. Viewers have read-only access to permitted variables.
+Owners, project managers, team leads and editors write directly. Developers write only what they hold a grant for and file requests for the rest. Viewers read only.
 
 ## Security
 

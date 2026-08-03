@@ -1,0 +1,122 @@
+---
+title: Connecting a client
+description: Claude Code, Codex, Cursor, and anything else that speaks Streamable HTTP.
+icon: zap
+---
+
+# Connecting a client
+
+Set `ENVPILOT_API_KEY` in the client's environment first, using the instructions above.
+
+### Claude Code
+
+Reference the environment variable in an expanded `Authorization` header:
+
+```bash
+claude mcp add --transport http --scope user \
+  envpilot https://www.envpilot.dev/api/mcp \
+  --header 'Authorization: Bearer ${ENVPILOT_API_KEY}'
+```
+
+The **single quotes matter** in POSIX shells: they keep `${ENVPILOT_API_KEY}` literal in the saved configuration, and Claude Code expands it from its environment at connection time. The secret never lands in the file.
+
+Choose the Claude Code configuration scope deliberately:
+
+- `--scope local` (the default) keeps the server private to you in the current project.
+- `--scope project` writes `.mcp.json` for the team. The environment-variable reference is safe to commit, but each user must set their own key and approve/trust the project server before tools load.
+- `--scope user` keeps the server private to your user and makes it available across projects.
+
+`claude mcp list` confirms the server is **registered** — a revoked or wrong key still shows as listed. To verify the connection is actually live and its tools loaded, run `/mcp` inside a session. Manage it later with `claude mcp get envpilot` / `claude mcp remove envpilot`.
+
+### Codex CLI, desktop, and IDE extension
+
+Codex's local CLI, desktop app, and IDE extension share the same MCP configuration layers. Register the server from the CLI:
+
+```bash
+codex mcp add envpilot --url https://www.envpilot.dev/api/mcp \
+  --bearer-token-env-var ENVPILOT_API_KEY
+```
+
+Or add it to the user-level `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.envpilot]
+url = "https://www.envpilot.dev/api/mcp"
+bearer_token_env_var = "ENVPILOT_API_KEY"
+```
+
+The `url` selects Streamable HTTP, while `bearer_token_env_var` makes Codex build the bearer header from the named variable. Do not replace it with the plaintext key.
+
+You may put the same block in `.codex/config.toml` to scope it to a repository, but Codex loads project configuration only after you trust that project. After changing the variable or configuration, start a new CLI session, select **Restart** for the server in Codex desktop, or restart the IDE extension. Run `/mcp` to confirm the server is connected and the Envpilot tools—not merely the saved server entry—are present.
+
+### Cursor
+
+Add a remote server to the global `~/.cursor/mcp.json`, or to `.cursor/mcp.json` for a trusted project:
+
+```json
+{
+  "mcpServers": {
+    "envpilot": {
+      "url": "https://www.envpilot.dev/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:ENVPILOT_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+Cursor resolves `${env:ENVPILOT_API_KEY}` from the environment it inherited at startup. Fully quit and reopen Cursor after setting or rotating the variable, then confirm the tools under MCP settings. Do not commit a raw `envpk_...` value.
+
+### Other Streamable HTTP clients
+
+Configure the endpoint as Streamable HTTP and send this header on every request:
+
+```text
+Authorization: Bearer <the ENVPILOT_API_KEY value>
+```
+
+Prefer a client-native secret store or environment-variable reference. Placeholder syntax is client-specific: do not assume a generic client expands `${ENVPILOT_API_KEY}` or `${env:ENVPILOT_API_KEY}`.
+
+### Hosted Claude connectors are not compatible
+
+Claude's hosted custom connectors—used by Claude web and synced to hosted Claude Desktop and mobile—are different from Claude Code's local MCP configuration. Their standard setup accepts a remote URL and an OAuth connection flow, not a per-user arbitrary `Authorization` header. Envpilot currently uses a fixed `envpk_...` bearer API key and does not expose the OAuth flow those hosted connectors expect, so use **Claude Code** instead.
+
+Do not paste an Envpilot API key into an **OAuth Client Secret** field. That field authenticates an OAuth client during a token exchange; it does not become `Authorization: Bearer envpk_...` on MCP requests and cannot adapt Envpilot's API-key auth into OAuth.
+
+## Troubleshooting
+
+A failed MCP tool call returns an error message in its result — no separate error code, since tool clients only see the text. The table lists each message (tool-specific variants may append detail, e.g. the request tools' `— filing requests needs the "requests" resource`). One exception: a missing or malformed `Authorization` header is rejected at the transport level with HTTP 401 before any tool runs.
+
+First separate client setup failures from Envpilot tool errors:
+
+| Symptom                               | Meaning / fix                                                                                                                                                                                                                                                          |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Server is registered but has no tools | Registration only proves the config was saved. Open `/mcp` or the client's MCP panel and inspect initialization. The most common cause is that the client process did not inherit `ENVPILOT_API_KEY`; set it in the parent environment and fully restart the client.   |
+| Works in a terminal, not a GUI app    | The terminal has a current-session variable, but the desktop launcher started from a different environment. Use `launchctl` on macOS, the graphical login/user environment on Linux, or Windows User scope, then launch a new process.                                 |
+| Works on Windows but not in WSL       | Windows and WSL environments are separate. Set the key inside the WSL distribution and restart the WSL-hosted client.                                                                                                                                                  |
+| Header contains `${...}` literally    | The client did not expand the placeholder. Claude Code uses `${ENVPILOT_API_KEY}`; Cursor uses `${env:ENVPILOT_API_KEY}`; Codex uses `bearer_token_env_var = "ENVPILOT_API_KEY"`. Confirm the client supports that syntax and inherited the variable, then restart it. |
+| HTTP 401 before tools load            | Ensure the header is exactly `Authorization: Bearer envpk_...`: one `Bearer` prefix, one space, no surrounding quotes in the value, no duplicated prefix, and no literal placeholder. Use a safe presence check instead of printing the key.                           |
+| Hosted Claude cannot authenticate     | Hosted Claude web/Desktop/mobile custom connectors use their URL/OAuth flow and cannot supply Envpilot's fixed bearer key through the standard setup. Use Claude Code; do not put the API key in an OAuth client-secret field.                                         |
+
+Once tools load, these are the server's error semantics:
+
+| Message                                                                                        | Meaning / fix                                                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Invalid or revoked API key`                                                                   | The key is wrong, revoked, or expired—create a replacement key.                                                                                                                                                                   |
+| `That resource is not in this API key's scope`                                                 | The key is missing the resource a tool needs. Scopes are immutable: use the [Tools](/mcp/tools) table to create a replacement with the required resource. Request tools append `— filing requests needs the "requests" resource`. |
+| `That environment is not in this API key's scope`                                              | The key is limited to other environments. Use one already in scope, or create a replacement key that includes the required environment.                                                                                           |
+| `Project not found`                                                                            | The slug is wrong, or the project is outside the key's immutable scope—the two are indistinguishable by design; see [Understand scope](/api/quickstart#understand-scope).                                                         |
+| `This API key is not enabled for this surface`                                                 | The key was created without the MCP server surface. Surfaces are immutable: create a replacement with **MCP server** selected.                                                                                                    |
+| `The public API is available on the Pro plan — this organization's plan no longer includes it` | The organization's plan no longer includes MCP access.                                                                                                                                                                            |
+| `Rate limit exceeded — retry after Nms`                                                        | Hit a rate-limit bucket: 120/min metadata or 30/min value pulls (both shared with REST), or 5/hour (burst 2) for `envpilot_request_variable`—back off for the given delay.                                                        |
+| `Missing or invalid API key.` (HTTP 401)                                                       | Transport-level rejection before any tool runs—the `Authorization` header is missing or malformed. It must resolve to `Bearer envpk_...`, not a literal placeholder.                                                              |
+
+Older server builds returned an opaque `[Request ID] Server Error` for all of the above instead of the real message — if you see that instead of one of these strings, the connected server predates this fix.
+
+## Limits
+
+- Streamable HTTP only. There is no stdio transport and no local proxy.
+- Placeholder syntax is client-specific — `${VAR}`, `${env:VAR}` and `bearer_token_env_var` are not interchangeable.
+- A client only inherits the environment it was launched with; changing the key means fully restarting it.
+- Hosted Claude web, Desktop and mobile connectors expect OAuth and cannot authenticate here. Use Claude Code.

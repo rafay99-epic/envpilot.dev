@@ -1,0 +1,80 @@
+---
+title: Core concepts
+description: Organizations, projects, environments, variables, secret files, roles, and requests — the whole object model on one page.
+icon: book
+---
+
+# Core concepts
+
+Six objects, and one rule about how they combine. Everything else in these docs is a surface over this model.
+
+## Organization
+
+The top-level container for your team: a name, a URL slug, members, billing, and API keys. If you are the first person on your team to sign up, you create one before anything else exists. A user can belong to several organizations; the free plan allows one organization per owner.
+
+## Project
+
+A project lives inside an organization and holds variables and secret files — typically one project per app or service (`api`, `web`, `worker-jobs`). Projects have their own name, slug, optional description, and project-level role assignments.
+
+## Environment
+
+Every project has exactly **three** environments: `development`, `staging`, `production`. There is no fourth, and custom environments cannot be added — the three-environment model is fixed across the dashboard, CLI, extension, GitHub Action, REST API and MCP server.
+
+Every variable and every secret file is scoped to one or more of them.
+
+## Variable
+
+A key, a value, a set of environments, an optional description, tags, and a "sensitive" flag.
+
+<Callout type="info" title="The uniqueness rule">
+  The same key may exist on several active variables in a project **as long as
+  their environment sets do not overlap**. `DATABASE_URL` for `[development]`
+  and `DATABASE_URL` for `[production]` are two independent variables with
+  independent values. Overlapping environments for one key are rejected, naming
+  the clash.
+</Callout>
+
+That invariant — every (key, environment) pair resolves to at most one active variable — is what makes `envpilot pull`, extension sync, and the public API deterministic. It is enforced on every write path, including request approvals and restores from trash. See [Variables](/platform/variables).
+
+## Sensitive is a display flag, not an encryption flag
+
+Marking a variable **sensitive** masks it (`••••••••`) in the dashboard until someone reveals it. That is all it does.
+
+Every value, sensitive or not, is encrypted at rest in WorkOS Vault; Convex stores only a vault reference id, never plaintext. "Sensitive" controls who casually reads a value over your shoulder, not how it is stored. See [Security](/platform/security).
+
+## Secret file
+
+Some secrets are not text you can paste into a `.env`: an Android signing keystore, an SSH private key, a `.p12` certificate, a service-account JSON. Those are **secret files** — binary blobs with a recorded destination path and POSIX mode, so a fresh clone can materialise everything a build needs.
+
+They are stored differently from variables (envelope encryption: ciphertext in Convex storage, key in Vault) and carry their own limits. See [Secret files](/platform/secret-files).
+
+## Role
+
+Every member holds one organization role, plus optional per-project roles and per-variable or per-file grants. Roles decide two things: what you can read, and whether your write lands immediately or becomes a request for someone else to approve. See [Roles & permissions](/platform/rbac).
+
+## Request
+
+A request is an ask, not a write: "I need `STRIPE_SECRET_KEY` in production, here is why." Developers file them, reviewers approve them and supply the value. Coding agents can file them too over the MCP server — which is the only mutation any machine credential is allowed to perform. See [Requests & approvals](/platform/requests).
+
+## How the pieces map to surfaces
+
+| You want to…                      | Use                                      |
+| --------------------------------- | ---------------------------------------- |
+| Manage everything, invite people  | [Dashboard](/dashboard/overview)         |
+| Work in a terminal, script CI     | [CLI](/cli/overview)                     |
+| Stay in the editor                | [VS Code extension](/extension/overview) |
+| Pull secrets in a workflow run    | [GitHub Action](/action/overview)        |
+| Read from your own program        | [REST API](/api/overview)                |
+| Give a coding agent scoped access | [MCP server](/mcp/overview)              |
+
+## Next
+
+- [Architecture](/start/architecture) — one enforcement core behind all six surfaces
+- [Plans & limits](/limits/plans) — what each tier allows
+
+## Limits worth knowing early
+
+- **Three environments**, fixed. No custom environments on any plan.
+- **One role per member**, organization-wide; project assignments narrow where it applies.
+- **Free tier**: 3 projects, 50 variables per project, 3 members, 3 secret files, 1 organization.
+- Deleted variables, accounts and files are recoverable for **7 days**, then purged permanently.

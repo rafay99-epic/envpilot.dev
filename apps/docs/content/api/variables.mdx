@@ -1,0 +1,73 @@
+---
+title: Variables
+description: The workhorse endpoint — pull values for one environment, or key names with nothing decrypted.
+icon: plug
+---
+
+# Variables
+
+<Endpoint
+  method="GET"
+  path="/v1/projects/{slug}/variables"
+  resource="variables"
+/>
+
+## Parameters
+
+| Query param     | Required                    | What it does                                                         |
+| --------------- | --------------------------- | -------------------------------------------------------------------- |
+| `environment`   | Yes, unless `metadata_only` | `development`, `staging`, or `production`                            |
+| `keys`          | No                          | Comma-separated exact key names — `keys=A,B,C`                       |
+| `prefix`        | No                          | Only keys starting with this prefix — `prefix=NEXT_PUBLIC_`          |
+| `metadata_only` | No                          | `true` returns key names only: no decrypt, no values, no audit entry |
+| `format`        | No                          | `json` (default) or `env` for dotenv text                            |
+
+```bash
+curl "https://www.envpilot.dev/api/v1/projects/backend/variables?environment=production&prefix=NEXT_PUBLIC_" \
+  -H "Authorization: Bearer envpk_..."
+```
+
+```json
+{
+  "environment": "production",
+  "variables": [
+    {
+      "key": "NEXT_PUBLIC_API_URL",
+      "value": "https://api.acme.com",
+      "updatedAt": 1752192000000
+    }
+  ]
+}
+```
+
+With `format=env` the same response is dotenv text, ready to redirect into a file.
+
+## Filter before you pull
+
+`keys` and `prefix` are not conveniences — they narrow what gets decrypted, which narrows what appears in the audit log and what a compromised process could scrape. A build that needs three variables should ask for three.
+
+`metadata_only=true` is the right call whenever you are checking _whether_ something exists: it never touches the vault, uses the cheaper rate bucket, and is not audited individually.
+
+## Legacy endpoint
+
+<Endpoint
+  method="GET"
+  path="/api/v1/secrets"
+  resource="variables"
+  auth="Action key"
+/>
+
+The original single-project endpoint used by the [GitHub Action](/action/overview). It still works and is not going anywhere, but new integrations should use `/v1/projects/{slug}/variables`.
+
+## Limits
+
+- Requires the `variables` resource, and the project **and** environment must be in the key's scope.
+- **Rate**: metadata reads use the 120/min bucket; value pulls use the 30/min bucket.
+- **`422`** if more than 1000 variables match — refused, never truncated.
+- **`503`** if any variable in the response fails to decrypt — the whole request aborts, with no partial result and no sentinel values.
+- Values are current. There is no version-history endpoint; history lives in the dashboard.
+- Read-only. There is no write endpoint at any version.
+
+## Next
+
+- [Accounts](/api/accounts) · [Files](/api/files) · [Errors](/api/errors)

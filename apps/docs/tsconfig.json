@@ -18,5 +18,8 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  // scripts/ runs under bun (Bun.YAML, import.meta.dir), not under the Next
+  // build — typechecking it here would need @types/bun for one build tool.
+  // `bun run reference:check` in CI is what proves it still works.
+  "exclude": ["node_modules", "scripts"]
 }

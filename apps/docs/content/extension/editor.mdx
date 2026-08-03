@@ -1,0 +1,45 @@
+---
+title: Editor features
+description: CodeLens, autocomplete over your real variable names, masked hovers, and filing a request without leaving the file.
+icon: puzzle
+---
+
+# Editor features
+
+Beyond syncing files, the extension knows which variables your project actually has — and uses that where you are typing.
+
+## CodeLens on `.env` files
+
+`envpilot.enableCodeLens` (on) annotates managed `.env` files with their sync status and quick actions, so you can tell a synced file from a hand-written one without reading its contents.
+
+## Autocomplete for variable names
+
+`envpilot.autocomplete.enable` (on) suggests variable names from your linked project when you type an environment-variable reference — `process.env.`, `os.getenv(`, and the equivalents in other languages.
+
+Suggestions come from the project's **keys**. Values are never offered as completions.
+
+## Hover
+
+`envpilot.hover.enable` (on) shows an Envpilot hover on recognised environment-variable references: which environments define the key, and a **masked** preview. The hover carries a **Reveal value** link gated on the same `project.secrets.reveal` capability as everything else — a role that cannot reveal values cannot reveal them one hover at a time either.
+
+## Request a variable
+
+When you need a key you cannot see, run **Envpilot: Request Variable**. It files the same request the CLI and dashboard file, and a reviewer approves it and supplies the value. See [Requests & approvals](/platform/requests).
+
+## Status and dashboard
+
+- **Envpilot: Show Status** — a summary of the current session, links and sync state.
+- **Envpilot: Open Dashboard Panel** — an in-editor panel for the linked project.
+- **Envpilot: Open Dashboard** — the same project on the web.
+
+## Limits
+
+- Autocomplete and hover only know about **linked** projects. An unlinked workspace gets neither.
+- Hover recognises common reference patterns; an exotic accessor may not be detected.
+- Reveal is role-gated at the command, not just in the UI — hiding the palette entry alone would be bypassable by keybinding.
+- These features read project metadata, not secret values; a hover reveal is what triggers a value read.
+
+## Next
+
+- [Commands](/extension/commands) · [Settings](/extension/settings)
+- [Troubleshooting](/extension/troubleshooting)

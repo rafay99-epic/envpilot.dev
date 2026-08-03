@@ -1,0 +1,88 @@
+---
+title: CLI overview
+description: Install the Envpilot CLI, run your first sync, and learn the shape of the command set.
+icon: terminal
+version: "{{cliVersion}}"
+---
+
+# CLI overview
+
+[`@envpilot/cli`](https://www.npmjs.com/package/@envpilot/cli) v{{cliVersion}} — pull, push, run, request, and manage secret files without leaving the terminal. Requires **Node.js 22+**.
+
+## Install
+
+```bash
+npm install -g @envpilot/cli
+```
+
+```bash
+bun install -g @envpilot/cli
+```
+
+Or run one command without installing anything:
+
+```bash
+npx @envpilot/cli login
+```
+
+## First run
+
+```bash
+envpilot sync
+```
+
+`sync` chains the three steps you would otherwise run yourself: authenticate in the browser, pick an organization → project → default environment, then pull. It writes a local `.envpilot` link file, adds `.env` to `.gitignore`, and installs the pre-commit guard (skip with `--no-guard`).
+
+Step by step, if you prefer:
+
+```bash
+envpilot login       # browser device-code flow
+envpilot init        # link this directory to a project
+envpilot pull        # write .env
+```
+
+## The command set
+
+| Group          | Commands                                      | Page                             |
+| -------------- | --------------------------------------------- | -------------------------------- |
+| Account        | `login` `logout` `whoami` `accounts` `config` | [Authentication](/cli/auth)      |
+| Project links  | `init` `switch` `unlink` `list linked`        | [Linking projects](/cli/link)    |
+| Sync           | `sync` `pull` `push`                          | [Pull & push](/cli/pull-push)    |
+| Run            | `run`                                         | [Running commands](/cli/run)     |
+| Single secrets | `secrets set` `secrets rm` `diff`             | [Secrets & diff](/cli/secrets)   |
+| Approvals      | `request` `requests`                          | [Requests](/cli/requests)        |
+| Files          | `files`                                       | [Secret files](/cli/files)       |
+| Browse         | `list` `usage` `man`                          | [Full reference](/cli/reference) |
+
+## Interactive terminal UI
+
+Run `envpilot` with no arguments and you get a terminal dashboard: arrow keys to browse commands, Enter to run, Esc to exit. It returns to the list after each command finishes. `envpilot ui` (alias `dashboard`) opens it explicitly.
+
+The TUI only opens when stdout is an interactive terminal, so scripts and CI never end up inside it.
+
+## Where state lives
+
+| Path                                   | Holds                                                            |
+| -------------------------------------- | ---------------------------------------------------------------- |
+| `.envpilot` (in your repo)             | Which project(s) this directory is linked to, and the active one |
+| Global config (`envpilot config path`) | Authenticated accounts, tokens, API URL                          |
+| `~/.config/envpilot/run-cache/`        | `envpilot run`'s metadata cache, mode `0600`                     |
+
+Secrets are never written to any of those. The only plaintext the CLI puts on disk is what a `pull` or `files pull` was explicitly asked to write.
+
+## Version policy
+
+The CLI checks the server's release manifest before each command. If your version is below the server's minimum, the command stops with an upgrade prompt; if it is merely behind, you get a one-line notice and the command runs. Network failures fail **open** — a flaky connection never bricks the CLI.
+
+## Limits
+
+- Node.js 22 or newer. There is no browser build.
+- `push` writes what your role allows and reports the rest as denied — it never files approval requests. Use [`request`](/cli/requests) for that.
+- Free plan: 3 projects, 50 variables per project, 3 secret files. See [Plans](/limits/plans).
+- Everything the CLI can do is bounded by your role — see [Roles & permissions](/platform/rbac).
+
+## Next
+
+- [Authentication & accounts](/cli/auth)
+- [Full command reference](/cli/reference) — generated from the CLI's own catalog
+- [CLI in CI](/cli/ci) — non-interactive usage

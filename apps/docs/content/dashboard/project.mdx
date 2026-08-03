@@ -1,0 +1,80 @@
+---
+title: Working in a project
+description: Variables, requests, files, diff, trash, accounts, sharing, members, and project settings.
+icon: monitor
+---
+
+# Working in a project
+
+## The variable table
+
+Opening a project lands on its variables, with tabs for **All** plus each of the three environments, a debounced server-side search, and a tag-filter row if tags are enabled.
+
+Each row supports edit, delete, reveal, [version history with rollback](/platform/variables), and — when sharing is enabled — sending a [share link](/platform/sharing). Selected rows can be bulk-deleted from a floating action bar. Deleting warns that the variable is recoverable for **7 days**, after which it and its vault value are purged.
+
+The create button reads **Add Variable** or **Request Variable** depending on your role. The same drawer has a **Bulk Paste** tab for a whole `.env` block.
+
+Rotation, if your plan includes it, is a checkbox in the same form with presets of 30, 60, 90 (default), 180, or 365 days. See [Rotation & expiry](/platform/rotation).
+
+## Requests
+
+A project's requests list links through to the reviewer inbox at `/dashboard/requests`, tabbed by **Pending / Approved / Rejected / Canceled**. Only reviewers can act.
+
+Before accepting, a reviewer picks which environments to approve for. A **machine-filed request** — from an API key over MCP — shows a masked input reading _"Enter the value to approve"_: the reviewer types the secret, and Accept stays disabled until both an environment and a value are supplied. The value is encrypted before the approval runs.
+
+Rejection on this screen is a plain confirm dialog; the free-text reason field lives in the CLI's `requests reject --reason`.
+
+## Files
+
+Project → **Files** manages [secret files](/platform/secret-files): keystores, SSH keys, certificates, service-account JSON.
+
+- **Upload** — drag and drop or pick a file, then set display name, destination path, environments, and mode (`0600 — owner read/write` or `0400 — owner read-only`).
+- **Replace contents** — swap the bytes while metadata stays locked, so a rotated keystore keeps its path and grants.
+- **Permissions** — per-file grants, the same model variables use.
+- **Trash** — soft-delete with the same 7-day retention.
+
+## Compare environments
+
+The diff page compares two or more environments (default development vs production), classifying each key as matching, changed, or missing — based on vault references, not decrypted content, until you reveal. If two references differ but the decrypted values are byte-identical, a **content match** badge says so rather than reporting a false diff.
+
+Search, filter to sensitive-only, sort, reveal individually or all at once, and export as per-environment `.env` files or a JSON/Markdown report. For a key missing from one environment there is a **copy-from** helper — there is no one-click sync mutation.
+
+## Trash
+
+Soft-deleted variables and shared accounts are listed separately, each restorable individually. Retention is **7 days**, shown per row as "Deleted N days ago — M days left", turning red at one day or less. **Empty trash** purges everything immediately, destroying the vault values.
+
+Restoring re-runs the uniqueness check — a restore that would collide with a newer variable is rejected, not merged.
+
+## Shared accounts
+
+`/accounts` holds [shared accounts](/platform/shared-accounts) — credential pairs for a shared Stripe login or a database admin account, kept separate from variables. Create with a name, optional URL, username, masked password, description, and environments. Edit, delete, reveal, manage permissions, and share, with the same 7-day trash retention.
+
+## Sharing
+
+The Sharing page manages [share links](/platform/sharing): one-time or time-limited links that reveal a single value to someone outside the project, gated by email verification. It shows totals — active, viewed, expired, revoked — and each card's type, recipient status, and countdown.
+
+The only action here is **Revoke**. Links are created from the share button on a variable or account row.
+
+## Members
+
+A project's Members page assigns existing organization members to the project. For environment-scoped roles, a checklist restricts which environments they see. Roles themselves are organization-level — see [Roles & permissions](/platform/rbac).
+
+## Settings
+
+Two tabs:
+
+- **General** — name, description, icon and colour, and VS Code auto-unsync behaviour (Pro).
+- **Danger Zone** — transfer the project to another organization, or delete it. Deletion gives variables and accounts the same 7-day trash retention as a manual delete.
+
+There is no CI/CD Tokens tab. Legacy service tokens still work through a compatibility fallback, but new automation uses an [API key](/api/authentication) from Organization Settings.
+
+## Limits
+
+- Environments are fixed at three. There is no way to add a fourth.
+- Variable search returns at most 100 matches at a time.
+- Diff compares vault references first — a reveal is what decrypts.
+- Trash is 7 days, then permanent.
+
+## Next
+
+- [Organization administration](/dashboard/organization)

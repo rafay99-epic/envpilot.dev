@@ -1,0 +1,64 @@
+---
+title: Organization administration
+description: Members and Security Hold, usage against plan limits, tags, API keys, and the danger zone.
+icon: monitor
+---
+
+# Organization administration
+
+## Members
+
+Invite people, change roles, and remove them. Each row also carries **Suspend access** — [Security Hold](/platform/rbac#security-hold) — which freezes a member everywhere (web, CLI, extension, API) without touching their role or assignments, and optionally surfaces any API keys they created so you can revoke those too. A suspended row flips to **Reinstate**, restoring exactly what was frozen.
+
+Invitations expire after 7 days and are only redeemable by the email address they were sent to.
+
+## Usage
+
+`/dashboard/usage` (owner only) is the plan page:
+
+- current tier, price, upgrade and billing links
+- an alert zone for anything at or near a limit
+- **Quotas & limits** meters: organizations, projects, team members, variables per project, invitations, active shares, rotation-enabled variables, shared accounts, secret files — plus your audit and analytics retention windows
+- **Plan features**, comparing your tier against Pro
+
+If tier enforcement is off (pre-alpha mode), a badge says so. `envpilot usage --json` gives the same numbers in the terminal.
+
+## Settings
+
+Four tabs: **General**, **Tags**, **API Keys**, **Danger Zone**. General and Danger Zone are owner-only.
+
+### Tags
+
+Full CRUD over the organization's colour-coded tag set — create, bulk-paste, edit, delete. Deleting a tag strips it from every variable that used it.
+
+### API keys
+
+Create org-scoped [API keys](/api/authentication) for the REST API, MCP server, and GitHub Action. For each key you choose:
+
+- **surfaces** — `rest_api`, `mcp_server`, `github_action`
+- **projects** — specific ones, or all including future ones (owner-only)
+- **environments**
+- **resources** — `variables`, `accounts`, `projects`, `files`, `requests`
+
+Each row shows who created it, when it was last used, pull / denial / request counts, and **Revoke**.
+
+<Callout type="warning" title="No rotate-in-place">
+  Scope is immutable and there is no rotate action: to change access or replace
+  a key, create a new one with the full intended scope, move your clients to it,
+  then revoke the old one. The plaintext is shown exactly once at creation.
+</Callout>
+
+### Danger zone
+
+Transfer the organization to another owner, or delete it.
+
+## Billing
+
+Billing and plan upgrades live on the personal account settings page (`/dashboard/settings`), not in organization settings.
+
+## Limits
+
+- Creating org-wide API keys is owner-only; team leads can create keys limited to specific projects.
+- "All projects" scope includes projects created later, which is why it is owner-only.
+- Security Hold requires the target to be strictly below your role, and Owners can never be suspended — transfer ownership first.
+- Plan limits are enforced server-side; this page reflects them, it does not define them. See [Plans & limits](/limits/plans).

@@ -1,0 +1,79 @@
+---
+title: Secret files
+description: Fetch keystores, certificates and service-account files — metadata to diff, or base64 contents to write.
+icon: plug
+---
+
+# Secret files
+
+<Endpoint method="GET" path="/v1/files" resource="files" />
+
+Project-scoped, unlike the variable endpoints: `project` is a **required query parameter** even when the key's scope resolves a single project.
+
+## Parameters
+
+| Query param    | Required | What it does                                                         |
+| -------------- | -------- | -------------------------------------------------------------------- |
+| `project`      | Yes      | Project slug                                                         |
+| `environment`  | Yes      | `development`, `staging`, or `production`                            |
+| `metadataOnly` | No       | `1` or `true` — path, size, mode and checksum with nothing decrypted |
+| `path`         | No       | Repeatable. Restrict to these exact destination paths                |
+
+```bash
+# What does this project need, and does my copy match?
+curl "https://www.envpilot.dev/api/v1/files?project=mobile-app&environment=production&metadataOnly=1" \
+  -H "Authorization: Bearer envpk_..."
+
+# Fetch exactly one file's contents
+curl "https://www.envpilot.dev/api/v1/files?project=mobile-app&environment=production&path=android/app/upload.jks" \
+  -H "Authorization: Bearer envpk_..."
+```
+
+## Response
+
+```json
+{
+  "project": { "slug": "mobile-app" },
+  "environment": "production",
+  "files": [
+    {
+      "name": "Play upload keystore",
+      "path": "android/app/upload.jks",
+      "mode": "0600",
+      "size": 2842,
+      "sha256": "9f2b…",
+      "contentType": "application/octet-stream",
+      "environments": ["production"],
+      "updatedAt": 1752192000000,
+      "content": "MIIK…"
+    }
+  ]
+}
+```
+
+`content` is base64 and is **omitted entirely** when `metadataOnly` is set. `sha256` is of the plaintext, so you can diff a local copy without fetching anything.
+
+## Writing them out
+
+Write each file to its recorded `path`, relative to your workspace root, with its recorded `mode` (`0600` or `0400`). Re-validate containment yourself — refuse absolute paths, refuse `..`, refuse writing through a symlink. The [GitHub Action](/action/secret-files) does exactly this and is worth reading as a reference implementation.
+
+<Callout type="warning" title="Two-step is the cheap path">
+  Call with `metadataOnly=1` first and compare `sha256` against what you have.
+  Only fetch contents for files that are actually missing or stale — that skips
+  the decrypt, the audit entry, and the expensive rate bucket.
+</Callout>
+
+## Limits
+
+- Requires the **`files` resource**, which is never granted by default.
+- Content fetches are **audited** individually; `metadataOnly` requests are not.
+- **Rate**: content reads refill at 60/min with a burst of 1000 (the per-project file ceiling); metadata reads use the 120/min bucket.
+- A single request refuses to return more than **8 MiB** of file content — batch by size, as the Action does.
+- **`422`** if the project holds more files than a complete listing allows — refused, never truncated.
+- **`503`** if any requested file fails to decrypt.
+- Read-only. Uploading is a human action in the CLI or dashboard.
+
+## Next
+
+- [Secret files](/platform/secret-files) — paths, modes, storage
+- [GitHub Action: secret files](/action/secret-files)

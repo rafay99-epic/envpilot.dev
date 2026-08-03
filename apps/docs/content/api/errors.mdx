@@ -1,0 +1,54 @@
+---
+title: Errors
+description: Every status code the API returns, what it means, and why some of them are deliberately vague.
+icon: plug
+---
+
+# Errors
+
+Every non-2xx response is:
+
+```json
+{ "error": "human-readable message", "code": "machine_code" }
+```
+
+plus an `x-request-id` header. Quote that id to support — it identifies the exact request without you having to send anything sensitive.
+
+## Status codes
+
+| Status | Meaning                                                                                         |
+| ------ | ----------------------------------------------------------------------------------------------- |
+| `400`  | A required query parameter is missing or malformed                                              |
+| `401`  | The key is missing, malformed, invalid, expired, or revoked — one uniform answer for all five   |
+| `403`  | The key is valid, but its scope or the organization's plan does not cover this call             |
+| `404`  | The target does not exist, **or** exists outside the key's scope — the same response either way |
+| `422`  | The response would exceed the bounded-read ceiling (1000 items) — refused rather than truncated |
+| `429`  | Rate limit exceeded. Carries `Retry-After` in **seconds**                                       |
+| `503`  | A vault decrypt failed mid-request, or the service is misconfigured — the whole request aborts  |
+| `500`  | Something unexpected. The `x-request-id` is the thing to report                                 |
+
+## Why 401, 403 and 404 are vague
+
+- **401 never says why.** Missing, malformed, invalid, expired and revoked all read the same, so error responses cannot be used to fingerprint which key you hold or whether it once worked.
+- **403 means valid but not allowed** — a `variables`-only key hitting `/accounts`, or an organization whose plan no longer includes `public_api`. The gate is re-checked per request, so a downgrade shows up on the next call.
+- **404 covers both "no such thing" and "not yours."** A key can never confirm the existence of a project it cannot see.
+
+## Retrying
+
+| Status       | Retry?                                                                       |
+| ------------ | ---------------------------------------------------------------------------- |
+| `429`        | Yes, after `Retry-After` seconds. Do not retry sooner; the bucket is empty   |
+| `503`        | Yes, once or twice with backoff. If it persists, a secret needs re-uploading |
+| `4xx` others | No. Retrying a scope or parameter error produces the same answer             |
+
+## The failures that look like success elsewhere
+
+Two behaviours are worth building against explicitly:
+
+- **`422` instead of a short list.** Other APIs paginate; this one refuses. A partial `.env` starts a process that then misbehaves far from the cause.
+- **`503` instead of a null value.** A variable that cannot be decrypted is never returned as `""`, `null`, or a placeholder — those look like real values to a deploy script.
+
+## See also
+
+- [Rate limits](/limits/rate-limits)
+- [Authentication](/api/authentication)

@@ -1,0 +1,61 @@
+---
+title: Inputs & outputs
+description: Every input and output of the Envpilot GitHub Action, generated from action.yml.
+icon: github
+version: "{{actionVersion}}"
+---
+
+# Inputs & outputs
+
+<Callout type="info" title="Generated from action.yml">
+  Both tables are generated from `packages/github-action/action.yml`. The
+  hand-written version of this page was missing three inputs and both outputs,
+  which is why it is generated now.
+</Callout>
+
+## Inputs
+
+{/* generated:action-inputs start */}
+
+| Input         | Required | Default                    | What it does                                                                                                                                                                                               |
+| ------------- | -------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `token`       | Yes      | —                          | Envpilot API key (envpk\_…) with the GitHub Action surface, scoped to a project and environment. Create one under Organization → Settings → API Keys.                                                      |
+| `environment` | Yes      | —                          | Environment to pull variables from, e.g. production, staging, development.                                                                                                                                 |
+| `api-url`     | No       | `https://www.envpilot.dev` | Envpilot API base URL. Override only for self-hosted or non-production instances.                                                                                                                          |
+| `export-env`  | No       | `true`                     | When true, exports every pulled variable to $GITHUB_ENV so later steps can read it directly.                                                                                                               |
+| `env-file`    | No       | —                          | Optional path to write the pulled variables as a dotenv file. Skipped when unset.                                                                                                                          |
+| `files`       | No       | `false`                    | When true, also pulls the project's secret files (keystores, SSH keys, certificates) and writes each to its recorded path. The API key must carry the 'files' resource, which is never granted by default. |
+| `project`     | No       | —                          | Project slug. Required when files is true — the files endpoint is project-scoped, unlike variables which the token scope resolves.                                                                         |
+| `files-dir`   | No       | —                          | Directory that secret file paths are resolved against. Defaults to the workspace root.                                                                                                                     |
+
+{/* generated:action-inputs end */}
+
+## Outputs
+
+{/* generated:action-outputs start */}
+
+| Output        | What it holds                                             |
+| ------------- | --------------------------------------------------------- |
+| `count`       | Number of variables pulled from Envpilot.                 |
+| `files-count` | Number of secret files written. Zero when files is false. |
+
+{/* generated:action-outputs end */}
+
+Using an output:
+
+```yaml
+- id: envpilot
+  uses: rafay99-epic/envpilot-action@v1
+  with:
+    token: ${{ secrets.ENVPILOT_TOKEN }}
+    environment: production
+
+- run: echo "Pulled ${{ steps.envpilot.outputs.count }} variables"
+```
+
+## Limits
+
+- Inputs are strings — GitHub Actions has no boolean type. `export-env: "true"` and `files: "true"` are quoted on purpose.
+- `api-url` exists for non-production instances; leave it unset otherwise.
+- `project` is ignored unless `files: true`, where it is required.
+- `files-dir` is created if it does not exist, then resolved to a real path before anything is written.
