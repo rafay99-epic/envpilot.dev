@@ -12,7 +12,7 @@ Instead, report privately through one of:
 
 - **GitHub Security Advisories** (preferred): open a private report at
   [github.com/rafay99-epic/envpilot.dev/security/advisories/new](https://github.com/rafay99-epic/envpilot.dev/security/advisories/new).
-- **Email:** send details to the maintainer at **backend@tudotechlab.com** with
+- **Email:** send details to the maintainer at **support@syntaxlabtechnology.com**. or **99marafay@gmail.com** with
   subject line `SECURITY: Envpilot`.
 
 Please include:
