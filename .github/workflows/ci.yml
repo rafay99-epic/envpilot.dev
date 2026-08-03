@@ -198,6 +198,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+      - name: Secret scan (gitleaks)
+        # Standing guard: fail the gate if any real credential is committed.
+        # Filesystem scan of the working tree (fast); full-history was swept
+        # once at open-sourcing. Allowlist for known example strings lives in
+        # .gitleaks.toml.
+        #
+        # Runs BEFORE the Turborepo cache restore and before any build on
+        # purpose. gitleaks emits its "file too large" warning while walking
+        # the tree, i.e. BEFORE the path allowlist is applied — so restoring
+        # .turbo first buried the real result under ten warnings about cache
+        # tarballs the scan was always going to ignore anyway.
+        #
+        # 4 MB, not 2: on a clean checkout exactly one tracked file exceeds
+        # 2 MB (a brand PNG), so the old cap bought nothing but a warning
+        # saying a file had gone UNSCANNED. Same wall-clock either way.
+        run: |
+          V=8.30.1
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${V}/gitleaks_${V}_linux_x64.tar.gz" | tar xz -C /tmp gitleaks
+          /tmp/gitleaks dir . --config .gitleaks.toml --max-target-megabytes 4 --redact --no-banner
       - name: Cache Turborepo
         uses: actions/cache@v4
         with:
@@ -207,15 +226,6 @@ jobs:
             turbo-${{ runner.os }}-
       - name: Prettier check
         run: bunx prettier --check .
-      - name: Secret scan (gitleaks)
-        # Standing guard: fail the gate if any real credential is committed.
-        # Filesystem scan of the working tree (fast); full-history was swept
-        # once at open-sourcing. Allowlist for known example strings lives in
-        # .gitleaks.toml.
-        run: |
-          V=8.30.1
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${V}/gitleaks_${V}_linux_x64.tar.gz" | tar xz -C /tmp gitleaks
-          /tmp/gitleaks dir . --config .gitleaks.toml --max-target-megabytes 2 --redact --no-banner
       - name: Build, lint, typecheck, test (turbo)
         run: bunx turbo build lint typecheck test --cache-dir=.turbo
       - name: Typecheck Convex functions

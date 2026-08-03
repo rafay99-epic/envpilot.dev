@@ -22,6 +22,11 @@ paths = [
   '''apps/web/content/docs/.*\.mdx$''',
   '''apps/docs/content/.*\.mdx$''',
   '''apps/web/src/components/variables/bulk-paste-form\.tsx$''',
+  # Masking unit test. It asserts that PEM armour stays READABLE while the
+  # body gets covered, so it necessarily contains literal BEGIN/END PRIVATE
+  # KEY markers — the "key" between them is a 16-char stub, not a key. The
+  # markers alone trip the private-key rule.
+  '''apps/vscode-extension/src/utils/cloakRanges\.test\.ts$''',
   '''(^|/)\.claude/''',
   '''apps/web/src/components/landing/.*''',
   # Build output, dependencies, lockfiles, sourcemaps — never source secrets,
