@@ -52,6 +52,7 @@ function formatBytes(bytes: number): string {
 function requireProject(projectOption?: string): {
   projectId: string;
   projectName: string;
+  environment: string;
 } {
   const config = readProjectConfigV2();
   if (!config) throw notInitialized();
@@ -66,7 +67,27 @@ function requireProject(projectOption?: string): {
         : "No active project. Run `envpilot init` or `envpilot switch`."
     );
   }
-  return { projectId: entry.projectId, projectName: entry.projectName };
+  return {
+    projectId: entry.projectId,
+    projectName: entry.projectName,
+    environment: entry.environment,
+  };
+}
+
+/**
+ * Which environment a command acts on.
+ *
+ * Commands that WRITE to disk or mutate must resolve to exactly one
+ * environment. The same path may legitimately exist in several (a dev and a
+ * prod google-services.json), so an unscoped `pull` would race two files onto
+ * one path and an unscoped `rm` would silently pick whichever came back
+ * first. Default to the linked environment, exactly like `envpilot pull`.
+ */
+function resolveEnvironment(
+  option: string | undefined,
+  linked: string
+): string {
+  return option ?? linked;
 }
 
 function printFileRow(file: SecretFileRow, status?: string): void {
@@ -85,7 +106,9 @@ function printFileRow(file: SecretFileRow, status?: string): void {
         ? chalk.red("  missing locally")
         : "";
   console.log(
-    `  ${marker} ${chalk.bold(file.path.padEnd(38))} ${formatBytes(file.size).padStart(9)}  ${file.mode}${suffix}`
+    `  ${marker} ${chalk.bold(file.path.padEnd(38))} ${formatBytes(file.size).padStart(9)}  ${file.mode}  ${chalk.dim(
+      file.environments.join(",")
+    )}${suffix}`
   );
 }
 
@@ -127,14 +150,17 @@ const statusCommand = new Command("status")
   .action(async (options) => {
     try {
       if (!isAuthenticated()) throw notAuthenticated();
-      const { projectId, projectName } = requireProject(options.project);
+      const { projectId, projectName, environment } = requireProject(
+        options.project
+      );
+      const env = resolveEnvironment(options.env, environment);
 
       const files = await withSpinner("Checking secret files...", () =>
-        createAPIClient().listSecretFiles(projectId, options.env)
+        createAPIClient().listSecretFiles(projectId, env)
       );
 
       if (files.length === 0) {
-        info(`No secret files in ${projectName}.`);
+        info(`No secret files in ${projectName} (${env}).`);
         return;
       }
 
@@ -167,14 +193,17 @@ const pullCommand = new Command("pull")
   .action(async (options) => {
     try {
       if (!isAuthenticated()) throw notAuthenticated();
-      const { projectId, projectName } = requireProject(options.project);
+      const { projectId, projectName, environment } = requireProject(
+        options.project
+      );
+      const env = resolveEnvironment(options.env, environment);
       const client = createAPIClient();
 
       const files = await withSpinner("Loading secret files...", () =>
-        client.listSecretFiles(projectId, options.env)
+        client.listSecretFiles(projectId, env)
       );
       if (files.length === 0) {
-        info(`No secret files in ${projectName}.`);
+        info(`No secret files in ${projectName} (${env}).`);
         return;
       }
 
@@ -334,17 +363,25 @@ const getCommand = new Command("get")
   .action(async (targetPath, options) => {
     try {
       if (!isAuthenticated()) throw notAuthenticated();
-      const { projectId } = requireProject(options.project);
+      const { projectId, environment } = requireProject(options.project);
+      const env = resolveEnvironment(options.env, environment);
       const client = createAPIClient();
 
-      const files = await client.listSecretFiles(projectId, options.env);
-      const match = files.find((f) => f.path === targetPath);
-      if (!match) {
-        error(`No secret file at "${targetPath}".`);
+      const files = await client.listSecretFiles(projectId, env);
+      const matches = files.filter((f) => f.path === targetPath);
+      if (matches.length === 0) {
+        error(`No secret file at "${targetPath}" in ${env}.`);
         info("Run `envpilot files list` to see what is available.");
         process.exitCode = 1;
         return;
       }
+      if (matches.length > 1) {
+        error(`"${targetPath}" matches ${matches.length} files in ${env}.`);
+        info("Narrow it down with --env.");
+        process.exitCode = 1;
+        return;
+      }
+      const match = matches[0];
 
       const content = await withSpinner(`Fetching ${match.path}...`, () =>
         client.getSecretFileContent(match._id)
@@ -364,28 +401,37 @@ const getCommand = new Command("get")
 const rmCommand = new Command("rm")
   .description("Move a secret file to the trash")
   .argument("<path>", "The secret file's destination path")
+  .option("-e, --env <environment>", "Environment (defaults to the linked one)")
   .option("-y, --yes", "Skip the confirmation prompt")
   .option("--project <name-or-id>", "Use a specific linked project")
   .action(async (targetPath, options) => {
     try {
       if (!isAuthenticated()) throw notAuthenticated();
-      const { projectId } = requireProject(options.project);
+      const { projectId, environment } = requireProject(options.project);
+      const env = resolveEnvironment(options.env, environment);
       const client = createAPIClient();
 
-      const files = await client.listSecretFiles(projectId);
-      const match = files.find((f) => f.path === targetPath);
-      if (!match) {
-        error(`No secret file at "${targetPath}".`);
+      const files = await client.listSecretFiles(projectId, env);
+      const matches = files.filter((f) => f.path === targetPath);
+      if (matches.length === 0) {
+        error(`No secret file at "${targetPath}" in ${env}.`);
         process.exitCode = 1;
         return;
       }
+      if (matches.length > 1) {
+        error(`"${targetPath}" matches ${matches.length} files in ${env}.`);
+        info("Narrow it down with --env.");
+        process.exitCode = 1;
+        return;
+      }
+      const match = matches[0];
 
       if (!options.yes) {
         const { confirmed } = await inquirer.prompt<{ confirmed: boolean }>([
           {
             type: "confirm",
             name: "confirmed",
-            message: `Move "${match.name}" (${match.path}) to trash?`,
+            message: `Move "${match.name}" (${match.path}, ${env}) to trash?`,
             default: false,
           },
         ]);

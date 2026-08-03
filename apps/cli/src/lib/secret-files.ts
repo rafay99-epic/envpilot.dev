@@ -143,7 +143,16 @@ export function ignoreSecretFilePaths(root: string, paths: string[]): string[] {
   const missing = wanted.filter((p) => !existing.has(p));
   if (missing.length === 0) return [];
 
-  const block = `${content.endsWith("\n") || content === "" ? "" : "\n"}\n# Envpilot secret files\n${missing.join("\n")}\n`;
+  // Only emit the section header once. Each `files add` appends whatever is
+  // newly missing, and repeating the comment every time turns .gitignore into
+  // a wall of identical headers.
+  const HEADER = "# Envpilot secret files";
+  const needsHeader = !content.includes(HEADER);
+  const leadingNewline = content.endsWith("\n") || content === "" ? "" : "\n";
+  const block =
+    leadingNewline +
+    (needsHeader ? `\n${HEADER}\n` : "") +
+    `${missing.join("\n")}\n`;
   writeFileSync(gitignorePath, content + block, "utf-8");
   return missing;
 }

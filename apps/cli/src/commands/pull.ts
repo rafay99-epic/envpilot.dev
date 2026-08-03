@@ -192,6 +192,7 @@ async function pullAllProjects(options: {
   force?: boolean;
   format?: string;
   dryRun?: boolean;
+  files?: boolean;
 }): Promise<void> {
   const configV2 = readProjectConfigV2();
   if (!configV2) throw notInitialized();
@@ -274,10 +275,6 @@ async function pullSingleProject(
     outputPath,
     options
   );
-
-  if (options.files && !options.dryRun) {
-    await pullSecretFiles(project.projectId, environment, options.force);
-  }
 }
 
 /**
@@ -335,7 +332,44 @@ async function pullSecretFiles(
   );
 }
 
+/**
+ * Pull a project's variables and, when asked, its secret files.
+ *
+ * Every caller routes through here — the default path, --project, and --all —
+ * so `--files` cannot be silently dropped by one of them. The variables pull
+ * returns early when a project has none; files still run after it, because a
+ * project can legitimately have secret files and no variables.
+ */
 async function pullProject(
+  project: {
+    projectId: string;
+    organizationId: string;
+    environment: string;
+    fileProtection?: FileProtection;
+  },
+  outputPath: string,
+  options: {
+    env?: string;
+    file?: string;
+    force?: boolean;
+    format?: string;
+    prefix?: string;
+    dryRun?: boolean;
+    files?: boolean;
+  }
+): Promise<void> {
+  await pullProjectVariables(project, outputPath, options);
+
+  if (options.files && !options.dryRun) {
+    await pullSecretFiles(
+      project.projectId,
+      project.environment,
+      options.force
+    );
+  }
+}
+
+async function pullProjectVariables(
   project: {
     projectId: string;
     organizationId: string;
