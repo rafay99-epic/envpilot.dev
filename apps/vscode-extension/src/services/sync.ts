@@ -487,7 +487,13 @@ export class SyncService {
      * silently destroy someone's hand-placed keystore, but a revert exists
      * precisely to undo the edit that triggered it.
      */
-    force = false
+    force = false,
+    /**
+     * Limits `force` to these paths. The edit watcher passes the single file
+     * it fired for: forcing the whole pass would overwrite every other
+     * locally-modified secret file in the environment as collateral.
+     */
+    forcePaths?: string[]
   ): Promise<void> {
     if (!root) return;
     // Trust is re-checked HERE, not only at the env-file writers. Those run
@@ -512,6 +518,7 @@ export class SyncService {
         root,
         {
           force,
+          forcePaths,
           setSyncing: (syncing) => this.fileProtection?.setSyncing(syncing),
           onWritten: async (file, contents) => {
             // Secret files get the SAME guards a synced .env gets. Mirrors
@@ -556,7 +563,13 @@ export class SyncService {
                 // fired. Without it materialise classes it a conflict and
                 // leaves the unauthorized edit in place, so the warning
                 // ("you cannot modify it") is the only thing that happens.
-                await this.syncSecretFiles(projectId, environments, root, true);
+                await this.syncSecretFiles(
+                  projectId,
+                  environments,
+                  root,
+                  true,
+                  [file.path]
+                );
               },
               "strict-readonly",
               { writable: 0o600, readonly: file.numericMode }

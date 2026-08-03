@@ -28,6 +28,13 @@ export const DEFAULT_FILE_MODE: FileMode = "0600";
  * history). Compared against the NORMALIZED path.
  */
 const FORBIDDEN_EXACT = new Set([".envpilot", ".git", ".gitignore"]);
+
+/**
+ * Bound on the collision scan, matching queries.list. A project that cannot
+ * be listed cannot be written to either — better a loud refusal than a
+ * silently partial uniqueness check.
+ */
+const MAX_PROJECT_FILE_SCAN = 1000;
 const FORBIDDEN_PREFIXES = [".git/", ".envpilot/"];
 
 /**
@@ -74,6 +81,15 @@ export function normalizeFilePath(rawPath: string): string {
 
   const segments: string[] = [];
   for (const segment of path.split("/")) {
+    // Win32 strips component-final spaces and periods before it touches the
+    // filesystem, so ".. /outside.pem" escapes the repo and ".git./config"
+    // lands in .git — both after passing every check below. Refuse the shape
+    // outright rather than trying to predict the rewrite.
+    if (/[ .]$/.test(segment) && segment !== "." && segment !== "..") {
+      throw new ConvexError(
+        "File path segments must not end in a space or a period — Windows silently strips them, which changes where the file lands"
+      );
+    }
     // Collapse "" (from "a//b") and "." (from "./a") rather than rejecting —
     // both are unambiguous and harmless once removed.
     if (segment === "" || segment === ".") continue;
@@ -187,13 +203,24 @@ export async function findFilePathConflicts(
   // Case-folded collisions too: "Config.json" and "config.json" are one file
   // on a case-insensitive checkout, so pulling both would have them
   // overwrite each other silently.
+  //
+  // ponytail: this is an O(files-in-project) scan, bounded by the SAME 1000-row
+  // ceiling queries.list already refuses to exceed — so it cannot grow past
+  // what a project can list. A folded-path column plus its own index is the
+  // upgrade if projects ever legitimately hold more than that.
   const foldedTarget = args.path.toLowerCase();
-  const allInProject = await ctx.db
+  const activeInProject = await ctx.db
     .query("projectFiles")
-    .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-    .collect();
-  for (const existing of allInProject) {
-    if (existing.deletedAt) continue;
+    .withIndex("by_project_deleted", (q) =>
+      q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+    )
+    .take(MAX_PROJECT_FILE_SCAN + 1);
+  if (activeInProject.length > MAX_PROJECT_FILE_SCAN) {
+    throw new ConvexError(
+      `Project has more than ${MAX_PROJECT_FILE_SCAN} secret files — refusing to write without a complete collision check. Contact support to raise the limit.`
+    );
+  }
+  for (const existing of activeInProject) {
     if (args.excludeFileId && existing._id === args.excludeFileId) continue;
     if (existing.path === args.path) continue; // exact match handled above
     if (existing.path.toLowerCase() !== foldedTarget) continue;

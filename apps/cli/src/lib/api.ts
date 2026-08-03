@@ -373,11 +373,11 @@ const refs = {
   removeFile: fnRef<"mutation", { fileId: string }, string>(
     "features/files/mutations:remove"
   ),
-  updateFile: fnRef<
+  detachFileEnvironment: fnRef<
     "mutation",
-    { fileId: string; environments?: string[] },
-    string
-  >("features/files/mutations:update"),
+    { fileId: string; environment: string },
+    { remaining: string[] }
+  >("features/files/mutations:detachEnvironment"),
   pushBulk: fnRef<
     "action",
     {
@@ -1024,14 +1024,16 @@ export class APIClient {
   }
 
   /**
-   * Narrow a secret file's environments. Used by `files rm --env` to detach
-   * one environment instead of trashing the file for all of them.
+   * Remove ONE environment from a secret file, atomically. Used by
+   * `files rm --env` to detach an environment instead of trashing the file
+   * for all of them. The server derives the surviving set from the row, so a
+   * concurrent edit by someone else cannot be clobbered by a stale array.
    */
-  async setSecretFileEnvironments(
+  async detachSecretFileEnvironment(
     fileId: string,
-    environments: string[]
-  ): Promise<string> {
-    return convexMutation(refs.updateFile, { fileId, environments });
+    environment: string
+  ): Promise<{ remaining: string[] }> {
+    return convexMutation(refs.detachFileEnvironment, { fileId, environment });
   }
 
   /**

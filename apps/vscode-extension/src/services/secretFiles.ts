@@ -73,7 +73,15 @@ export async function materialiseSecretFiles(
   environment: string,
   root: string,
   options: {
+    /**
+     * Overwrite locally-modified files instead of reporting conflicts.
+     * Scope it with `forcePaths` — a blanket force during a single file's
+     * revert would silently destroy every OTHER hand-placed keystore in the
+     * environment.
+     */
     force?: boolean;
+    /** Restrict `force` to these recorded paths. */
+    forcePaths?: string[];
     /**
      * Called for each file as it is written, while its plaintext is still in
      * hand. sync.ts uses this to register the same guards a synced .env gets
@@ -113,7 +121,14 @@ export async function materialiseSecretFiles(
       }
       result.unchanged.push(file.path);
       alreadyPresent.push(file);
-    } else if (status === "modified" && !options.force) {
+    } else if (
+      status === "modified" &&
+      !(
+        options.force &&
+        (options.forcePaths === undefined ||
+          options.forcePaths.includes(file.path))
+      )
+    ) {
       result.conflicts.push(file.path);
       // Still guard it: the bytes differ from the server, but it IS a secret
       // file sitting in the workspace and must not be copyable.

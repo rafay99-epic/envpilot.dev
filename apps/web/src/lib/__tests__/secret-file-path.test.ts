@@ -47,6 +47,20 @@ describe("normalizeFilePath", () => {
     }
   });
 
+  it("refuses segments ending in a space or a period", () => {
+    // Win32 strips both before touching the filesystem, so ".. /outside.pem"
+    // escapes the repo and ".git./config" lands in .git — after passing
+    // every other check.
+    for (const bad of [
+      ".. /outside.pem",
+      ".git./config",
+      "certs /server.pem",
+      "certs/server.pem.",
+    ]) {
+      expect(() => normalizeFilePath(bad)).toThrow();
+    }
+  });
+
   it("allows ordinary paths that merely start with a dot", () => {
     expect(normalizeFilePath(".config/gcloud/key.json")).toBe(
       ".config/gcloud/key.json"

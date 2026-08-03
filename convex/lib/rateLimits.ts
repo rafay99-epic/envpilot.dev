@@ -45,13 +45,17 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 20,
   },
 
-  // Secret-file content reads: 60 per minute per user. Each one is a blob
-  // read plus a vault read plus a decrypt, and returns plaintext.
+  // Secret-file content reads. Each one is a blob read plus a vault read plus
+  // a decrypt, and returns plaintext — but the CLI and the extension issue
+  // ONE action per file, so a first pull of a Pro project (no file-count
+  // limit) is a burst of hundreds. A 60/min bucket aborted that pull partway
+  // through with a rate-limit error neither client retries. Sized for a real
+  // cold pull, still far below what an exfiltration loop would want.
   fileDownload: {
     kind: "token bucket",
-    rate: 60,
+    rate: 600,
     period: 60_000,
-    capacity: 60,
+    capacity: 600,
   },
 
   // Machine-originated variable requests: 5 per hour per key, burst 2.

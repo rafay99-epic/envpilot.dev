@@ -508,11 +508,14 @@ const rmCommand = new Command("rm")
       }
 
       if (detachOnly) {
-        await withSpinner(`Removing from ${env}...`, () =>
-          client.setSecretFileEnvironments(match._id, remaining)
+        // The server derives the surviving set itself — sending a computed
+        // array would overwrite an environment change another user made
+        // between the listing above and this call.
+        const result = await withSpinner(`Removing from ${env}...`, () =>
+          client.detachSecretFileEnvironment(match._id, env)
         );
         success(
-          `${match.name} removed from ${env}. Still in ${remaining.join(", ")}.`
+          `${match.name} removed from ${env}. Still in ${result.remaining.join(", ")}.`
         );
         return;
       }

@@ -5,7 +5,11 @@ import type { Doc } from "../../_generated/dataModel";
 import { requireFileAccess, authorizeFileAccess } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import { requireAuthedUser } from "../../lib/identity";
-import { checkCountedLimit, countActiveFiles } from "../featureRegistry/gates";
+import {
+  checkBooleanFeature,
+  checkCountedLimit,
+  countActiveFiles,
+} from "../featureRegistry/gates";
 import {
   isEnvironmentScopeAllowed,
   getActiveMembership,
@@ -277,6 +281,31 @@ export const uploadQuota = query({
       user._id
     );
     if (!membership) return { allowed: false, current: 0, limit: null };
+
+    // Same three checks the upload preflight runs, in the same order — the
+    // point of this query is that the button's disabled state matches the
+    // server. Reporting only the count limit left Upload enabled for members
+    // without create permission and for tiers with the feature switched off,
+    // so the click failed after they had already picked a file.
+    try {
+      await authorizeFileAccess(ctx, {
+        userId: user._id,
+        projectId: args.projectId,
+        action: "project:create_file",
+        preloadedProject: project,
+      });
+    } catch {
+      return { allowed: false, current: 0, limit: null };
+    }
+
+    const boolGate = await checkBooleanFeature(
+      ctx.db,
+      project.organizationId,
+      "secret_files"
+    );
+    if (!boolGate.allowed) {
+      return { allowed: false, current: 0, limit: null };
+    }
 
     const gate = await checkCountedLimit(
       ctx.db,

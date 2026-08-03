@@ -392,21 +392,24 @@ export async function countActiveFiles(
   for (const project of projects) {
     if (limit !== undefined && count >= limit) break;
 
+    // ACTIVE rows only, via the index — not a raw take() over by_project
+    // followed by a filter. Trashed rows sort at the front of that range, so
+    // a project with three deleted files and three live ones reported zero
+    // against a limit of three and let a fourth upload through.
     const query = db
       .query("projectFiles")
-      .withIndex("by_project", (q) => q.eq("projectId", project._id));
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", project._id).eq("deletedAt", undefined)
+      );
 
     if (limit === undefined) {
-      const rows = await query.collect();
-      count += rows.filter((f) => f.deletedAt === undefined).length;
+      count += (await query.collect()).length;
       continue;
     }
 
     // One more than we need: enough to prove the limit is exceeded without
     // reading the rest of the project.
-    const remaining = limit - count;
-    const rows = await query.take(remaining + 1);
-    count += rows.filter((f) => f.deletedAt === undefined).length;
+    count += (await query.take(limit - count + 1)).length;
   }
   return count;
 }

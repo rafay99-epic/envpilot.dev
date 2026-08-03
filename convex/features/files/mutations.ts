@@ -420,6 +420,82 @@ export const replaceContent = internalMutation({
   },
 });
 
+/**
+ * Remove ONE environment from a file, atomically.
+ *
+ * Deliberately not `update({environments})`: a client computing the new array
+ * from a listing it fetched moments earlier overwrites whatever another user
+ * changed in between — including re-adding the environment they just
+ * detached. The environment to drop is the only thing the caller sends; the
+ * surviving set is derived from the row inside the transaction.
+ *
+ * Refuses to empty the array. A file belonging to no environment is
+ * invisible to every environment-filtered read while still occupying its
+ * path — delete it instead.
+ */
+export const detachEnvironment = mutation({
+  args: {
+    fileId: v.id("projectFiles"),
+    environment: v.string(),
+  },
+  returns: v.object({
+    remaining: v.array(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const userId = (await requireAuthedUser(ctx))._id;
+
+    const file = await ctx.db.get(args.fileId);
+    if (!file || file.deletedAt) {
+      throw new ConvexError("File not found");
+    }
+    const project = await ctx.db.get(file.projectId);
+    if (!project) {
+      throw new ConvexError("Project not found");
+    }
+
+    await requireFileAccess(ctx, userId, file, "write", project);
+
+    if (!file.environments.includes(args.environment)) {
+      throw new ConvexError(
+        `"${file.path}" is not in ${args.environment} — nothing to remove`
+      );
+    }
+    const remaining = file.environments.filter((e) => e !== args.environment);
+    if (remaining.length === 0) {
+      throw new ConvexError(
+        `"${file.path}" belongs only to ${args.environment}. Delete the file instead of leaving it with no environment.`
+      );
+    }
+
+    await ctx.db.patch(args.fileId, {
+      environments: remaining,
+      version: file.version + 1,
+      lastModifiedBy: userId,
+      updatedAt: now,
+    });
+
+    await createAuditLog(ctx, {
+      organizationId: project.organizationId,
+      projectId: file.projectId,
+      userId,
+      action: "file.updated",
+      details: {
+        fileId: args.fileId,
+        fileName: file.name,
+        path: file.path,
+        detachedEnvironment: args.environment,
+        environments: remaining,
+        previousVersion: file.version,
+        newVersion: file.version + 1,
+      },
+      resourceType: "file",
+    });
+
+    return { remaining };
+  },
+});
+
 /** Metadata-only edit. Never touches the blob or the vault object. */
 export const update = mutation({
   args: {
