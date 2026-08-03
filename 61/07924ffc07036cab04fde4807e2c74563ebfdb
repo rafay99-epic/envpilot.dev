@@ -1,0 +1,25 @@
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/files/page.tsx
+  s_e94a11bf9b2f48::t_4445f703bf3f8b 229,258,278,290
+apps/web/tests/e2e/authenticated/secret-files.spec.ts
+  s_e94a11bf9b2f48::t_56dda97b76e0ee 19-23,26
+apps/web/src/components/files/file-list-item.tsx
+  s_e94a11bf9b2f48::t_4445f703bf3f8b 49-50,60,103
+apps/web/src/components/files/file-permissions-drawer.tsx
+  s_e94a11bf9b2f48::t_4445f703bf3f8b 123,147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "6107924ffc07036cab04fde4807e2c74563ebfdb",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
