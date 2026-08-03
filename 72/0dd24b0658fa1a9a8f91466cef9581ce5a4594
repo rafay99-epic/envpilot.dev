@@ -1,0 +1,28 @@
+apps/cli/src/commands/files.ts
+  s_e94a11bf9b2f48::t_565439a7a5c575 23,25,99,109-111,176-182,255-268
+apps/cli/src/commands/pull.ts
+  s_e94a11bf9b2f48::t_565439a7a5c575 14,16,321-327
+apps/vscode-extension/src/services/secretFiles.ts
+  s_e94a11bf9b2f48::t_9d3282b7ecc46d 8,88-112,127,131,143,212-220
+apps/cli/src/lib/secret-files.test.ts
+  s_e94a11bf9b2f48::t_84f30607b106f1 3,16,19,163-201
+  s_e94a11bf9b2f48::t_95ed28dffed3b1 202-203
+apps/cli/src/lib/secret-files.ts
+  s_e94a11bf9b2f48::t_f8a934f83e21b0 8,67-98,130,134,148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "720dd24b0658fa1a9a8f91466cef9581ce5a4594",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
