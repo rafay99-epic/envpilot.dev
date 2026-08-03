@@ -1,0 +1,155 @@
+---
+title: API Quickstart
+description: Create an API key and pull your first environment variable over REST in under a minute.
+icon: zap
+---
+
+# API Quickstart
+
+Envpilot's public REST API lets you read projects, variables, and shared accounts programmatically — no CLI or extension required. It's read-only in v1 and requires the **Pro** plan.
+
+## Create an API key
+
+Go to **Organization Settings → API Keys** — there's a single creation screen; project scope is a choice you make inside it, not a separate settings page.
+
+1. Click **New API Key**
+2. Select the surfaces where the key may authenticate: REST API, MCP server, and/or GitHub Action
+3. Choose project, environment, and resource scopes (see below) — pick specific projects, or "all projects, including future ones" (owner-only)
+4. Copy the key — it's shown **once**, as `envpk_...`. Envpilot only stores a hash of it; if you lose it, revoke it and create a new one — there's no rotate-in-place.
+
+Org-wide keys (scope = all projects) can only be created by the organization **Owner**. Project-scoped keys can also be created by a Team Lead.
+
+All project, environment, resource, and surface choices are immutable. If the required access changes, create a replacement key with the complete intended scope, switch clients to it, verify it, and then revoke the old key. For an MCP credential, follow [Create an MCP key](/mcp/overview#create-an-mcp-key) and [set `ENVPILOT_API_KEY`](/mcp/overview#set-envpilot-api-key) before configuring a client.
+
+## Understand scope
+
+Every key has three independent scope dimensions:
+
+- **Projects** — `all` (every project in the org) or a specific list of projects
+- **Environments** — `all` (development, staging, production) or a specific list
+- **Resources** — which resource types the key can read: `variables`, `accounts`, `projects`, and optionally `requests` (the one write path — filing a variable request for a human to approve)
+
+A key also carries immutable **surfaces** — which faces it may use: the REST API (`rest_api`), the MCP server (`mcp_server`), and the GitHub Action (`github_action`). All three route through the same enforcement core; see [Architecture](/start/architecture).
+
+A key requesting a **project** outside its scope gets a `404` — identical to a project that genuinely doesn't exist, so a leaked key can't be used to probe which project slugs are real. A key requesting a **resource type, environment, or surface** outside its scope gets a `403` instead, since the project's existence is already implied by a URL the key can otherwise reach. This is deliberate: see [API Security](/api/authentication) for why.
+
+## Pull your first variables
+
+```bash
+curl https://www.envpilot.dev/api/v1/projects/backend/variables?environment=production \
+  -H "Authorization: Bearer envpk_your_key_here"
+```
+
+Response:
+
+```json
+{
+  "variables": [
+    {
+      "key": "DATABASE_URL",
+      "value": "postgres://...",
+      "environments": ["production"],
+      "isSensitive": true,
+      "updatedAt": 1752192000000
+    },
+    {
+      "key": "API_SECRET",
+      "value": "sk_live_...",
+      "environments": ["staging", "production"],
+      "isSensitive": true,
+      "updatedAt": 1752192000000
+    }
+  ]
+}
+```
+
+`environment` is required unless you pass `metadata_only=true`. Each variable's `environments` array is its **full** scope — a key shared across staging and production shows both, even though you asked for `production` only. With `metadata_only=true`, the `value` field is omitted entirely (no vault round-trip happens).
+
+## Filtering
+
+**Exact keys** — pull only the variables you name:
+
+```bash
+curl "https://www.envpilot.dev/api/v1/projects/backend/variables?environment=production&keys=DATABASE_URL,API_SECRET" \
+  -H "Authorization: Bearer envpk_your_key_here"
+```
+
+**Prefix match** — useful for grabbing a related group, e.g. everything exposed to the client:
+
+```bash
+curl "https://www.envpilot.dev/api/v1/projects/backend/variables?environment=production&prefix=NEXT_PUBLIC_" \
+  -H "Authorization: Bearer envpk_your_key_here"
+```
+
+**Metadata only** — list variable keys without decrypting any values (no vault round-trip, higher rate limit):
+
+```bash
+curl "https://www.envpilot.dev/api/v1/projects/backend/variables?metadata_only=true" \
+  -H "Authorization: Bearer envpk_your_key_here"
+```
+
+**dotenv output** — get a ready-to-write `.env` file instead of JSON:
+
+```bash
+curl "https://www.envpilot.dev/api/v1/projects/backend/variables?environment=production&format=env" \
+  -H "Authorization: Bearer envpk_your_key_here"
+# DATABASE_URL=postgres://...
+# API_SECRET=sk_live_...
+```
+
+## Handling errors
+
+Every error response — across all v1 endpoints — has the same shape: `{ "error": "<message>", "code": "<CODE>" }`, plus an `x-request-id` header worth logging for support.
+
+| Status | Code                | Meaning                                                                                                 |
+| ------ | ------------------- | ------------------------------------------------------------------------------------------------------- |
+| 400    | `VALIDATION_ERROR`  | Missing or malformed query params (e.g. no `environment` and no `metadata_only=true`)                   |
+| 401    | `MISSING_TOKEN`     | No `Authorization: Bearer` header                                                                       |
+| 401    | `INVALID_KEY`       | Key is unknown, revoked, or expired — all three look identical to the caller                            |
+| 403    | `FORBIDDEN_SCOPE`   | Key doesn't include this resource type or environment                                                   |
+| 403    | `FORBIDDEN_SURFACE` | Key isn't enabled for this surface (REST vs. MCP vs. GitHub Action)                                     |
+| 403    | `TIER_GATE`         | Organization's plan no longer includes the public API                                                   |
+| 404    | `NOT_FOUND`         | Project outside the key's scope, or genuinely doesn't exist — see [Understand scope](#understand-scope) |
+| 422    | `OVERFLOW`          | Project exceeds the 1000-row bounded-read cap — see [Bounded reads](#bounded-reads-no-pagination)       |
+| 429    | `RATE_LIMITED`      | Bucket exceeded — see [Rate limits](/limits/rate-limits)                                                |
+| 503    | `DECRYPT_FAILED`    | Vault couldn't decrypt one of the values in this pull                                                   |
+| 503    | `CONFIG_ERROR`      | Server-side misconfiguration, not your key                                                              |
+| 500    | `INTERNAL_ERROR`    | Unrecognized failure                                                                                    |
+
+```bash
+curl -i "https://www.envpilot.dev/api/v1/projects/backend/variables?environment=production" \
+  -H "Authorization: Bearer envpk_a_revoked_key"
+# HTTP/1.1 401 Unauthorized
+# {"error":"Invalid or revoked API key","code":"INVALID_KEY"}
+```
+
+## Bounded reads, no pagination
+
+There's no cursor or page parameter on any read endpoint — `keys`, `prefix`, and `metadata_only` are filters, not pagination. A pull is **all-or-nothing up to 1000 active rows** per project (variables and accounts each). If a project has more than that, the request fails outright with `422 OVERFLOW` and a message telling you to contact support to raise the limit — you will never get a silently-truncated partial page back.
+
+The same "loud, not partial" rule applies to decryption: if any single value in the pull fails to decrypt, the **whole request fails** with `503 DECRYPT_FAILED` naming the offending key. Nothing decrypted so far is returned — Envpilot would rather fail a pull than hand back a response with one variable silently missing.
+
+## Retrying
+
+Envpilot's public API fails **closed**: every denial and every partial-data risk turns into a full request failure with a specific code, not a degraded response. That makes the retry decision mechanical:
+
+- **429 `RATE_LIMITED`** — respect the `Retry-After` header (seconds) before retrying the identical request. See [Rate limits](/limits/rate-limits) for the per-bucket windows.
+- **503 `DECRYPT_FAILED`** — retryable; vault errors are usually transient. If it persists across retries, the variable needs to be re-saved in Envpilot rather than pulled again.
+- **503 `CONFIG_ERROR` / 500 `INTERNAL_ERROR`** — retryable with backoff; these are server-side, not caused by your request.
+- **401 / 403 / 404 / 422** — not retryable as-is. These only change if you fix the actual cause: replace a revoked key, create a new key with the required immutable scope or surface, or shrink the project below the 1000-row cap.
+
+## Next steps
+
+- [API Reference](/api/overview) — every endpoint, filter, and error code
+- [Architecture](/start/architecture) — the five client surfaces and the one auth core
+- [MCP Server](/mcp/overview) — create the right MCP key, configure `ENVPILOT_API_KEY`, and connect an AI agent directly to your variables
+- [Rate limits](/limits/rate-limits) — every per-key bucket and what happens when you exceed it
+- [API Security](/api/authentication) — key model, scoping, revocation, and audit
+
+## Limits
+
+- Read-only. Every endpoint, every surface.
+- Pro plan (`public_api`), and the gate is re-checked on every call.
+- 120 requests/min for metadata, 30/min for value pulls, per key.
+- No pagination: a response that cannot be complete is an error, not a page.
+- No CORS — keys belong on a server, never in a browser bundle.

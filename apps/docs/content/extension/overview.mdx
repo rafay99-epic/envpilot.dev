@@ -1,0 +1,63 @@
+---
+title: VS Code overview
+description: Install the extension, sign in, and understand what it does in your workspace.
+icon: puzzle
+version: "{{extensionVersion}}"
+---
+
+# VS Code overview
+
+Envpilot v{{extensionVersion}} for VS Code and Cursor: real-time variable sync, secret files materialised into the workspace, commit and clipboard protection, and editor intelligence over your `.env` files.
+
+Requires VS Code 1.85+ or the Cursor equivalent.
+
+## Install
+
+Search for **Envpilot** in the Extensions sidebar, or install from the [Marketplace](https://marketplace.visualstudio.com/items?itemName=envpilot.envpilot). The same extension works in Cursor.
+
+## Sign in
+
+<Steps>
+
+### Run the command
+
+Open the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) and run **Envpilot: Sign In**.
+
+### Confirm in the browser
+
+Your browser opens the Envpilot authentication page. Confirm there, and the extension picks the session up automatically.
+
+### Done
+
+The session is stored in VS Code's secure credential storage — not in a file in your project.
+
+</Steps>
+
+Several accounts can be signed in at once: **Envpilot: Switch Account** moves between them, **Envpilot: Sign Out** ends the active one, and **Envpilot: Sign Out of All Accounts** clears every one.
+
+## What you get
+
+| Area                                 | What happens                                                          |
+| ------------------------------------ | --------------------------------------------------------------------- |
+| Sidebar                              | Linked projects, environments and variables in the Activity Bar       |
+| Status bar                           | Current project, environment, and sync state at a glance              |
+| Dashboard panel                      | **Envpilot: Open Dashboard Panel** — an in-editor view of the project |
+| [Sync](/extension/sync)              | `.env` files and secret files written and kept current                |
+| [Protection](/extension/protection)  | Commit guard, clipboard guard, value cloaking                         |
+| [Editor features](/extension/editor) | CodeLens, autocomplete, hover, request-a-variable                     |
+
+## Trust matters
+
+In VS Code **Restricted Mode** the extension never writes secrets: sync, pull and link are disabled until you trust the workspace. Cleanup still runs, so previously synced `.env` files are removed on close and after crashes. Trust is re-checked mid-sync, not just at the start — a window that drops to Restricted must never end up holding a plaintext keystore.
+
+## Limits
+
+- **VS Code and Cursor only.** There is no JetBrains, Neovim, or Zed build.
+- **Uploading secret files is not possible from the editor** — the extension writes them, the CLI and dashboard manage them.
+- Everything is bounded by your role. Revealing values, for instance, requires a capability an owner grants; see [Protection](/extension/protection).
+- The extension enforces a minimum supported version against the server and fails open on network errors.
+
+## Next
+
+- [Linking & sync](/extension/sync)
+- [Commands](/extension/commands) · [Settings](/extension/settings)

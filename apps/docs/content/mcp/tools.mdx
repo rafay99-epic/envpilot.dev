@@ -1,0 +1,73 @@
+---
+title: Tools
+description: All nine MCP tools, their parameters, and the API-key resource each one demands.
+icon: zap
+---
+
+# Tools
+
+Every tool runs against the same scope, rate limits and plan gate as the REST API, and every value-returning call is audited.
+
+## Read tools
+
+| Tool                     | What it does                                                                                          | Resource                                      |
+| ------------------------ | ----------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `envpilot_list_projects` | List every project in the key's scope                                                                 | `projects`                                    |
+| `envpilot_get_variables` | Variables for a project + environment, with optional `keys` / `prefix` / `metadata_only`              | `variables`                                   |
+| `envpilot_get_variable`  | One variable by exact key                                                                             | `variables`                                   |
+| `envpilot_list_accounts` | Shared accounts for a project, optionally filtered by environment                                     | `accounts`                                    |
+| `envpilot_list_files`    | Secret-file **metadata** for a project: path, size, mode, checksum. Never contents                    | `files`                                       |
+| `envpilot_get_file`      | The decrypted contents of **one** secret file, base64-encoded                                         | `files`                                       |
+| `envpilot_search`        | Search project names/slugs and variable **keys** — never values. Bounded to 20 projects / 100 matches | `projects` (plus `variables` for key matches) |
+
+## Write-adjacent tools
+
+The only mutation a machine credential can perform is filing a request. Available only when the key carries `requests`:
+
+| Tool                          | What it does                                                                                         | Resource   |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------- | ---------- |
+| `envpilot_request_variable`   | File a request with a **required justification**. A human approves it and supplies the value         | `requests` |
+| `envpilot_get_request_status` | Poll a filed request — `pending`, `approved`, `rejected` (with the reviewer's reason), or `canceled` | `requests` |
+
+## Secret file tools in detail
+
+### `envpilot_list_files`
+
+| Parameter     | Required | Notes                                                  |
+| ------------- | -------- | ------------------------------------------------------ |
+| `project`     | Yes      | Project slug                                           |
+| `environment` | No       | Omit to return files across every in-scope environment |
+
+Metadata only: destination path, size, mode, checksum, environments. Nothing is decrypted and no download is recorded, so an agent can safely explore what a build needs.
+
+### `envpilot_get_file`
+
+| Parameter     | Required                                     | Notes                                             |
+| ------------- | -------------------------------------------- | ------------------------------------------------- |
+| `project`     | Yes                                          | Project slug                                      |
+| `path`        | Yes                                          | Exact destination path from `envpilot_list_files` |
+| `environment` | When the path exists in several environments | Otherwise the call fails rather than guessing     |
+
+Returns real secret material. The tool description tells the agent as much: fetch only the file the task needs, never speculatively, never echo the contents back to the user, and write straight to the recorded path.
+
+If the path exists in more than one environment and no `environment` was given, the call fails with a message naming the count. Guessing which one a build wanted would be worse than asking.
+
+## Cost of each call
+
+| Tool                                                    | Bucket                                | Audited |
+| ------------------------------------------------------- | ------------------------------------- | ------- |
+| `list_projects`, `search`, `list_files`, metadata reads | 120/min metadata                      | No      |
+| `get_variables`, `get_variable`, `list_accounts`        | 30/min value pulls                    | Yes     |
+| `get_file`                                              | file reads: refill 60/min, burst 1000 | Yes     |
+| `request_variable`                                      | 5/hour per key, burst 2               | Yes     |
+
+## Limits
+
+- A tool whose resource is missing from the key is denied with a message naming the resource — scopes are immutable, so the fix is a replacement key.
+- A project outside scope behaves exactly as if it does not exist.
+- `envpilot_search` never returns values, only names and keys.
+- There is no tool that writes a variable, uploads a file, or approves a request. There is no plan on which one appears.
+
+## Next
+
+- [Agent requests](/mcp/agent-requests) · [Setup](/mcp/setup)

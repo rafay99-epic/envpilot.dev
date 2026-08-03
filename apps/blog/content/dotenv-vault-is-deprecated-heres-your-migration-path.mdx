@@ -74,7 +74,7 @@ rm .env .env.production .env.vault .env.keys
 
 Teammates run steps 1–2 and they're synced — no key to hand them, because access is tied to their account, not a shared secret. When someone leaves the team, you revoke the person, not rotate every key they ever touched.
 
-CI needs variables too: the [GitHub Action](https://docs.envpilot.dev/github-action) pulls them with a scoped token and masks every value in workflow logs.
+CI needs variables too: the [GitHub Action](https://docs.envpilot.dev/action/overview) pulls them with a scoped token and masks every value in workflow logs.
 
 ## Which one should you pick?
 

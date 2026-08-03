@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/github-action",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "GitHub Action that pulls environment variables from Envpilot into a workflow job",
   "private": true,
   "license": "MIT",

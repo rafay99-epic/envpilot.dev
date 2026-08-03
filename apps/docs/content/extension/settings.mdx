@@ -1,0 +1,51 @@
+---
+title: Settings
+description: Every Envpilot setting, its type and default, generated from the extension manifest.
+icon: puzzle
+version: "{{extensionVersion}}"
+---
+
+# Settings
+
+Configure under **Settings → Extensions → Envpilot** (`Cmd+,`), or in `settings.json`.
+
+<Callout type="info" title="Generated from the manifest">
+  This table is generated from `contributes.configuration` in the extension's
+  `package.json`. The previous hand-maintained version listed two settings that
+  did not exist and omitted seven that did — hence the generator.
+</Callout>
+
+{/* generated:extension-settings start */}
+
+| Setting                                | Type    | Default         | What it does                                                                                                                                                                                                                                                                                     |
+| -------------------------------------- | ------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `envpilot.serverUrl`                   | string  | —               | The URL of the Envpilot server (auto-configured at build time)                                                                                                                                                                                                                                   |
+| `envpilot.autoSync`                    | boolean | `true`          | Automatically sync variables when workspace opens                                                                                                                                                                                                                                                |
+| `envpilot.syncInterval`                | number  | `300`           | Interval (in seconds) for checking permission changes                                                                                                                                                                                                                                            |
+| `envpilot.targetFile`                  | string  | `".env.local"`  | Default target file for synced variables                                                                                                                                                                                                                                                         |
+| `envpilot.environment`                 | string  | `"development"` | Default environment for synced variables. Options: `development`, `staging`, `production`.                                                                                                                                                                                                       |
+| `envpilot.preventCopyOnRevoke`         | boolean | `true`          | Delete synced .env files when permissions are revoked                                                                                                                                                                                                                                            |
+| `envpilot.defaultConflictResolution`   | string  | `"prompt"`      | Default action when existing .env files are found. Options: `prompt`, `overwrite`, `backup`, `merge`, `skip`.                                                                                                                                                                                    |
+| `envpilot.convexUrl`                   | string  | —               | Convex deployment URL for real-time sync (auto-detected from server if empty)                                                                                                                                                                                                                    |
+| `envpilot.enableCodeLens`              | boolean | `true`          | Show CodeLens annotations above .env files with sync status and actions                                                                                                                                                                                                                          |
+| `envpilot.commitGuard.enabled`         | boolean | `true`          | Enable dual-layer .env commit protection (VS Code staging guard + pre-commit hook)                                                                                                                                                                                                               |
+| `envpilot.commitGuard.autoInstallHook` | boolean | `true`          | Automatically install a pre-commit hook to block .env file commits                                                                                                                                                                                                                               |
+| `envpilot.clipboardGuard.scope`        | string  | `"all-managed"` | Which Envpilot-managed .env files block clipboard copy/cut. Options: `all-managed`, `readonly-roles`, `off`.                                                                                                                                                                                     |
+| `envpilot.cloakValues`                 | boolean | `true`          | Visually mask variable values in Envpilot-managed .env files (the file content on disk is unchanged). Masking uses editor decorations, so values may still be visible in surfaces VS Code renders directly: the minimap (with editor.minimap.renderCharacters on), peek views, and diff editors. |
+| `envpilot.autocomplete.enable`         | boolean | `true`          | Suggest variable names from your linked Envpilot project when typing environment variable references (process.env., os.getenv, etc.)                                                                                                                                                             |
+| `envpilot.hover.enable`                | boolean | `true`          | Show a masked Envpilot hover on recognized environment variable references, with a role-checked option to reveal the value                                                                                                                                                                       |
+| `envpilot.idlePauseMinutes`            | number  | `10`            | Minutes the window must stay unfocused before real-time sync (Convex WebSocket subscriptions) is paused. Set to 0 to disable idle-pausing and keep real-time sync running regardless of focus.                                                                                                   |
+
+{/* generated:extension-settings end */}
+
+## Notes on a few of them
+
+- **`envpilot.serverUrl` / `envpilot.convexUrl`** are configured at build time and should be left alone unless you are running against a non-production instance.
+- **`envpilot.cloakValues`** masks with editor decorations. See the caveat in [Protection](/extension/protection).
+- **`envpilot.idlePauseMinutes`** trades a little freshness for a lot of idle connection cost. `0` disables pausing.
+- **Unsync-on-close customization** is Pro-gated (`vscode_unsync_customization`); on Free the project default applies.
+
+## Limits
+
+- Settings marked `machine` scope cannot be set per workspace — that is deliberate for anything that changes where credentials are sent.
+- A setting change takes effect on the next sync unless stated otherwise; use **Envpilot: Refresh** to apply immediately.

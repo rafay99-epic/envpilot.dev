@@ -9,7 +9,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     url: `${SITE_URLS.docs}/${doc.slug}`,
     lastModified: now,
     changeFrequency: "weekly" as const,
-    priority: doc.slug === "getting-started" ? 1 : 0.8,
+    priority: doc.slug === "start/quickstart" ? 1 : 0.8,
   }));
 
   return [

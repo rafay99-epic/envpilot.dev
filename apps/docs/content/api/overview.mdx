@@ -1,0 +1,71 @@
+---
+title: API overview
+description: Base URL, conventions, and the rules every endpoint obeys — read-only, bounded, and loud on failure.
+icon: plug
+---
+
+# API overview
+
+```
+https://www.envpilot.dev/api/v1
+```
+
+Every endpoint requires `Authorization: Bearer <api key>` and every endpoint is **read-only**. Requires the Pro plan (`public_api`).
+
+## Endpoints
+
+| Endpoint                                              | Returns                           | Resource    |
+| ----------------------------------------------------- | --------------------------------- | ----------- |
+| [`GET /v1/organization`](/api/organization)           | Organization metadata             | any key     |
+| [`GET /v1/projects`](/api/projects)                   | Projects in scope                 | `projects`  |
+| [`GET /v1/projects/{slug}`](/api/projects)            | One project                       | `projects`  |
+| [`GET /v1/projects/{slug}/variables`](/api/variables) | Variables, with or without values | `variables` |
+| [`GET /v1/projects/{slug}/accounts`](/api/accounts)   | Shared accounts                   | `accounts`  |
+| [`GET /v1/files`](/api/files)                         | Secret files                      | `files`     |
+
+## Conventions
+
+- **JSON by default.** `format=env` on the variables endpoint returns dotenv text instead.
+- **Errors are `{ "error": string, "code": string }`**, plus an `x-request-id` header worth quoting to support. See [Errors](/api/errors).
+- **Environments** are exactly `development`, `staging`, `production`.
+- **Timestamps** are epoch milliseconds.
+
+## Three rules that shape everything
+
+### Reads are bounded, and never partial
+
+A response that would exceed 1000 items is **refused** with `422` rather than truncated. A silently short list is worse than an error: a deploy that starts with three variables missing fails somewhere far from the cause.
+
+### Failure is loud
+
+If a vault decrypt fails for any item in a response, the whole request aborts with `503`. You never receive a partial set, and never a sentinel value standing in for a secret.
+
+### Scope is invisible
+
+A project outside your key's scope returns the same `404` as a project that does not exist. Existence cannot be probed by watching which error comes back.
+
+## No pagination
+
+There is deliberately no cursor or page parameter. The bounded-read rule means any successful response is complete, and any response that would not be complete is an error. If you are hitting the ceiling, you want more keys with narrower scope, not more pages.
+
+## No CORS
+
+The API sends no CORS headers and is not meant to be called from a browser. An API key in client-side code is a published key.
+
+<Callout type="danger" title="Keys belong on servers">
+  `envpk_…` values grant read access to real secrets. Keep them in CI secret
+  stores, server environments, or a secrets manager — never in a bundle, a
+  mobile app, or a repository.
+</Callout>
+
+## Limits
+
+- Read-only. There is no write endpoint on any surface; the only machine-initiated action is filing a [request](/platform/requests) over MCP.
+- Pro plan required. The gate is re-checked on **every** request, so a downgrade stops access immediately.
+- Rate limits are per key: 120/min metadata, 30/min values, plus separate buckets for [files](/api/files). See [Rate limits](/limits/rate-limits).
+- Every value-returning call is audited against the key.
+
+## Next
+
+- [Quickstart](/api/quickstart) — first call end to end
+- [Authentication](/api/authentication) — the key model

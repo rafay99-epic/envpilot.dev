@@ -1,0 +1,83 @@
+---
+title: Authentication
+description: The API key model — scoping, surfaces, revocation, audit, and the fail-loud contract shared by REST, MCP, and the GitHub Action.
+icon: shield
+---
+
+# Authentication
+
+The REST API, MCP server, and GitHub Action all authenticate with the **same key system** and call the **same** underlying Convex actions — one enforcement core, three faces. Nothing about auth, scoping, or auditing is re-implemented per surface.
+
+## Key model
+
+- A new key is generated as `envpk_...` and shown **exactly once**, at creation time.
+- Envpilot stores only a **SHA-256 hash** of the key, never the plaintext. If you lose a key, there's no way to recover it — revoke it and issue a new one.
+- Every key is scoped along three dimensions: **projects** (all or a specific list), **environments** (all or a specific list), and **resources** (`variables`, `accounts`, `projects`, optionally `files`, and optionally `requests`). A request for anything outside a key's scope is treated as if it doesn't exist.
+- Every key also declares its **surfaces** — which faces it may authenticate on: `rest_api`, `mcp_server`, `github_action`. All three route through one enforcement core (`_authorizeRequest`); see [Architecture](/start/architecture).
+- Keys can optionally have an **expiry date** (`expiresAt`). An expired key returns the same uniform "invalid or revoked" error as a bad or revoked key — the API never tells a caller _why_ a key stopped working.
+
+## The `files` resource is never granted by default
+
+[Secret files](/platform/secret-files) are the highest-value material a key can read — a signing keystore is not recoverable by rotating a string. So `files` is an explicit opt-in when minting a key, never included by a "select all" default, and every file-content read is audited individually.
+
+## Machine credentials never write secrets
+
+Every machine credential — REST API, MCP server, or GitHub Action key — is fundamentally **read-only**. No API key can create, edit, or delete a variable's value. The blast radius of a leaked key is bounded to reads within its scope, never a silent change to what a deploy pulls.
+
+There is exactly one escalation path, and it's **opt-in per key**: a key whose scope includes the `requests` resource can **file a variable request** — an ask, with a required justification, that lands in a human reviewer's dashboard queue. This is not a write. The agent never proposes a value; if the reviewer approves, **the reviewer supplies the value**. Keys without the `requests` resource (including every GitHub Action key) can't file requests at all.
+
+This is the trust model in one line: **read-only keys, human-approved escalation.** Request creation is additionally throttled per key — 5 per hour (burst 2), a standing cap of 5 open pending requests, and a 24-hour cooldown after a rejection — so a retry-looping agent can't flood reviewers. See [Rate limits](/limits/rate-limits) and [Architecture](/start/architecture).
+
+## Revocation is immediate
+
+Revoking a key from the dashboard takes effect on the **next request** — there is no grace period and no cache to wait out. Every request re-checks the key's status (valid, scoped, not expired, not revoked, plan still entitled) before doing any work.
+
+## Why 401 vs 403 vs 404 are deliberately uninformative
+
+- **401** covers every reason a key doesn't work — missing, malformed, invalid, expired, or revoked — as one message. This stops an attacker from using error responses to fingerprint _why_ a specific key failed.
+- **403** means the key is valid but the org's plan or the key's own resource scope doesn't cover this call (e.g. a `variables`-only key hitting `/accounts`, or the org isn't on a plan with `public_api`/`mcp_server` enabled).
+- **404** means the target doesn't exist **or** exists but is outside the key's scope — both return the same 404. A key is never allowed to confirm the existence of a project it can't see.
+
+## Fail-loud, never partial
+
+If any part of a variable pull can't be completed safely, the whole request fails instead of returning something silently incomplete:
+
+- **No partial pulls.** If vault decryption fails for any variable in the response, the request aborts with `503` rather than returning the variables that did decrypt and omitting the ones that didn't.
+- **No sentinel values.** A variable that fails to decrypt is never represented as an empty string, `null`, or placeholder — that would look like a real (wrong) value to a deploy script.
+- **No silent truncation.** A project with more than 1000 matching variables returns `422` rather than a truncated list that looks complete but isn't.
+
+## Audit trail
+
+Every value pull is logged — which key, which project/environment, which filters were used, and the source (`public-api`, `mcp`, or `cicd` for the GitHub Action). Metadata-only reads (key names without values) are **not** audited individually to avoid log noise, since they carry no secret exposure.
+
+Every **denied** request is also logged, including:
+
+- Reuse of a revoked key
+- A request outside a key's scope
+- A tier/plan gate rejection after a downgrade
+
+Revoked-key reuse is treated as the highest-signal event in this set — it's the strongest indicator of a leaked key still being used after the team responded.
+
+## Rate limiting
+
+Rate limits are enforced per key with a token-bucket limiter — 120/min for metadata reads, 30/min for value pulls (see [API Reference](/api/overview) for the full table). Requests using a key hash that doesn't match anything on file are rate-limited separately, per hash, to slow down brute-force key guessing.
+
+## Why there's no CORS
+
+The API and MCP endpoint deliberately do not send CORS headers, so browsers refuse cross-origin requests to them. API keys are bearer credentials with broad read access to your secrets — they must never be shipped in client-side JavaScript where anyone with dev tools open could read them out of a network request. If you need secrets in a browser context, that's a product decision to make deliberately, not something the public API should make easy by accident.
+
+## CI runners are ephemeral
+
+GitHub-hosted (and most self-hosted) runners are torn down after each job. A pulled variable only exists in that job's process environment for the duration of the run — it isn't persisted anywhere by Envpilot's side, and the [GitHub Action](/action/overview) additionally masks every value in the job log before it's exported.
+
+## Tier downgrades
+
+If an organization's plan is downgraded below the tier that grants `public_api`/`mcp_server`, existing keys aren't proactively deleted — the same per-request gate check simply starts returning `403` on the next call. There's no background sweep to race and no window where a downgraded org's keys keep working past the next request.
+
+## Limits
+
+- **Scope is immutable.** Projects, environments, resources and surfaces are fixed at creation.
+- **The plaintext is shown once.** There is no recovery and no rotate-in-place — revoke and re-issue.
+- **Org-wide key creation is owner-only**; team leads can mint keys limited to specific projects.
+- **Pro plan required** (`public_api` / `mcp_server`), re-checked per request.
+- Keys are bearer credentials with no IP allowlist and no per-key CORS exemption.

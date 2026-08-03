@@ -1,0 +1,84 @@
+---
+title: CLI in CI & troubleshooting
+description: Non-interactive usage, keeping secrets out of argv and logs, and the failures worth recognising on sight.
+icon: terminal
+---
+
+# CLI in CI & troubleshooting
+
+## Should you use the CLI in CI at all?
+
+Often not. The CLI authenticates as a **person** through a browser device flow, which no CI runner can complete. For pipelines, prefer:
+
+| Situation                       | Use                                       |
+| ------------------------------- | ----------------------------------------- |
+| GitHub Actions                  | [The Envpilot Action](/action/overview)   |
+| Any other CI, or your own tool  | [REST API](/api/overview) with an API key |
+| A local script you run yourself | The CLI, non-interactively as below       |
+
+## Non-interactive rules
+
+Every command that would prompt takes flags to answer instead:
+
+```bash
+envpilot pull --env production --force --quiet
+envpilot push --env staging --merge --force
+envpilot secrets rm OLD_FLAG -e staging --yes
+envpilot files pull -e production --force
+envpilot run --env production --quiet --no-cache -- ./deploy.sh
+```
+
+Add `--json` where it is offered (`list`, `usage`, `requests`, `diff`) and parse that instead of scraping human output, which is free to change.
+
+## Keeping secrets out of argv
+
+Anything on a command line is visible in `ps`, in shell history, and often in CI logs.
+
+```bash
+# Good — the value arrives on stdin
+printf %s "$SECRET" | envpilot requests approve <id> --value-stdin
+
+# Avoid — lands in history and argv
+envpilot secrets set API_KEY=sk_live_…
+```
+
+`--value` is deliberately rejected in interactive sessions for the same reason.
+
+## Exit codes
+
+`envpilot run` exits with **the child process's exit code**, so it composes cleanly:
+
+```bash
+envpilot run -- npm test || exit 1
+```
+
+Other commands exit non-zero on failure — including the deliberate refusals, such as `files pull` declining to overwrite a locally modified file.
+
+## Failures worth recognising
+
+| What you see                                       | What it means                                                                                              |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `Not authenticated`                                | No session in this environment. Run `envpilot login`, or use an API key for CI.                            |
+| 401 on the first call after weeks                  | The session was revoked — by an admin, by a sign-out, or by [Security Hold](/platform/rbac#security-hold). |
+| A hard stop asking you to upgrade                  | Your CLI is below the server's minimum supported version. Upgrade; there is no override.                   |
+| `⚠ N variable(s) were NOT written (access denied)` | Your role holds no write grant for those keys. This is not a bug — see [Pull & push](/cli/pull-push).      |
+| `Refusing to overwrite. Re-run with --force`       | A local secret file differs from the server. Inspect it before forcing.                                    |
+| `Limit reached (3/3)`                              | A plan limit. `envpilot usage --json` shows every limit and your current count.                            |
+| A rate-limit message with a retry window           | Back off for the stated number of seconds. See [Rate limits](/limits/rate-limits).                         |
+
+## Diagnostics
+
+```bash
+envpilot whoami          # identity, API target, active context
+envpilot usage --json    # plan limits vs current usage
+envpilot config path     # where local state lives
+envpilot list linked     # what this directory is bound to
+```
+
+If the CLI seems to be acting on the wrong project, it is almost always the active link — `envpilot list linked` then `envpilot switch --active <project>`.
+
+## Limits
+
+- No headless login. A device flow needs a browser.
+- The version check fails **open** on network errors, so an outage never blocks your commands; it also means a stale CLI can go unflagged offline.
+- Machine-readable output exists for some commands, not all; where `--json` is absent, treat output as human-facing and subject to change.

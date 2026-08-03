@@ -1,0 +1,138 @@
+---
+title: Roles & permissions
+description: One role per member, expressed as a capability set — plus project assignments, environment scope, per-secret grants, and Security Hold.
+icon: users
+---
+
+# Roles & permissions
+
+Envpilot has a **unified role model**: each member holds exactly one role in the organization, and that role is a named set of granular capabilities. Which projects the role applies to is a separate question, answered by project assignments.
+
+```
+who you are      →  one organization role   (capabilities)
+where it applies →  project assignments     (+ optional environment scope)
+exceptions       →  per-variable / per-file grants
+```
+
+## The roles
+
+Four system roles ship with every organization, plus two seeded non-system roles.
+
+| Role                | Level | In one line                                                                     |
+| ------------------- | ----- | ------------------------------------------------------------------------------- |
+| **Owner**           | 100   | Every capability, always. Billing, deletion, ownership transfer.                |
+| **Project Manager** | 80    | Full control of assigned projects; manages team leads and developers.           |
+| **Team Lead**       | 60    | Manages variables, files and access inside assigned projects.                   |
+| **Editor**          | 50    | Creates and edits secrets in assigned projects. No approvals, members, sharing. |
+| **Developer**       | 40    | Works in assigned projects; values need explicit grants. Can file requests.     |
+| **Viewer**          | 20    | Sees everything in assigned projects; changes nothing.                          |
+
+Level is a hierarchy, not decoration: several actions (removing a member, applying a Security Hold, changing someone's role) require the target to be strictly below you.
+
+## What each role can do
+
+| Capability area                          | Owner | Project Manager | Team Lead | Editor | Developer | Viewer |
+| ---------------------------------------- | ----- | --------------- | --------- | ------ | --------- | ------ |
+| Read assigned projects                   | ✓     | ✓               | ✓         | ✓      | ✓         | ✓      |
+| Create variables / accounts / files      | ✓     | ✓               | ✓         | ✓      | ✓         | —      |
+| Update / delete variables & files        | ✓     | ✓               | ✓         | ✓      | —         | —      |
+| Reveal secret values locally             | ✓     | ✓               | ✓         | ✓      | —         | —      |
+| Review requests                          | ✓     | ✓               | ✓         | —      | —         | —      |
+| File a request                           | —     | —               | —         | —      | ✓         | —      |
+| Manage per-secret permissions            | ✓     | ✓               | ✓         | —      | —         | —      |
+| Manage project members                   | ✓     | ✓               | ✓         | —      | —         | —      |
+| Create share links                       | ✓     | ✓               | ✓         | —      | ✓         | —      |
+| Invite organization members              | ✓     | ✓               | ✓         | —      | —         | —      |
+| Create projects                          | ✓     | ✓               | —         | —      | —         | —      |
+| Roll back a variable version             | ✓     | —               | —         | —      | —         | —      |
+| Manage API keys                          | ✓     | —               | —         | —      | —         | —      |
+| Billing, organization settings, deletion | ✓     | —               | —         | —      | —         | —      |
+
+Owners do not file requests because they never need to — they create directly.
+
+<Callout type="info" title="Capabilities, not hardcoded branches">
+  Every row above is a capability key (`project.variables.create`,
+  `org.members.invite`, `project.requests.review`, …) stored on the role.
+  Nothing in the codebase asks "is this user an admin?" — it asks whether the
+  role carries the capability. That is what makes custom roles possible at all.
+</Callout>
+
+## Project assignments and environment scope
+
+A role says what you may do; a project assignment says where. A member with no assignment for a project cannot see it, whatever their role — Owners excepted, who see everything.
+
+Assignments can additionally carry an **environment scope**, used for developers: a variable is only accessible if _all_ of its environments fall inside the scope. A developer scoped to `[development]` never sees a `[staging, production]` variable, and cannot upload a production secret file.
+
+<Callout type="warning" title="Legacy project roles">
+  Older organizations may still have per-project role rows (`manager`,
+  `developer`, `viewer`). Those are ignored by current code — the organization
+  role is the single source of truth, and the assignment only carries scope.
+</Callout>
+
+## Per-secret grants
+
+Beyond roles, access can be granted on an individual variable or secret file. That is how a developer gets exactly the one credential they need.
+
+A grant carries:
+
+- **Target** — the specific variable or file
+- **Level** — `read` or `write`
+- **Expiry** — optional; access revokes itself when the date passes
+- **Granted by** — recorded for audit
+
+Developers receive an automatic write grant on secrets they create themselves, which is why they can create without being able to edit everything.
+
+## How push behaves by role
+
+```bash
+# Owner / Project Manager / Team Lead / Editor
+envpilot push
+# ✓ Pushed 5 variables to production
+#   Created: 3   Updated: 2
+
+# Developer — writes what they hold a grant for, refuses the rest
+envpilot push
+# ✓ Pushed 2 variables to development
+# ⚠ 3 variable(s) were NOT written (access denied):
+#   ✗ STRIPE_SECRET_KEY
+```
+
+<Callout type="danger" title="Push never files requests">
+  A denied key is reported and skipped. If you need a variable you cannot write,
+  use [`envpilot request`](/cli/requests) — that is the path that produces
+  something a reviewer can approve.
+</Callout>
+
+## Requests
+
+When a developer needs a secret they cannot create or see, they file a request and a reviewer (Owner, Project Manager, or Team Lead) approves it and supplies the value. Agents can file requests too, over MCP. The full loop, including the caps that stop an agent from flooding reviewers, is in [Requests & approvals](/platform/requests).
+
+## Security Hold
+
+Security Hold freezes a member's access across the entire organization **without removing them** — membership, role, assignments and grants all stay exactly as they are. It exists for the moment access must stop now, before anyone has decided whether the person is leaving.
+
+**What it does.** Every authorization check denies that member immediately, reads and writes alike. Active CLI tokens and VS Code sessions are revoked in the same action, and the resulting revocation events tell the extension to delete its locally synced `.env` files. A held member can sign in and see that they are suspended, with the date — not who did it or why. Lifting the hold restores the exact prior shape; nothing has to be rebuilt.
+
+**Who can apply it.** The same capability as removing a member, plus the hierarchy rule: only someone strictly below you, never yourself, and never an Owner (transfer ownership first if an Owner's access is the incident).
+
+**Credential sweep.** Applying a hold surfaces any organization API keys the held member created that are still active so they can be reviewed and revoked — opt-in, not automatic, since a shared key may still be powering everyone else's CI.
+
+Security Hold is Pro-gated (`security_hold`).
+
+## Custom roles
+
+The role registry is capability-backed, so new roles are data rather than code. Today they are managed by the Envpilot team from the internal admin panel — creating a role, editing its capabilities, activating or deactivating it. **There is no self-serve custom-role UI for organizations yet.** If you need a shape the six roles above do not cover, contact support.
+
+## Limits
+
+- One organization role per member. There is no "two roles at once".
+- Rollback is Owner-only.
+- API key management is Owner-only (org-wide creation).
+- Environment scope applies to assignments, not to roles.
+- Tier enforcement being disabled never relaxes RBAC — feature gates and roles are independent systems.
+
+## See also
+
+- [Requests & approvals](/platform/requests)
+- [Security](/platform/security) — revocation, audit, sessions
+- [Secret files](/platform/secret-files) — file-specific capabilities

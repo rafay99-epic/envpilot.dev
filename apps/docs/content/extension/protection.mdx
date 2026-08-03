@@ -1,0 +1,68 @@
+---
+title: Protection
+description: Commit guard, clipboard guard, value cloaking, and edit reversion — the four things standing between a synced secret and a leak.
+icon: shield
+---
+
+# Protection
+
+A synced `.env` is plaintext on your disk. These four guards exist because that plaintext has more ways to escape than most people expect.
+
+## Commit guard
+
+Dual-layer protection against committing a `.env`:
+
+1. **Staging guard** — VS Code warns when you stage a managed `.env` and offers to unstage it.
+2. **Pre-commit hook** — a git hook that blocks the commit at the git level, so it also catches commits made outside the editor.
+
+Both are on by default (`envpilot.commitGuard.enabled`, `envpilot.commitGuard.autoInstallHook`). Manage the hook by hand with **Envpilot: Install Commit Guard Hook** and **Envpilot: Remove Commit Guard Hook**.
+
+## Clipboard guard
+
+Copy and cut are blocked inside Envpilot-managed files, because "copy the whole `.env` into a chat window" is how most secrets actually travel.
+
+| `envpilot.clipboardGuard.scope` | Behaviour                                                     |
+| ------------------------------- | ------------------------------------------------------------- |
+| `all-managed` (default)         | Block copy/cut in every managed `.env`, whatever your role    |
+| `readonly-roles`                | Block only in read-only files (viewer and request-only roles) |
+| `off`                           | Never block                                                   |
+
+`Cmd+C` / `Cmd+X` inside a protected file trigger an explanation instead of a copy. Secret files are always treated as strict read-only, because the dashboard and CLI are their write path.
+
+## Value cloaking
+
+`envpilot.cloakValues` (on by default) masks values in managed `.env` files with a fixed-length `••••••` decoration. The mask is a constant width, so it does not leak the real value's length, and the file on disk is untouched — sync, diff, and saving all see the real text.
+
+- **Envpilot: Toggle Value Cloaking** turns masking off or on.
+- **Envpilot: Reveal Values for 30 Seconds** unmasks temporarily and re-masks itself.
+
+Both the reveal command and the _unmasking_ direction of the toggle are role-gated on the `project.secrets.reveal` capability. Re-masking is always allowed — someone who loses the capability while cloaking is off must still be able to hide values again.
+
+<Callout type="warning" title="Cloaking is a decoration, not redaction">
+  Masking uses editor decorations, so values can still be visible in surfaces VS
+  Code renders directly: the minimap with `editor.minimap.renderCharacters` on,
+  peek views, and diff editors. Treat cloaking as shoulder-surfing defence, not
+  as access control.
+</Callout>
+
+## Unauthorised-edit reversion
+
+Managed files are watched. Hand-editing a synced `.env` or a secret file triggers a warning and a revert to the server's version, restoring the file's own mode — a keystore goes back to `0600`/`0400`, not to a `.env`'s more permissive bits.
+
+The write path is the dashboard, the CLI, or a [request](/platform/requests). Editing the file on disk is not a write path, and pretending otherwise would mean silent divergence between what you run and what your team ships.
+
+## Revocation cleanup
+
+When access is revoked, the extension deletes the synced files it wrote (`envpilot.preventCopyOnRevoke`, on by default). Combined with [Security Hold](/platform/rbac#security-hold), that turns "revoke this person" into "their disk is clean within seconds", not "their disk is clean at their next sign-in".
+
+## Limits
+
+- Guards apply to files **Envpilot manages**. A `.env` you created by hand is not tracked, and nothing about it is protected.
+- The pre-commit hook is a local git hook — a fresh clone has no hook until the extension or `envpilot sync` installs one.
+- Clipboard guard covers the editor's copy and cut. It cannot stop a screenshot, a terminal `cat`, or a file manager.
+- None of this survives the file leaving your machine. If a secret is exposed, [rotate it](/platform/rotation).
+
+## Next
+
+- [Editor features](/extension/editor)
+- [Security](/platform/security)

@@ -1,0 +1,113 @@
+---
+title: Quickstart
+description: From zero to a working secret in about five minutes — from the dashboard, the CLI, or VS Code.
+icon: chevron-right
+---
+
+# Quickstart
+
+Three surfaces, one dataset. A variable created in the dashboard shows up on your next `envpilot pull` and in the VS Code sidebar. Pick whichever surface you are already sitting in.
+
+If you want the model before the mechanics, read [Core concepts](/start/concepts) first — it is one page.
+
+## Create an organization and a project
+
+<Steps>
+
+### Create an organization
+
+Sign in at [envpilot.dev](https://www.envpilot.dev) and choose **Create Organization**. Give it a name (`Acme Inc.`) and a slug (`acme-inc`). Everything else — projects, members, API keys, billing — lives inside it.
+
+### Create a project
+
+From the dashboard, choose **Create Project**, name it (`api`, `web`, `worker-jobs`) and give it a slug. The new-project flow also offers a framework template (Next.js, T3 Stack, Django, Rails and more) that pre-fills a starter set of variable keys for you to fill in.
+
+### Pick an environment
+
+Every project ships with exactly three environments: `development`, `staging`, `production`. Open the project and pick an environment tab.
+
+</Steps>
+
+## Your first secret
+
+### From the dashboard
+
+Click **Add Variable** — the button reads **Request Variable** instead if your role cannot write directly, see [Roles & permissions](/platform/rbac). Fill in:
+
+- **Key** — e.g. `DATABASE_URL`
+- **Value**
+- **Description** — optional
+- **Environments** — one or more; each is colour-coded (green for development, amber for staging, red for production)
+- **Mark as sensitive** — masks the value in the UI by default
+
+Submit. The variable appears in the project's table immediately, or lands in the Requests inbox if your role needs approval.
+
+The same drawer has a **Bulk Paste** tab for pasting a whole `.env` block at once.
+
+### From the CLI
+
+```bash
+npm install -g @envpilot/cli
+envpilot sync
+```
+
+`envpilot sync` chains login, project selection and a first pull into one flow: it authenticates in the browser, walks you through organization → project → default environment, writes a local `.envpilot` config, pulls your variables, and adds `.env` to `.gitignore`.
+
+To set a single secret without a pull/push round trip:
+
+```bash
+envpilot secrets set STRIPE_SECRET_KEY -e production
+```
+
+The value is typed into a masked prompt, so it never lands in your shell history.
+
+To inject secrets into a process without writing any file to disk:
+
+```bash
+envpilot run -- bun dev
+```
+
+Full details in the [CLI overview](/cli/overview).
+
+### From VS Code
+
+<Steps>
+
+### Install
+
+Install **Envpilot** from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=envpilot.envpilot). It works in Cursor too.
+
+### Sign in
+
+Run **Envpilot: Sign In** from the command palette. Your browser opens to authenticate and the extension picks the session up automatically.
+
+### Link a project
+
+Run **Envpilot: Link Project**, choose your organization, project, and the environments to sync. Variables are written to your target file (`.env.local` by default) and stay in sync while the workspace is open.
+
+</Steps>
+
+More in the [VS Code overview](/extension/overview).
+
+## Invite a teammate
+
+From the organization's **Members** page, open the invite panel:
+
+1. Type an email — Envpilot autocompletes existing users and flags anyone who is already a member or already invited.
+2. Pick a **role**. Roles are described inline as you pick; the full model is in [Roles & permissions](/platform/rbac).
+3. For roles that are not organization-wide, choose which projects the person is assigned to.
+
+Envpilot emails an **Accept Invitation** link that expires after 7 days. The invite only becomes a membership when the invitee signs in with the **same email address** it was sent to, so a forwarded link is not redeemable by anyone else. Pending invitations can be resent (fresh token and expiry) or cancelled at any time.
+
+## What this does not cover
+
+- Secrets that are not text — keystores, SSH keys, `.p12` certificates and service-account JSON are [secret files](/platform/secret-files), a separate object with its own upload flow.
+- CI and agents — machine access uses [API keys](/api/authentication), not your login.
+- Free-plan ceilings — 3 projects, 50 variables per project, 3 members. Full table in [Plans & limits](/limits/plans).
+
+## Where to go next
+
+- [Core concepts](/start/concepts) — the object model in one page
+- [Architecture](/start/architecture) — how the five surfaces share one enforcement core
+- [CLI](/cli/overview) · [VS Code](/extension/overview) · [Dashboard](/dashboard/overview)
+- [API quickstart](/api/quickstart) — read variables from CI or an agent

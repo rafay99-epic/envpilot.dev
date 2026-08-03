@@ -1,0 +1,87 @@
+---
+title: Pull & push
+description: Write variables to disk in seven formats, send local changes back, and understand exactly what your role lets through.
+icon: terminal
+---
+
+# Pull & push
+
+`pull` brings variables down to a file. `push` sends a local file back up. Both act on the active link unless told otherwise.
+
+## Pull
+
+```bash
+envpilot pull                              # .env for the active project + environment
+envpilot pull --env staging --dry-run      # show what would be written, write nothing
+envpilot pull --file .env.production       # custom target
+envpilot pull --prefix NEXT_PUBLIC_        # only keys with this prefix
+envpilot pull --project api                # a specific linked project
+envpilot pull --all                        # every linked project
+envpilot pull --force                      # overwrite without confirmation
+```
+
+Pulled paths are added to `.gitignore` before the file is written, not after.
+
+### Output formats
+
+```bash
+envpilot pull                         # .env (default)
+envpilot pull --format json           # JSON
+envpilot pull --format yaml           # YAML
+envpilot pull --format vercel         # Vercel
+envpilot pull --format netlify        # Netlify TOML
+envpilot pull --format aws            # AWS Parameter Store JSON
+envpilot pull --format docker-compose # Docker Compose
+```
+
+## Push
+
+```bash
+envpilot push                     # merge .env into the active environment
+envpilot push --replace           # replace: keys absent locally are deleted remotely
+envpilot push --dry-run           # show the diff, change nothing
+envpilot push --file .env.local
+envpilot push --env staging
+envpilot push --project api
+envpilot push --force             # skip the confirmation prompt
+```
+
+`--merge` is the default: local keys are created or updated, remote-only keys are left alone. `--replace` is the destructive one — it deletes remote keys missing from your file. Run it with `--dry-run` first.
+
+## What your role lets through
+
+| Role                                         | Push behaviour                                                                       |
+| -------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Owner / Project Manager / Team Lead / Editor | Writes every key in the project                                                      |
+| Developer with write grants                  | Writes the keys they hold a grant for; the rest are listed as denied and not written |
+| Developer with no access to the environment  | The push is refused outright — nothing is written                                    |
+| Viewer                                       | Push is unavailable                                                                  |
+
+```bash
+envpilot push
+# ✓ Pushed 2 variables to development
+#   Created: 1   Updated: 1
+# ⚠ 3 variable(s) were NOT written (access denied):
+#   ✗ STRIPE_SECRET_KEY
+```
+
+<Callout type="danger" title="Push never files approval requests">
+  Denied keys are reported and skipped. To propose a brand-new variable for
+  review, use [`envpilot request`](/cli/requests) — that is the path a reviewer
+  can act on.
+</Callout>
+
+Pulling as a scope-limited role is symmetric: you receive the variables you are allowed to see, and nothing else appears in the file. Nothing signals that other keys exist.
+
+## Limits
+
+- Three environments only. `--env` accepts `development`, `staging`, `production`.
+- `--replace` deletes remote keys that are absent locally — there is no undo beyond the [7-day trash](/platform/variables).
+- Invalid keys in the local file are reported and skipped rather than silently mangled.
+- Bulk export is Pro-gated (`bulk_export`), as is bulk import (`bulk_import`).
+- Pull writes plaintext to disk. If you would rather it never touched disk, use [`envpilot run`](/cli/run).
+
+## Next
+
+- [Running commands with secrets](/cli/run)
+- [Single-secret edits](/cli/secrets)

@@ -1,0 +1,40 @@
+---
+title: Agent requests
+description: The only mutation a machine credential can perform — asking a human for a secret.
+icon: zap
+---
+
+# Agent requests
+
+A machine credential can never write a secret value. The one thing it can do beyond reading is **ask** — and only if its key carries the `requests` resource. `envpilot_request_variable` takes the variable key and a required justification, and files a request into a human reviewer's dashboard queue. The agent never proposes a value; if the reviewer approves, **the reviewer supplies it**.
+
+The loop for an agent is:
+
+1. Call `envpilot_request_variable` with the key and a justification explaining why it's needed.
+2. Poll `envpilot_get_request_status` until it returns `approved` or `rejected`.
+3. On `approved`, read the value with `envpilot_get_variable`. On `rejected`, the status carries the reviewer's reason — report it back rather than retrying blindly.
+
+Request creation is deliberately strict: it is rate-limited to 5 per hour per key (burst 2), capped at 5 open pending requests per key, and a rejected request for a given variable can't be re-filed for 24 hours. Every created request emails a reviewer, so these limits stop an agent loop from becoming alert spam. See [Rate limits](/limits/rate-limits) for the full picture and [Architecture](/start/architecture) for how "agent requests, human approves" fits the wider trust model.
+
+## Reviewing on the human side
+
+A reviewer sees machine-filed requests in the same queue as human ones — the project's Requests inbox, `envpilot requests`, or an email. Approving one prompts for the value:
+
+```bash
+envpilot requests                       # find the id
+printf %s "$SECRET" | envpilot requests approve <id> --value-stdin
+```
+
+Read the justification before approving. It is the only account of what the agent was doing when it asked, and it is required precisely so that a reviewer never has to guess.
+
+## Limits
+
+- **Requests create variables.** An agent cannot request a change to an existing value.
+- **5 filings per hour per key**, burst 2, and at most **5 open pending** at a time. The sixth is refused until a human clears one.
+- **24-hour cooldown after a rejection** for the same key. A rejection is a decision.
+- The GitHub Action can never file a request, whatever its scope.
+
+## See also
+
+- [Requests & approvals](/platform/requests) — the full model
+- [CLI: requests](/cli/requests) — the reviewer's side

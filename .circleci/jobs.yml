@@ -135,6 +135,12 @@ jobs:
       - run:
           name: Typecheck Convex functions
           command: bunx tsc --noEmit -p convex/tsconfig.ci.json
+      # The docs reference tables (CLI commands, extension commands and
+      # settings, Action inputs/outputs) are generated from their sources.
+      # Fail here rather than shipping docs that describe a build nobody has.
+      - run:
+          name: Docs reference tables match their sources
+          command: cd apps/docs && bun run reference:check
       - save_cache:
           key: turbo-v2-{{ .Branch }}-{{ .Revision }}-quality
           paths: [.turbo]

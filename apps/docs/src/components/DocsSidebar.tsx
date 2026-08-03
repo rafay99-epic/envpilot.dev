@@ -14,12 +14,14 @@ import {
   Network,
   Gauge,
   ExternalLink,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
+import { DocsSearch } from "@/components/DocsSearch";
 
 /**
  * Shared icon map for docs frontmatter `icon` keys.
- * Used by the sidebar items and the article header.
+ * Used by the sidebar sections and the article header.
  */
 export const DOC_ICONS: Record<string, LucideIcon> = {
   "chevron-right": Rocket,
@@ -56,81 +58,105 @@ export interface SidebarItem {
   slug: string;
   title: string;
   icon: string;
-  category: string;
-  description?: string;
 }
 
-/** Group items by category, preserving the incoming (already sorted) order. */
-function groupByCategory(
-  items: SidebarItem[]
-): { label: string; items: SidebarItem[] }[] {
-  const groups: { label: string; items: SidebarItem[] }[] = [];
-  for (const item of items) {
-    const last = groups[groups.length - 1];
-    if (last && last.label === item.category) {
-      last.items.push(item);
-    } else {
-      const existing = groups.find((g) => g.label === item.category);
-      if (existing) existing.items.push(item);
-      else groups.push({ label: item.category, items: [item] });
-    }
-  }
-  return groups;
+export interface SidebarSection {
+  slug: string;
+  label: string;
+  icon: string;
+  items: SidebarItem[];
 }
 
-export function DocsSidebar({
-  items,
+function SectionLinks({
+  section,
   activeSlug,
 }: {
-  items: SidebarItem[];
+  section: SidebarSection;
   activeSlug: string;
 }) {
-  const groups = groupByCategory(items);
+  return (
+    <ul className="mt-1 space-y-0.5 border-l border-zinc-800/70 pl-3">
+      {section.items.map((item) => {
+        const active = item.slug === activeSlug;
+        return (
+          <li key={item.slug} className="relative">
+            {active && (
+              <span
+                aria-hidden
+                className="absolute -left-[13px] top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-green-400"
+              />
+            )}
+            <Link
+              href={`/${item.slug}`}
+              aria-current={active ? "page" : undefined}
+              className={`block rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                active
+                  ? "bg-green-500/5 text-green-400"
+                  : "text-zinc-500 hover:bg-zinc-900/60 hover:text-zinc-200"
+              }`}
+            >
+              {item.title}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * Two-level docs navigation.
+ *
+ * Sections collapse with the native <details> element — the section holding
+ * the current page renders `open`, everything else starts closed, and none of
+ * it needs client-side state.
+ */
+export function DocsSidebar({
+  sections,
+  activeSlug,
+}: {
+  sections: SidebarSection[];
+  activeSlug: string;
+}) {
+  const activeSection = activeSlug.split("/")[0];
+
   return (
     <>
       {/* ── Desktop sticky rail ───────────────────────────────────── */}
-      <aside className="hidden w-56 shrink-0 lg:block">
-        <nav aria-label="Documentation" className="sticky top-24">
-          <p className="flex items-center gap-2 px-3 font-mono text-[11px] tracking-widest text-green-400">
+      <aside className="hidden w-60 shrink-0 lg:block">
+        <nav
+          aria-label="Documentation"
+          className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto pr-1"
+        >
+          <DocsSearch />
+
+          <Link
+            href="/"
+            className="mt-4 flex items-center gap-2 px-3 font-mono text-[11px] tracking-widest text-green-400"
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-green-400 [animation:pulse-glow_2.4s_ease-in-out_infinite]" />
             {"// documentation"}
-          </p>
+          </Link>
 
-          {groups.map((group) => (
-            <div key={group.label} className="mt-5">
-              <p className="px-3 font-mono text-[10px] uppercase tracking-widest text-zinc-600">
-                {group.label}
-              </p>
-              <ul className="mt-1.5 space-y-1">
-                {group.items.map((item) => {
-                  const active = item.slug === activeSlug;
-                  const Icon = DOC_ICONS[item.icon] ?? DOC_ICONS["file-text"];
-                  return (
-                    <li key={item.slug} className="relative">
-                      {active && (
-                        <span
-                          aria-hidden
-                          className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-green-400"
-                        />
-                      )}
-                      <Link
-                        href={`/${item.slug}`}
-                        aria-current={active ? "page" : undefined}
-                        className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
-                          active
-                            ? "bg-green-500/5 text-green-400"
-                            : "text-zinc-500 hover:bg-zinc-900/60 hover:text-zinc-200"
-                        }`}
-                      >
-                        <Icon className="h-3.5 w-3.5 shrink-0" />
-                        {item.title}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
+          <div className="mt-3 space-y-1">
+            {sections.map((section) => {
+              const Icon = DOC_ICONS[section.icon] ?? DOC_ICONS["file-text"];
+              return (
+                <details
+                  key={section.slug}
+                  open={section.slug === activeSection}
+                  className="group"
+                >
+                  <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-medium uppercase tracking-widest text-zinc-500 transition-colors marker:content-none hover:text-zinc-300 [&::-webkit-details-marker]:hidden">
+                    <ChevronRight className="h-3 w-3 shrink-0 transition-transform group-open:rotate-90" />
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="font-mono">{section.label}</span>
+                  </summary>
+                  <SectionLinks section={section} activeSlug={activeSlug} />
+                </details>
+              );
+            })}
+          </div>
 
           <div className="mt-8 border-t border-zinc-800/60 pt-4">
             <p className="px-3 font-mono text-[10px] tracking-widest text-zinc-600">
@@ -155,20 +181,18 @@ export function DocsSidebar({
         </nav>
       </aside>
 
-      {/* ── Mobile: horizontal scrollable pill row ────────────────── */}
-      <nav
-        aria-label="Documentation"
-        className="-mx-4 w-auto px-4 sm:-mx-6 sm:px-6 lg:hidden"
-      >
-        <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {items.map((item) => {
-            const active = item.slug === activeSlug;
-            const Icon = DOC_ICONS[item.icon] ?? DOC_ICONS["file-text"];
+      {/* ── Mobile: search, section pills, then pages of this section ── */}
+      <nav aria-label="Documentation" className="w-auto lg:hidden">
+        <DocsSearch />
+
+        <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {sections.map((section) => {
+            const active = section.slug === activeSection;
+            const Icon = DOC_ICONS[section.icon] ?? DOC_ICONS["file-text"];
             return (
               <Link
-                key={item.slug}
-                href={`/${item.slug}`}
-                aria-current={active ? "page" : undefined}
+                key={section.slug}
+                href={`/${section.items[0].slug}`}
                 className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors ${
                   active
                     ? "border-green-500/30 bg-green-500/10 text-green-400"
@@ -176,10 +200,33 @@ export function DocsSidebar({
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
-                {item.title}
+                {section.label}
               </Link>
             );
           })}
+        </div>
+
+        <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {sections
+            .filter((section) => section.slug === activeSection)
+            .flatMap((section) => section.items)
+            .map((item) => {
+              const active = item.slug === activeSlug;
+              return (
+                <Link
+                  key={item.slug}
+                  href={`/${item.slug}`}
+                  aria-current={active ? "page" : undefined}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
+                    active
+                      ? "bg-green-500/10 text-green-400"
+                      : "text-zinc-500 hover:text-zinc-200"
+                  }`}
+                >
+                  {item.title}
+                </Link>
+              );
+            })}
         </div>
       </nav>
     </>

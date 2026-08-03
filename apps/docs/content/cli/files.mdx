@@ -1,0 +1,87 @@
+---
+title: Secret files
+description: Upload, inspect, and materialise keystores, SSH keys and certificates from the terminal.
+icon: terminal
+---
+
+# Secret files
+
+Keystores, SSH keys, `.p12` certificates, service-account JSON — the secrets that do not fit in a `.env`. Each carries a destination path and a mode, so one command turns a fresh clone into a buildable checkout.
+
+Concepts and storage model: [Secret files](/platform/secret-files).
+
+## Inspect without decrypting
+
+```bash
+envpilot files list              # alias: envpilot files ls
+envpilot files list -e production
+envpilot files status
+```
+
+Both are **metadata-only**: path, size, mode, checksum, environments. Nothing is decrypted, and nothing is recorded as a download — exploring what a project holds is free.
+
+`status` compares each recorded file against your working directory and reports `missing`, `in sync`, or `modified`.
+
+## Materialise them
+
+```bash
+envpilot files pull
+envpilot files pull -e production
+envpilot files pull --force
+```
+
+Writes every in-scope file to its recorded path with its recorded mode. Two safeguards:
+
+- **Paths are gitignored before they are written**, not after.
+- **A local file that differs from the server is never silently replaced.** The pull refuses, lists the conflicting paths, and exits non-zero until you pass `--force`. Someone's debug keystore is worth more than a tidy diff.
+
+One file at a time:
+
+```bash
+envpilot files get android/app/upload.jks
+envpilot files get android/app/upload.jks --force
+```
+
+## Upload
+
+```bash
+envpilot files add ./upload.jks \
+  --path android/app/upload.jks \
+  --env production \
+  --mode 0600 \
+  --name "Play upload keystore" \
+  --description "Signing key for release builds"
+```
+
+| Flag                     | Default                | Meaning                         |
+| ------------------------ | ---------------------- | ------------------------------- |
+| `--path <path>`          | the file's own path    | Where clients will write it     |
+| `-n, --name <name>`      | the filename           | Display name                    |
+| `-e, --env <list>`       | the linked environment | Comma-separated environments    |
+| `--mode <mode>`          | `0600`                 | `0600` or `0400` — nothing else |
+| `-d, --description <t>`  | —                      | Optional note                   |
+| `--project <name-or-id>` | active link            | Use a specific linked project   |
+
+## Remove
+
+```bash
+envpilot files rm android/app/upload.jks
+envpilot files rm android/app/upload.jks -e staging --yes
+envpilot files rm android/app/upload.jks --all-envs
+```
+
+Like variables, removal is environment-aware: by default only the selected environment is detached, and the file stays live in the others. `--all-envs` trashes it everywhere.
+
+## Limits
+
+- **Reading contents is audited.** Every `pull` and `get` is recorded against you. `list` and `status` are not.
+- **File size**: 256 KB on Free, 8 MB on Pro. **Count**: 3 files on Free, unlimited on Pro — with a hard ceiling of **1000 active files per project** that no plan lifts.
+- **Rate**: content reads refill at 60/min with a burst of 1000; uploads are 20/min per user.
+- **Paths are strict** — relative only, forward slashes, no `..`, and `.git`, `.gitignore`, `.envpilot` are reserved. Rejected paths are refused, never sanitised.
+- **Modes** are `0600` or `0400`. There is no `0755`; these are secrets, not scripts.
+- **Uploading is CLI or dashboard only.** The VS Code extension writes secret files during [sync](/extension/sync) but cannot upload, edit, or delete them.
+
+## Next
+
+- [Android keystore in CI](/guides/android-keystore-ci)
+- [GitHub Action: secret files](/action/secret-files)

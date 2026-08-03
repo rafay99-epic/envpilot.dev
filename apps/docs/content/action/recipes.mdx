@@ -1,0 +1,105 @@
+---
+title: Recipes
+description: Matrix environments, dotenv artifacts, monorepos, and mobile release builds.
+icon: github
+---
+
+# Recipes
+
+## One workflow, several environments
+
+Use a matrix and one key per environment, or one key scoped to all three:
+
+```yaml
+jobs:
+  deploy:
+    strategy:
+      matrix:
+        environment: [staging, production]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rafay99-epic/envpilot-action@v1
+        with:
+          token: ${{ secrets.ENVPILOT_TOKEN }}
+          environment: ${{ matrix.environment }}
+      - run: ./deploy.sh
+```
+
+Matrix jobs fan out, and the value-pull bucket is sized for exactly that: full capacity is available as a burst.
+
+## Dotenv file for a container build
+
+```yaml
+- uses: rafay99-epic/envpilot-action@v1
+  with:
+    token: ${{ secrets.ENVPILOT_TOKEN }}
+    environment: production
+    export-env: "false"
+    env-file: .env.production
+
+- run: docker build --secret id=env,src=.env.production .
+```
+
+<Callout type="danger" title="Never upload the dotenv file as an artifact">
+  Artifacts outlive the runner and are downloadable by anyone with repository
+  access. If a build genuinely needs to hand secrets to another job, pull them
+  again in that job instead.
+</Callout>
+
+## Monorepo: two projects in one job
+
+```yaml
+- uses: rafay99-epic/envpilot-action@v1
+  with:
+    token: ${{ secrets.ENVPILOT_API_TOKEN }}
+    environment: production
+    export-env: "false"
+    env-file: apps/api/.env
+
+- uses: rafay99-epic/envpilot-action@v1
+  with:
+    token: ${{ secrets.ENVPILOT_WEB_TOKEN }}
+    environment: production
+    export-env: "false"
+    env-file: apps/web/.env
+```
+
+Two keys, two scopes, two files. Exporting both to `$GITHUB_ENV` would collide on shared key names — write files instead.
+
+## Mobile release build with a keystore
+
+```yaml
+- uses: rafay99-epic/envpilot-action@v1
+  with:
+    token: ${{ secrets.ENVPILOT_TOKEN }}
+    environment: production
+    project: mobile-app
+    files: true
+
+- run: ./gradlew bundleRelease
+```
+
+Full walkthrough: [Android keystore in CI](/guides/android-keystore-ci).
+
+## Only pull on the branches that need it
+
+```yaml
+- uses: rafay99-epic/envpilot-action@v1
+  if: github.ref == 'refs/heads/main'
+  with:
+    token: ${{ secrets.ENVPILOT_TOKEN }}
+    environment: production
+```
+
+Every pull is audited and rate-limited. A pull-request job that does not need production secrets should not draw them.
+
+## Fork pull requests
+
+Repository secrets are not available to workflows triggered by a fork, so the token input is empty and the step fails. That is the correct outcome — gate the step on `github.event.pull_request.head.repo.full_name == github.repository` rather than trying to work around it.
+
+## Limits
+
+- One environment per step; one project per step for files.
+- `$GITHUB_ENV` is per job, not per workflow. Downstream jobs need their own pull.
+- Values are masked in logs, but a step that writes a value into a file you upload has left masking behind.

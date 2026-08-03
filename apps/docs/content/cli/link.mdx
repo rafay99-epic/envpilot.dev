@@ -1,0 +1,62 @@
+---
+title: Linking projects
+description: Bind a directory to one or more Envpilot projects, switch the active target, and unlink cleanly.
+icon: terminal
+---
+
+# Linking projects
+
+A link tells the CLI which project and environment this directory belongs to, so `pull`, `push`, `run` and `files` need no flags in daily use. Links live in a plain `.envpilot` file you can commit.
+
+## Link a directory
+
+```bash
+envpilot init
+envpilot init -o <organization-id> -p <project-id> -e production
+envpilot init --add     # link an ADDITIONAL project to this directory
+envpilot init --force   # overwrite the existing link
+```
+
+Interactive by default: pick organization → project → default environment.
+
+## Multiple projects in one directory
+
+A monorepo often needs several: `--add` appends a link instead of replacing one. One link is **active** at a time; commands act on the active link unless you pass `--project`.
+
+```bash
+envpilot list linked          # what this directory is linked to, and which is active
+envpilot switch --active api  # make the 'api' link active
+```
+
+## Switch the active target
+
+```bash
+envpilot switch production          # bare argument: a project slug or an environment name
+envpilot switch --env production
+envpilot switch --project api
+envpilot switch --organization <id>
+envpilot switch --active api
+```
+
+`switch` edits local state only — it never rewrites your whole project config, and it never touches the server.
+
+## Unlink
+
+```bash
+envpilot unlink
+envpilot unlink api --force
+```
+
+Removes the link and updates the active-project state. **Existing `.env` files are left on disk untouched** — unlinking is not a cleanup command.
+
+## Limits
+
+- A link is local. Nothing about it is stored server-side, and it grants no access by itself.
+- The active link is per directory, not per shell — two terminals in the same folder share it.
+- Environments are fixed at `development`, `staging`, `production`; `--env` accepts nothing else.
+- `unlink` does not delete secrets from disk. Delete the `.env` yourself, or let the [VS Code extension](/extension/protection) clean up on revocation.
+
+## Next
+
+- [Pull & push](/cli/pull-push)
+- [Secret files](/cli/files)

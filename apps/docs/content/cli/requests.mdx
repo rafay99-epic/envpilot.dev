@@ -1,0 +1,60 @@
+---
+title: Requests
+description: File a variable request, review the queue, and approve or reject without opening the dashboard.
+icon: terminal
+---
+
+# Requests
+
+Developers ask; reviewers decide. Both halves work from the terminal.
+
+## File a request
+
+```bash
+envpilot request
+envpilot request --project api
+```
+
+An interactive wizard: key → masked value → description → environments. Your environment choices are limited to your assigned scope.
+
+Only roles that carry the request capability (developers, and any custom role given it) file requests — owners, project managers and team leads create variables directly instead.
+
+## See the queue
+
+```bash
+envpilot requests                        # the linked project's requests
+envpilot requests --status pending
+envpilot requests --project api --json
+```
+
+Reviewers see every request in their projects; developers see only their own. The `ID` column is what the review subcommands take.
+
+## Review
+
+```bash
+envpilot requests approve k5738xq2…
+envpilot requests reject  k5738xq2… --reason "use the shared key"
+envpilot requests cancel  k5738xq2…
+```
+
+Approving a **machine-filed** request — one with no value, because an agent may never propose secret material — prompts you, masked, for the value:
+
+```bash
+# CI: read the value from stdin so it never lands in argv or shell history
+printf %s "$SECRET" | envpilot requests approve k5738xq2… --value-stdin
+```
+
+`--value <text>` exists for CI without a usable stdin and is **rejected in interactive sessions**, because it would put the secret in your shell history.
+
+## Limits
+
+- `--status` and `--json` apply to listing only; `--value`, `--value-stdin` and `--reason` apply to review subcommands only.
+- Cancelling is the requester's action, on their own pending request.
+- A rejected request for a given key cannot be re-filed by the same API key for **24 hours**. A rejection is a decision, not a retry prompt.
+- Machine-filed requests are capped at 5 per hour per key with at most 5 open at once. See [Rate limits](/limits/rate-limits).
+- Requests create variables. Editing an existing value is a direct write by someone who holds the capability.
+
+## Next
+
+- [Requests & approvals](/platform/requests) — the model behind this
+- [MCP agent requests](/mcp/agent-requests)

@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/docs",
-  "version": "1.7.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Envpilot Docs — CLI, VS Code extension, and web dashboard documentation",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
@@ -11,7 +11,9 @@
     "build": "next build",
     "start": "next start -p 3002",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "reference": "bun scripts/generate-reference.ts",
+    "reference:check": "bun scripts/generate-reference.ts --check"
   },
   "dependencies": {
     "@envpilot/ui": "workspace:*",

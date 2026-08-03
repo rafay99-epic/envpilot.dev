@@ -33,10 +33,10 @@ const FOOTER_COLUMNS: FooterColumn[] = [
   {
     title: "resources",
     links: [
-      { label: "Getting Started", href: "/getting-started" },
-      { label: "CLI Reference", href: "/cli" },
-      { label: "VS Code Extension", href: "/extension" },
-      { label: "Security", href: "/security" },
+      { label: "Getting Started", href: "/start/quickstart" },
+      { label: "CLI Reference", href: "/cli/overview" },
+      { label: "VS Code Extension", href: "/extension/overview" },
+      { label: "Security", href: "/platform/security" },
     ],
   },
   {

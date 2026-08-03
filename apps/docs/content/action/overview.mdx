@@ -1,0 +1,81 @@
+---
+title: GitHub Action overview
+description: Pull variables — and secret files — into a workflow run with one step.
+icon: github
+version: "{{actionVersion}}"
+---
+
+# GitHub Action overview
+
+`rafay99-epic/envpilot-action@v1` pulls your project's variables into a workflow job, masks every value in the log, and optionally materialises [secret files](/action/secret-files) on the runner.
+
+## Create a key
+
+<Steps>
+
+### Mint it
+
+In Envpilot, go to **Organization → Settings → API Keys** and create a key with the **GitHub Action** surface, scoped to the project and environment(s) the workflow needs. Add the `files` resource only if the workflow pulls secret files — it is never granted by default.
+
+### Store it
+
+Copy the `envpk_…` value — it is shown once — and save it as a repository secret, e.g. `ENVPILOT_TOKEN`.
+
+### Use it
+
+Reference it as `${{ secrets.ENVPILOT_TOKEN }}` in the workflow.
+
+</Steps>
+
+## Usage
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pull environment variables
+        uses: rafay99-epic/envpilot-action@v1
+        with:
+          token: ${{ secrets.ENVPILOT_TOKEN }}
+          environment: production
+
+      - name: Deploy
+        run: ./deploy.sh # DATABASE_URL, API_SECRET, … are already in the environment
+```
+
+By default (`export-env: "true"`) every pulled variable is appended to `$GITHUB_ENV`, so it becomes a normal environment variable for every later step in the job. No extra wiring.
+
+To write a dotenv file instead of, or alongside, exporting:
+
+```yaml
+- uses: rafay99-epic/envpilot-action@v1
+  with:
+    token: ${{ secrets.ENVPILOT_TOKEN }}
+    environment: production
+    export-env: "false"
+    env-file: .env
+```
+
+The dotenv file is written with mode `0600`.
+
+## Versioning
+
+`@v1` is a floating major tag: it always points at the newest 1.x release, which is how you get non-breaking updates without editing every workflow. Pin `@vX.Y.Z` instead if you need a frozen build.
+
+## Limits
+
+- **Read-only.** The key pulls variables and files. It can never create, edit, delete, or [file a request](/platform/requests) — CI reads, it does not negotiate.
+- **`public_api` tier gate.** Machine access is a Pro feature.
+- **One environment per step.** Pull twice for two environments.
+- **`project` is required for files.** The files endpoint is project-scoped even when the token's scope resolves a single project.
+- **Rate limited per key.** See [Rate limits](/limits/rate-limits).
+- Runs on `node20`.
+
+## Next
+
+- [Inputs & outputs](/action/reference)
+- [Secret files in CI](/action/secret-files)
+- [Recipes](/action/recipes) · [Security](/action/security)

@@ -1,0 +1,78 @@
+---
+title: Authentication & accounts
+description: Sign in with the device flow, hold several accounts at once, and inspect or reset local CLI state.
+icon: terminal
+---
+
+# Authentication & accounts
+
+The CLI authenticates as **you**, not as a service. Everything it can read or write is decided by your organization role.
+
+## Sign in
+
+```bash
+envpilot login
+envpilot login --no-browser          # print the URL instead of opening it
+envpilot login --api-url <url>       # non-production instances only
+```
+
+A device-code flow: the CLI mints a one-time code, your browser confirms it, and the CLI polls until the session is live. Tokens refresh automatically afterwards.
+
+## Several accounts, no logout dance
+
+Each `envpilot login` **adds** an account rather than replacing the current one — a work identity and a personal one can coexist.
+
+```bash
+envpilot accounts                        # list authenticated accounts
+envpilot accounts switch you@example.com # switch the active account
+envpilot accounts remove you@example.com # forget one account
+```
+
+Identifiers are an account id or the account's email, case-insensitive. Switching logs nobody out.
+
+## Who am I right now
+
+```bash
+envpilot whoami
+```
+
+Prints the authenticated user, the API target, and the active organization/project/environment context — the first thing to run when a command behaves as though it belongs to someone else. It validates the token against the server, so it also catches a stale session.
+
+## Sign out
+
+```bash
+envpilot logout        # the active account
+envpilot logout --all  # every account added via login
+```
+
+Local tokens are cleared even if the remote revoke call fails, so a logout on a plane still logs you out locally. With `--all`, a failing remote revoke stops the run at that account — re-run it once you are online to clear the rest.
+
+## Local configuration
+
+```bash
+envpilot config          # show current config
+envpilot config list
+envpilot config get <key>
+envpilot config set <key> <value>
+envpilot config path     # where the global and project config live
+envpilot config reset
+```
+
+Useful mainly for pointing a development build at a non-production API URL, and for finding the config file when something looks wrong.
+
+<Callout type="warning" title="Do not repoint a production install">
+  `config set apiUrl …` changes where your real credentials are sent. If you are
+  testing a branch build, use a throwaway config location rather than editing
+  the one your day-to-day CLI uses.
+</Callout>
+
+## Limits
+
+- The device flow needs a browser somewhere — a fully headless machine cannot complete a login. For CI, use an [API key](/api/authentication) with the REST API or the [GitHub Action](/action/overview) instead of a user session.
+- Sessions are revoked instantly when an admin revokes them, or when [Security Hold](/platform/rbac#security-hold) is applied — the next command returns 401 and clears local tokens.
+- `--api-url` affects only the current login; it does not migrate existing accounts.
+
+## Next
+
+- [Linking projects](/cli/link)
+- [CLI in CI](/cli/ci)

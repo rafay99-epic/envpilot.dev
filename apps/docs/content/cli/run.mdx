@@ -1,0 +1,93 @@
+---
+title: Running commands with secrets
+description: Inject secrets straight into a child process — no .env on disk, nothing to gitignore, nothing to leak.
+icon: terminal
+---
+
+# Running commands with secrets
+
+```bash
+envpilot run -- bun dev
+```
+
+Secrets are fetched, injected into the child process environment, and gone when it exits. No file is written, so there is nothing to `.gitignore`, nothing to forget to delete, and nothing for a backup tool to pick up.
+
+Everything after `--` is the command to run.
+
+```bash
+envpilot run -- npm test
+envpilot run -- python manage.py runserver
+envpilot run --env production -- node dist/server.js
+envpilot run --project api -- pnpm test
+```
+
+## Options
+
+| Flag                         | Default        | What it does                                                         |
+| ---------------------------- | -------------- | -------------------------------------------------------------------- |
+| `-e, --env <environment>`    | linked env     | Environment to load                                                  |
+| `-p, --project <name-or-id>` | active project | Override the linked project                                          |
+| `-o, --organization <id>`    | linked org     | Override the organization                                            |
+| `--keep-existing`            | off            | Let your shell's variables win over fetched secrets                  |
+| `--print`                    | off            | Preview what would be injected, run nothing                          |
+| `--shell`                    | off            | Run through the user's shell, enabling pipes, `&&`, `$VAR` expansion |
+| `--no-cache`                 | off            | Always fetch fresh                                                   |
+| `--cache-ttl <seconds>`      | `0`            | Serve cached secrets without even a freshness check for this long    |
+| `-q, --quiet`                | off            | Suppress informational output                                        |
+
+## Freshness without the round trip
+
+Every run does one cheap metadata fingerprint check (roughly 50–100 ms, no decryption). Only a changed fingerprint triggers the expensive vault fetch:
+
+| State                     | What happens                            | Vault calls |
+| ------------------------- | --------------------------------------- | ----------- |
+| Unchanged                 | Fingerprint matches, cache is served    | **0**       |
+| Changed                   | Fingerprint differs, secrets fetched    | 1×          |
+| First run / cache cleared | Full fetch, cache written               | 1×          |
+| Offline                   | Cache served with a loud offline notice | **0**       |
+
+A variable changed in the dashboard is visible on your very next run. `--cache-ttl` skips even the fingerprint check for a window — fastest, and blind to changes for that long.
+
+Cache files live in `~/.config/envpilot/run-cache/` with mode `0600`. A different account, server URL, or token invalidates the cache automatically.
+
+## Overriding shell variables
+
+Fetched secrets win by default. `--keep-existing` reverses that, which is how you override one value locally without editing anything remote:
+
+```bash
+DATABASE_URL=postgres://localhost/dev envpilot run --keep-existing -- bun dev
+```
+
+## Preview
+
+```bash
+envpilot run --print
+# Would inject 12 variables from backend/staging:
+#
+#   DATABASE_URL=post…rd (52 chars)
+#   API_SECRET=sk_t…2x (40 chars)
+# Dry run — no command executed.
+```
+
+`run` also tells you when variables you can access exist only in **other** environments — `Injected 8 of 12 — 4 not in development: FOO, BAR` — instead of quietly dropping them.
+
+## Process behaviour
+
+- Signals (`SIGINT`, `SIGTERM`, `SIGHUP`, `SIGQUIT`) are forwarded to the child.
+- The child's exit code becomes the CLI's exit code, so `run` composes in scripts and CI.
+- On Windows the command goes through the shell, so `.cmd` and `.bat` files resolve.
+
+## Limits
+
+- Secrets exist in the child's environment. Anything that can read `/proc/<pid>/environ` or a crash dump can read them — `run` removes the _file_ risk, not every risk.
+- Without `--shell`, shell syntax (`&&`, pipes, globs) is not interpreted — that is deliberate, so a command cannot be smuggled through an argument.
+- The cache holds metadata for freshness checks, not plaintext secrets.
+- `run` reads only variables; [secret files](/cli/files) still have to be materialised with `files pull`.
+
+## In CI
+
+```bash
+envpilot run --env production --quiet --no-cache -- ./scripts/deploy.sh
+```
+
+`--no-cache` guarantees freshness, `--quiet` keeps the log clean. See [CLI in CI](/cli/ci).
