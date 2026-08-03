@@ -1,0 +1,23 @@
+.gitleaks.toml
+  s_e94a11bf9b2f48::t_1647eb65d84e83 25-29
+.github/workflows/ci.yml
+  s_e94a11bf9b2f48::t_ae20b34bc61089 206-211
+  s_e94a11bf9b2f48::t_47a18241d310b5 212-219
+  s_e94a11bf9b2f48::t_35e5b3703e33e3 201-205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "8a737e26e2ba2ae249c4a0962446742849d85d4e",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
