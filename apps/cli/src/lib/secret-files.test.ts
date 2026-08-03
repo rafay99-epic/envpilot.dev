@@ -78,7 +78,7 @@ function row(overrides: Partial<Record<string, unknown>> = {}) {
   } as Parameters<typeof statusOf>[0];
 }
 
-describe("path containment", async () => {
+describe("path containment", () => {
   it("accepts a normal nested path", async () => {
     // Compare against the REAL root: containment now resolves symlinks, and
     // on macOS /tmp is itself a symlink to /private/tmp.
@@ -124,7 +124,7 @@ describe("path containment", async () => {
   });
 });
 
-describe("writeSecretFile", async () => {
+describe("writeSecretFile", () => {
   it("creates missing directories and writes the bytes", async () => {
     const written = await writeSecretFile(
       root,
@@ -167,7 +167,7 @@ describe("writeSecretFile", async () => {
   });
 });
 
-describe("drift detection", async () => {
+describe("drift detection", () => {
   it("reports missing, in-sync, then modified as the file changes", async () => {
     const salt = newDigestSalt();
     const contents = Buffer.from('{"type":"service_account"}');
@@ -201,7 +201,7 @@ describe("drift detection", async () => {
   });
 });
 
-describe("permission drift", async () => {
+describe("permission drift", () => {
   it("detects a byte-identical file whose mode was loosened", async () => {
     // The digest still matches, so statusOf reports in-sync — but a keystore
     // left world-readable is still wrong. This is the case a careless
@@ -244,7 +244,7 @@ describe("permission drift", async () => {
   });
 });
 
-describe("cross-client digest agreement", async () => {
+describe("cross-client digest agreement", () => {
   it("CLI localDigest matches the server digest byte for byte", async () => {
     // If these diverge, every file reports as permanently modified and every
     // pull re-downloads everything. Assert against the real server function.
@@ -264,7 +264,7 @@ describe("cross-client digest agreement", async () => {
   });
 });
 
-describe("full encrypt → transport → disk round trip", async () => {
+describe("full encrypt → transport → disk round trip", () => {
   it("a sealed file decrypts and lands on disk byte-identical", async () => {
     // Exercises the whole content path without a network: seal on the
     // server, base64 over the wire, decrypt, write, read back.
@@ -295,7 +295,7 @@ describe("full encrypt → transport → disk round trip", async () => {
   });
 });
 
-describe("gitignore", async () => {
+describe("gitignore", () => {
   it("creates .gitignore when the repo has none", async () => {
     // Returning early here left secrets untracked-and-offerable in exactly
     // the repo most likely to commit one by accident.
@@ -336,7 +336,7 @@ describe("gitignore", async () => {
   });
 });
 
-describe("ordering guarantee", async () => {
+describe("ordering guarantee", () => {
   it("gitignore is written before the file exists", async () => {
     mkdirSync(join(root, "android/app"), { recursive: true });
     writeFileSync(join(root, ".gitignore"), "node_modules\n");

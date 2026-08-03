@@ -46,14 +46,22 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   },
 
   // Secret-file content reads. Each one is a blob read plus a vault read plus
-  // a decrypt, and returns plaintext — but the CLI and the extension issue
-  // ONE action per file, so a first pull of a Pro project (no file-count
-  // limit) is a burst of hundreds. A 60/min bucket aborted that pull partway
-  // through with a rate-limit error neither client retries. Sized for a real
-  // cold pull, still far below what an exfiltration loop would want.
+  // a decrypt, and returns PLAINTEXT.
+  //
+  // capacity >> rate on purpose. The CLI and the extension issue one action
+  // per file, so a first pull of a Pro project (no file-count limit) is a
+  // burst of hundreds — a bucket sized 60/60 aborted that pull partway
+  // through with an error neither client retries. But setting rate to 600 as
+  // well would have refilled as fast as it drained, licensing a SUSTAINED
+  // 10 secrets/second forever, which is precisely an exfiltration profile.
+  //
+  // Splitting them gives the cold pull its one-off burst of 600 and then
+  // settles to 1/second. A legitimate second pull moments later is served
+  // from files already in sync (statusOf short-circuits, zero decrypts), so
+  // the slow refill is invisible to real use and expensive to abuse.
   fileDownload: {
     kind: "token bucket",
-    rate: 600,
+    rate: 60,
     period: 60_000,
     capacity: 600,
   },

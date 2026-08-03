@@ -283,33 +283,46 @@ export const _readActiveFiles = internalQuery({
 });
 
 /** One audit row per secret file returned by an API/MCP content pull. */
-export const _logFilePull = internalMutation({
+export const _logFilePulls = internalMutation({
   args: {
     organizationId: v.id("organizations"),
     projectId: v.id("projects"),
     userId: v.id("apiKeys"),
-    path: v.string(),
-    name: v.string(),
+    files: v.array(v.object({ path: v.string(), name: v.string() })),
     environment: v.optional(v.string()),
+    /**
+     * The surface that actually presented the secret. Server-derived from
+     * the authorized request, never a caller-supplied string.
+     */
+    surface: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const key = await ctx.db.get(args.userId);
     if (!key) return null;
-    await ctx.db.insert("auditLogs", {
-      organizationId: args.organizationId,
-      projectId: args.projectId,
-      userId: key.createdBy,
-      action: "file.downloaded",
-      details: JSON.stringify({
-        keyId: args.userId,
-        path: args.path,
-        fileName: args.name,
-        environment: args.environment,
-        source: "public-api",
-      }),
-      createdAt: Date.now(),
-    });
+    const now = Date.now();
+    // ONE mutation for the whole pull, not one per file. Awaiting a round
+    // trip inside the decrypt loop meant a 200-file pull paid 200 of them
+    // and could spend most of the action's budget writing audit rows.
+    for (const file of args.files) {
+      await ctx.db.insert("auditLogs", {
+        organizationId: args.organizationId,
+        projectId: args.projectId,
+        userId: key.createdBy,
+        action: "file.downloaded",
+        details: JSON.stringify({
+          keyId: args.userId,
+          path: file.path,
+          fileName: file.name,
+          environment: args.environment,
+          // "public-api" for every surface could not answer "which surface
+          // exposed the production signing key" — REST, MCP and the Action
+          // are different blast radii.
+          source: args.surface,
+        }),
+        createdAt: now,
+      });
+    }
     return null;
   },
 });
@@ -874,6 +887,10 @@ export const getProjectFiles = action({
   > => {
     assertKeyFormat(args.token);
     const metadataOnly = args.metadataOnly ?? false;
+    // Server-derived from the SAME value authorize.ts enforced the key
+    // against — never a caller-supplied label. Absent means the REST
+    // inference in authorize.ts applied.
+    const auditSurface = args.surface ?? "rest_api";
 
     const tokenHash = await hashToken(args.token);
     await consumeRateLimit(
@@ -1014,17 +1031,20 @@ export const getProjectFiles = action({
       }
 
       results.push({ ...meta, content: toBase64(plaintext) });
+    }
 
-      // One entry PER FILE. A single generic "files pulled" row cannot
-      // answer "who pulled the production signing key", which is the
-      // question this audit trail exists for.
-      await ctx.runMutation(internal.features.api.reads._logFilePull, {
+    // One entry PER FILE, written in ONE mutation after every decrypt. The
+    // per-file granularity is what lets the trail answer "who pulled the
+    // production signing key"; batching the write is what keeps a large
+    // pull from spending its action budget on round trips.
+    if (results.length > 0) {
+      await ctx.runMutation(internal.features.api.reads._logFilePulls, {
         organizationId: bootstrap.organizationId,
         projectId: projectDoc._id,
         userId: bootstrap.keyId,
-        path: row.path,
-        name: row.name,
+        files: results.map((r) => ({ path: r.path, name: r.name })),
         environment: args.environment,
+        surface: auditSurface,
       });
     }
 

@@ -26,12 +26,23 @@ export interface PullSecretsParams {
  * it never includes the token. */
 export class EnvpilotApiError extends Error {
   readonly status: number;
+  /** Server's Retry-After, in seconds, when it sent one (429 responses). */
+  readonly retryAfterSeconds?: number;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, retryAfterSeconds?: number) {
     super(message);
     this.name = "EnvpilotApiError";
     this.status = status;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+/** Parse Retry-After (seconds form). Undefined when absent or unparseable. */
+function retryAfterOf(response: Response): number | undefined {
+  const raw = response.headers.get("retry-after");
+  if (!raw) return undefined;
+  const seconds = Number(raw.trim());
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
 }
 
 /** One secret file as returned by `GET /api/v1/files`. */
@@ -95,7 +106,11 @@ export async function pullFiles(
   });
 
   if (!response.ok) {
-    throw new EnvpilotApiError(await errorMessage(response), response.status);
+    throw new EnvpilotApiError(
+      await errorMessage(response),
+      response.status,
+      retryAfterOf(response)
+    );
   }
 
   return (await response.json()) as EnvpilotFilesResponse;
@@ -135,7 +150,11 @@ export async function pullSecrets(
   });
 
   if (!response.ok) {
-    throw new EnvpilotApiError(await errorMessage(response), response.status);
+    throw new EnvpilotApiError(
+      await errorMessage(response),
+      response.status,
+      retryAfterOf(response)
+    );
   }
 
   return (await response.json()) as EnvpilotSecretsResponse;

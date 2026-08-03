@@ -156,3 +156,117 @@ describe("run (fetch handler)", () => {
     expect(String(failMessage)).not.toContain("envpk_test_token");
   });
 });
+
+describe("secret-file pulls: rate-limit retry", () => {
+  const inputs: Record<string, string> = {};
+
+  beforeEach(() => {
+    inputs.token = "envpk_test_token";
+    inputs.environment = "production";
+    inputs["api-url"] = "https://www.envpilot.dev";
+    inputs["export-env"] = "false";
+    inputs["env-file"] = "";
+    inputs.files = "true";
+    inputs.project = "acme";
+    inputs["files-dir"] = "";
+
+    vi.spyOn(core, "getInput").mockImplementation(
+      (name: string) => inputs[name] ?? ""
+    );
+    vi.spyOn(core, "setSecret").mockImplementation(() => {});
+    vi.spyOn(core, "exportVariable").mockImplementation(() => {});
+    vi.spyOn(core, "setOutput").mockImplementation(() => {});
+    vi.spyOn(core, "setFailed").mockImplementation(() => {});
+    vi.spyOn(core, "info").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn());
+    // Retry waits are real timers; make them instant.
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => {
+      fn();
+      return 0 as unknown as NodeJS.Timeout;
+    }) as unknown as typeof setTimeout);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("waits out a 429 mid-pull instead of failing the job", async () => {
+    const secretsBody = JSON.stringify({
+      project: { name: "Acme", slug: "acme" },
+      environment: "production",
+      variables: [],
+    });
+    const metadataBody = JSON.stringify({
+      project: { slug: "acme" },
+      environment: "production",
+      files: [
+        {
+          name: "k",
+          path: "k.pem",
+          mode: "0600",
+          size: 4,
+          sha256: "s",
+          environments: ["production"],
+          updatedAt: 1,
+        },
+      ],
+    });
+    const contentBody = JSON.stringify({
+      project: { slug: "acme" },
+      environment: "production",
+      files: [
+        {
+          name: "k",
+          path: "k.pem",
+          mode: "0600",
+          size: 4,
+          sha256: "s",
+          environments: ["production"],
+          updatedAt: 1,
+          content: Buffer.from("kkkk").toString("base64"),
+        },
+      ],
+    });
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(secretsBody, { status: 200 }))
+      .mockResolvedValueOnce(new Response(metadataBody, { status: 200 }))
+      // Batching shares the 30/min machine bucket, so a large pull can
+      // legitimately hit the limit partway through. Terminal treatment left
+      // the job failed with only some keystores written.
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+          status: 429,
+          headers: { "Retry-After": "1" },
+        })
+      )
+      .mockResolvedValueOnce(new Response(contentBody, { status: 200 }));
+
+    await run();
+
+    expect(core.setFailed).not.toHaveBeenCalled();
+    expect(core.setOutput).toHaveBeenCalledWith("files-count", 1);
+  });
+
+  it("gives up after the bounded attempts rather than looping forever", async () => {
+    const secretsBody = JSON.stringify({
+      project: { name: "Acme", slug: "acme" },
+      environment: "production",
+      variables: [],
+    });
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(secretsBody, { status: 200 }))
+      .mockResolvedValue(
+        new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+          status: 429,
+          headers: { "Retry-After": "1" },
+        })
+      );
+
+    await run();
+
+    expect(core.setFailed).toHaveBeenCalled();
+  });
+});

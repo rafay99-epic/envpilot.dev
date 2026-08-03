@@ -135,7 +135,21 @@ jobs:
             echo "::error::Built CLI does not contain the Convex URL — refusing to publish a broken build."
             exit 1
           fi
-          echo "WorkOS client id + Convex URL embedded in CLI bundle ✓"
+          # @envpilot/* workspace packages are PRIVATE and bundled into dist
+          # by tsup's noExternal glob. They deliberately live in
+          # devDependencies: listing a `workspace:*` private package under
+          # dependencies would publish a manifest npm cannot resolve, breaking
+          # `npm i -g @envpilot/cli` for everyone. The tradeoff is that a
+          # dropped noExternal glob would silently ship a bundle importing a
+          # module that does not exist on npm — so assert it here instead.
+          # Match module SPECIFIERS only — the bundle legitimately contains
+          # the string "@envpilot/cli" in upgrade hints printed to the user.
+          if grep -rqE '(from|require\(|import\()[[:space:]]*"@envpilot/' dist; then
+            echo "::error::Built CLI still imports an @envpilot/* workspace package — tsup noExternal is not bundling it. Refusing to publish a build that cannot resolve on npm."
+            grep -rnE '(from|require\(|import\()[[:space:]]*"@envpilot/' dist | head -5
+            exit 1
+          fi
+          echo "WorkOS client id + Convex URL embedded, no unbundled workspace imports ✓"
 
       # --ignore-scripts is CRITICAL: the CLI has "prepublishOnly": "npm run
       # build", so a plain `bun publish` would RE-RUN tsup here — without the

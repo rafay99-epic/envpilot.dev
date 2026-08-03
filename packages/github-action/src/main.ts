@@ -55,6 +55,39 @@ function batchByTotalSize(
   return batches;
 }
 
+/**
+ * Run `attempt`, retrying only on a 429 and only for the cooldown the SERVER
+ * asked for.
+ *
+ * Content pulls share the 30-requests-per-minute machine bucket, and batching
+ * deliberately turns one logical pull into several requests — so a large Pro
+ * project can legitimately reach the limit mid-pull. Treating that 429 as
+ * terminal failed the job with half the keystores written, which is worse
+ * than waiting. Bounded so a genuinely wedged limiter still fails the job
+ * rather than burning the runner.
+ */
+async function withRateLimitRetry<T>(
+  label: string,
+  attempt: () => Promise<T>
+): Promise<T> {
+  const MAX_ATTEMPTS = 5;
+  for (let i = 1; ; i += 1) {
+    try {
+      return await attempt();
+    } catch (error) {
+      const is429 = error instanceof EnvpilotApiError && error.status === 429;
+      if (!is429 || i >= MAX_ATTEMPTS) throw error;
+      // Trust the server's cooldown; fall back to a short wait if it sent
+      // none. Capped so a bad header cannot stall the job for hours.
+      const waitSeconds = Math.min(error.retryAfterSeconds ?? 5, 60);
+      core.info(
+        `Envpilot: rate limited on ${label}, waiting ${waitSeconds}s (attempt ${i}/${MAX_ATTEMPTS})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, waitSeconds * 1000));
+    }
+  }
+}
+
 function parseBooleanInput(raw: string, fallback: boolean): boolean {
   const normalized = raw.trim().toLowerCase();
   if (normalized === "") return fallback;
@@ -207,13 +240,15 @@ export async function run(): Promise<void> {
     // whole job on any project with more than 8 MiB of secret files.
     let manifest;
     try {
-      manifest = await pullFiles({
-        apiUrl,
-        token,
-        environment,
-        project,
-        metadataOnly: true,
-      });
+      manifest = await withRateLimitRetry("file metadata", () =>
+        pullFiles({
+          apiUrl,
+          token,
+          environment,
+          project,
+          metadataOnly: true,
+        })
+      );
     } catch (error) {
       const message =
         error instanceof EnvpilotApiError || error instanceof Error
@@ -227,13 +262,15 @@ export async function run(): Promise<void> {
     const files: EnvpilotFile[] = [];
     for (const batch of batches) {
       try {
-        const chunk = await pullFiles({
-          apiUrl,
-          token,
-          environment,
-          project,
-          paths: batch.map((f) => f.path),
-        });
+        const chunk = await withRateLimitRetry("file contents", () =>
+          pullFiles({
+            apiUrl,
+            token,
+            environment,
+            project,
+            paths: batch.map((f) => f.path),
+          })
+        );
         files.push(...chunk.files);
       } catch (error) {
         const message =

@@ -281,20 +281,57 @@ function stripTomlComment(value: string): string {
   return value;
 }
 
-/** True when a TOML multi-line array or string closes on this line. */
-function closesTomlContinuation(text: string): boolean {
-  const bare = stripTomlComment(text).trimEnd();
-  if (bare.endsWith("]")) return true;
-  return TOML_MULTILINE_DELIMITERS.some((d) => bare.endsWith(d));
+/**
+ * Net `[` minus `]` on one TOML line, ignoring brackets inside quotes and
+ * anything after an unquoted `#`.
+ *
+ * A depth COUNT is required, not a "does the line end in ]" test. In
+ *
+ *     a = [
+ *       [1, 2],
+ *       "secret"
+ *     ]
+ *
+ * the middle line ends with `]` while the outer array is still open, so a
+ * terminal-bracket test closed cloaking early and left every element below
+ * it in plaintext.
+ */
+function netBracketDelta(text: string): number {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (quote) {
+      if (ch === "\\" && quote === '"') {
+        i += 1;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === "#") break;
+    if (ch === "[") depth += 1;
+    else if (ch === "]") depth -= 1;
+  }
+  return depth;
 }
 
-/** True when `value` opens a TOML multi-line string that does not close. */
-function opensTomlString(value: string): boolean {
+/**
+ * The multi-line string delimiter this value OPENS without closing, or null.
+ *
+ * WHICH delimiter matters: a `'''` body may legally contain `"""`, so
+ * closing on whichever one appears first ends the mask early.
+ */
+function opensTomlString(value: string): string | null {
   for (const delimiter of TOML_MULTILINE_DELIMITERS) {
     if (!value.startsWith(delimiter)) continue;
-    return !value.slice(delimiter.length).trimEnd().endsWith(delimiter);
+    return value.slice(delimiter.length).includes(delimiter) ? null : delimiter;
   }
-  return false;
+  return null;
 }
 
 /** Number of trailing backslashes — odd means a .properties continuation. */
@@ -317,8 +354,10 @@ export function computeCloakRanges(
   let inPemBody = false;
   /** Indentation of an open YAML block scalar (`key: |`), else null. */
   let yamlBlockIndent: number | null = null;
-  /** True while inside an unterminated TOML array or multiline string. */
-  let tomlContinuation = false;
+  /** Open-bracket depth of an unterminated TOML array, 0 when outside one. */
+  let tomlArrayDepth = 0;
+  /** The delimiter of an open TOML multi-line string, else null. */
+  let tomlStringDelimiter: string | null = null;
   /** True while a .properties value continues via a trailing backslash. */
   let propertiesContinuation = false;
 
@@ -396,11 +435,18 @@ export function computeCloakRanges(
       }
 
       case "toml": {
-        // Continuation of a multi-line array or multi-line string — every
-        // line of it is value, so mask it and keep going until it closes.
-        if (tomlContinuation) {
+        // Inside a multi-line string: every line is value until the SAME
+        // delimiter that opened it reappears.
+        if (tomlStringDelimiter !== null) {
           ranges.push({ line, start: indentOf(text), end: text.length });
-          if (closesTomlContinuation(text)) tomlContinuation = false;
+          if (text.includes(tomlStringDelimiter)) tomlStringDelimiter = null;
+          break;
+        }
+
+        // Inside a multi-line array: mask until the nesting unwinds to zero.
+        if (tomlArrayDepth > 0) {
+          ranges.push({ line, start: indentOf(text), end: text.length });
+          tomlArrayDepth = Math.max(0, tomlArrayDepth + netBracketDelta(text));
           break;
         }
 
@@ -410,7 +456,17 @@ export function computeCloakRanges(
         if (trimmed.startsWith("[")) break;
 
         const m = TOML_LINE.exec(text);
-        if (!m) break;
+        if (!m) {
+          // FAIL CLOSED, exactly as the .properties branch does. The key
+          // regex covers bare and simply-quoted keys; an escaped quoted key,
+          // a dotted key with unusual spacing, or a line caught mid-edit
+          // falls through it — and "leave the secret in plaintext" is not an
+          // acceptable default for a file we already know holds secrets.
+          if (indentOf(text) < text.length) {
+            ranges.push({ line, start: indentOf(text), end: text.length });
+          }
+          break;
+        }
 
         const valueStart = m[1].length;
         // Strip a trailing comment first. Without it `k = ["s"] # note` looks
@@ -423,10 +479,15 @@ export function computeCloakRanges(
         // `[`, `"""` or `'''` at the end of the line is an OPENER, not an
         // empty container, and treating it as structure left its whole body
         // visible on the lines below.
-        const opensArray = value.startsWith("[") && !value.endsWith("]");
-        if (opensArray || opensTomlString(value)) {
-          tomlContinuation = true;
+        const openDelimiter = opensTomlString(value);
+        if (openDelimiter !== null) {
+          tomlStringDelimiter = openDelimiter;
           // The opener itself carries no secret; the body below does.
+          break;
+        }
+        const delta = netBracketDelta(value);
+        if (value.startsWith("[") && delta > 0) {
+          tomlArrayDepth = delta;
           break;
         }
 

@@ -33,15 +33,18 @@ export interface ManagedFileEntry {
    */
   mode?: "strict-readonly" | "readonly-with-request" | "writable";
   /**
-   * Project that materialised this file, when known.
+   * Every project that has materialised this file, when known.
    *
-   * Cleanup is per-directory, but two projects can be linked to the SAME
-   * directory — unlinking one used to delete the other's secret files too,
-   * because every managed path under the directory looked like ours.
-   * Optional: `.env` entries and older manifests simply lack it, and are
-   * treated as unowned (the previous directory-scoped behaviour).
+   * A LIST, not a single id. Cleanup is per-directory, but two projects can
+   * be linked to the SAME directory and legitimately publish the same
+   * relative path — unlinking one used to delete a file the other still
+   * needs. With a single field the last sync simply overwrote the owner, so
+   * which project "owned" the file was a race.
+   *
+   * Optional: `.env` entries and older manifests lack it and are treated as
+   * unowned (the previous directory-scoped behaviour).
    */
-  projectId?: string;
+  projectIds?: string[];
 }
 
 // ponytail: one manifest shared by all VS Code forks (Code/Cursor/VSCodium).
@@ -78,10 +81,21 @@ export async function readManifest(
       (e): e is ManagedFileEntry =>
         typeof e?.path === "string" && typeof e?.sha256 === "string"
     );
-    // A non-string projectId (version skew, hand-edited manifest) is dropped
-    // so ownership checks fall back to the unowned path rather than throwing.
     for (const e of entries) {
-      if (typeof e.projectId !== "string") delete e.projectId;
+      // Migrate the single-owner shape written by earlier builds.
+      const legacy = (e as { projectId?: unknown }).projectId;
+      if (typeof legacy === "string" && e.projectIds === undefined) {
+        e.projectIds = [legacy];
+      }
+      delete (e as { projectId?: unknown }).projectId;
+      // A malformed list (version skew, hand-edited manifest) is dropped so
+      // ownership checks fall back to unowned rather than throwing.
+      if (
+        !Array.isArray(e.projectIds) ||
+        e.projectIds.some((id) => typeof id !== "string")
+      ) {
+        delete e.projectIds;
+      }
     }
     // Unknown modes (version skew, hand-edited manifest) become undefined so
     // consumers' `?? "readonly-with-request"` fallbacks fail closed.
@@ -145,12 +159,19 @@ export async function recordManagedFile(
     await withManifestLock(async () => {
       const resolved = path.resolve(filePath);
       const entries = await readManifest(manifestPath);
+      const previous = entries.find((e) => pathsEqual(e.path, resolved));
+      // UNION the owners, never replace them. Overwriting meant the last
+      // project to sync became the sole owner, and unlinking it deleted a
+      // file another linked project was still using.
+      const owners = new Set(previous?.projectIds ?? []);
+      if (projectId) owners.add(projectId);
+
       const next = entries.filter((e) => !pathsEqual(e.path, resolved));
       next.push({
         path: resolved,
         sha256: hashContent(content),
         ...(mode ? { mode } : {}),
-        ...(projectId ? { projectId } : {}),
+        ...(owners.size > 0 ? { projectIds: [...owners] } : {}),
       });
       await writeManifest(manifestPath, next);
     });
@@ -197,6 +218,46 @@ export async function forgetManagedFile(
     });
   } catch {
     // Never let manifest bookkeeping break a delete.
+  }
+}
+
+/**
+ * Drop ONE project's claim on a managed file.
+ *
+ * Returns true when that was the last claim and the file may be deleted;
+ * false when another linked project still materialises this same path into
+ * the same directory, in which case the file must be left alone. Entries
+ * with no recorded owner report true (the pre-ownership behaviour).
+ */
+export async function releaseManagedFile(
+  filePath: string,
+  projectId: string,
+  manifestPath: string = getManifestPath()
+): Promise<boolean> {
+  try {
+    return await withManifestLock(async () => {
+      const entries = await readManifest(manifestPath);
+      const entry = entries.find((e) => pathsEqual(e.path, filePath));
+      if (!entry) return true;
+
+      const owners = entry.projectIds ?? [];
+      const remaining = owners.filter((id) => id !== projectId);
+      if (owners.length > 0 && remaining.length > 0) {
+        entry.projectIds = remaining;
+        await writeManifest(manifestPath, entries);
+        return false;
+      }
+
+      await writeManifest(
+        manifestPath,
+        entries.filter((e) => !pathsEqual(e.path, filePath))
+      );
+      return true;
+    });
+  } catch {
+    // Bookkeeping must never break cleanup — but do NOT report "safe to
+    // delete" off the back of a failure we could not read.
+    return false;
   }
 }
 

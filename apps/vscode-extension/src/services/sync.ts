@@ -26,6 +26,7 @@ import { envFileNamesFor } from "../utils/envFiles";
 import {
   recordManagedFile,
   forgetManagedFile,
+  releaseManagedFile,
   readManifest,
   getManifestPath,
 } from "../utils/managedFiles";
@@ -1512,17 +1513,15 @@ export class SyncService {
       const rel = path.relative(normalizedDir, filePath);
       if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) continue;
       if (envFiles.has(rel)) continue;
-      // Only OUR files. A directory can host secret files from more than one
-      // linked project, and unlinking one used to delete the other's too.
-      // Entries with no recorded owner predate ownership tracking and stay on
-      // the old directory-scoped behaviour.
-      if (entry.projectId !== undefined && entry.projectId !== projectId) {
-        continue;
-      }
+      // A directory can host secret files from more than one linked project,
+      // and both may publish the SAME relative path. Drop this project's
+      // claim and delete only when it was the last one — otherwise the file
+      // still belongs to a project that is very much still linked.
+      const lastOwner = await releaseManagedFile(filePath, projectId);
+      if (!lastOwner) continue;
 
       this.fileProtection?.unwatchFile(filePath);
       this.clipboardGuard?.unprotectFile(filePath);
-      await forgetManagedFile(filePath);
 
       try {
         await fs.access(filePath);

@@ -358,3 +358,40 @@ describe("regression: values that used to stay visible", () => {
     expect(out).not.toContain("admin");
   });
 });
+
+describe("regression: TOML continuation state", () => {
+  it("keeps masking past a nested array that closes on its own line", () => {
+    // The middle line ends with `]` while the OUTER array is still open. A
+    // terminal-bracket test closed cloaking there and left every element
+    // below it readable.
+    const out = render("toml", 'a = [\n  [1, 2],\n  "secret-elem"\n]');
+    expect(out).not.toContain("secret-elem");
+    expect(out).toContain("a = [");
+  });
+
+  it("does not close a ''' body on a nested \"\"\"", () => {
+    const out = render(
+      "toml",
+      "k = '''\ncontains \"\"\" inside\nstill-secret\n'''"
+    );
+    expect(out).not.toContain("still-secret");
+  });
+
+  it("ignores brackets inside quotes and comments when counting depth", () => {
+    const out = render("toml", 'a = [\n  "has ] bracket",\n  "secret-elem"\n]');
+    expect(out).not.toContain("secret-elem");
+  });
+
+  it("fails closed on a TOML line the key regex does not match", () => {
+    // Escaped quoted key — legal TOML, outside the regex. Leaving it in
+    // plaintext is not an acceptable default for a known-secret file.
+    const out = render("toml", '"key\\"esc" = "secret-value"');
+    expect(out).not.toContain("secret-value");
+  });
+
+  it("still leaves comments and table headers readable", () => {
+    const out = render("toml", "# a note\n[section]\nk = 1");
+    expect(out).toContain("# a note");
+    expect(out).toContain("[section]");
+  });
+});

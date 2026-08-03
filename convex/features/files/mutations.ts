@@ -489,6 +489,10 @@ export const detachEnvironment = mutation({
         previousVersion: file.version,
         newVersion: file.version + 1,
       },
+      // Same as every other secret-file lifecycle write. Detaching an
+      // environment revokes a whole environment's access to this file, so
+      // omitting it hid the change from sensitive-action audit reporting.
+      involvesSensitiveData: true,
       resourceType: "file",
     });
 

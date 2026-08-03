@@ -3,12 +3,13 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import {
-  recordManagedFile,
   forgetManagedFile,
-  readManifest,
+  hashContent,
   purgeManagedFiles,
   purgeManagedFilesFiltered,
-  hashContent,
+  readManifest,
+  recordManagedFile,
+  releaseManagedFile,
 } from "./managedFiles";
 
 describe("managedFiles", () => {
@@ -266,5 +267,65 @@ describe("managedFiles", () => {
       );
       expect(result).toEqual({ deleted: 0, spared: 0, failed: 0 });
     });
+  });
+});
+
+describe("multi-project ownership", () => {
+  let dir: string;
+  let manifest: string;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "envpilot-owners-"));
+    manifest = path.join(dir, "manifest.json");
+  });
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("keeps the file when another linked project still owns the path", async () => {
+    // Two projects linked to the same directory publishing the same relative
+    // path. Unlinking one must not delete a file the other is still using.
+    const file = path.join(dir, "shared.pem");
+    await fs.writeFile(file, "key-bytes");
+
+    await recordManagedFile(
+      file,
+      "key-bytes",
+      manifest,
+      "strict-readonly",
+      "proj-a"
+    );
+    await recordManagedFile(
+      file,
+      "key-bytes",
+      manifest,
+      "strict-readonly",
+      "proj-b"
+    );
+
+    expect(await releaseManagedFile(file, "proj-a", manifest)).toBe(false);
+    const afterFirst = await readManifest(manifest);
+    expect(afterFirst[0].projectIds).toEqual(["proj-b"]);
+
+    expect(await releaseManagedFile(file, "proj-b", manifest)).toBe(true);
+    expect(await readManifest(manifest)).toHaveLength(0);
+  });
+
+  it("reports an unowned legacy entry as safe to delete", async () => {
+    const file = path.join(dir, "legacy.pem");
+    await fs.writeFile(file, "x");
+    await recordManagedFile(file, "x", manifest);
+    expect(await releaseManagedFile(file, "proj-a", manifest)).toBe(true);
+  });
+
+  it("migrates the single-owner shape written by earlier builds", async () => {
+    const file = path.join(dir, "old.pem");
+    await fs.writeFile(
+      manifest,
+      JSON.stringify([{ path: file, sha256: "abc", projectId: "proj-a" }])
+    );
+    const entries = await readManifest(manifest);
+    expect(entries[0].projectIds).toEqual(["proj-a"]);
   });
 });

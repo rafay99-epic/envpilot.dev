@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { randomBytes } from "node:crypto";
 import {
+  appendFileSync,
   chmodSync,
   constants as fsConstants,
   existsSync,
@@ -298,7 +299,10 @@ export async function writeSecretFile(
       0o600
     );
     try {
-      await handle.write(contents);
+      // writeFile, NOT write: write() resolves on a SHORT write, so a
+      // partially-written keystore would be renamed into place and reported
+      // as success. writeFile loops until every byte lands.
+      await handle.writeFile(contents);
       await handle.chmod(target);
     } finally {
       await handle.close();
@@ -387,6 +391,11 @@ export function ignoreSecretFilePaths(root: string, paths: string[]): string[] {
     }
   }
 
-  writeFileSync(gitignorePath, content + block, "utf-8");
+  // APPEND, never rewrite. Writing `content + block` replays the snapshot we
+  // read at the top of this function, so a concurrent pull that appended its
+  // own paths in between would have them erased — leaving that pull's secret
+  // untracked-and-offerable to git. A duplicate line is already documented as
+  // harmless; a dropped one is not.
+  appendFileSync(gitignorePath, block, "utf-8");
   return missing;
 }
