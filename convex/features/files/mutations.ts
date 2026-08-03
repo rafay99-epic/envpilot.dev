@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
+import { MAX_PROJECT_FILES } from "../../lib/fileLimits";
 import { mutation, internalMutation } from "../../_generated/server";
 import {
   checkBooleanFeature,
@@ -289,6 +290,24 @@ export const create = internalMutation({
       throw new ConvexError(
         countGate.reason ??
           `Secret file limit reached (${countGate.current}/${countGate.limit}). Upgrade your tier for more.`
+      );
+    }
+
+    // STRUCTURAL ceiling, separate from the tier limit (which Pro leaves
+    // unlimited). Enforced HERE rather than inferred from the collision
+    // scan: that scan only rejects a project already over the bound, so it
+    // permitted the write that took a project to 1001 — one row past every
+    // reader's cap, leaving the project unlistable and unpullable, and past
+    // the download burst sized to the same number.
+    const activeInProject = await ctx.db
+      .query("projectFiles")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+      )
+      .take(MAX_PROJECT_FILES);
+    if (activeInProject.length >= MAX_PROJECT_FILES) {
+      throw new ConvexError(
+        `This project already holds the maximum of ${MAX_PROJECT_FILES} secret files. Delete one, or contact support to raise the limit.`
       );
     }
 

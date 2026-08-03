@@ -1,4 +1,5 @@
 import { v, ConvexError } from "convex/values";
+import { MAX_PROJECT_FILES } from "../../lib/fileLimits";
 import {
   action,
   internalQuery,
@@ -55,7 +56,7 @@ import { get as blobStoreGet } from "../files/blobStore";
 // Hard product bound — LOUD failure on overflow, mirrors
 // cicd/pull.ts's _readScopedVariables exactly. A silent partial read would
 // let an integration "succeed" while missing secrets/accounts.
-const MAX_PULL_ROWS = 1000;
+const MAX_PULL_ROWS = MAX_PROJECT_FILES;
 // Mirrors projects/helpers.ts's listWithStatsCore VARIABLE_COUNT_CAP — a
 // bounded reactive-safe count, not an exact total for pathological projects.
 const VARIABLE_COUNT_CAP = 500;

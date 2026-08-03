@@ -126,25 +126,40 @@ export async function readManifest(
   }
 }
 
-/** How long a lockfile may sit before it is assumed to be a crashed holder. */
+/**
+ * A lock is presumed abandoned only after this long WITHOUT a heartbeat. The
+ * holder refreshes it every LOCK_RENEW_MS, so a long-running purge is never
+ * mistaken for a crashed one no matter how many files it touches.
+ */
 const LOCK_STALE_MS = 10_000;
+const LOCK_RENEW_MS = 2_000;
 const LOCK_RETRY_MS = 25;
-const LOCK_TIMEOUT_MS = 3_000;
+/** Total time a waiter will queue before giving up. */
+const LOCK_MAX_WAIT_MS = 60_000;
 
 /**
  * Cross-PROCESS mutual exclusion on the manifest.
  *
  * The manifest is shared by every VS Code fork and window on the machine, so
- * the in-process chain below is not enough: two extension hosts syncing at
- * once could each read the same snapshot and write back a version missing
- * the other's change. That used to cost a re-recorded entry on the next
- * sync (benign), but with ownership in the file a lost writer means either a
- * revoked project's secret stays on disk or a file another project still
- * needs gets deleted. Both are exactly what the ownership work was for.
+ * the in-process chain below is not enough: two extension hosts could each
+ * read the same snapshot and write back a version missing the other's
+ * change. A lost writer means either a revoked project's secret stays on
+ * disk or a file another project still needs gets deleted.
  *
- * ponytail: O_EXCL lockfile with a stale break, not a lockfile dependency —
- * the critical section is a sub-millisecond read/modify/write, so contention
- * is rare and the failure mode of waiting is just a slower sync.
+ * Two rules make that safe rather than merely likely-safe:
+ *
+ *   1. A waiter WAITS. It never proceeds unlocked on timeout — running the
+ *      critical section without the lock is the exact race the lock exists
+ *      to prevent, and every caller already treats a thrown lock error as
+ *      "changed nothing" (recordManagedFile swallows it, releaseManagedFile
+ *      answers "do not delete").
+ *   2. The holder RENEWS. purgeManagedFilesFiltered holds the lock across
+ *      per-file chmod+unlink, which on a large workspace easily outlives a
+ *      fixed staleness window — without a heartbeat another host would
+ *      break a live lock and both would write.
+ *
+ * ponytail: an O_EXCL lockfile with a heartbeat, not a lockfile dependency.
+ * The uncontended path is one open + one unlink.
  */
 async function withFileLock<T>(
   manifestPath: string,
@@ -153,7 +168,7 @@ async function withFileLock<T>(
   const lockPath = `${manifestPath}.lock`;
   await fs.mkdir(path.dirname(lockPath), { recursive: true });
 
-  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  const deadline = Date.now() + LOCK_MAX_WAIT_MS;
   for (;;) {
     try {
       const handle = await fs.open(lockPath, "wx");
@@ -161,8 +176,8 @@ async function withFileLock<T>(
       break;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      // Break a lock left behind by a crashed or killed host, rather than
-      // wedging every future sync on this machine forever.
+      // Break a lock only when its heartbeat has stopped — a crashed or
+      // killed host — never merely because it is taking a while.
       const age = await fs
         .stat(lockPath)
         .then((s) => Date.now() - s.mtimeMs)
@@ -172,17 +187,25 @@ async function withFileLock<T>(
         continue;
       }
       if (Date.now() > deadline) {
-        // Proceeding unlocked is strictly better than failing the sync: the
-        // in-process chain still applies and the write itself is atomic.
-        return await fn();
+        throw new Error("Timed out waiting for the managed-file manifest lock");
       }
       await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
     }
   }
 
+  // Heartbeat: keep proving this holder is alive for as long as it works.
+  const now = new Date();
+  const heartbeat = setInterval(() => {
+    void fs.utimes(lockPath, now, new Date()).catch(() => {});
+  }, LOCK_RENEW_MS);
+  // Never hold the event loop open on the heartbeat alone — the uninstall
+  // hook is a short-lived script and must be able to exit.
+  heartbeat.unref?.();
+
   try {
     return await fn();
   } finally {
+    clearInterval(heartbeat);
     await fs.unlink(lockPath).catch(() => {});
   }
 }
@@ -367,47 +390,56 @@ export async function purgeManagedFilesFiltered(
   shouldPurge: (filePath: string) => boolean,
   manifestPath: string = getManifestPath()
 ): Promise<{ deleted: number; spared: number; failed: number }> {
-  return withManifestLock(manifestPath, async () => {
-    let deleted = 0;
-    let spared = 0;
-    let failed = 0;
-    const entries = await readManifest(manifestPath);
-    const kept: ManagedFileEntry[] = [];
-    for (const entry of entries) {
-      if (!shouldPurge(entry.path)) {
-        kept.push(entry);
-        continue;
+  // The lock can now time out rather than silently proceeding unlocked, and
+  // this function documents that it never throws — deactivate() calls it on
+  // the way out, where an exception surfaces as a VS Code error toast.
+  // Reporting "purged nothing" is the correct answer when we could not take
+  // the lock: the files stay, and the next run retries.
+  try {
+    return await withManifestLock(manifestPath, async () => {
+      let deleted = 0;
+      let spared = 0;
+      let failed = 0;
+      const entries = await readManifest(manifestPath);
+      const kept: ManagedFileEntry[] = [];
+      for (const entry of entries) {
+        if (!shouldPurge(entry.path)) {
+          kept.push(entry);
+          continue;
+        }
+        let content: Buffer;
+        try {
+          // Bytes, not utf-8: see hashContent.
+          content = await fs.readFile(entry.path);
+        } catch {
+          // Already gone — drop the stale manifest entry.
+          continue;
+        }
+        if (hashContent(content) !== entry.sha256) {
+          spared++; // Hand-edited since last sync — never delete user data.
+          kept.push(entry);
+          continue;
+        }
+        try {
+          // Synced files are often chmod 0o444 by file protection.
+          await fs.chmod(entry.path, 0o644);
+          await fs.unlink(entry.path);
+          deleted++;
+        } catch {
+          failed++;
+          kept.push(entry); // Keep the entry so a later purge can retry.
+        }
       }
-      let content: Buffer;
       try {
-        // Bytes, not utf-8: see hashContent.
-        content = await fs.readFile(entry.path);
+        await writeManifest(manifestPath, kept);
       } catch {
-        // Already gone — drop the stale manifest entry.
-        continue;
+        // Manifest bookkeeping must never break a purge.
       }
-      if (hashContent(content) !== entry.sha256) {
-        spared++; // Hand-edited since last sync — never delete user data.
-        kept.push(entry);
-        continue;
-      }
-      try {
-        // Synced files are often chmod 0o444 by file protection.
-        await fs.chmod(entry.path, 0o644);
-        await fs.unlink(entry.path);
-        deleted++;
-      } catch {
-        failed++;
-        kept.push(entry); // Keep the entry so a later purge can retry.
-      }
-    }
-    try {
-      await writeManifest(manifestPath, kept);
-    } catch {
-      // Manifest bookkeeping must never break a purge.
-    }
-    return { deleted, spared, failed };
-  });
+      return { deleted, spared, failed };
+    });
+  } catch {
+    return { deleted: 0, spared: 0, failed: 0 };
+  }
 }
 
 /**

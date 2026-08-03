@@ -1,5 +1,6 @@
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
+import { MAX_PROJECT_FILES } from "./fileLimits";
 
 /**
  * Rate limiter configuration for Envpilot backend.
@@ -60,17 +61,16 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // already in sync (statusOf short-circuits, zero decrypts), so the slow
   // refill is invisible to real use and expensive to abuse.
   //
-  // capacity is tied to MAX_FILE_ROWS (1000), the ceiling queries.list and
-  // the collision scan already refuse to exceed. That is not a round number
-  // picked for comfort — it is the largest listing a single project can
-  // produce, so a cold pull of ANY supported project fits in one burst by
-  // construction. `throws: true` gives no retry, so a capacity below that
-  // ceiling would abort a legitimate 700-file first pull at file 601.
+  // capacity IS the project ceiling, imported rather than restated. The write
+  // path refuses the insert that would exceed it, so a cold pull of any
+  // project that can exist fits in one burst by construction. `throws: true`
+  // gives no retry, so a capacity below that ceiling would abort a legitimate
+  // first pull partway through.
   fileDownload: {
     kind: "token bucket",
     rate: 60,
     period: 60_000,
-    capacity: 1000,
+    capacity: MAX_PROJECT_FILES,
   },
 
   // Machine-originated variable requests: 5 per hour per key, burst 2.

@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
+import { MAX_PROJECT_FILES } from "../../lib/fileLimits";
 
 /**
  * Secret-file helpers: path validation and per-environment path uniqueness.
@@ -34,7 +35,7 @@ const FORBIDDEN_EXACT = new Set([".envpilot", ".git", ".gitignore"]);
  * be listed cannot be written to either — better a loud refusal than a
  * silently partial uniqueness check.
  */
-const MAX_PROJECT_FILE_SCAN = 1000;
+const MAX_PROJECT_FILE_SCAN = MAX_PROJECT_FILES;
 const FORBIDDEN_PREFIXES = [".git/", ".envpilot/"];
 
 /**
@@ -204,10 +205,10 @@ export async function findFilePathConflicts(
   // on a case-insensitive checkout, so pulling both would have them
   // overwrite each other silently.
   //
-  // ponytail: this is an O(files-in-project) scan, bounded by the SAME 1000-row
-  // ceiling queries.list already refuses to exceed — so it cannot grow past
-  // what a project can list. A folded-path column plus its own index is the
-  // upgrade if projects ever legitimately hold more than that.
+  // ponytail: this is an O(files-in-project) scan, bounded by the SAME
+  // MAX_PROJECT_FILES ceiling the write path enforces — so it cannot grow
+  // past what a project is allowed to hold. A folded-path column plus its
+  // own index is the upgrade if that ceiling is ever raised much.
   const foldedTarget = args.path.toLowerCase();
   const activeInProject = await ctx.db
     .query("projectFiles")

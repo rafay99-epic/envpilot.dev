@@ -270,7 +270,15 @@ describe("managedFiles", () => {
   });
 });
 
-describe("multi-project ownership", () => {
+/**
+ * These cover releaseManagedFile's DECISION only — the boolean it returns —
+ * not the fs.unlink that acts on it. The caller
+ * (SyncService.deleteSecretFilesFromDirectory) lives behind a `vscode`
+ * import and this suite is deliberately hermetic (see vitest.config.ts), so
+ * naming them "deletes"/"keeps" would have claimed an on-disk guarantee
+ * nothing here checks.
+ */
+describe("multi-project ownership (release signal)", () => {
   let dir: string;
   let manifest: string;
 
@@ -283,7 +291,7 @@ describe("multi-project ownership", () => {
     await fs.rm(dir, { recursive: true, force: true });
   });
 
-  it("keeps the file when another linked project still owns the path", async () => {
+  it("SIGNALS keep when another linked project still owns the path", async () => {
     // Two projects linked to the same directory publishing the same relative
     // path. Unlinking one must not delete a file the other is still using.
     const file = path.join(dir, "shared.pem");
@@ -312,7 +320,7 @@ describe("multi-project ownership", () => {
     expect(await readManifest(manifest)).toHaveLength(0);
   });
 
-  it("deletes the departing project's bytes even when an owner remains", async () => {
+  it("SIGNALS delete for the departing project's bytes when an owner remains", async () => {
     // Two projects, same path, DIFFERENT content. The file holds whatever
     // synced last. Unlinking that project must not leave its secret on disk
     // just because another project also claims the path — the remaining
@@ -330,7 +338,7 @@ describe("multi-project ownership", () => {
     expect(after[0].lastWriter).toBeUndefined();
   });
 
-  it("keeps a file whose bytes belong to a project that is staying", async () => {
+  it("SIGNALS keep for a file whose bytes belong to a project that is staying", async () => {
     const file = path.join(dir, "shared2.pem");
     await fs.writeFile(file, "a-bytes");
     await recordManagedFile(file, "a-bytes", manifest, undefined, "proj-a");
@@ -342,7 +350,7 @@ describe("multi-project ownership", () => {
     expect(await releaseManagedFile(file, "proj-b", manifest)).toBe(false);
   });
 
-  it("reports an unowned legacy entry as safe to delete", async () => {
+  it("SIGNALS delete for an unowned legacy entry", async () => {
     const file = path.join(dir, "legacy.pem");
     await fs.writeFile(file, "x");
     await recordManagedFile(file, "x", manifest);
@@ -357,5 +365,68 @@ describe("multi-project ownership", () => {
     );
     const entries = await readManifest(manifest);
     expect(entries[0].projectIds).toEqual(["proj-a"]);
+  });
+});
+
+describe("manifest locking", () => {
+  let dir: string;
+  let manifest: string;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "envpilot-lock-"));
+    manifest = path.join(dir, "manifest.json");
+  });
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("does not lose an owner when writers interleave IN THIS PROCESS", async () => {
+    // Scope is deliberate and limited: this exercises the promise chain, not
+    // the cross-process lockfile — a single-process test cannot observe two
+    // extension hosts racing. The lockfile's own behaviour is covered by the
+    // stale-break test below; "waits rather than proceeding unlocked" is not
+    // unit-covered and is asserted only by reading withFileLock.
+    const file = path.join(dir, "shared.pem");
+    await fs.writeFile(file, "bytes");
+
+    await Promise.all([
+      recordManagedFile(file, "bytes", manifest, undefined, "proj-a"),
+      recordManagedFile(file, "bytes", manifest, undefined, "proj-b"),
+      recordManagedFile(file, "bytes", manifest, undefined, "proj-c"),
+    ]);
+
+    const entries = await readManifest(manifest);
+    expect(entries).toHaveLength(1);
+    expect([...(entries[0].projectIds ?? [])].sort()).toEqual([
+      "proj-a",
+      "proj-b",
+      "proj-c",
+    ]);
+  });
+
+  it("releases the lock so later writers are not blocked by a dead one", async () => {
+    const file = path.join(dir, "a.pem");
+    await fs.writeFile(file, "x");
+    await recordManagedFile(file, "x", manifest, undefined, "proj-a");
+    // A leftover lockfile would wedge this if it were never cleaned up.
+    await expect(fs.access(`${manifest}.lock`)).rejects.toBeTruthy();
+  });
+
+  it("breaks a lock whose holder left no heartbeat", async () => {
+    // Simulate a crashed host: a lockfile with an old mtime and nobody
+    // renewing it. A live holder refreshes every 2s, so only a truly
+    // abandoned lock ages past the staleness window.
+    const lockPath = `${manifest}.lock`;
+    await fs.writeFile(lockPath, "");
+    const old = new Date(Date.now() - 60_000);
+    await fs.utimes(lockPath, old, old);
+
+    const file = path.join(dir, "b.pem");
+    await fs.writeFile(file, "y");
+    await recordManagedFile(file, "y", manifest, undefined, "proj-a");
+
+    const entries = await readManifest(manifest);
+    expect(entries).toHaveLength(1);
   });
 });

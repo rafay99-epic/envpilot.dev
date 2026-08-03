@@ -5,6 +5,7 @@ import type { Doc } from "../../_generated/dataModel";
 import { requireFileAccess, authorizeFileAccess } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import { requireAuthedUser } from "../../lib/identity";
+import { MAX_PROJECT_FILES } from "../../lib/fileLimits";
 import {
   checkBooleanFeature,
   checkCountedLimit,
@@ -32,8 +33,8 @@ import {
  * that fails to serialize, because the content never travels in a list.
  */
 
-/** Bound on a single project listing, matching features/api/reads.ts. */
-const MAX_FILE_ROWS = 1000;
+/** Bound on a single project listing — the shared structural ceiling. */
+const MAX_FILE_ROWS = MAX_PROJECT_FILES;
 
 /**
  * Build a fileId → active grant lookup from a caller's grant rows.
