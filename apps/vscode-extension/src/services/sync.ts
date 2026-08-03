@@ -20,9 +20,16 @@ import {
   getDisplayPath,
   isPathInside,
 } from "../utils/paths";
+import { materialiseSecretFiles } from "./secretFiles";
 import { SingleFlight } from "../utils/singleFlight";
 import { envFileNamesFor } from "../utils/envFiles";
-import { recordManagedFile, forgetManagedFile } from "../utils/managedFiles";
+import {
+  recordManagedFile,
+  forgetManagedFile,
+  releaseManagedFile,
+  readManifest,
+  getManifestPath,
+} from "../utils/managedFiles";
 import { captureError } from "../utils/sentry";
 import {
   normalizeOrgRole,
@@ -79,11 +86,18 @@ function assertTrustedWorkspace(): void {
  * Atomic env-file write: write a temp sibling, then rename over the target so
  * a reader (or a crash mid-write) never observes a half-written secrets file.
  */
+let tmpCounter = 0;
+
 async function atomicWriteFile(
   filePath: string,
   content: string
 ): Promise<void> {
-  const tmpPath = `${filePath}.tmp-envpilot`;
+  // UNIQUE per write. A fixed temp name collides whenever two syncs target
+  // the same file — two projects linked to one directory both write
+  // `.env.local`, the first rename succeeds, and the second fails with
+  // ENOENT because its temp was already renamed away. The suffix stays after
+  // `.tmp-envpilot` so the activation sweeper still recognises leftovers.
+  const tmpPath = `${filePath}.tmp-envpilot.${process.pid}.${tmpCounter++}`;
   try {
     await fs.writeFile(tmpPath, content, "utf-8");
     await fs.rename(tmpPath, filePath);
@@ -386,6 +400,15 @@ export class SyncService {
       // Write to .env file
       await this.writeEnvFile(project, variables);
 
+      // Materialise secret files alongside the .env. Files already in sync
+      // are skipped without a fetch, so a routine sync of an up-to-date
+      // workspace performs zero decrypts and writes zero audit rows.
+      await this.syncSecretFiles(
+        project.projectId,
+        [project.environment],
+        project.workspacePath
+      );
+
       // Update last synced timestamp
       await this.storage.updateLinkedProject(
         project.projectId,
@@ -448,6 +471,134 @@ export class SyncService {
    * Write environment variables to the .env file
    * Validates that the target path is within the workspace to prevent path traversal
    */
+  /**
+   * Pull the project's secret files into the workspace.
+   *
+   * Deliberately non-fatal: a keystore that cannot be written must not fail
+   * the variable sync that already succeeded. Conflicts and failures are
+   * surfaced as warnings so they are visible rather than silent.
+   */
+  private async syncSecretFiles(
+    projectId: string,
+    environments: string[],
+    root: string | undefined,
+    /**
+     * Overwrite locally-modified files instead of reporting them as
+     * conflicts. Only the edit watcher sets this: a routine sync must never
+     * silently destroy someone's hand-placed keystore, but a revert exists
+     * precisely to undo the edit that triggered it.
+     */
+    force = false,
+    /**
+     * Limits `force` to these paths. The edit watcher passes the single file
+     * it fired for: forcing the whole pass would overwrite every other
+     * locally-modified secret file in the environment as collateral.
+     */
+    forcePaths?: string[]
+  ): Promise<void> {
+    if (!root) return;
+    // Trust is re-checked HERE, not only at the env-file writers. Those run
+    // under Promise.allSettled, so a rejected .env write does not stop
+    // execution reaching this call — and trust can also flip mid-sync. A
+    // Restricted Mode window must never end up with a plaintext keystore.
+    assertTrustedWorkspace();
+
+    // A secret file has ONE path, but a directory can be linked to several
+    // environments — and the same path may legitimately exist in more than
+    // one (a dev and a prod google-services.json). Writing both into one
+    // directory would race them onto the same file, so materialise exactly
+    // the first environment, the same way the CLI scopes to one.
+    const environment = environments[0];
+    if (!environment) return;
+
+    try {
+      const result = await materialiseSecretFiles(
+        this.api,
+        projectId,
+        environment,
+        root,
+        {
+          force,
+          forcePaths,
+          setSyncing: (syncing) => this.fileProtection?.setSyncing(syncing),
+          onWritten: async (file, contents) => {
+            // Secret files get the SAME guards a synced .env gets. Mirrors
+            // writeEnvFileToDirectory step for step; only the permission bits
+            // differ, because a keystore is 0600/0400 rather than 0644/0444.
+            //
+            // 1. Manifest — so uninstall/purge and rename tracking see it.
+            // MUST hash the same representation the purge/unsync paths
+            // read back (`fs.readFile(path, "utf-8")`). Recording a base64
+            // hash meant the two never matched, so every secret file was
+            // "hand-edited" to the purge and survived uninstall. Binary
+            // content decodes lossily on both sides — identically — so the
+            // hashes still agree.
+            await recordManagedFile(
+              file.absolutePath,
+              // Raw bytes. Recording a decoded string aliased every invalid
+              // utf-8 sequence to U+FFFD, so two different binary keystores
+              // hashed the same and a hand-edited one could be purged as
+              // "unchanged".
+              contents,
+              undefined,
+              "strict-readonly",
+              // Ownership: two projects can be linked to the same directory,
+              // and unlinking one must not delete the other's secret files.
+              projectId
+            );
+
+            // 2. Clipboard guard. Always strict-readonly: a secret file is
+            //    never hand-edited, the dashboard and CLI are the write path.
+            this.clipboardGuard?.protectFile(
+              file.absolutePath,
+              "strict-readonly"
+            );
+
+            // 3. Unauthorized-edit protection, restoring the file's OWN mode.
+            //    The .env default would re-chmod to 0444 on revert, which is
+            //    world-readable and looser than what the file was pulled with.
+            this.fileProtection?.watchFile(
+              file.absolutePath,
+              async () => {
+                // force: the file IS modified — that is why the watcher
+                // fired. Without it materialise classes it a conflict and
+                // leaves the unauthorized edit in place, so the warning
+                // ("you cannot modify it") is the only thing that happens.
+                await this.syncSecretFiles(
+                  projectId,
+                  environments,
+                  root,
+                  true,
+                  [file.path]
+                );
+              },
+              "strict-readonly",
+              { writable: 0o600, readonly: file.numericMode }
+            );
+          },
+        }
+      );
+
+      if (result.conflicts.length > 0) {
+        void vscode.window.showWarningMessage(
+          `Envpilot: ${result.conflicts.length} secret file(s) differ locally and were not overwritten: ${result.conflicts.join(", ")}`
+        );
+      }
+      if (result.failed.length > 0) {
+        void vscode.window.showWarningMessage(
+          `Envpilot: could not write ${result.failed.length} secret file(s). ${result.failed[0]?.message ?? ""}`
+        );
+      }
+    } catch (error) {
+      // Secret files are additive: never let them break variable sync.
+      console.warn(
+        `[envpilot] secret file sync failed: ${
+          error instanceof Error ? error.message : "unknown"
+        }`
+      );
+    }
+  }
+
   private async writeEnvFile(
     project: LinkedProject,
     variables: EnvironmentVariable[]
@@ -589,6 +740,32 @@ export class SyncService {
     return fileProtectionMode(
       this.buildProjectAccess(projectId, variables),
       this.api.getAccessMeta(projectId)?.capabilities
+    );
+  }
+
+  /**
+   * Whether the signed-in user may unmask secret values on screen.
+   *
+   * Driven by the `project.secrets.reveal` capability, which admins toggle
+   * per role in the registry — so a viewer or a locked-down developer never
+   * gets the 30-second reveal, while an owner or team lead does.
+   *
+   * FAIL CLOSED, twice over: a project whose capability map has not arrived
+   * yet denies, and a single denying project denies overall. The reveal
+   * command is global (it unmasks every managed file at once), so the most
+   * restrictive linked project has to win — otherwise access to one
+   * permissive project would unmask another project's secrets.
+   */
+  canRevealSecrets(projectIds: string[]): boolean {
+    // Capability maps are cached per project from the last pull, and
+    // apiService.clearCache() drops them on sign-out and account switch —
+    // so after a transition this reads an empty cache and fails closed
+    // until the new session's first sync repopulates it.
+    if (projectIds.length === 0) return false;
+    return projectIds.every(
+      (id) =>
+        this.api.getAccessMeta(id)?.capabilities?.["project.secrets.reveal"] ===
+        true
     );
   }
 
@@ -1063,6 +1240,15 @@ export class SyncService {
         )
       );
 
+      // Secret files land in the SAME directory as the .env files. This path
+      // (not syncProject) is what modern multi-directory links run through,
+      // so the files step has to live here too.
+      await this.syncSecretFiles(
+        project.projectId,
+        directory.environments,
+        directory.directoryPath
+      );
+
       // Remove a stale merged file left over from the old single-file scheme
       // (only for multi-env dirs, and only if it carries our header).
       await this.cleanupStaleMergedFile(directory, envToFile);
@@ -1272,6 +1458,7 @@ export class SyncService {
 
     for (const directory of project.directories) {
       try {
+        await this.deleteSecretFilesFromDirectory(project.projectId, directory);
         await this.deleteEnvFileFromDirectory(directory);
       } catch (err) {
         errors.push(err instanceof Error ? err : new Error(String(err)));
@@ -1292,6 +1479,61 @@ export class SyncService {
    * legacy `targetFile` when it isn't already one of the derived names AND it
    * carries the Envpilot header (guards against nuking a user's file).
    */
+  /**
+   * Release every secret file this directory materialised: stop the edit
+   * watcher, drop the clipboard guard, forget the manifest entry, and remove
+   * the file. Mirrors deleteEnvFileFromDirectory — an unlinked project must
+   * not leave a decrypted keystore behind, and a released path must not stay
+   * registered with guards that now point at nothing.
+   */
+  private async deleteSecretFilesFromDirectory(
+    projectId: string,
+    directory: LinkedDirectory
+  ): Promise<void> {
+    // Enumerate from the LOCAL manifest, never the API. Cleanup runs when
+    // access is revoked or a project is unlinked — exactly when the listing
+    // endpoint rejects the caller — and the previous version swallowed that
+    // failure and reported success, leaving decrypted keystores on disk.
+    const platformPath = toPlatformPath(directory.directoryPath);
+    const normalizedDir = path.resolve(platformPath);
+    // The .env files this directory owns are handled by
+    // deleteEnvFileFromDirectory; everything else it manages is a secret file.
+    const envFiles = new Set(envFileNamesFor(directory).values());
+    envFiles.add(directory.targetFile);
+
+    let entries: Awaited<ReturnType<typeof readManifest>>;
+    try {
+      entries = await readManifest(getManifestPath());
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const filePath = path.resolve(entry.path);
+      const rel = path.relative(normalizedDir, filePath);
+      if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) continue;
+      if (envFiles.has(rel)) continue;
+      // A directory can host secret files from more than one linked project,
+      // and both may publish the SAME relative path. Drop this project's
+      // claim and delete only when it was the last one — otherwise the file
+      // still belongs to a project that is very much still linked.
+      const lastOwner = await releaseManagedFile(filePath, projectId);
+      if (!lastOwner) continue;
+
+      this.fileProtection?.unwatchFile(filePath);
+      this.clipboardGuard?.unprotectFile(filePath);
+
+      try {
+        await fs.access(filePath);
+        // Pulled at 0400, so make it writable before unlinking.
+        await fs.chmod(filePath, 0o600);
+        await fs.unlink(filePath);
+      } catch {
+        // Already gone — that is the goal.
+      }
+    }
+  }
+
   private async deleteEnvFileFromDirectory(
     directory: LinkedDirectory
   ): Promise<void> {

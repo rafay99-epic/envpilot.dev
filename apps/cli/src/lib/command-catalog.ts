@@ -12,6 +12,7 @@ import { syncCommand } from "../commands/sync.js";
 import { usageCommand } from "../commands/usage.js";
 import { whoamiCommand } from "../commands/whoami.js";
 import { accountsCommand } from "../commands/accounts.js";
+import { filesCommand } from "../commands/files.js";
 import { runCommand } from "../commands/run.js";
 import { createManCommand } from "../commands/man.js";
 import { createUICommand } from "../commands/ui.js";
@@ -496,6 +497,48 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     keywords: ["accounts", "multi-account", "switch", "remove", "identity"],
     topLevel: true,
     createCommand: () => accountsCommand,
+  },
+  {
+    id: "files",
+    title: "Files",
+    category: "Project",
+    description:
+      "Manage secret files — keystores, SSH keys, certificates, and service-account JSON — that cannot live in a .env.",
+    argv: ["files"],
+    args: "[list|status|pull|add <file>|get <path>|rm <path>]",
+    examples: [
+      ["files", "list"],
+      ["files", "status"],
+      ["files", "pull"],
+      [
+        "files",
+        "add",
+        "./upload.jks",
+        "--path",
+        "android/app/upload.jks",
+        "-e",
+        "production",
+      ],
+    ],
+    websiteSurface:
+      "Project → Files in the dashboard. Each file carries a destination path and mode, so a fresh clone materialises everything the build needs.",
+    notes: [
+      "`list` and `status` are metadata-only: nothing is decrypted and no download is recorded.",
+      "`pull` refuses to overwrite a local file that differs from the server unless you pass --force.",
+      "Pulled paths are added to .gitignore before the files are written.",
+      "Every download of file contents is audited.",
+    ],
+    keywords: [
+      "files",
+      "keystore",
+      "ssh",
+      "certificate",
+      "jks",
+      "p12",
+      "secret files",
+    ],
+    topLevel: true,
+    createCommand: () => filesCommand,
   },
   {
     id: "config",

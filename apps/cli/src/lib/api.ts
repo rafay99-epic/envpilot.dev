@@ -212,6 +212,36 @@ type PulledVariableRow = {
   updatedAt: number;
   access: "read" | "write";
 };
+/** Metadata row from features/files/queries:list. Never contains content. */
+export type SecretFileRow = {
+  _id: string;
+  name: string;
+  path: string;
+  mode: string;
+  contentType?: string;
+  size: number;
+  sha256: string;
+  digestSalt: string;
+  description?: string;
+  environments: string[];
+  projectId: string;
+  version: number;
+  createdAt: number;
+  updatedAt: number;
+  access: "read" | "write";
+};
+
+/** One decrypted file. Content is base64. */
+export type SecretFileContent = {
+  name: string;
+  path: string;
+  mode: string;
+  size: number;
+  sha256: string;
+  contentType?: string;
+  content: string;
+};
+
 type PullMeta = {
   role: "admin" | "team_lead" | "member";
   projectRole: "manager" | "developer" | "viewer" | null;
@@ -315,6 +345,39 @@ const refs = {
     { projectId: string; environment?: string; metadataOnly?: boolean },
     PullValuesResult
   >("features/variables/values:pullValues"),
+  listFiles: fnRef<
+    "query",
+    { projectId: string; environment?: string },
+    SecretFileRow[]
+  >("features/files/queries:list"),
+  getFileContent: fnRef<
+    "action",
+    { fileId: string; source?: string },
+    SecretFileContent
+  >("features/files/values:getFileContent"),
+  uploadFile: fnRef<
+    "action",
+    {
+      projectId: string;
+      name: string;
+      path: string;
+      content: string;
+      mode?: string;
+      contentType?: string;
+      description?: string;
+      environments: string[];
+      replaceFileId?: string;
+    },
+    { fileId: string; size: number; sha256: string }
+  >("features/files/values:uploadFile"),
+  removeFile: fnRef<"mutation", { fileId: string }, string>(
+    "features/files/mutations:remove"
+  ),
+  detachFileEnvironment: fnRef<
+    "mutation",
+    { fileId: string; environment: string },
+    { remaining: string[] }
+  >("features/files/mutations:detachEnvironment"),
   pushBulk: fnRef<
     "action",
     {
@@ -915,6 +978,62 @@ export class APIClient {
       updated: result.updated,
       unchanged: result.created === 0 && result.updated === 0,
     };
+  }
+
+  // ============================================
+  // High-level methods — SECRET FILES
+  // ============================================
+
+  /**
+   * List a project's secret files. METADATA ONLY — no decryption, no vault
+   * reads, no download audit entries. `files status` runs entirely on this.
+   */
+  async listSecretFiles(
+    projectId: string,
+    environment?: string
+  ): Promise<SecretFileRow[]> {
+    return convexQuery(refs.listFiles, {
+      projectId,
+      ...(environment ? { environment } : {}),
+    });
+  }
+
+  /** Decrypt ONE file. Audited server-side on every call. */
+  async getSecretFileContent(fileId: string): Promise<SecretFileContent> {
+    return convexAction(refs.getFileContent, { fileId, source: "cli" });
+  }
+
+  /** Upload a new secret file, or replace an existing one's contents. */
+  async uploadSecretFile(input: {
+    projectId: string;
+    name: string;
+    path: string;
+    content: string;
+    mode?: string;
+    contentType?: string;
+    description?: string;
+    environments: string[];
+    replaceFileId?: string;
+  }): Promise<{ fileId: string; size: number; sha256: string }> {
+    return convexAction(refs.uploadFile, input);
+  }
+
+  /** Move a secret file to the trash. */
+  async removeSecretFile(fileId: string): Promise<string> {
+    return convexMutation(refs.removeFile, { fileId });
+  }
+
+  /**
+   * Remove ONE environment from a secret file, atomically. Used by
+   * `files rm --env` to detach an environment instead of trashing the file
+   * for all of them. The server derives the surviving set from the row, so a
+   * concurrent edit by someone else cannot be clobbered by a stale array.
+   */
+  async detachSecretFileEnvironment(
+    fileId: string,
+    environment: string
+  ): Promise<{ remaining: string[] }> {
+    return convexMutation(refs.detachFileEnvironment, { fileId, environment });
   }
 
   /**

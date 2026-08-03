@@ -26,7 +26,8 @@ export type AuditResourceType =
   | "invitation"
   | "billing"
   | "security"
-  | "account";
+  | "account"
+  | "file";
 
 // Severity mapping for different action types
 const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
@@ -89,6 +90,14 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "account.permission_granted": "info",
   "account.permission_revoked": "warning",
   "account.permission_updated": "info",
+  "file.created": "info",
+  "file.updated": "info",
+  "file.deleted": "warning",
+  "file.restored": "info",
+  "file.downloaded": "info",
+  "file.permission_granted": "warning",
+  "file.permission_revoked": "warning",
+  "file.permission_updated": "info",
   // Notification webhooks
   "integration.webhook_created": "info",
   "integration.webhook_updated": "info",
@@ -193,6 +202,14 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "account.permission_granted": "account",
   "account.permission_revoked": "account",
   "account.permission_updated": "account",
+  "file.created": "file",
+  "file.updated": "file",
+  "file.deleted": "file",
+  "file.restored": "file",
+  "file.downloaded": "file",
+  "file.permission_granted": "file",
+  "file.permission_revoked": "file",
+  "file.permission_updated": "file",
   // Notification webhooks (org-scoped config)
   "integration.webhook_created": "organization",
   "integration.webhook_updated": "organization",

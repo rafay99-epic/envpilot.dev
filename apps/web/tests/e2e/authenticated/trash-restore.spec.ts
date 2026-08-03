@@ -69,7 +69,11 @@ test.describe.serial("trash & restore", () => {
     await expect(
       page
         .getByRole("heading", { name: "Trash is empty" })
-        .or(page.getByRole("heading", { name: /Variables|Shared accounts/ }))
+        .or(
+          page.getByRole("heading", {
+            name: /Variables|Shared accounts|Secret files/,
+          })
+        )
         .first()
     ).toBeVisible({ timeout: 20_000 });
 

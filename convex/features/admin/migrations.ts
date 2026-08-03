@@ -45,7 +45,7 @@ export const listMigrations = query({
       {
         name: "seed-role-registry",
         description:
-          "Seeds the role registry from SEED_ROLES: system-role metadata and levels sync from code; system capability matrices MERGE (new code defaults fill in, admin edits survive) except owner, which stays fully code-synced. Seeded custom roles (editor/viewer) insert only if absent. Idempotent.",
+          "Seeds the role registry from SEED_ROLES: system-role metadata and levels sync from code; system capability matrices MERGE (new code defaults fill in, admin edits survive) except owner, which stays fully code-synced. Seeded custom roles (editor/viewer) keep their admin-owned METADATA after the first seed, but their capability maps merge the same way system roles do — a newly shipped capability fills in, every explicit admin choice survives. Idempotent.",
         category: "Feature & Tier System",
         priority: 4,
         destructive: false,
@@ -393,9 +393,34 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
             skipped++;
           }
         } else {
-          // Seeded custom roles (editor/viewer): insert-only — the admin
-          // panel owns them after the first seed.
-          skipped++;
+          // Seeded custom roles (editor/viewer): the admin panel owns their
+          // METADATA after the first seed, but capabilities merge the same
+          // way system roles do. Without this a newly shipped capability
+          // never reaches an existing Editor row, so those users silently
+          // lack the feature forever. Merge only fills keys the row has
+          // never seen — every explicit admin choice is preserved.
+          const mergedCaps = mergeSystemRoleCapabilities(
+            role.capabilities,
+            existing.capabilities as Record<string, boolean>
+          ) as Record<string, boolean>;
+          const normalize = (caps: Record<string, boolean>) =>
+            JSON.stringify(
+              Object.keys(caps)
+                .sort()
+                .map((k) => [k, caps[k]])
+            );
+          if (
+            normalize(existing.capabilities as Record<string, boolean>) !==
+            normalize(mergedCaps)
+          ) {
+            await ctx.db.patch(existing._id, {
+              capabilities: mergedCaps,
+              updatedAt: now,
+            });
+            updated++;
+          } else {
+            skipped++;
+          }
         }
         continue;
       }
@@ -523,6 +548,9 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         max_active_shares: "0",
         shared_accounts: "true",
         shared_accounts_limit: "5",
+        secret_files: "true",
+        secret_files_limit: "3",
+        secret_files_max_bytes: "262144",
         keyboard_shortcuts_custom: "true",
         custom_branding: "false",
         analytics_retention_days: "7",
@@ -557,6 +585,9 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         max_active_shares: "null",
         shared_accounts: "true",
         shared_accounts_limit: "null",
+        secret_files: "true",
+        secret_files_limit: "null",
+        secret_files_max_bytes: "8388608",
         keyboard_shortcuts_custom: "true",
         custom_branding: "true",
         analytics_retention_days: "30",

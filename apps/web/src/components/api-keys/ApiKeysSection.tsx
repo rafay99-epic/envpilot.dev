@@ -53,7 +53,13 @@ const ENV_CHIP_SELECTED: Record<Environment, string> = {
   production: "border-green-500/40 bg-green-500/10 text-green-400",
 };
 
-const RESOURCES = ["variables", "accounts", "projects", "requests"] as const;
+const RESOURCES = [
+  "variables",
+  "accounts",
+  "files",
+  "projects",
+  "requests",
+] as const;
 type Resource = (typeof RESOURCES)[number];
 
 // "requests" is the one mutating capability: the key may FILE variable
@@ -61,6 +67,9 @@ type Resource = (typeof RESOURCES)[number];
 // surface — CI can't wait on human approval.
 const RESOURCE_HINT: Partial<Record<Resource, string>> = {
   requests: "may file variable requests for human approval (agents)",
+  // Never on by default: this is the switch that lets a credential reach
+  // keystores and signing material, not just env vars.
+  files: "may read secret file contents (keystores, SSH keys, certificates)",
 };
 
 // Which MCP tools each resource unlocks — mirrors the `requirement` each
@@ -72,6 +81,7 @@ const MCP_RESOURCE_TOOLS: Record<Resource, string> = {
     "envpilot_list_projects, envpilot_search (key matches also need variables)",
   variables: "envpilot_get_variables, envpilot_get_variable",
   accounts: "envpilot_list_accounts",
+  files: "envpilot_list_files, envpilot_get_file",
   requests: "envpilot_request_variable, envpilot_get_request_status",
 };
 
@@ -565,12 +575,18 @@ function CreateKeyDrawer({
       }
       return next;
     });
-    // The Action pull path only accepts single-project, exactly-variables
-    // keys (and never files requests) — steer the form into that shape
-    // instead of failing at submit.
+    // The Action pull path only accepts single-project keys carrying
+    // "variables", optionally plus "files" — steer the form into that shape
+    // instead of failing at submit. Anything else the user had picked is
+    // dropped; "files" is kept because an Action key may legitimately pull
+    // keystores.
     if (adding && surface === "github_action") {
       setProjectMode("specific");
-      setSelectedResources(new Set<Resource>(["variables"]));
+      setSelectedResources((prev) => {
+        const next = new Set<Resource>(["variables"]);
+        if (prev.has("files")) next.add("files");
+        return next;
+      });
     }
   };
 
@@ -581,10 +597,18 @@ function CreateKeyDrawer({
     ? projectMode === "specific" && selectedProjectIds.size === 1
     : projectMode === "all" || selectedProjectIds.size > 0;
   const envSelectionValid = envMode === "all" || selectedEnvs.size > 0;
+  // Matches convex/features/api/keys.ts: an Action key must carry
+  // "variables" and may additionally carry "files" — nothing else, so an
+  // Action credential never doubles as broader REST/MCP access. The form
+  // previously demanded EXACTLY variables, which made a files-capable Action
+  // key impossible to create at all.
   const resourceSelectionValid =
     selectedResources.size > 0 &&
     (!githubActionSelected ||
-      (selectedResources.size === 1 && selectedResources.has("variables")));
+      (selectedResources.has("variables") &&
+        [...selectedResources].every(
+          (r) => r === "variables" || r === "files"
+        )));
   const surfaceSelectionValid = selectedSurfaces.size > 0;
   const customExpiryValid =
     expiryMode !== "custom" ||
@@ -942,8 +966,13 @@ function CreateKeyDrawer({
             <div className="mt-2 flex flex-wrap gap-2">
               {RESOURCES.map((resource) => {
                 const selected = selectedResources.has(resource);
+                // The Action pulls variables and, optionally, secret files.
+                // Everything else stays off so an Action credential never
+                // doubles as broader REST/MCP access.
                 const disabled =
-                  githubActionSelected && resource !== "variables";
+                  githubActionSelected &&
+                  resource !== "variables" &&
+                  resource !== "files";
                 return (
                   <button
                     key={resource}
@@ -953,7 +982,7 @@ function CreateKeyDrawer({
                     disabled={disabled}
                     title={
                       disabled
-                        ? "GitHub Action keys carry exactly the variables resource"
+                        ? "GitHub Action keys carry variables, and optionally files — nothing else"
                         : RESOURCE_HINT[resource]
                     }
                     onClick={() => toggleResource(resource)}

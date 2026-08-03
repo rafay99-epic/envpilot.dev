@@ -58,7 +58,7 @@
     },
     "apps/blog": {
       "name": "@envpilot/blog",
-      "version": "1.5.0",
+      "version": "1.6.0",
       "dependencies": {
         "@envpilot/ui": "workspace:*",
         "date-fns": "^4.1.0",
@@ -88,7 +88,7 @@
     },
     "apps/cli": {
       "name": "@envpilot/cli",
-      "version": "1.18.0",
+      "version": "1.20.0",
       "bin": {
         "envpilot": "./dist/index.js",
       },
@@ -109,6 +109,7 @@
       },
       "devDependencies": {
         "@envpilot/eslint-config": "workspace:*",
+        "@envpilot/secret-files": "workspace:*",
         "@envpilot/tsconfig": "workspace:*",
         "@types/cross-spawn": "^6.0.6",
         "@types/node": "^22.10.10",
@@ -122,7 +123,7 @@
     },
     "apps/docs": {
       "name": "@envpilot/docs",
-      "version": "1.5.1",
+      "version": "1.7.0",
       "dependencies": {
         "@envpilot/ui": "workspace:*",
         "gray-matter": "^4.0.3",
@@ -151,7 +152,7 @@
     },
     "apps/vscode-extension": {
       "name": "envpilot",
-      "version": "1.16.0",
+      "version": "1.17.0",
       "dependencies": {
         "@sentry/node": "^10.43.0",
         "axios": "^1.6.2",
@@ -159,6 +160,7 @@
       },
       "devDependencies": {
         "@envpilot/eslint-config": "workspace:*",
+        "@envpilot/secret-files": "workspace:*",
         "@envpilot/tsconfig": "workspace:*",
         "@types/node": "^22",
         "@types/vscode": "^1.85.0",
@@ -173,7 +175,7 @@
     },
     "apps/web": {
       "name": "@envpilot/web",
-      "version": "1.52.0",
+      "version": "1.55.0",
       "dependencies": {
         "@envpilot/ui": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.29.0",
@@ -236,7 +238,7 @@
     },
     "packages/github-action": {
       "name": "@envpilot/github-action",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "dependencies": {
         "@actions/core": "^1.11.1",
       },
@@ -254,6 +256,17 @@
     "packages/prettier-config": {
       "name": "@envpilot/prettier-config",
       "version": "1.1.0",
+    },
+    "packages/secret-files": {
+      "name": "@envpilot/secret-files",
+      "version": "1.0.0",
+      "devDependencies": {
+        "@envpilot/eslint-config": "workspace:*",
+        "@envpilot/tsconfig": "workspace:*",
+        "@types/node": "^22",
+        "eslint": "^9",
+        "typescript": "^5",
+      },
     },
     "packages/tsconfig": {
       "name": "@envpilot/tsconfig",
@@ -405,6 +418,8 @@
     "@envpilot/github-action": ["@envpilot/github-action@workspace:packages/github-action"],
 
     "@envpilot/prettier-config": ["@envpilot/prettier-config@workspace:packages/prettier-config"],
+
+    "@envpilot/secret-files": ["@envpilot/secret-files@workspace:packages/secret-files"],
 
     "@envpilot/tsconfig": ["@envpilot/tsconfig@workspace:packages/tsconfig"],
 

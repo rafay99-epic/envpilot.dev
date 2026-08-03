@@ -538,6 +538,106 @@ export default defineSchema({
     .index("by_active_and_expires", ["isActive", "expiresAt"]),
 
   // ==========================================
+  // SECRET FILES (envelope-encrypted project files)
+  // ==========================================
+  // Structural mirror of projectAccounts: same lifecycle, trash window, GC,
+  // and audit surface. The difference is WHERE the secret lives. A variable's
+  // or account's plaintext is the Vault object; a file's Vault object holds
+  // only the AES-256-GCM data key + nonce, and the ciphertext lives in Convex
+  // file storage. Neither store alone can reveal the file.
+  projectFiles: defineTable({
+    // Display label, e.g. "Android Upload Keystore"
+    name: v.string(),
+    // Destination path relative to the project root, e.g.
+    // "android/app/upload.jks". Validated + normalized on every write (see
+    // features/files/helpers.ts::normalizeFilePath) — never absolute, never
+    // containing "..", never inside .git/ or .envpilot.
+    path: v.string(),
+    // POSIX mode the clients apply after writing. "0600" (default) or "0400".
+    mode: v.optional(v.string()),
+    // Best-effort MIME type from the upload, for the dashboard icon only.
+    contentType: v.optional(v.string()),
+    // PLAINTEXT byte length. Drives the tier byte limit and the UI — the
+    // stored blob is larger (GCM tag) and is never the number shown.
+    size: v.number(),
+    // sha256(digestSalt || plaintext), base64. Lets every client answer
+    // "is my local copy current?" with NO decrypt and NO vault round trip.
+    sha256: v.string(),
+    // 16 random bytes, base64. Salts the digest so a database dump cannot be
+    // rainbow-tabled back to the contents of a low-entropy file.
+    digestSalt: v.string(),
+    // WorkOS Vault reference holding {alg,k,iv} — the data key, NOT the file.
+    vaultRef: v.string(),
+    // Convex file storage id holding the AES-256-GCM ciphertext. Required:
+    // a row without it is unreadable by construction.
+    storageId: v.id("_storage"),
+    // Optional human-readable description
+    description: v.optional(v.string()),
+    // Environment tags; >= 1. Two active files may share a `path` only when
+    // their environments are DISJOINT (see helpers.findFilePathConflicts).
+    environments: v.array(v.string()),
+    // Parent project
+    projectId: v.id("projects"),
+    // User who uploaded the file
+    createdBy: v.id("users"),
+    // User who last replaced or edited it
+    lastModifiedBy: v.id("users"),
+    // Current version number (bumped on every content replace)
+    version: v.number(),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    // Soft delete support
+    deletedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_and_path", ["projectId", "path"])
+    // Bounds the daily vault-GC sweep to soft-deleted rows past the retention
+    // window (see environmentVariables.by_deleted_at for the ordering caveat).
+    .index("by_deleted_at", ["deletedAt"])
+    // Serves the per-project trash listing — see the twin index on
+    // environmentVariables.
+    .index("by_project_deleted", ["projectId", "deletedAt"])
+    // Reverse lookup for the download path: a file is authorized by its
+    // opaque vaultRef, exactly like variables and accounts.
+    .index("by_vaultRef", ["vaultRef"]),
+
+  // ==========================================
+  // SECRET FILE ACCESS PERMISSIONS (per-file grants)
+  // EXACT mirror of accountPermissions.
+  // ==========================================
+  filePermissions: defineTable({
+    // Reference to the secret file
+    fileId: v.id("projectFiles"),
+    // Reference to the user granted access
+    userId: v.id("users"),
+    // Permission level
+    permission: v.union(
+      v.literal("read"), // Can download the file
+      v.literal("write") // Can replace or edit the file
+    ),
+    // Who granted this permission
+    grantedBy: v.id("users"),
+    // When the permission was granted
+    grantedAt: v.number(),
+    // Optional expiration (for temporary access)
+    expiresAt: v.optional(v.number()),
+    // Is this permission currently active?
+    isActive: v.boolean(),
+    // When the permission was revoked (if applicable)
+    revokedAt: v.optional(v.number()),
+    // Who revoked it
+    revokedBy: v.optional(v.id("users")),
+  })
+    .index("by_file", ["fileId"])
+    .index("by_user", ["userId"])
+    .index("by_file_and_user", ["fileId", "userId"])
+    .index("by_user_active", ["userId", "isActive"])
+    // Bounds the daily permission-expiry sweep — see the twin index on
+    // accountPermissions.by_active_and_expires.
+    .index("by_active_and_expires", ["isActive", "expiresAt"]),
+
+  // ==========================================
   // PROJECT ACCESS (for extension linking)
   // ==========================================
   projectAccess: defineTable({
@@ -1003,6 +1103,15 @@ export default defineSchema({
       v.literal("account.permission_granted"),
       v.literal("account.permission_revoked"),
       v.literal("account.permission_updated"),
+      // Secret file actions
+      v.literal("file.created"),
+      v.literal("file.updated"),
+      v.literal("file.deleted"),
+      v.literal("file.restored"),
+      v.literal("file.downloaded"),
+      v.literal("file.permission_granted"),
+      v.literal("file.permission_revoked"),
+      v.literal("file.permission_updated"),
       // Notification webhook (Slack/Discord) actions
       v.literal("integration.webhook_created"),
       v.literal("integration.webhook_updated"),
@@ -1034,7 +1143,8 @@ export default defineSchema({
         v.literal("invitation"),
         v.literal("billing"),
         v.literal("security"),
-        v.literal("account")
+        v.literal("account"),
+        v.literal("file")
       )
     ),
     // Whether this action involved sensitive data

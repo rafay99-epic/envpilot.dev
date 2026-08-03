@@ -7,6 +7,7 @@ import {
 } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { requireAuthedUser } from "../../lib/identity";
+import { del as blobStoreDel } from "../files/blobStore";
 import { assertProjectAction } from "../../lib/authz";
 
 /**
@@ -73,6 +74,13 @@ export const listPurgeEligible = internalQuery({
         vaultRefs: v.array(v.string()),
       })
     ),
+    files: v.array(
+      v.object({
+        id: v.id("projectFiles"),
+        vaultRefs: v.array(v.string()),
+        storageId: v.id("_storage"),
+      })
+    ),
   }),
   handler: async (ctx) => {
     const cutoff = Date.now() - PURGE_RETENTION_DAYS * DAY_MS;
@@ -112,7 +120,23 @@ export const listPurgeEligible = internalQuery({
       vaultRefs: [account.vaultRef],
     }));
 
-    return { variables, accounts };
+    // Secret files carry a SECOND resource: the ciphertext blob in Convex
+    // file storage. The purge destroys the blob first, then the Vault key,
+    // then the row — see purgeExpiredBatch for why that order.
+    const fileDocs = await ctx.db
+      .query("projectFiles")
+      .withIndex("by_deleted_at", (q) =>
+        q.gt("deletedAt", 0).lt("deletedAt", cutoff)
+      )
+      .take(PURGE_BATCH_SIZE);
+
+    const files = fileDocs.map((file) => ({
+      id: file._id,
+      vaultRefs: [file.vaultRef],
+      storageId: file.storageId,
+    }));
+
+    return { variables, accounts, files };
   },
 });
 
@@ -185,6 +209,36 @@ export const hardDeleteAccount = internalMutation({
     }
 
     await ctx.db.delete(args.accountId);
+    return true;
+  },
+});
+
+/**
+ * Permanently delete a secret file's rows AFTER its blob AND its Vault
+ * object are confirmed gone. Same defensive retention re-check as the other
+ * two hard-deletes.
+ */
+export const hardDeleteFile = internalMutation({
+  args: { fileId: v.id("projectFiles") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const file = await ctx.db.get(args.fileId);
+    if (!file) return false;
+
+    const cutoff = Date.now() - PURGE_RETENTION_DAYS * DAY_MS;
+    if (file.deletedAt === undefined || file.deletedAt >= cutoff) {
+      return false;
+    }
+
+    const permissions = await ctx.db
+      .query("filePermissions")
+      .withIndex("by_file", (q) => q.eq("fileId", args.fileId))
+      .collect();
+    for (const perm of permissions) {
+      await ctx.db.delete(perm._id);
+    }
+
+    await ctx.db.delete(args.fileId);
     return true;
   },
 });
@@ -284,6 +338,7 @@ export const purgeExpiredBatch = internalAction({
     aborted: v.boolean(),
     purgedVariables: v.number(),
     purgedAccounts: v.number(),
+    purgedFiles: v.number(),
     skipped: v.number(),
     rescheduled: v.boolean(),
   }),
@@ -301,6 +356,7 @@ export const purgeExpiredBatch = internalAction({
         aborted: true,
         purgedVariables: 0,
         purgedAccounts: 0,
+        purgedFiles: 0,
         skipped: 0,
         rescheduled: false,
       };
@@ -313,6 +369,7 @@ export const purgeExpiredBatch = internalAction({
 
     let purgedVariables = 0;
     let purgedAccounts = 0;
+    let purgedFiles = 0;
     let skipped = 0;
 
     for (const variable of batch.variables) {
@@ -358,10 +415,43 @@ export const purgeExpiredBatch = internalAction({
       else skipped++;
     }
 
-    // A full batch on either type means more work likely remains.
+    // Secret files: blob FIRST, then the Vault key, then the row. Every
+    // crash point in that order leaves harmless garbage — a key that unlocks
+    // nothing, or a row the next sweep retries. The reverse order could
+    // leave readable ciphertext whose key is gone from our records but whose
+    // blob is still served, which is the one state worth designing out.
+    for (const file of batch.files) {
+      // Through the seam, not ctx.storage directly — otherwise swapping the
+      // blob backend would silently orphan every ciphertext the GC purges.
+      const blobDeleted = await blobStoreDel(ctx, file.storageId);
+      if (!blobDeleted) {
+        skipped++;
+        continue;
+      }
+
+      let allDeleted = true;
+      for (const ref of file.vaultRefs) {
+        const ok = await deleteVaultObject(ref, apiKey);
+        if (!ok) allDeleted = false;
+      }
+      if (!allDeleted) {
+        skipped++;
+        continue;
+      }
+
+      const deleted = await ctx.runMutation(
+        internal.features.vault.gc.hardDeleteFile,
+        { fileId: file.id }
+      );
+      if (deleted) purgedFiles++;
+      else skipped++;
+    }
+
+    // A full batch on any type means more work likely remains.
     const fullBatch =
       batch.variables.length === PURGE_BATCH_SIZE ||
-      batch.accounts.length === PURGE_BATCH_SIZE;
+      batch.accounts.length === PURGE_BATCH_SIZE ||
+      batch.files.length === PURGE_BATCH_SIZE;
 
     let rescheduled = false;
     if (fullBatch && depth + 1 < MAX_RESCHEDULE_DEPTH) {
@@ -377,6 +467,7 @@ export const purgeExpiredBatch = internalAction({
 
     return {
       aborted: false,
+      purgedFiles,
       purgedVariables,
       purgedAccounts,
       skipped,
@@ -436,6 +527,13 @@ export const listProjectTrash = internalQuery({
         vaultRefs: v.array(v.string()),
       })
     ),
+    files: v.array(
+      v.object({
+        id: v.id("projectFiles"),
+        vaultRefs: v.array(v.string()),
+        storageId: v.id("_storage"),
+      })
+    ),
   }),
   handler: async (ctx, args) => {
     const variableDocs = await ctx.db
@@ -471,7 +569,20 @@ export const listProjectTrash = internalQuery({
       vaultRefs: [account.vaultRef],
     }));
 
-    return { variables, accounts };
+    const fileDocs = await ctx.db
+      .query("projectFiles")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).gt("deletedAt", 0)
+      )
+      .take(PURGE_BATCH_SIZE);
+
+    const files = fileDocs.map((file) => ({
+      id: file._id,
+      vaultRefs: [file.vaultRef],
+      storageId: file.storageId,
+    }));
+
+    return { variables, accounts, files };
   },
 });
 
@@ -527,6 +638,30 @@ export const hardDeleteTrashedAccount = internalMutation({
 });
 
 /** Audit record for a user-initiated empty-trash run. */
+/**
+ * Hard-delete a TRASHED secret file regardless of retention age, AFTER its
+ * blob and vault object are gone. Same still-trashed guard as the other two.
+ */
+export const hardDeleteTrashedFile = internalMutation({
+  args: { fileId: v.id("projectFiles") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const file = await ctx.db.get(args.fileId);
+    if (!file || file.deletedAt === undefined) return false;
+
+    const permissions = await ctx.db
+      .query("filePermissions")
+      .withIndex("by_file", (q) => q.eq("fileId", args.fileId))
+      .collect();
+    for (const perm of permissions) {
+      await ctx.db.delete(perm._id);
+    }
+
+    await ctx.db.delete(args.fileId);
+    return true;
+  },
+});
+
 export const recordTrashEmptied = internalMutation({
   args: {
     projectId: v.id("projects"),
@@ -534,6 +669,9 @@ export const recordTrashEmptied = internalMutation({
     userId: v.id("users"),
     purgedVariables: v.number(),
     purgedAccounts: v.number(),
+    // Optional so a web build deployed before this convex deploy keeps
+    // working — it simply records nothing for files.
+    purgedFiles: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -545,6 +683,7 @@ export const recordTrashEmptied = internalMutation({
       details: JSON.stringify({
         purgedVariables: args.purgedVariables,
         purgedAccounts: args.purgedAccounts,
+        purgedFiles: args.purgedFiles ?? 0,
       }),
       createdAt: Date.now(),
     });
@@ -563,6 +702,7 @@ export const emptyProjectTrash = action({
   returns: v.object({
     purgedVariables: v.number(),
     purgedAccounts: v.number(),
+    purgedFiles: v.number(),
     skipped: v.number(),
   }),
   handler: async (ctx, args) => {
@@ -581,6 +721,7 @@ export const emptyProjectTrash = action({
 
     let purgedVariables = 0;
     let purgedAccounts = 0;
+    let purgedFiles = 0;
     let skipped = 0;
 
     for (let round = 0; round < MAX_RESCHEDULE_DEPTH; round++) {
@@ -588,9 +729,14 @@ export const emptyProjectTrash = action({
         internal.features.vault.gc.listProjectTrash,
         { projectId: args.projectId }
       );
-      if (batch.variables.length === 0 && batch.accounts.length === 0) break;
+      if (
+        batch.variables.length === 0 &&
+        batch.accounts.length === 0 &&
+        batch.files.length === 0
+      )
+        break;
 
-      const purgedBeforeRound = purgedVariables + purgedAccounts;
+      const purgedBeforeRound = purgedVariables + purgedAccounts + purgedFiles;
 
       for (const variable of batch.variables) {
         let allDeleted = true;
@@ -628,10 +774,41 @@ export const emptyProjectTrash = action({
         else skipped++;
       }
 
+      // Secret files: blob first, then the vault key, then the row — the same
+      // ordering the scheduled sweep uses, for the same reason.
+      for (const file of batch.files) {
+        const blobDeleted = await ctx.storage
+          .delete(file.storageId)
+          .then(() => true)
+          .catch(() => false);
+        if (!blobDeleted) {
+          skipped++;
+          continue;
+        }
+        let allDeleted = true;
+        for (const ref of file.vaultRefs) {
+          const ok = await deleteVaultObject(ref, apiKey);
+          if (!ok) allDeleted = false;
+        }
+        if (!allDeleted) {
+          skipped++;
+          continue;
+        }
+        const deleted = await ctx.runMutation(
+          internal.features.vault.gc.hardDeleteTrashedFile,
+          { fileId: file.id }
+        );
+        if (deleted) purgedFiles++;
+        else skipped++;
+      }
+
       // A round that purged nothing means every remaining doc is failing its
       // Vault delete — stop instead of spinning on the same skips (the
       // scheduled GC retries them).
-      if (purgedVariables + purgedAccounts === purgedBeforeRound) {
+      if (
+        purgedVariables + purgedAccounts + purgedFiles ===
+        purgedBeforeRound
+      ) {
         break;
       }
     }
@@ -642,8 +819,9 @@ export const emptyProjectTrash = action({
       userId: authz.userId,
       purgedVariables,
       purgedAccounts,
+      purgedFiles,
     });
 
-    return { purgedVariables, purgedAccounts, skipped };
+    return { purgedVariables, purgedAccounts, purgedFiles, skipped };
   },
 });

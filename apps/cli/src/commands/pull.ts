@@ -10,6 +10,13 @@ import {
   diff as showDiff,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
+import {
+  applyMode,
+  ignoreSecretFilePaths,
+  modeMatches,
+  statusOf,
+  writeSecretFile,
+} from "../lib/secret-files.js";
 import { isAuthenticated } from "../lib/config.js";
 import {
   readProjectConfig,
@@ -100,6 +107,10 @@ export const pullCommand = new Command("pull")
     "AWS Parameter Store path prefix (default: /project-name)"
   )
   .option("--dry-run", "Show what would be downloaded without writing")
+  .option(
+    "--files",
+    "Also materialise secret files (keystores, SSH keys, certificates)"
+  )
   .option("--project <name-or-id>", "Pull a specific linked project")
   .option("--all", "Pull all linked projects")
   .action(async (options) => {
@@ -183,6 +194,7 @@ async function pullAllProjects(options: {
   force?: boolean;
   format?: string;
   dryRun?: boolean;
+  files?: boolean;
 }): Promise<void> {
   const configV2 = readProjectConfigV2();
   if (!configV2) throw notInitialized();
@@ -242,6 +254,7 @@ async function pullSingleProject(
     format?: string;
     prefix?: string;
     dryRun?: boolean;
+    files?: boolean;
   }
 ): Promise<void> {
   checkTrackedFiles();
@@ -266,7 +279,140 @@ async function pullSingleProject(
   );
 }
 
+/**
+ * Materialise a project's secret files alongside the .env.
+ *
+ * Deliberately additive and opt-in: `pull` has always produced exactly one
+ * file, and silently scattering keystores through someone's tree would be a
+ * surprising change of contract. The work itself is the same as
+ * `envpilot files pull`.
+ */
+async function pullSecretFiles(
+  projectId: string,
+  environment: string,
+  force?: boolean,
+  dryRun?: boolean
+): Promise<boolean> {
+  const client = createAPIClient();
+  const files = await client.listSecretFiles(projectId, environment);
+  if (files.length === 0) return true;
+
+  const root = process.cwd();
+
+  // --dry-run still previews WHICH files would be written and their current
+  // drift, it just never downloads content or touches the disk.
+  if (dryRun) {
+    console.log();
+    info(`${files.length} secret file(s) for ${environment}:`);
+    for (const file of files) {
+      const status = await statusOf(file, root);
+      // Permission drift is drift: a real pull chmods a byte-identical file
+      // whose mode was loosened, so a preview that calls it "in-sync" is
+      // lying about what the pull will do.
+      const label =
+        status === "in-sync" && !modeMatches(root, file.path, file.mode)
+          ? "wrong-mode"
+          : status;
+      console.log(`    ${label.padEnd(10)} ${file.path}`);
+    }
+    return true;
+  }
+
+  const conflicts: typeof files = [];
+  for (const file of files) {
+    if ((await statusOf(file, root)) === "modified") conflicts.push(file);
+  }
+  if (conflicts.length > 0 && !force) {
+    console.log();
+    warning(
+      "Secret files skipped — these local copies differ from the server:"
+    );
+    for (const file of conflicts) console.log(`    ${file.path}`);
+    info("Re-run with --force to replace them.");
+    // FAILURE, not a warning. Reporting success here made `pull --all` count
+    // the project as pulled while its keystores were never written — the
+    // build then fails somewhere far less obvious.
+    return false;
+  }
+
+  // .gitignore before the write, never after.
+  ignoreSecretFilePaths(
+    root,
+    files.map((f) => f.path)
+  );
+
+  console.log();
+  let written = 0;
+  for (const file of files) {
+    if ((await statusOf(file, root)) === "in-sync") {
+      // Repair loosened permissions without re-downloading anything.
+      if (!modeMatches(root, file.path, file.mode)) {
+        applyMode(root, file.path, file.mode);
+      }
+      continue;
+    }
+    const content = await client.getSecretFileContent(file._id);
+    await writeSecretFile(
+      root,
+      content.path,
+      Buffer.from(content.content, "base64"),
+      content.mode
+    );
+    written += 1;
+    console.log(`  ${chalk.green("✓")} ${file.path}  ${file.mode}`);
+  }
+  success(
+    `${written} secret file${written === 1 ? "" : "s"} written, ${files.length - written} unchanged`
+  );
+  return true;
+}
+
+/**
+ * Pull a project's variables and, when asked, its secret files.
+ *
+ * Every caller routes through here — the default path, --project, and --all —
+ * so `--files` cannot be silently dropped by one of them. The variables pull
+ * returns early when a project has none; files still run after it, because a
+ * project can legitimately have secret files and no variables.
+ */
 async function pullProject(
+  project: {
+    projectId: string;
+    organizationId: string;
+    environment: string;
+    fileProtection?: FileProtection;
+  },
+  outputPath: string,
+  options: {
+    env?: string;
+    file?: string;
+    force?: boolean;
+    format?: string;
+    prefix?: string;
+    dryRun?: boolean;
+    files?: boolean;
+  }
+): Promise<void> {
+  await pullProjectVariables(project, outputPath, options);
+
+  if (options.files) {
+    const ok = await pullSecretFiles(
+      project.projectId,
+      project.environment,
+      options.force,
+      options.dryRun
+    );
+    if (!ok) {
+      // Propagate: `pull --all` must not count this project as pulled, and a
+      // single-project pull must exit nonzero so CI notices.
+      throw new Error(
+        "Secret files were not written — local copies differ from the server. Re-run with --force."
+      );
+    }
+  }
+}
+
+async function pullProjectVariables(
   project: {
     projectId: string;
     organizationId: string;

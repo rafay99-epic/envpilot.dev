@@ -1,0 +1,21 @@
+{
+  "name": "@envpilot/secret-files",
+  "version": "1.0.0",
+  "description": "Node-safe secret-file helpers shared by the Envpilot CLI and VS Code extension",
+  "private": true,
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@envpilot/eslint-config": "workspace:*",
+    "@envpilot/tsconfig": "workspace:*",
+    "@types/node": "^22",
+    "eslint": "^9",
+    "typescript": "^5"
+  }
+}

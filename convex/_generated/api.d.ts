@@ -58,6 +58,12 @@ import type * as features_emails_templates from "../features/emails/templates.js
 import type * as features_featureRegistry_gates from "../features/featureRegistry/gates.js";
 import type * as features_featureRegistry_queries from "../features/featureRegistry/queries.js";
 import type * as features_featureRegistry_resolver from "../features/featureRegistry/resolver.js";
+import type * as features_files_blobStore from "../features/files/blobStore.js";
+import type * as features_files_crypto from "../features/files/crypto.js";
+import type * as features_files_helpers from "../features/files/helpers.js";
+import type * as features_files_mutations from "../features/files/mutations.js";
+import type * as features_files_queries from "../features/files/queries.js";
+import type * as features_files_values from "../features/files/values.js";
 import type * as features_integrations_dispatch from "../features/integrations/dispatch.js";
 import type * as features_integrations_messages from "../features/integrations/messages.js";
 import type * as features_integrations_notify from "../features/integrations/notify.js";
@@ -174,6 +180,12 @@ declare const fullApi: ApiFromModules<{
   "features/featureRegistry/gates": typeof features_featureRegistry_gates;
   "features/featureRegistry/queries": typeof features_featureRegistry_queries;
   "features/featureRegistry/resolver": typeof features_featureRegistry_resolver;
+  "features/files/blobStore": typeof features_files_blobStore;
+  "features/files/crypto": typeof features_files_crypto;
+  "features/files/helpers": typeof features_files_helpers;
+  "features/files/mutations": typeof features_files_mutations;
+  "features/files/queries": typeof features_files_queries;
+  "features/files/values": typeof features_files_values;
   "features/integrations/dispatch": typeof features_integrations_dispatch;
   "features/integrations/messages": typeof features_integrations_messages;
   "features/integrations/notify": typeof features_integrations_notify;

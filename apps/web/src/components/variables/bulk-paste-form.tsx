@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ENVIRONMENTS, type Environment } from "@/constants/project";
+import {
+  ENVIRONMENTS,
+  type Environment,
+  envToggleClasses,
+} from "@/constants/project";
 import {
   parseEnvFile,
   type ParsedEnvEntry,
@@ -214,15 +218,7 @@ export function BulkPasteForm({
               type="button"
               onClick={() => handleEnvironmentToggle(env as Environment)}
               disabled={isSubmitting}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-                environments.includes(env as Environment)
-                  ? env === "production"
-                    ? "bg-red-100 text-red-700 ring-1 ring-red-300 dark:bg-red-900/30 dark:text-red-400 dark:ring-red-700"
-                    : env === "staging"
-                      ? "bg-yellow-100 text-yellow-700 ring-1 ring-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:ring-yellow-700"
-                      : "bg-green-100 text-green-700 ring-1 ring-green-300 dark:bg-green-900/30 dark:text-green-400 dark:ring-green-700"
-                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-              }`}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${envToggleClasses(env as Environment, environments.includes(env as Environment))}`}
             >
               {env}
             </button>

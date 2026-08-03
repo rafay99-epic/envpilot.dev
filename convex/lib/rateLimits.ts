@@ -1,5 +1,6 @@
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
+import { MAX_PROJECT_FILES } from "./fileLimits";
 
 /**
  * Rate limiter configuration for Envpilot backend.
@@ -33,6 +34,43 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     rate: 120,
     period: 60_000,
     capacity: 120,
+  },
+
+  // Secret-file uploads: 20 per minute per user. Each one encrypts, writes
+  // a blob and creates a vault object, so an unthrottled loop is expensive
+  // in storage and in WorkOS calls, not just CPU.
+  fileUpload: {
+    kind: "token bucket",
+    rate: 20,
+    period: 60_000,
+    capacity: 20,
+  },
+
+  // Secret-file content reads. Each one is a blob read plus a vault read plus
+  // a decrypt, and returns PLAINTEXT.
+  //
+  // capacity >> rate on purpose. The CLI and the extension issue one action
+  // per file, so a first pull of a Pro project (no file-count limit) is a
+  // burst of hundreds — a bucket sized 60/60 aborted that pull partway
+  // through with an error neither client retries. But setting rate to 600 as
+  // well would have refilled as fast as it drained, licensing a SUSTAINED
+  // 10 secrets/second forever, which is precisely an exfiltration profile.
+  //
+  // Splitting them gives the cold pull its one-off burst and then settles to
+  // 1/second. A legitimate second pull moments later is served from files
+  // already in sync (statusOf short-circuits, zero decrypts), so the slow
+  // refill is invisible to real use and expensive to abuse.
+  //
+  // capacity IS the project ceiling, imported rather than restated. The write
+  // path refuses the insert that would exceed it, so a cold pull of any
+  // project that can exist fits in one burst by construction. `throws: true`
+  // gives no retry, so a capacity below that ceiling would abort a legitimate
+  // first pull partway through.
+  fileDownload: {
+    kind: "token bucket",
+    rate: 60,
+    period: 60_000,
+    capacity: MAX_PROJECT_FILES,
   },
 
   // Machine-originated variable requests: 5 per hour per key, burst 2.

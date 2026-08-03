@@ -44,6 +44,46 @@ const ACCESS_REVOKED_MESSAGE =
   "Your access to this organization has been revoked. Please contact your organization administrator.";
 
 /**
+ * Reduce a Convex error to the single user-facing sentence it carries.
+ *
+ * A ConvexError thrown inside an action arrives at the CLI wrapped in the
+ * deployment's diagnostics: a request id, one or more "Uncaught ConvexError:"
+ * layers (an action re-throwing a mutation's error double-wraps it), and a
+ * source stack. Printing `error.message` raw dumped all of that at the user.
+ *
+ * Mirrors sanitizeConvexError in apps/web/src/lib/error-messages.ts — the two
+ * surfaces must show the same sentence for the same failure.
+ */
+export function sanitizeConvexError(error: unknown): string {
+  // In production the plain message is redacted to "Server Error" and only the
+  // ConvexError payload survives, so prefer it when present.
+  const data = (error as { data?: unknown })?.data;
+  if (typeof data === "string" && data.trim().length > 0) {
+    return data.trim();
+  }
+
+  const raw =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "An unexpected error occurred";
+
+  return (
+    raw
+      .replace(/\[CONVEX [MAQ]\([^)]*\)\]\s*/g, "")
+      .replace(/\[Request ID: [^\]]+\]\s*/g, "")
+      .replace(/\s*at\s+\S+\s+\([^)]*\)/g, "")
+      .replace(/^(Server Error\s*)?(Uncaught (Convex)?Error:\s*)+/i, "")
+      .replace(/\/[\w./-]+\.(ts|js|tsx|jsx)(:\d+:\d+)?/g, "")
+      .replace(/\.\.\//g, "")
+      .replace(/\s*at handler\s*/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim() || "An unexpected error occurred"
+  );
+}
+
+/**
  * Format an error for display
  */
 export function formatError(error: unknown): string {
@@ -67,7 +107,7 @@ export function formatError(error: unknown): string {
   }
 
   if (error instanceof Error) {
-    return chalk.red(`Error: ${error.message}`);
+    return chalk.red(`Error: ${sanitizeConvexError(error)}`);
   }
 
   return chalk.red(`Error: ${String(error)}`);

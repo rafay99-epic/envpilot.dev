@@ -2,7 +2,7 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects. Real-time revocation, clipboard protection, commit guard, and role-based access.",
-  "version": "1.16.1",
+  "version": "1.17.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "MIT",
@@ -229,6 +229,10 @@
         {
           "command": "envpilot.clipboardBlocked",
           "when": "false"
+        },
+        {
+          "command": "envpilot.revealValues",
+          "when": "envpilot.canRevealSecrets"
         }
       ],
       "view/title": [
@@ -454,6 +458,7 @@
   },
   "devDependencies": {
     "@envpilot/eslint-config": "workspace:*",
+    "@envpilot/secret-files": "workspace:*",
     "@envpilot/tsconfig": "workspace:*",
     "@types/node": "^22",
     "@types/vscode": "^1.85.0",

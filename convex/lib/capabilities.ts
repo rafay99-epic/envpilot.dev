@@ -161,6 +161,46 @@ export const CAPABILITIES = {
     description: "Soft-delete and restore shared accounts",
     risk: "high",
   },
+  "project.files.create": {
+    label: "Upload secret files",
+    category: "Files",
+    description:
+      "Upload keystores, SSH keys, certificates, and service-account files",
+    risk: "medium",
+  },
+  "project.files.update": {
+    label: "Update secret files (blanket)",
+    category: "Files",
+    description: "Blanket write on all in-scope secret files",
+    risk: "high",
+  },
+  "project.files.delete": {
+    label: "Delete / restore secret files",
+    category: "Files",
+    description: "Soft-delete and restore secret files",
+    risk: "high",
+  },
+  /**
+   * DISPLAY capability, enforced at the client — deliberately, not by
+   * omission.
+   *
+   * Everything it governs is already on the developer's disk: the extension
+   * only ever masks files it just wrote, and the read that delivered them
+   * was authorized by `project.read` and the per-file grants. A backend
+   * assertion here would be asserting on plaintext the caller legitimately
+   * holds, which is theatre, not a gate. What the server owes the client is
+   * an accurate capability map; the extension consumes this key in
+   * SyncService.canRevealSecrets (fail-closed: unknown project denies, and
+   * one denying project denies overall) and gates both the reveal command
+   * and the unmasking direction of the cloaking toggle on it.
+   */
+  "project.secrets.reveal": {
+    label: "Reveal secret values locally",
+    category: "Access model",
+    description:
+      "Temporarily unmask synced .env values and secret file contents in the VS Code editor",
+    risk: "high",
+  },
   "project.requests.submit": {
     label: "Submit requests",
     category: "Requests",
@@ -275,6 +315,11 @@ export const PROJECT_ACTION_TO_CAPABILITY = {
   "project:update_account": "project.accounts.update",
   "project:delete_account": "project.accounts.delete",
   "project:manage_account_permissions": "project.permissions.manage",
+  "project:create_file": "project.files.create",
+  "project:update_file": "project.files.update",
+  "project:delete_file": "project.files.delete",
+  "project:manage_file_permissions": "project.permissions.manage",
+  "project:reveal_secrets": "project.secrets.reveal",
 } as const satisfies Record<string, CapabilityKey>;
 
 export type OrgAction = keyof typeof ORG_ACTION_TO_CAPABILITY;

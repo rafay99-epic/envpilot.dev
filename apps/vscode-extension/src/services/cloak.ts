@@ -1,9 +1,5 @@
 import * as vscode from "vscode";
-
-/**
- * Matches an assignment line; captures the value after "=". Anchored per line.
- */
-const VALUE_LINE = /^\s*[A-Za-z_][A-Za-z0-9_.]*\s*=(.*)$/;
+import { computeCloakRanges, detectCloakFormat } from "../utils/cloakRanges";
 
 /**
  * Fixed-length mask so the decoration never leaks the real value's length.
@@ -63,7 +59,9 @@ export class CloakService {
     this.refresh();
   }
 
-  private isEnabled(): boolean {
+  /** Whether cloaking is currently on (public: the toggle command needs it
+   * to decide which direction requires the reveal capability). */
+  isEnabled(): boolean {
     return vscode.workspace
       .getConfiguration("envpilot")
       .get<boolean>("cloakValues", true);
@@ -77,21 +75,27 @@ export class CloakService {
         editor.setDecorations(this.decoration, []);
         continue;
       }
-      const ranges: vscode.Range[] = [];
+      // The format decides how to mask, derived from the path alone. That
+      // matters for correctness, not just tidiness: it works the instant the
+      // clipboard guard re-arms from the manifest at activation, BEFORE the
+      // first sync. Keying off a registry the sync populates left every
+      // value visible from window-open until that sync landed.
+      const format = detectCloakFormat(
+        editor.document.uri.fsPath,
+        editor.document.languageId
+      );
+
+      const lines: string[] = [];
       for (let line = 0; line < editor.document.lineCount; line++) {
-        const text = editor.document.lineAt(line).text;
-        const match = VALUE_LINE.exec(text);
-        if (!match || match[1].length === 0) continue;
-        ranges.push(
-          new vscode.Range(
-            line,
-            text.length - match[1].length,
-            line,
-            text.length
-          )
-        );
+        lines.push(editor.document.lineAt(line).text);
       }
-      editor.setDecorations(this.decoration, ranges);
+
+      editor.setDecorations(
+        this.decoration,
+        computeCloakRanges(format, lines).map(
+          (r) => new vscode.Range(r.line, r.start, r.line, r.end)
+        )
+      );
     }
   }
 

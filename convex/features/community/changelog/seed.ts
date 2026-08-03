@@ -1441,4 +1441,42 @@ The bug only existed in production, where the platform redacts internal error de
 ### Known Limitation
 Right-click → Copy and the Edit menu inside a protected \`.env\` file are not intercepted. Covering them requires overriding built-in commands, which is exactly what caused this bug. The clipboard guard is a safeguard against accidental exposure, not a security boundary — \`.env\` files remain readable by any other tool on the machine, and real enforcement lives in role-based access control, the commit guard, and the audit log.`,
   },
+
+  // ============================================================
+  // Secret Files — files that are not strings (2026-08-03)
+  // ============================================================
+  {
+    title: "Secret Files: Keystores, SSH Keys and Certificates",
+    version: "v1.55.0",
+    type: "feature",
+    publishedAt: ts("2026-08-03T15:30:00Z"),
+    content: `Envpilot solved half the secret problem. \`DATABASE_URL\` was covered; \`upload.jks\`, \`id_ed25519\`, \`google-services.json\` and \`AuthKey.p8\` were not — so they lived in Slack DMs, 1Password notes, and one teammate's laptop. Secret Files makes them first-class: uploaded from the dashboard, encrypted, and written to their exact path by the CLI and the VS Code extension.
+
+The goal, in one line: \`git clone && envpilot pull\` should produce a repository that builds — not one that builds after you ask someone for the keystore.
+
+### Encrypted in Two Places, Readable From Neither
+- Each file is sealed with its own AES-256-GCM key; the ciphertext goes to file storage and the key goes to the vault, so neither store alone can reveal anything
+- A fresh key and nonce are generated on every write, so the classic GCM reuse failure is unreachable rather than merely guarded against
+- Tampered or truncated content fails loudly instead of producing a half-written signing key
+
+### A Path and a Mode, Not Just Bytes
+- Every file carries the destination path and POSIX mode it should land at, so nobody has to remember that a keystore belongs in \`android/app/\`
+- The same path may exist in several environments as long as they do not overlap — a development and a production \`google-services.json\` coexist, and each environment pulls the right one
+- Files are written atomically at \`0600\` or \`0400\`, and their paths are added to \`.gitignore\` before the file exists
+
+### In the CLI
+- \`envpilot files list | status | pull | add | get | rm\`, plus \`--files\` on \`envpilot pull\`
+- \`status\` compares a local copy against the server by checksum — no decryption, no download, no audit entry
+- \`pull\` refuses to overwrite a local file that differs from the server unless you pass \`--force\`, and repairs permissions that have been loosened since the last pull
+
+### In VS Code
+- Files materialise alongside \`.env\` on every sync, and carry the same protections: clipboard guard, unauthorized-edit reversion, and removal when a project is unlinked
+- Contents are masked in the editor by format — JSON, YAML, TOML and PEM keep their keys, comments and structure readable while every value is hidden
+- Revealing values is role-based: an organization owner or team lead can unmask for 30 seconds, and a role without the permission never sees the option
+
+### Access and Limits
+- Per-file read and write grants, mirroring shared accounts, with every upload, download, grant and revocation recorded in the audit log
+- Deleted files go to the trash with the same retention window as variables and accounts, and can be restored
+- Available on the free plan up to three files, unlimited on Pro`,
+  },
 ];

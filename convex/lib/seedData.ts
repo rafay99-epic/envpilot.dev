@@ -232,6 +232,33 @@ export const SEED_FEATURES = [
     resettable: false,
     sortOrder: 8,
   },
+  {
+    key: "secret_files",
+    displayName: "Secret Files",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 9,
+  },
+  {
+    key: "secret_files_limit",
+    displayName: "Max Secret Files",
+    valueType: "numeric" as const,
+    category: "Security",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 10,
+  },
+  {
+    key: "secret_files_max_bytes",
+    displayName: "Max Secret File Size (bytes)",
+    valueType: "numeric" as const,
+    category: "Security",
+    defaultValue: "262144",
+    resettable: false,
+    sortOrder: 11,
+  },
 
   // Customization
   {
