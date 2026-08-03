@@ -55,15 +55,22 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // well would have refilled as fast as it drained, licensing a SUSTAINED
   // 10 secrets/second forever, which is precisely an exfiltration profile.
   //
-  // Splitting them gives the cold pull its one-off burst of 600 and then
-  // settles to 1/second. A legitimate second pull moments later is served
-  // from files already in sync (statusOf short-circuits, zero decrypts), so
-  // the slow refill is invisible to real use and expensive to abuse.
+  // Splitting them gives the cold pull its one-off burst and then settles to
+  // 1/second. A legitimate second pull moments later is served from files
+  // already in sync (statusOf short-circuits, zero decrypts), so the slow
+  // refill is invisible to real use and expensive to abuse.
+  //
+  // capacity is tied to MAX_FILE_ROWS (1000), the ceiling queries.list and
+  // the collision scan already refuse to exceed. That is not a round number
+  // picked for comfort — it is the largest listing a single project can
+  // produce, so a cold pull of ANY supported project fits in one burst by
+  // construction. `throws: true` gives no retry, so a capacity below that
+  // ceiling would abort a legitimate 700-file first pull at file 601.
   fileDownload: {
     kind: "token bucket",
     rate: 60,
     period: 60_000,
-    capacity: 600,
+    capacity: 1000,
   },
 
   // Machine-originated variable requests: 5 per hour per key, burst 2.

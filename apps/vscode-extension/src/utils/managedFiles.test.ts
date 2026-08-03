@@ -312,6 +312,36 @@ describe("multi-project ownership", () => {
     expect(await readManifest(manifest)).toHaveLength(0);
   });
 
+  it("deletes the departing project's bytes even when an owner remains", async () => {
+    // Two projects, same path, DIFFERENT content. The file holds whatever
+    // synced last. Unlinking that project must not leave its secret on disk
+    // just because another project also claims the path — the remaining
+    // owner re-materialises its own copy on the next sync.
+    const file = path.join(dir, "shared.pem");
+    await fs.writeFile(file, "a-bytes");
+    await recordManagedFile(file, "a-bytes", manifest, undefined, "proj-a");
+    await fs.writeFile(file, "b-bytes");
+    await recordManagedFile(file, "b-bytes", manifest, undefined, "proj-b");
+
+    // proj-b wrote last, so proj-b's bytes are the ones sitting there.
+    expect(await releaseManagedFile(file, "proj-b", manifest)).toBe(true);
+    const after = await readManifest(manifest);
+    expect(after[0].projectIds).toEqual(["proj-a"]);
+    expect(after[0].lastWriter).toBeUndefined();
+  });
+
+  it("keeps a file whose bytes belong to a project that is staying", async () => {
+    const file = path.join(dir, "shared2.pem");
+    await fs.writeFile(file, "a-bytes");
+    await recordManagedFile(file, "a-bytes", manifest, undefined, "proj-a");
+    await recordManagedFile(file, "a-bytes", manifest, undefined, "proj-b");
+    await fs.writeFile(file, "a-bytes");
+    await recordManagedFile(file, "a-bytes", manifest, undefined, "proj-a");
+
+    // proj-a wrote last; releasing proj-b must not touch proj-a's file.
+    expect(await releaseManagedFile(file, "proj-b", manifest)).toBe(false);
+  });
+
   it("reports an unowned legacy entry as safe to delete", async () => {
     const file = path.join(dir, "legacy.pem");
     await fs.writeFile(file, "x");

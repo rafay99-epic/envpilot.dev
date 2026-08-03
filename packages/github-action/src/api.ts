@@ -39,9 +39,12 @@ export class EnvpilotApiError extends Error {
 
 /** Parse Retry-After (seconds form). Undefined when absent or unparseable. */
 function retryAfterOf(response: Response): number | undefined {
-  const raw = response.headers.get("retry-after");
+  const raw = response.headers.get("retry-after")?.trim();
+  // Empty after trimming must fall through to the caller's default, NOT to
+  // zero: Number("") is 0, which reads as "retry immediately" and turns a
+  // malformed header into a hot retry loop against a limiter.
   if (!raw) return undefined;
-  const seconds = Number(raw.trim());
+  const seconds = Number(raw);
   return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
 }
 

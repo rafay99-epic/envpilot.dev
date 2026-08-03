@@ -144,9 +144,13 @@ jobs:
           # module that does not exist on npm — so assert it here instead.
           # Match module SPECIFIERS only — the bundle legitimately contains
           # the string "@envpilot/cli" in upgrade hints printed to the user.
-          if grep -rqE '(from|require\(|import\()[[:space:]]*"@envpilot/' dist; then
+          # Covers both quote styles and BARE side-effect imports
+          # (`import "@envpilot/x"`), which carry no `from` and slipped
+          # through a from/require-only pattern.
+          SPEC='(from|require\(|import\(|import)[[:space:]]*["'"'"']@envpilot/'
+          if grep -rqE "$SPEC" dist; then
             echo "::error::Built CLI still imports an @envpilot/* workspace package — tsup noExternal is not bundling it. Refusing to publish a build that cannot resolve on npm."
-            grep -rnE '(from|require\(|import\()[[:space:]]*"@envpilot/' dist | head -5
+            grep -rnE "$SPEC" dist | head -5
             exit 1
           fi
           echo "WorkOS client id + Convex URL embedded, no unbundled workspace imports ✓"

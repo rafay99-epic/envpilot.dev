@@ -888,9 +888,12 @@ export const getProjectFiles = action({
     assertKeyFormat(args.token);
     const metadataOnly = args.metadataOnly ?? false;
     // Server-derived from the SAME value authorize.ts enforced the key
-    // against — never a caller-supplied label. Absent means the REST
-    // inference in authorize.ts applied.
-    const auditSurface = args.surface ?? "rest_api";
+    // against — never a caller-supplied label. MIRRORS its fallback exactly:
+    // a legacy MCP caller sends only gateFeature, and defaulting those to
+    // rest_api mis-attributed every file it pulled.
+    const auditSurface =
+      args.surface ??
+      (args.gateFeature === "mcp_server" ? "mcp_server" : "rest_api");
 
     const tokenHash = await hashToken(args.token);
     await consumeRateLimit(
@@ -1037,7 +1040,12 @@ export const getProjectFiles = action({
     // per-file granularity is what lets the trail answer "who pulled the
     // production signing key"; batching the write is what keeps a large
     // pull from spending its action budget on round trips.
-    if (results.length > 0) {
+    //
+    // CONTENT pulls only. A metadata listing returns no plaintext, so
+    // recording it as `file.downloaded` both lies about what happened and —
+    // now that the Action always lists before pulling — doubles the rows for
+    // every real pull.
+    if (!metadataOnly && results.length > 0) {
       await ctx.runMutation(internal.features.api.reads._logFilePulls, {
         organizationId: bootstrap.organizationId,
         projectId: projectDoc._id,

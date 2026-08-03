@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import * as core from "@actions/core";
 import { buildDotenvContent, escapeSingleQuoted } from "./dotenv.js";
 import { run } from "./main.js";
@@ -159,8 +162,12 @@ describe("run (fetch handler)", () => {
 
 describe("secret-file pulls: rate-limit retry", () => {
   const inputs: Record<string, string> = {};
+  let filesDir: string;
 
   beforeEach(() => {
+    // A per-test temp dir, never the process cwd. Writing k.pem into the
+    // checkout left debris behind and could clobber a real file.
+    filesDir = mkdtempSync(path.join(os.tmpdir(), "envpilot-action-"));
     inputs.token = "envpk_test_token";
     inputs.environment = "production";
     inputs["api-url"] = "https://www.envpilot.dev";
@@ -168,7 +175,7 @@ describe("secret-file pulls: rate-limit retry", () => {
     inputs["env-file"] = "";
     inputs.files = "true";
     inputs.project = "acme";
-    inputs["files-dir"] = "";
+    inputs["files-dir"] = filesDir;
 
     vi.spyOn(core, "getInput").mockImplementation(
       (name: string) => inputs[name] ?? ""
@@ -189,6 +196,7 @@ describe("secret-file pulls: rate-limit retry", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    rmSync(filesDir, { recursive: true, force: true });
   });
 
   it("waits out a 429 mid-pull instead of failing the job", async () => {

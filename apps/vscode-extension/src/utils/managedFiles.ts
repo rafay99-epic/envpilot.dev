@@ -45,6 +45,17 @@ export interface ManagedFileEntry {
    * unowned (the previous directory-scoped behaviour).
    */
   projectIds?: string[];
+  /**
+   * The project whose bytes are CURRENTLY on disk at this path.
+   *
+   * Ownership alone is not enough when two projects publish the same path
+   * with different content: the file holds whatever the last sync wrote. If
+   * that project is then unlinked, "another owner remains" would keep its
+   * secret sitting on disk after revocation — the exact leak the ownership
+   * work exists to prevent. Recording the writer lets release tell the two
+   * cases apart.
+   */
+  lastWriter?: string;
 }
 
 // ponytail: one manifest shared by all VS Code forks (Code/Cursor/VSCodium).
@@ -87,6 +98,7 @@ export async function readManifest(
       if (typeof legacy === "string" && e.projectIds === undefined) {
         e.projectIds = [legacy];
       }
+      if (typeof e.lastWriter !== "string") delete e.lastWriter;
       delete (e as { projectId?: unknown }).projectId;
       // A malformed list (version skew, hand-edited manifest) is dropped so
       // ownership checks fall back to unowned rather than throwing.
@@ -114,15 +126,79 @@ export async function readManifest(
   }
 }
 
+/** How long a lockfile may sit before it is assumed to be a crashed holder. */
+const LOCK_STALE_MS = 10_000;
+const LOCK_RETRY_MS = 25;
+const LOCK_TIMEOUT_MS = 3_000;
+
 /**
- * Serializes every in-process read-modify-write of the manifest so parallel
- * writers (per-env sync fan-out, rename events) can't clobber each other's
- * entries with a stale snapshot. Cross-process (multi-window) races remain
- * the disclosed bounded tradeoff — see purgeManagedFilesFiltered.
+ * Cross-PROCESS mutual exclusion on the manifest.
+ *
+ * The manifest is shared by every VS Code fork and window on the machine, so
+ * the in-process chain below is not enough: two extension hosts syncing at
+ * once could each read the same snapshot and write back a version missing
+ * the other's change. That used to cost a re-recorded entry on the next
+ * sync (benign), but with ownership in the file a lost writer means either a
+ * revoked project's secret stays on disk or a file another project still
+ * needs gets deleted. Both are exactly what the ownership work was for.
+ *
+ * ponytail: O_EXCL lockfile with a stale break, not a lockfile dependency —
+ * the critical section is a sub-millisecond read/modify/write, so contention
+ * is rare and the failure mode of waiting is just a slower sync.
+ */
+async function withFileLock<T>(
+  manifestPath: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  const lockPath = `${manifestPath}.lock`;
+  await fs.mkdir(path.dirname(lockPath), { recursive: true });
+
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  for (;;) {
+    try {
+      const handle = await fs.open(lockPath, "wx");
+      await handle.close();
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      // Break a lock left behind by a crashed or killed host, rather than
+      // wedging every future sync on this machine forever.
+      const age = await fs
+        .stat(lockPath)
+        .then((s) => Date.now() - s.mtimeMs)
+        .catch(() => 0);
+      if (age > LOCK_STALE_MS) {
+        await fs.unlink(lockPath).catch(() => {});
+        continue;
+      }
+      if (Date.now() > deadline) {
+        // Proceeding unlocked is strictly better than failing the sync: the
+        // in-process chain still applies and the write itself is atomic.
+        return await fn();
+      }
+      await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
+    }
+  }
+
+  try {
+    return await fn();
+  } finally {
+    await fs.unlink(lockPath).catch(() => {});
+  }
+}
+
+/**
+ * Serializes every read-modify-write of the manifest: the promise chain
+ * covers parallel writers inside THIS process (per-env sync fan-out, rename
+ * events), the lockfile covers other extension hosts.
  */
 let manifestChain: Promise<unknown> = Promise.resolve();
-function withManifestLock<T>(fn: () => Promise<T>): Promise<T> {
-  const p = manifestChain.then(fn, fn);
+function withManifestLock<T>(
+  manifestPath: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  const run = () => withFileLock(manifestPath, fn);
+  const p = manifestChain.then(run, run);
   manifestChain = p.catch(() => {});
   return p;
 }
@@ -156,7 +232,7 @@ export async function recordManagedFile(
   projectId?: string
 ): Promise<void> {
   try {
-    await withManifestLock(async () => {
+    await withManifestLock(manifestPath, async () => {
       const resolved = path.resolve(filePath);
       const entries = await readManifest(manifestPath);
       const previous = entries.find((e) => pathsEqual(e.path, resolved));
@@ -172,6 +248,8 @@ export async function recordManagedFile(
         sha256: hashContent(content),
         ...(mode ? { mode } : {}),
         ...(owners.size > 0 ? { projectIds: [...owners] } : {}),
+        // These bytes are ours until someone else overwrites them.
+        ...(projectId ? { lastWriter: projectId } : {}),
       });
       await writeManifest(manifestPath, next);
     });
@@ -190,7 +268,7 @@ export async function renameManagedFile(
   manifestPath: string = getManifestPath()
 ): Promise<void> {
   try {
-    await withManifestLock(async () => {
+    await withManifestLock(manifestPath, async () => {
       const entries = await readManifest(manifestPath);
       // pathsEqual (not string equality): the persisted spelling may differ
       // in casing or symlink form from the rename event's path.
@@ -210,7 +288,7 @@ export async function forgetManagedFile(
   manifestPath: string = getManifestPath()
 ): Promise<void> {
   try {
-    await withManifestLock(async () => {
+    await withManifestLock(manifestPath, async () => {
       const entries = await readManifest(manifestPath);
       const next = entries.filter((e) => !pathsEqual(e.path, filePath));
       if (next.length === entries.length) return;
@@ -235,7 +313,7 @@ export async function releaseManagedFile(
   manifestPath: string = getManifestPath()
 ): Promise<boolean> {
   try {
-    return await withManifestLock(async () => {
+    return await withManifestLock(manifestPath, async () => {
       const entries = await readManifest(manifestPath);
       const entry = entries.find((e) => pathsEqual(e.path, filePath));
       if (!entry) return true;
@@ -243,9 +321,15 @@ export async function releaseManagedFile(
       const owners = entry.projectIds ?? [];
       const remaining = owners.filter((id) => id !== projectId);
       if (owners.length > 0 && remaining.length > 0) {
+        // Another project still publishes this path — but the BYTES on disk
+        // may be the departing project's. Keeping them would leave a revoked
+        // project's secret readable; deleting is safe because a remaining
+        // owner's next sync sees "missing" and re-materialises its own copy.
+        const holdsOurBytes = entry.lastWriter === projectId;
         entry.projectIds = remaining;
+        if (holdsOurBytes) delete entry.lastWriter;
         await writeManifest(manifestPath, entries);
-        return false;
+        return holdsOurBytes;
       }
 
       await writeManifest(
@@ -283,7 +367,7 @@ export async function purgeManagedFilesFiltered(
   shouldPurge: (filePath: string) => boolean,
   manifestPath: string = getManifestPath()
 ): Promise<{ deleted: number; spared: number; failed: number }> {
-  return withManifestLock(async () => {
+  return withManifestLock(manifestPath, async () => {
     let deleted = 0;
     let spared = 0;
     let failed = 0;

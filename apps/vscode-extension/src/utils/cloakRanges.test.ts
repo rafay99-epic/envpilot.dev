@@ -360,26 +360,66 @@ describe("regression: values that used to stay visible", () => {
 });
 
 describe("regression: TOML continuation state", () => {
-  it("keeps masking past a nested array that closes on its own line", () => {
-    // The middle line ends with `]` while the OUTER array is still open. A
-    // terminal-bracket test closed cloaking there and left every element
-    // below it readable.
-    const out = render("toml", 'a = [\n  [1, 2],\n  "secret-elem"\n]');
-    expect(out).not.toContain("secret-elem");
-    expect(out).toContain("a = [");
-  });
+  // Every sentinel here is a COMMENT on purpose. A comment is READABLE when
+  // the parser is outside continuation state and MASKED while inside it, so
+  // it detects an early close. A bare string sentinel cannot: the
+  // fail-closed path masks it either way, which made the previous versions
+  // of these tests pass against a parser that closed on the wrong token.
+  const SENTINEL = "# sentinel-inside-continuation";
 
-  it("does not close a ''' body on a nested \"\"\"", () => {
+  it("keeps masking past a nested array that closes on its own line", () => {
+    // The nested element must END the line with `]` — that is the exact
+    // shape a terminal-bracket test mistakes for the outer array closing.
     const out = render(
       "toml",
-      "k = '''\ncontains \"\"\" inside\nstill-secret\n'''"
+      ["a = [", "  [1, 2]", `  ${SENTINEL}`, "]"].join("\n")
     );
-    expect(out).not.toContain("still-secret");
+    expect(out).not.toContain(SENTINEL);
   });
 
-  it("ignores brackets inside quotes and comments when counting depth", () => {
-    const out = render("toml", 'a = [\n  "has ] bracket",\n  "secret-elem"\n]');
-    expect(out).not.toContain("secret-elem");
+  it("does not unwind array depth on a bracket inside a quoted element", () => {
+    const out = render(
+      "toml",
+      ["a = [", '  "has ] bracket",', `  ${SENTINEL}`, "]"].join("\n")
+    );
+    expect(out).not.toContain(SENTINEL);
+  });
+
+  it("does not unwind array depth on a bracket inside a comment", () => {
+    const out = render(
+      "toml",
+      ["a = [", "  1, # ] not a close", `  ${SENTINEL}`, "]"].join("\n")
+    );
+    expect(out).not.toContain(SENTINEL);
+  });
+
+  it("does not close a literal-string body on a nested basic delimiter", () => {
+    const out = render(
+      "toml",
+      ["k = '''", 'contains """ inside', SENTINEL, "'''"].join("\n")
+    );
+    expect(out).not.toContain(SENTINEL);
+  });
+
+  it("does not close a basic-string body on an ESCAPED delimiter", () => {
+    // A backslash-escaped quote followed by two more is not a terminator.
+    const out = render(
+      "toml",
+      ['k = """', 'escaped \\""" here', SENTINEL, '"""'].join("\n")
+    );
+    expect(out).not.toContain(SENTINEL);
+  });
+
+  it("DOES stop masking once the array really closes", () => {
+    // The counterpart assertion: without it every test above would pass on a
+    // parser that simply never leaves continuation state.
+    const out = render("toml", ["a = [", "  1", "]", SENTINEL].join("\n"));
+    expect(out).toContain(SENTINEL);
+  });
+
+  it("DOES stop masking once the multi-line string really closes", () => {
+    const out = render("toml", ['k = """', "body", '"""', SENTINEL].join("\n"));
+    expect(out).toContain(SENTINEL);
   });
 
   it("fails closed on a TOML line the key regex does not match", () => {

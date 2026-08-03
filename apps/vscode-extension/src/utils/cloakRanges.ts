@@ -321,15 +321,38 @@ function netBracketDelta(text: string): number {
 }
 
 /**
+ * True when `delimiter` appears in `text` UNESCAPED.
+ *
+ * Only basic (triple-double-quote) strings honour backslash escapes, and in
+ * one of those a backslash-escaped quote followed by two more quotes is NOT a
+ * terminator. A plain `includes` closed the mask there and exposed the rest
+ * of the string. Literal (triple-single-quote) strings have no escapes at
+ * all, so the raw search stays correct for them.
+ */
+function hasUnescapedDelimiter(text: string, delimiter: string): boolean {
+  if (delimiter !== '"""') return text.includes(delimiter);
+  for (let i = 0; i <= text.length - delimiter.length; i += 1) {
+    if (text[i] === "\\") {
+      i += 1; // skip the escaped character
+      continue;
+    }
+    if (text.startsWith(delimiter, i)) return true;
+  }
+  return false;
+}
+
+/**
  * The multi-line string delimiter this value OPENS without closing, or null.
  *
- * WHICH delimiter matters: a `'''` body may legally contain `"""`, so
- * closing on whichever one appears first ends the mask early.
+ * WHICH delimiter matters: a literal-string body may legally contain the
+ * basic-string delimiter, so closing on whichever appears first ends the
+ * mask early.
  */
 function opensTomlString(value: string): string | null {
   for (const delimiter of TOML_MULTILINE_DELIMITERS) {
     if (!value.startsWith(delimiter)) continue;
-    return value.slice(delimiter.length).includes(delimiter) ? null : delimiter;
+    const rest = value.slice(delimiter.length);
+    return hasUnescapedDelimiter(rest, delimiter) ? null : delimiter;
   }
   return null;
 }
@@ -439,7 +462,9 @@ export function computeCloakRanges(
         // delimiter that opened it reappears.
         if (tomlStringDelimiter !== null) {
           ranges.push({ line, start: indentOf(text), end: text.length });
-          if (text.includes(tomlStringDelimiter)) tomlStringDelimiter = null;
+          if (hasUnescapedDelimiter(text, tomlStringDelimiter)) {
+            tomlStringDelimiter = null;
+          }
           break;
         }
 
