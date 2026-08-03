@@ -26,8 +26,22 @@ import type { ApiService, SecretFileRow } from "./api";
 
 export type FileStatus = "in-sync" | "modified" | "missing";
 
+/** A file this run actually wrote, with everything the guards need. */
+export interface WrittenSecretFile {
+  /** Path relative to the workspace root, as recorded on the server. */
+  path: string;
+  /** Absolute on-disk path. */
+  absolutePath: string;
+  /** Permission bits applied ("0600" | "0400"). */
+  mode: string;
+  /** Numeric form of `mode`, for chmod. */
+  numericMode: number;
+}
+
 export interface MaterialiseResult {
   written: string[];
+  /** Same set as `written`, with the detail the VS Code guards need. */
+  writtenFiles: WrittenSecretFile[];
   unchanged: string[];
   /** Local copies that differ from the server and were left alone. */
   conflicts: string[];
@@ -193,10 +207,22 @@ export async function materialiseSecretFiles(
   projectId: string,
   environment: string,
   root: string,
-  options: { force?: boolean } = {}
+  options: {
+    force?: boolean;
+    /**
+     * Called for each file as it is written, while its plaintext is still in
+     * hand. sync.ts uses this to register the same guards a synced .env gets
+     * (managed-file manifest, clipboard guard, edit protection) without this
+     * module needing to import vscode.
+     */
+    onWritten?: (file: WrittenSecretFile, contents: Buffer) => Promise<void>;
+    /** Suppresses the edit watcher around our own writes. */
+    setSyncing?: (syncing: boolean) => void;
+  } = {}
 ): Promise<MaterialiseResult> {
   const result: MaterialiseResult = {
     written: [],
+    writtenFiles: [],
     unchanged: [],
     conflicts: [],
     failed: [],
@@ -236,24 +262,40 @@ export async function materialiseSecretFiles(
 
   if (pending.length === 0) return result;
 
-  for (const file of pending) {
-    try {
-      const content = await api.getSecretFileContent(file._id);
-      writeSecretFile(
-        root,
-        content.path,
-        Buffer.from(content.content, "base64"),
-        content.mode
-      );
-      result.written.push(content.path);
-    } catch (error) {
-      // One bad file must not abort the rest of the sync, but it must be
-      // reported — never swallowed into a "synced" state.
-      result.failed.push({
-        path: file.path,
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
+  // Suppress the unauthorized-edit watcher for our own writes, exactly as the
+  // .env path does — otherwise re-writing a protected file trips its own guard.
+  options.setSyncing?.(true);
+  try {
+    for (const file of pending) {
+      try {
+        const content = await api.getSecretFileContent(file._id);
+        const bytes = Buffer.from(content.content, "base64");
+        const absolutePath = writeSecretFile(
+          root,
+          content.path,
+          bytes,
+          content.mode
+        );
+        const written: WrittenSecretFile = {
+          path: content.path,
+          absolutePath,
+          mode: content.mode,
+          numericMode: numericMode(content.mode),
+        };
+        result.written.push(content.path);
+        result.writtenFiles.push(written);
+        await options.onWritten?.(written, bytes);
+      } catch (error) {
+        // One bad file must not abort the rest of the sync, but it must be
+        // reported — never swallowed into a "synced" state.
+        result.failed.push({
+          path: file.path,
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
     }
+  } finally {
+    options.setSyncing?.(false);
   }
 
   return result;

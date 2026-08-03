@@ -23,6 +23,11 @@ export class FileProtectionService {
   private watchers: Map<string, vscode.FileSystemWatcher> = new Map();
   private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
   private protectionModes: Map<string, ProtectionMode> = new Map();
+  /** Per-file permission bits to restore around a revert (see watchFile). */
+  private restoreModes = new Map<
+    string,
+    { writable: number; readonly: number }
+  >();
   /** Depth counter — concurrent sync writes (per-env fan-out) each hold the
    * suppression until their own finally releases it. */
   private syncDepth = 0;
@@ -46,7 +51,14 @@ export class FileProtectionService {
   watchFile(
     filePath: string,
     resyncCallback: () => Promise<void>,
-    mode: ProtectionMode = "readonly-with-request"
+    mode: ProtectionMode = "readonly-with-request",
+    /**
+     * Permission bits to restore around a revert. Omit for .env files, which
+     * keep the historical 0644-write / 0444-readonly pair. Secret files pass
+     * their own (0600 or 0400): reverting a keystore to 0444 would make it
+     * world-readable, which is looser than the mode it was pulled with.
+     */
+    restoreMode?: { writable: number; readonly: number }
   ): void {
     // Don't create duplicate watchers
     if (this.watchers.has(filePath)) {
@@ -54,6 +66,9 @@ export class FileProtectionService {
     }
 
     this.protectionModes.set(filePath, mode);
+    if (restoreMode) {
+      this.restoreModes.set(filePath, restoreMode);
+    }
 
     const fileWatcher = vscode.workspace.createFileSystemWatcher(filePath);
 
@@ -96,6 +111,7 @@ export class FileProtectionService {
    * Stop watching a file
    */
   unwatchFile(filePath: string): void {
+    this.restoreModes.delete(filePath);
     const watcher = this.watchers.get(filePath);
     if (watcher) {
       watcher.dispose();
@@ -155,9 +171,14 @@ export class FileProtectionService {
     try {
       this.setSyncing(true);
 
+      const restore = this.restoreModes.get(filePath) ?? {
+        writable: 0o644,
+        readonly: 0o444,
+      };
+
       // Make writable so we can overwrite
       try {
-        await fs.chmod(filePath, 0o644);
+        await fs.chmod(filePath, restore.writable);
       } catch {
         // File might not exist
       }
@@ -166,7 +187,7 @@ export class FileProtectionService {
 
       // Re-apply read-only
       try {
-        await fs.chmod(filePath, 0o444);
+        await fs.chmod(filePath, restore.readonly);
       } catch {
         // Ignore
       }

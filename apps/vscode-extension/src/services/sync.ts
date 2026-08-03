@@ -485,7 +485,42 @@ export class SyncService {
         this.api,
         projectId,
         environment,
-        root
+        root,
+        {
+          setSyncing: (syncing) => this.fileProtection?.setSyncing(syncing),
+          onWritten: async (file, contents) => {
+            // Secret files get the SAME guards a synced .env gets. Mirrors
+            // writeEnvFileToDirectory step for step; only the permission bits
+            // differ, because a keystore is 0600/0400 rather than 0644/0444.
+            //
+            // 1. Manifest — so uninstall/purge and rename tracking see it.
+            await recordManagedFile(
+              file.absolutePath,
+              contents.toString("base64"),
+              undefined,
+              "strict-readonly"
+            );
+
+            // 2. Clipboard guard. Always strict-readonly: a secret file is
+            //    never hand-edited, the dashboard and CLI are the write path.
+            this.clipboardGuard?.protectFile(
+              file.absolutePath,
+              "strict-readonly"
+            );
+
+            // 3. Unauthorized-edit protection, restoring the file's OWN mode.
+            //    The .env default would re-chmod to 0444 on revert, which is
+            //    world-readable and looser than what the file was pulled with.
+            this.fileProtection?.watchFile(
+              file.absolutePath,
+              async () => {
+                await this.syncSecretFiles(projectId, environments, root);
+              },
+              "strict-readonly",
+              { writable: 0o600, readonly: file.numericMode }
+            );
+          },
+        }
       );
 
       if (result.conflicts.length > 0) {
@@ -496,16 +531,6 @@ export class SyncService {
       if (result.failed.length > 0) {
         void vscode.window.showWarningMessage(
           `Envpilot: could not write ${result.failed.length} secret file(s). ${result.failed[0]?.message ?? ""}`
-        );
-      }
-      for (const written of result.written) {
-        // Register with the clipboard guard so these paths get the same
-        // copy/cut protection the synced .env already has. Secret files are
-        // always at least read-only on disk (0600/0400), so the strictest
-        // mode is the honest one.
-        this.clipboardGuard?.protectFile(
-          path.join(root, written),
-          "strict-readonly"
         );
       }
     } catch (error) {
@@ -1351,6 +1376,7 @@ export class SyncService {
 
     for (const directory of project.directories) {
       try {
+        await this.deleteSecretFilesFromDirectory(project.projectId, directory);
         await this.deleteEnvFileFromDirectory(directory);
       } catch (err) {
         errors.push(err instanceof Error ? err : new Error(String(err)));
@@ -1371,6 +1397,57 @@ export class SyncService {
    * legacy `targetFile` when it isn't already one of the derived names AND it
    * carries the Envpilot header (guards against nuking a user's file).
    */
+  /**
+   * Release every secret file this directory materialised: stop the edit
+   * watcher, drop the clipboard guard, forget the manifest entry, and remove
+   * the file. Mirrors deleteEnvFileFromDirectory — an unlinked project must
+   * not leave a decrypted keystore behind, and a released path must not stay
+   * registered with guards that now point at nothing.
+   */
+  private async deleteSecretFilesFromDirectory(
+    projectId: string,
+    directory: LinkedDirectory
+  ): Promise<void> {
+    const environment = directory.environments[0];
+    if (!environment) return;
+
+    let files: Awaited<ReturnType<ApiService["listSecretFiles"]>>;
+    try {
+      files = await this.api.listSecretFiles(projectId, environment);
+    } catch {
+      // Access may already be revoked — nothing further we can enumerate.
+      return;
+    }
+
+    const platformPath = toPlatformPath(directory.directoryPath);
+    const normalizedDir = path.resolve(platformPath);
+
+    for (const file of files) {
+      const filePath = path.resolve(platformPath, file.path);
+
+      // Never touch anything outside the linked directory.
+      if (
+        !filePath.startsWith(normalizedDir + path.sep) &&
+        filePath !== normalizedDir
+      ) {
+        continue;
+      }
+
+      this.fileProtection?.unwatchFile(filePath);
+      this.clipboardGuard?.unprotectFile(filePath);
+      await forgetManagedFile(filePath);
+
+      try {
+        await fs.access(filePath);
+        // Pulled at 0400, so make it writable before unlinking.
+        await fs.chmod(filePath, 0o600);
+        await fs.unlink(filePath);
+      } catch {
+        // Already gone — that is the goal.
+      }
+    }
+  }
+
   private async deleteEnvFileFromDirectory(
     directory: LinkedDirectory
   ): Promise<void> {
