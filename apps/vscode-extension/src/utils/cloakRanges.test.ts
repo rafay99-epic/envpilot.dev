@@ -300,3 +300,61 @@ describe("opaque", () => {
     }
   });
 });
+
+describe("regression: values that used to stay visible", () => {
+  it("masks a TOML inline array that carries a trailing comment", () => {
+    // `# note` made the line stop looking like a closed array, so the parser
+    // opened continuation state and left the value on THIS line readable.
+    const out = render("toml", 'tokens = ["secret"] # note');
+    expect(out).not.toContain("secret");
+    expect(out).toContain("tokens");
+    expect(out).toContain("# note");
+  });
+
+  it("masks a TOML multi-line literal string body", () => {
+    const out = render("toml", "key = '''\nsecret-body\n'''");
+    expect(out).not.toContain("secret-body");
+    expect(out).toContain("key =");
+  });
+
+  it("keeps TOML inline-table keys readable and masks their values", () => {
+    const out = render("toml", 'creds = { user = "admin", pass = "hunter2" }');
+    expect(out).toContain("user");
+    expect(out).toContain("pass");
+    expect(out).not.toContain("admin");
+    expect(out).not.toContain("hunter2");
+  });
+
+  it("masks a YAML block scalar written as |2- (indent before chomp)", () => {
+    const out = render("yaml", "key: |2-\n    secret-line\n");
+    expect(out).not.toContain("secret-line");
+    expect(out).toContain("key: |2-");
+  });
+
+  it("masks a whitespace-separated .properties value", () => {
+    const out = render("properties", "keystore.password hunter2");
+    expect(out).not.toContain("hunter2");
+    expect(out).toContain("keystore.password");
+  });
+
+  it("masks every line of a backslash-continued .properties value", () => {
+    const out = render("properties", "key=first\\\nsecond\\\nthird");
+    expect(out).not.toContain("first");
+    expect(out).not.toContain("second");
+    expect(out).not.toContain("third");
+    expect(out).toContain("key=");
+  });
+
+  it("fails closed on an unrecognised .properties line", () => {
+    // No `=`, no `:`, no whitespace separator after a key-shaped token.
+    const out = render("properties", "bare-token-with-no-separator");
+    expect(out).not.toContain("bare-token-with-no-separator");
+  });
+
+  it("keeps JSON object keys readable inside an inline container", () => {
+    const out = render("json", '"creds": {"user": "admin"}');
+    expect(out).toContain("user");
+    expect(out).toContain("creds");
+    expect(out).not.toContain("admin");
+  });
+});

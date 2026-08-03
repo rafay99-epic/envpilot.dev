@@ -19,6 +19,42 @@ import {
   type EnvpilotFile,
 } from "./api.js";
 
+/**
+ * Per-request content budget for file pulls.
+ *
+ * The server refuses any single request whose files total over 8 MiB. Stay
+ * under it with headroom rather than at it — the server counts plaintext
+ * bytes but the response also carries base64 and JSON overhead.
+ */
+const MAX_BATCH_BYTES = 6 * 1024 * 1024;
+
+/**
+ * Greedily pack files into batches under `budget` bytes.
+ *
+ * A single file larger than the budget gets its own batch: the server may
+ * still refuse it, but failing on that one file with a clear message beats
+ * silently dropping it.
+ */
+function batchByTotalSize(
+  files: EnvpilotFile[],
+  budget: number
+): EnvpilotFile[][] {
+  const batches: EnvpilotFile[][] = [];
+  let current: EnvpilotFile[] = [];
+  let total = 0;
+  for (const file of files) {
+    if (current.length > 0 && total + file.size > budget) {
+      batches.push(current);
+      current = [];
+      total = 0;
+    }
+    current.push(file);
+    total += file.size;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
 function parseBooleanInput(raw: string, fallback: boolean): boolean {
   const normalized = raw.trim().toLowerCase();
   if (normalized === "") return fallback;
@@ -36,6 +72,12 @@ function parseBooleanInput(raw: string, fallback: boolean): boolean {
 function writeSecretFile(root: string, file: EnvpilotFile): void {
   if (isAbsolute(file.path)) {
     throw new Error("refusing an absolute path");
+  }
+  if (file.content === undefined) {
+    // A metadata-only row reaching the write path means the batching logic
+    // asked for the wrong thing. Fail loudly rather than write an empty file
+    // over a real one.
+    throw new Error("server returned no content for this file");
   }
   const absoluteRoot = realpathSync.native(resolve(root));
   const destination = resolve(absoluteRoot, file.path);
@@ -158,13 +200,19 @@ export async function run(): Promise<void> {
       return;
     }
 
-    let filesResult;
+    // Metadata first: path/size/checksum with nothing decrypted. It is what
+    // lets the content pulls be BATCHED — the server refuses any single
+    // request whose files total over 8 MiB, and the Action has no way to
+    // know the sizes otherwise. Asking for everything at once failed the
+    // whole job on any project with more than 8 MiB of secret files.
+    let manifest;
     try {
-      filesResult = await pullFiles({
+      manifest = await pullFiles({
         apiUrl,
         token,
         environment,
         project,
+        metadataOnly: true,
       });
     } catch (error) {
       const message =
@@ -175,9 +223,37 @@ export async function run(): Promise<void> {
       return;
     }
 
-    const root = core.getInput("files-dir") || process.cwd();
+    const batches = batchByTotalSize(manifest.files, MAX_BATCH_BYTES);
+    const files: EnvpilotFile[] = [];
+    for (const batch of batches) {
+      try {
+        const chunk = await pullFiles({
+          apiUrl,
+          token,
+          environment,
+          project,
+          paths: batch.map((f) => f.path),
+        });
+        files.push(...chunk.files);
+      } catch (error) {
+        const message =
+          error instanceof EnvpilotApiError || error instanceof Error
+            ? error.message
+            : "Unknown error while fetching secret files";
+        core.setFailed(`Envpilot: ${message}`);
+        return;
+      }
+    }
+
+    // Create and canonicalize the output root BEFORE any write. writeSecretFile
+    // realpaths it, which throws ENOENT on a files-dir that does not exist yet
+    // — so a nested output directory failed every pull.
+    const configuredRoot = core.getInput("files-dir") || process.cwd();
+    mkdirSync(configuredRoot, { recursive: true });
+    const root = realpathSync.native(resolve(configuredRoot));
+
     let written = 0;
-    for (const file of filesResult.files) {
+    for (const file of files) {
       try {
         writeSecretFile(root, file);
         written += 1;
@@ -196,7 +272,7 @@ export async function run(): Promise<void> {
     }
 
     core.info(
-      `Envpilot: pulled ${written} secret file${written === 1 ? "" : "s"} for ${filesResult.environment}`
+      `Envpilot: pulled ${written} secret file${written === 1 ? "" : "s"} for ${manifest.environment} in ${batches.length} request${batches.length === 1 ? "" : "s"}`
     );
     core.setOutput("files-count", written);
   } catch (error) {

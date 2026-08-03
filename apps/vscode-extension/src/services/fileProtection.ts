@@ -140,7 +140,9 @@ export class FileProtectionService {
     try {
       const [entries, content] = await Promise.all([
         readManifest(getManifestPath()),
-        fs.readFile(filePath, "utf-8"),
+        // Bytes, not utf-8 — the manifest hashes raw bytes, and a binary
+        // keystore decoded as utf-8 never matches its own recorded hash.
+        fs.readFile(filePath),
       ]);
       const resolved = path.resolve(filePath);
       const entry = entries.find((e) => e.path === resolved);

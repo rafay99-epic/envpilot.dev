@@ -1,17 +1,14 @@
-import { createHash, randomBytes } from "node:crypto";
 import {
-  chmodSync,
-  existsSync,
-  lstatSync,
-  realpathSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+  ignoreSecretFilePaths,
+  localDigest,
+  modeMatches,
+  numericMode,
+  resolveInsideRoot,
+  statusOf,
+  writeSecretFile,
+  type FileStatus,
+} from "@envpilot/secret-files";
+import { chmodSync, existsSync, readFileSync } from "node:fs";
 import type { ApiService, SecretFileRow } from "./api";
 
 /**
@@ -26,7 +23,16 @@ import type { ApiService, SecretFileRow } from "./api";
  * function that fetches (and therefore decrypts, and therefore audits).
  */
 
-export type FileStatus = "in-sync" | "modified" | "missing";
+/** Disk helpers live in @envpilot/secret-files — shared with the CLI so a
+ * containment or drift fix cannot land in one client and miss the other. */
+export {
+  ignoreSecretFilePaths,
+  localDigest,
+  modeMatches,
+  resolveInsideRoot,
+  statusOf,
+  type FileStatus,
+};
 
 /** A file this run actually wrote, with everything the guards need. */
 export interface WrittenSecretFile {
@@ -42,214 +48,15 @@ export interface WrittenSecretFile {
 
 export interface MaterialiseResult {
   written: string[];
-  /** Same set as `written`, with the detail the VS Code guards need. */
-  writtenFiles: WrittenSecretFile[];
   unchanged: string[];
   /** Local copies that differ from the server and were left alone. */
   conflicts: string[];
   failed: Array<{ path: string; message: string }>;
 }
 
-/**
- * Recompute the server digest over local bytes.
- *
- * Must stay byte-identical to convex/features/files/crypto.ts::digest and to
- * the CLI's localDigest — sha256(salt || plaintext), base64.
- */
-export function localDigest(
-  contents: Buffer,
-  digestSaltBase64: string
-): string {
-  const salt = Buffer.from(digestSaltBase64, "base64");
-  return createHash("sha256")
-    .update(Buffer.concat([salt, contents]))
-    .digest("base64");
-}
-
-/**
- * Resolve `filePath` under `root`, refusing anything that escapes.
- *
- * Lexical resolve()/relative() is not enough on its own: an intermediate
- * directory inside the repo can be a SYMLINK pointing outside it, and the
- * normalised string still looks contained. Since the path comes from the
- * server and this function is the client-side hardening against a tampered
- * or buggy response, the deepest EXISTING ancestor is realpath'd and
- * re-checked before the write.
- */
-export function resolveInsideRoot(root: string, filePath: string): string {
-  if (isAbsolute(filePath)) {
-    throw new Error(`Refusing to write an absolute path: ${filePath}`);
-  }
-  const absoluteRoot = realpathSync.native(resolve(root));
-  const destination = resolve(absoluteRoot, filePath);
-
-  const contained = (candidate: string): boolean => {
-    const rel = relative(absoluteRoot, candidate);
-    return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
-  };
-
-  if (!contained(destination)) {
-    throw new Error(
-      `Refusing to write outside the project directory: ${filePath}`
-    );
-  }
-
-  // Walk up to the deepest ancestor that exists and resolve it for real.
-  // A symlinked parent that escapes the root is rejected here even though
-  // the lexical check above passed.
-  let ancestor = dirname(destination);
-  while (!existsSync(ancestor) && contained(ancestor)) {
-    ancestor = dirname(ancestor);
-  }
-  if (existsSync(ancestor)) {
-    const realAncestor = realpathSync.native(ancestor);
-    if (realAncestor !== absoluteRoot && !contained(realAncestor)) {
-      throw new Error(
-        `Refusing to write through a symlink that escapes the project: ${filePath}`
-      );
-    }
-  }
-
-  // The destination itself must not be a symlink pointing elsewhere.
-  try {
-    if (lstatSync(destination).isSymbolicLink()) {
-      throw new Error(`Refusing to write through a symlink: ${filePath}`);
-    }
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-  }
-
-  return destination;
-}
-
-/** Drift state for one file — no decryption, no network. */
-export function statusOf(file: SecretFileRow, root: string): FileStatus {
-  let destination: string;
-  try {
-    destination = resolveInsideRoot(root, file.path);
-  } catch {
-    return "missing";
-  }
-  // A directory, FIFO, or symlink at the recorded path is NOT something to
-  // silently overwrite, and an unreadable file must not abort the whole
-  // sync — both report as a local conflict so the rest still proceeds.
-  let stats;
-  try {
-    stats = lstatSync(destination);
-  } catch {
-    return "missing";
-  }
-  if (!stats.isFile()) return "modified";
-
-  try {
-    const local = readFileSync(destination);
-    return localDigest(local, file.digestSalt) === file.sha256
-      ? "in-sync"
-      : "modified";
-  } catch {
-    return "modified";
-  }
-}
-
-function numericMode(mode: string): number {
-  return mode === "0400" ? 0o400 : 0o600;
-}
-
-/**
- * True when the local file's permission bits match the server's.
- *
- * Content and permissions drift independently — a byte-identical keystore
- * left world-readable still needs repairing, and the digest alone reports it
- * as in sync.
- */
-export function modeMatches(
-  root: string,
-  filePath: string,
-  mode: string
-): boolean {
-  try {
-    const destination = resolveInsideRoot(root, filePath);
-    if (!existsSync(destination)) return true;
-    return (statSync(destination).mode & 0o777) === numericMode(mode);
-  } catch {
-    return true;
-  }
-}
-
 /** Count of files whose local copy is absent or stale. */
 export function countDrift(files: SecretFileRow[], root: string): number {
   return files.filter((file) => statusOf(file, root) !== "in-sync").length;
-}
-
-function writeSecretFile(
-  root: string,
-  filePath: string,
-  contents: Buffer,
-  mode: string
-): string {
-  const destination = resolveInsideRoot(root, filePath);
-  mkdirSync(dirname(destination), { recursive: true });
-
-  const target = numericMode(mode);
-  // Unpredictable name + O_EXCL: a predictable temp path can be pre-created
-  // as a symlink by another local user, and a plain write would then follow
-  // it and deliver the plaintext secret somewhere else entirely.
-  const temp = `${destination}.envpilot-${process.pid}-${randomBytes(8).toString("hex")}.tmp`;
-  try {
-    writeFileSync(temp, contents, { mode: 0o600, flag: "wx" });
-    chmodSync(temp, target);
-    renameSync(temp, destination);
-  } catch (error) {
-    if (existsSync(temp)) {
-      try {
-        unlinkSync(temp);
-      } catch {
-        // The write already failed; nothing useful to do.
-      }
-    }
-    throw error;
-  }
-  chmodSync(destination, target);
-  return destination;
-}
-
-/**
- * Append secret-file paths to .gitignore, BEFORE anything is written.
- *
- * Ordering matters: there must be no window in which a signing key exists in
- * the tree while git still offers it as untracked.
- */
-export function ignoreSecretFilePaths(root: string, paths: string[]): string[] {
-  const gitignorePath = join(root, ".gitignore");
-  // Create it when absent. Returning early left every pulled secret
-  // untracked-and-offerable in a repo that simply had no .gitignore yet —
-  // exactly the repo most likely to commit one by accident.
-  const content = existsSync(gitignorePath)
-    ? readFileSync(gitignorePath, "utf-8")
-    : "";
-  const existing = new Set(
-    content.split("\n").map((line) => line.trim().replace(/^\/+/, ""))
-  );
-  // The atomic write leaves a `<dest>.envpilot-<pid>.tmp` beside the target
-  // for an instant. The catch path unlinks it, but a SIGKILL mid-write would
-  // not — and that temp file holds plaintext. Ignore the pattern so a
-  // survivor is never offerable to git.
-  const TEMP_PATTERN = "*.envpilot-*.tmp";
-  const missing = [...paths, TEMP_PATTERN].filter((p) => !existing.has(p));
-  if (missing.length === 0) return [];
-
-  // Only emit the section header once. Each `files add` appends whatever is
-  // newly missing, and repeating the comment every time turns .gitignore into
-  // a wall of identical headers.
-  const HEADER = "# Envpilot secret files";
-  const needsHeader = !content.includes(HEADER);
-  const leadingNewline = content.endsWith("\n") || content === "" ? "" : "\n";
-  const block =
-    leadingNewline +
-    (needsHeader ? `\n${HEADER}\n` : "") +
-    `${missing.join("\n")}\n`;
-  writeFileSync(gitignorePath, content + block, "utf-8");
-  return missing;
 }
 
 /**
@@ -280,7 +87,6 @@ export async function materialiseSecretFiles(
 ): Promise<MaterialiseResult> {
   const result: MaterialiseResult = {
     written: [],
-    writtenFiles: [],
     unchanged: [],
     conflicts: [],
     failed: [],
@@ -371,7 +177,6 @@ export async function materialiseSecretFiles(
           numericMode: numericMode(content.mode),
         };
         result.written.push(content.path);
-        result.writtenFiles.push(written);
         await options.onWritten?.(written, bytes);
       } catch (error) {
         // One bad file must not abort the rest of the sync, but it must be

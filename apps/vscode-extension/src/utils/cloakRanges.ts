@@ -41,9 +41,13 @@ const ENV_LINE = /^\s*[A-Za-z_][A-Za-z0-9_.]*\s*=(.*)$/;
 /** `key: value` (YAML), allowing a leading list dash. */
 const YAML_LINE = /^(\s*(?:-\s+)?(?:"[^"]*"|'[^']*'|[\w.\-/]+)\s*:\s+)(\S.*)$/;
 
-/** `key = value` or `key: value` (.properties / .ini accept both). */
+/**
+ * `key = value`, `key: value`, or `key value` — .properties and .ini accept
+ * all three separators. Whitespace-separated keys are standard in
+ * `.properties` files and were previously left fully visible.
+ */
 const PROPERTIES_LINE =
-  /^(\s*(?:"[^"]*"|'[^']*'|[\w.\-]+)\s*[=:]\s*)(\S.*?)\s*$/;
+  /^(\s*(?:"[^"]*"|'[^']*'|[\w.\-]+)(?:\s*[=:]\s*|\s+))(\S.*?)\s*$/;
 
 /** `key = value` (TOML). Section headers are skipped by the caller. */
 const TOML_LINE = /^(\s*(?:"[^"]*"|'[^']*'|[\w.\-]+)\s*=\s*)(\S.*?)\s*$/;
@@ -126,9 +130,18 @@ function jsonValueEnd(text: string, from: number): number | null {
     return text.length;
   }
 
-  // Bare literal: number, true/false/null. Ends at a separator.
+  // Bare literal: number, true/false/null, or a TOML inline-table key.
+  // Ends at a separator — `=` and `:` included, so `{ user = "admin" }`
+  // yields the key and the value as two tokens instead of swallowing both.
   let i = from;
-  while (i < text.length && !",}]".includes(text[i])) i += 1;
+  while (i < text.length && !",}]=:".includes(text[i])) i += 1;
+  return trimEndIndex(text, from, i);
+}
+
+/** Index of the last non-space character in [from, to), exclusive. */
+function trimEndIndex(text: string, from: number, to: number): number {
+  let i = to;
+  while (i > from && /\s/.test(text[i - 1])) i -= 1;
   return i;
 }
 
@@ -161,13 +174,23 @@ function inlineScalarRanges(
       if (depth <= 0) break;
       continue;
     }
-    if (ch === "," || ch === ":" || /\s/.test(ch)) {
+    // `=` is the separator inside a TOML inline table, `:` inside a JSON
+    // object.
+    if (ch === "," || ch === ":" || ch === "=" || /\s/.test(ch)) {
       i += 1;
       continue;
     }
     const end = jsonValueEnd(text, i);
     if (end === null || end <= i) {
       i += 1;
+      continue;
+    }
+    // A scalar followed by `:` or `=` is a KEY, not a value. Masking it made
+    // `{"user": "secret"}` unreadable — the whole point of format-aware
+    // cloaking is that the structure survives.
+    const after = text.slice(end).match(/^\s*([:=])/);
+    if (after) {
+      i = end;
       continue;
     }
     ranges.push({ line, start: i, end });
@@ -181,7 +204,6 @@ function inlineScalarRanges(
 function jsonRangesForLine(line: number, text: string): CloakRange[] {
   const ranges: CloakRange[] = [];
   const keyed = /"(?:[^"\\]|\\.)*"\s*:\s*/g;
-  const consumed: Array<[number, number]> = [];
 
   let m: RegExpExecArray | null;
   while ((m = keyed.exec(text)) !== null) {
@@ -197,7 +219,6 @@ function jsonRangesForLine(line: number, text: string): CloakRange[] {
     }
     if (end <= valueStart) continue;
     ranges.push({ line, start: valueStart, end });
-    consumed.push([m.index, end]);
     keyed.lastIndex = end;
   }
 
@@ -218,7 +239,68 @@ function jsonRangesForLine(line: number, text: string): CloakRange[] {
     }
   }
 
-  return ranges;
+  // After an inline container the keyed scan resumes INSIDE it, so a nested
+  // value can be produced twice. Ranges are documented as non-overlapping.
+  const seen = new Set<string>();
+  return ranges.filter((r) => {
+    const key = `${r.start}:${r.end}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** The two TOML multi-line string delimiters. */
+const TOML_MULTILINE_DELIMITERS = ['"""', "'''"];
+
+/**
+ * Drop a trailing `# comment` from a TOML value, respecting quoting.
+ *
+ * `tokens = ["secret"] # note` used to look like an UNCLOSED array (the line
+ * does not end in `]`), so the parser opened continuation state and left
+ * `secret` visible on this very line.
+ */
+function stripTomlComment(value: string): string {
+  let quote: string | null = null;
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i];
+    if (quote) {
+      if (ch === "\\" && quote === '"') {
+        i += 1;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === "#") return value.slice(0, i).trimEnd();
+  }
+  return value;
+}
+
+/** True when a TOML multi-line array or string closes on this line. */
+function closesTomlContinuation(text: string): boolean {
+  const bare = stripTomlComment(text).trimEnd();
+  if (bare.endsWith("]")) return true;
+  return TOML_MULTILINE_DELIMITERS.some((d) => bare.endsWith(d));
+}
+
+/** True when `value` opens a TOML multi-line string that does not close. */
+function opensTomlString(value: string): boolean {
+  for (const delimiter of TOML_MULTILINE_DELIMITERS) {
+    if (!value.startsWith(delimiter)) continue;
+    return !value.slice(delimiter.length).trimEnd().endsWith(delimiter);
+  }
+  return false;
+}
+
+/** Number of trailing backslashes — odd means a .properties continuation. */
+function endsWithOddBackslash(text: string): boolean {
+  const match = /(\\+)$/.exec(text);
+  return match ? match[1].length % 2 === 1 : false;
 }
 
 /**
@@ -237,6 +319,8 @@ export function computeCloakRanges(
   let yamlBlockIndent: number | null = null;
   /** True while inside an unterminated TOML array or multiline string. */
   let tomlContinuation = false;
+  /** True while a .properties value continues via a trailing backslash. */
+  let propertiesContinuation = false;
 
   for (let line = 0; line < lines.length; line += 1) {
     const text = lines[line];
@@ -299,7 +383,10 @@ export function computeCloakRanges(
         // A block scalar indicator (|, >, with optional chomping/indent
         // markers) is structure — remember its indentation so every body
         // line below is masked until the block dedents.
-        if (/^[|>][+-]?\d*$/.test(m[2].trim())) {
+        // Both legal orders: `|-2` (chomp then indent indicator) and `|2-`
+        // (indent then chomp). Accepting only the first left every body line
+        // of a `key: |2-` block fully visible.
+        if (/^[|>](?:[+-]\d*|\d+[+-]?)?$/.test(m[2].trim())) {
           yamlBlockIndent = indentOf(text);
           break;
         }
@@ -308,38 +395,45 @@ export function computeCloakRanges(
         break;
       }
 
-      case "toml":
-      case "properties": {
-        // Continuation of a multi-line array or """string""" — every line
-        // of it is value, so mask it and keep going until it closes.
+      case "toml": {
+        // Continuation of a multi-line array or multi-line string — every
+        // line of it is value, so mask it and keep going until it closes.
         if (tomlContinuation) {
           ranges.push({ line, start: indentOf(text), end: text.length });
-          if (/(\]|""")\s*$/.test(text)) tomlContinuation = false;
+          if (closesTomlContinuation(text)) tomlContinuation = false;
           break;
         }
 
         const trimmed = text.trimStart();
-        if (trimmed.startsWith("#") || trimmed.startsWith(";")) break;
-        // [section] headers are structure.
+        if (trimmed.startsWith("#")) break;
+        // [section] and [[array-of-table]] headers are structure.
         if (trimmed.startsWith("[")) break;
 
-        const m =
-          format === "properties"
-            ? PROPERTIES_LINE.exec(text)
-            : TOML_LINE.exec(text);
+        const m = TOML_LINE.exec(text);
         if (!m) break;
 
+        const valueStart = m[1].length;
+        // Strip a trailing comment first. Without it `k = ["s"] # note` looks
+        // like an unclosed array, which opened continuation state and left
+        // `s` visible on this very line.
+        const value = stripTomlComment(m[2]).trimEnd();
+        if (value.length === 0) break;
+
         // Check for a multi-line opener BEFORE the structural test: a bare
-        // `[` or `"""` at the end of the line is an OPENER, not an empty
-        // container, and treating it as structure left its whole body
+        // `[`, `"""` or `'''` at the end of the line is an OPENER, not an
+        // empty container, and treating it as structure left its whole body
         // visible on the lines below.
-        const value = m[2];
-        const opensArray = value.startsWith("[") && !/\]\s*$/.test(value);
-        const opensString =
-          value.startsWith('"""') && !/"""\s*$/.test(value.slice(3));
-        if (opensArray || opensString) {
+        const opensArray = value.startsWith("[") && !value.endsWith("]");
+        if (opensArray || opensTomlString(value)) {
           tomlContinuation = true;
           // The opener itself carries no secret; the body below does.
+          break;
+        }
+
+        // An inline array or table that closes on this line: mask the
+        // scalars, keep the brackets and any keys readable.
+        if (value.startsWith("[") || value.startsWith("{")) {
+          ranges.push(...inlineScalarRanges(line, text, valueStart));
           break;
         }
 
@@ -347,9 +441,50 @@ export function computeCloakRanges(
 
         ranges.push({
           line,
-          start: m[1].length,
-          end: m[1].length + value.length,
+          start: valueStart,
+          end: valueStart + value.length,
         });
+        break;
+      }
+
+      case "properties": {
+        // A `\` at the end of a logical line continues the VALUE onto the
+        // next physical line — every one of those lines is secret.
+        if (propertiesContinuation) {
+          ranges.push({ line, start: indentOf(text), end: text.length });
+          propertiesContinuation = endsWithOddBackslash(text);
+          break;
+        }
+
+        const trimmed = text.trimStart();
+        if (
+          trimmed.startsWith("#") ||
+          trimmed.startsWith(";") ||
+          trimmed.startsWith("!")
+        ) {
+          break;
+        }
+        // [section] headers are structure.
+        if (trimmed.startsWith("[")) break;
+
+        const m = PROPERTIES_LINE.exec(text);
+        if (!m) {
+          // FAIL CLOSED. An unrecognised non-comment line in a secrets file
+          // is more likely an exotic value shape than harmless structure, so
+          // mask it rather than assume.
+          ranges.push({ line, start: indentOf(text), end: text.length });
+          break;
+        }
+
+        const value = m[2];
+        if (isStructural(value)) break;
+
+        ranges.push({
+          line,
+          start: m[1].length,
+          end: text.length,
+        });
+        propertiesContinuation = endsWithOddBackslash(text);
         break;
       }
 

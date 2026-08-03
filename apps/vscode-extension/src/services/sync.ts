@@ -490,6 +490,11 @@ export class SyncService {
     force = false
   ): Promise<void> {
     if (!root) return;
+    // Trust is re-checked HERE, not only at the env-file writers. Those run
+    // under Promise.allSettled, so a rejected .env write does not stop
+    // execution reaching this call — and trust can also flip mid-sync. A
+    // Restricted Mode window must never end up with a plaintext keystore.
+    assertTrustedWorkspace();
 
     // A secret file has ONE path, but a directory can be linked to several
     // environments — and the same path may legitimately exist in more than
@@ -522,9 +527,16 @@ export class SyncService {
             // hashes still agree.
             await recordManagedFile(
               file.absolutePath,
-              contents.toString("utf-8"),
+              // Raw bytes. Recording a decoded string aliased every invalid
+              // utf-8 sequence to U+FFFD, so two different binary keystores
+              // hashed the same and a hand-edited one could be purged as
+              // "unchanged".
+              contents,
               undefined,
-              "strict-readonly"
+              "strict-readonly",
+              // Ownership: two projects can be linked to the same directory,
+              // and unlinking one must not delete the other's secret files.
+              projectId
             );
 
             // 2. Clipboard guard. Always strict-readonly: a secret file is
@@ -1464,8 +1476,6 @@ export class SyncService {
     projectId: string,
     directory: LinkedDirectory
   ): Promise<void> {
-    void projectId;
-
     // Enumerate from the LOCAL manifest, never the API. Cleanup runs when
     // access is revoked or a project is unlinked — exactly when the listing
     // endpoint rejects the caller — and the previous version swallowed that
@@ -1489,6 +1499,13 @@ export class SyncService {
       const rel = path.relative(normalizedDir, filePath);
       if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) continue;
       if (envFiles.has(rel)) continue;
+      // Only OUR files. A directory can host secret files from more than one
+      // linked project, and unlinking one used to delete the other's too.
+      // Entries with no recorded owner predate ownership tracking and stay on
+      // the old directory-scoped behaviour.
+      if (entry.projectId !== undefined && entry.projectId !== projectId) {
+        continue;
+      }
 
       this.fileProtection?.unwatchFile(filePath);
       this.clipboardGuard?.unprotectFile(filePath);

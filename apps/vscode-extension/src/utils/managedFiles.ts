@@ -32,6 +32,16 @@ export interface ManagedFileEntry {
    * stays vscode-free for the uninstall bundle.
    */
   mode?: "strict-readonly" | "readonly-with-request" | "writable";
+  /**
+   * Project that materialised this file, when known.
+   *
+   * Cleanup is per-directory, but two projects can be linked to the SAME
+   * directory — unlinking one used to delete the other's secret files too,
+   * because every managed path under the directory looked like ours.
+   * Optional: `.env` entries and older manifests simply lack it, and are
+   * treated as unowned (the previous directory-scoped behaviour).
+   */
+  projectId?: string;
 }
 
 // ponytail: one manifest shared by all VS Code forks (Code/Cursor/VSCodium).
@@ -42,8 +52,19 @@ export function getManifestPath(homedir: string = os.homedir()): string {
   return path.join(homedir, ".envpilot", "vscode-managed-files.json");
 }
 
-export function hashContent(content: string): string {
-  return createHash("sha256").update(content, "utf-8").digest("hex");
+/**
+ * Hash the EXACT bytes, never a decoded string.
+ *
+ * A binary keystore read as utf-8 aliases every invalid sequence to U+FFFD,
+ * so two different files hash the same — which let a locally-modified binary
+ * secret be deleted as "unchanged" during unsync or uninstall. Passing a
+ * string still hashes its utf-8 encoding, so existing .env entries are
+ * unaffected.
+ */
+export function hashContent(content: string | Buffer): string {
+  return typeof content === "string"
+    ? createHash("sha256").update(content, "utf-8").digest("hex")
+    : createHash("sha256").update(content).digest("hex");
 }
 
 export async function readManifest(
@@ -57,6 +78,11 @@ export async function readManifest(
       (e): e is ManagedFileEntry =>
         typeof e?.path === "string" && typeof e?.sha256 === "string"
     );
+    // A non-string projectId (version skew, hand-edited manifest) is dropped
+    // so ownership checks fall back to the unowned path rather than throwing.
+    for (const e of entries) {
+      if (typeof e.projectId !== "string") delete e.projectId;
+    }
     // Unknown modes (version skew, hand-edited manifest) become undefined so
     // consumers' `?? "readonly-with-request"` fallbacks fail closed.
     for (const e of entries) {
@@ -110,9 +136,10 @@ async function writeManifest(
 /** Record (upsert) a file the extension just wrote. Best-effort. */
 export async function recordManagedFile(
   filePath: string,
-  content: string,
+  content: string | Buffer,
   manifestPath: string = getManifestPath(),
-  mode?: ManagedFileEntry["mode"]
+  mode?: ManagedFileEntry["mode"],
+  projectId?: string
 ): Promise<void> {
   try {
     await withManifestLock(async () => {
@@ -123,6 +150,7 @@ export async function recordManagedFile(
         path: resolved,
         sha256: hashContent(content),
         ...(mode ? { mode } : {}),
+        ...(projectId ? { projectId } : {}),
       });
       await writeManifest(manifestPath, next);
     });
@@ -205,9 +233,10 @@ export async function purgeManagedFilesFiltered(
         kept.push(entry);
         continue;
       }
-      let content: string;
+      let content: Buffer;
       try {
-        content = await fs.readFile(entry.path, "utf-8");
+        // Bytes, not utf-8: see hashContent.
+        content = await fs.readFile(entry.path);
       } catch {
         // Already gone — drop the stale manifest entry.
         continue;
@@ -251,7 +280,7 @@ export async function purgeManagedFiles(
   const entries = await readManifest(manifestPath);
   for (const entry of entries) {
     try {
-      const content = await fs.readFile(entry.path, "utf-8");
+      const content = await fs.readFile(entry.path);
       if (hashContent(content) !== entry.sha256) {
         spared++; // Hand-edited since last sync — never delete user data.
         continue;

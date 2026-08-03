@@ -292,10 +292,10 @@ async function pullSecretFiles(
   environment: string,
   force?: boolean,
   dryRun?: boolean
-): Promise<void> {
+): Promise<boolean> {
   const client = createAPIClient();
   const files = await client.listSecretFiles(projectId, environment);
-  if (files.length === 0) return;
+  if (files.length === 0) return true;
 
   const root = process.cwd();
 
@@ -305,9 +305,17 @@ async function pullSecretFiles(
     console.log();
     info(`${files.length} secret file(s) for ${environment}:`);
     for (const file of files) {
-      console.log(`    ${statusOf(file, root).padEnd(9)} ${file.path}`);
+      const status = statusOf(file, root);
+      // Permission drift is drift: a real pull chmods a byte-identical file
+      // whose mode was loosened, so a preview that calls it "in-sync" is
+      // lying about what the pull will do.
+      const label =
+        status === "in-sync" && !modeMatches(root, file.path, file.mode)
+          ? "wrong-mode"
+          : status;
+      console.log(`    ${label.padEnd(10)} ${file.path}`);
     }
-    return;
+    return true;
   }
 
   const conflicts = files.filter((file) => statusOf(file, root) === "modified");
@@ -318,7 +326,10 @@ async function pullSecretFiles(
     );
     for (const file of conflicts) console.log(`    ${file.path}`);
     info("Re-run with --force to replace them.");
-    return;
+    // FAILURE, not a warning. Reporting success here made `pull --all` count
+    // the project as pulled while its keystores were never written — the
+    // build then fails somewhere far less obvious.
+    return false;
   }
 
   // .gitignore before the write, never after.
@@ -350,6 +361,7 @@ async function pullSecretFiles(
   success(
     `${written} secret file${written === 1 ? "" : "s"} written, ${files.length - written} unchanged`
   );
+  return true;
 }
 
 /**
@@ -381,12 +393,19 @@ async function pullProject(
   await pullProjectVariables(project, outputPath, options);
 
   if (options.files) {
-    await pullSecretFiles(
+    const ok = await pullSecretFiles(
       project.projectId,
       project.environment,
       options.force,
       options.dryRun
     );
+    if (!ok) {
+      // Propagate: `pull --all` must not count this project as pulled, and a
+      // single-project pull must exit nonzero so CI notices.
+      throw new Error(
+        "Secret files were not written — local copies differ from the server. Re-run with --force."
+      );
+    }
   }
 }
 

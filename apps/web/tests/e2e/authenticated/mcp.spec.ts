@@ -162,7 +162,7 @@ test.describe.serial("MCP server (/api/mcp)", () => {
     expect(result?.serverInfo?.version?.length ?? 0).toBeGreaterThan(0);
   });
 
-  test("tools/list returns exactly the 7 documented tools", async ({
+  test("tools/list returns exactly the 9 documented tools", async ({
     request,
   }) => {
     test.skip(!plaintextToken, "no key from the mint test");

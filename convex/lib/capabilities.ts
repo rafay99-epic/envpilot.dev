@@ -180,6 +180,20 @@ export const CAPABILITIES = {
     description: "Soft-delete and restore secret files",
     risk: "high",
   },
+  /**
+   * DISPLAY capability, enforced at the client — deliberately, not by
+   * omission.
+   *
+   * Everything it governs is already on the developer's disk: the extension
+   * only ever masks files it just wrote, and the read that delivered them
+   * was authorized by `project.read` and the per-file grants. A backend
+   * assertion here would be asserting on plaintext the caller legitimately
+   * holds, which is theatre, not a gate. What the server owes the client is
+   * an accurate capability map; the extension consumes this key in
+   * SyncService.canRevealSecrets (fail-closed: unknown project denies, and
+   * one denying project denies overall) and gates both the reveal command
+   * and the unmasking direction of the cloaking toggle on it.
+   */
   "project.secrets.reveal": {
     label: "Reveal secret values locally",
     category: "Access model",

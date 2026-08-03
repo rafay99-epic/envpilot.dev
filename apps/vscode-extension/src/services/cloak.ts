@@ -59,7 +59,9 @@ export class CloakService {
     this.refresh();
   }
 
-  private isEnabled(): boolean {
+  /** Whether cloaking is currently on (public: the toggle command needs it
+   * to decide which direction requires the reveal capability). */
+  isEnabled(): boolean {
     return vscode.workspace
       .getConfiguration("envpilot")
       .get<boolean>("cloakValues", true);

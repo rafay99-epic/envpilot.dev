@@ -183,9 +183,19 @@ describe("drift detection", () => {
     expect(statusOf(file, root)).toBe("modified");
   });
 
-  it("treats an unresolvable path as missing rather than throwing", () => {
-    // A hostile or buggy server response must not crash `files status`.
-    expect(statusOf(row({ path: "../evil" }), root)).toBe("missing");
+  it("reports an unsafe path as a conflict, not as missing", () => {
+    // A hostile or buggy server response must not crash `files status` — and
+    // it must not read as "missing" either. Missing means "safe to write",
+    // which would send pull off to decrypt a file it then refuses to write.
+    expect(statusOf(row({ path: "../evil" }), root)).toBe("modified");
+  });
+
+  it("reports an unreadable local entry as a conflict, not as missing", () => {
+    // Only ENOENT is an absence. EACCES/EIO mean we cannot tell what is
+    // there, and "safe to overwrite" must never be a guess.
+    const dir = join(root, "as-directory");
+    mkdirSync(dir, { recursive: true });
+    expect(statusOf(row({ path: "as-directory" }), root)).toBe("modified");
   });
 });
 

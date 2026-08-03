@@ -45,7 +45,7 @@ export const listMigrations = query({
       {
         name: "seed-role-registry",
         description:
-          "Seeds the role registry from SEED_ROLES: system-role metadata and levels sync from code; system capability matrices MERGE (new code defaults fill in, admin edits survive) except owner, which stays fully code-synced. Seeded custom roles (editor/viewer) insert only if absent. Idempotent.",
+          "Seeds the role registry from SEED_ROLES: system-role metadata and levels sync from code; system capability matrices MERGE (new code defaults fill in, admin edits survive) except owner, which stays fully code-synced. Seeded custom roles (editor/viewer) keep their admin-owned METADATA after the first seed, but their capability maps merge the same way system roles do — a newly shipped capability fills in, every explicit admin choice survives. Idempotent.",
         category: "Feature & Tier System",
         priority: 4,
         destructive: false,

@@ -575,12 +575,18 @@ function CreateKeyDrawer({
       }
       return next;
     });
-    // The Action pull path only accepts single-project, exactly-variables
-    // keys (and never files requests) — steer the form into that shape
-    // instead of failing at submit.
+    // The Action pull path only accepts single-project keys carrying
+    // "variables", optionally plus "files" — steer the form into that shape
+    // instead of failing at submit. Anything else the user had picked is
+    // dropped; "files" is kept because an Action key may legitimately pull
+    // keystores.
     if (adding && surface === "github_action") {
       setProjectMode("specific");
-      setSelectedResources(new Set<Resource>(["variables"]));
+      setSelectedResources((prev) => {
+        const next = new Set<Resource>(["variables"]);
+        if (prev.has("files")) next.add("files");
+        return next;
+      });
     }
   };
 
@@ -591,10 +597,18 @@ function CreateKeyDrawer({
     ? projectMode === "specific" && selectedProjectIds.size === 1
     : projectMode === "all" || selectedProjectIds.size > 0;
   const envSelectionValid = envMode === "all" || selectedEnvs.size > 0;
+  // Matches convex/features/api/keys.ts: an Action key must carry
+  // "variables" and may additionally carry "files" — nothing else, so an
+  // Action credential never doubles as broader REST/MCP access. The form
+  // previously demanded EXACTLY variables, which made a files-capable Action
+  // key impossible to create at all.
   const resourceSelectionValid =
     selectedResources.size > 0 &&
     (!githubActionSelected ||
-      (selectedResources.size === 1 && selectedResources.has("variables")));
+      (selectedResources.has("variables") &&
+        [...selectedResources].every(
+          (r) => r === "variables" || r === "files"
+        )));
   const surfaceSelectionValid = selectedSurfaces.size > 0;
   const customExpiryValid =
     expiryMode !== "custom" ||
@@ -968,7 +982,7 @@ function CreateKeyDrawer({
                     disabled={disabled}
                     title={
                       disabled
-                        ? "GitHub Action keys carry exactly the variables resource"
+                        ? "GitHub Action keys carry variables, and optionally files — nothing else"
                         : RESOURCE_HINT[resource]
                     }
                     onClick={() => toggleResource(resource)}

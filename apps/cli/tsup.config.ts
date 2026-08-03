@@ -16,6 +16,10 @@ const { version } = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
 
 export default defineConfig({
   entry: ["src/index.tsx"],
+  // Bundle the private workspace helpers. Without this tsup externalises them
+  // (they are workspace deps) and the published package imports a module npm
+  // consumers can never install.
+  noExternal: [/^@envpilot\//],
   format: ["esm"],
   dts: true,
   clean: true,

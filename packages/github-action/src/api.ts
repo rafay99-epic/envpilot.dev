@@ -46,8 +46,8 @@ export interface EnvpilotFile {
   contentType?: string;
   environments: string[];
   updatedAt: number;
-  /** base64 of the decrypted bytes. */
-  content: string;
+  /** base64 of the decrypted bytes. Absent in metadata-only responses. */
+  content?: string;
 }
 
 export interface EnvpilotFilesResponse {
@@ -62,6 +62,10 @@ export interface PullFilesParams {
   environment: string;
   /** Project slug — the files endpoint is project-scoped. */
   project: string;
+  /** Metadata only: path/size/checksum, nothing decrypted. */
+  metadataOnly?: boolean;
+  /** Restrict the pull to these recorded paths. Omit for all of them. */
+  paths?: string[];
 }
 
 /**
@@ -79,6 +83,8 @@ export async function pullFiles(
   url.searchParams.set("project", params.project);
   // Identify the surface so a github_action-scoped key authorizes here.
   url.searchParams.set("surface", "github_action");
+  if (params.metadataOnly) url.searchParams.set("metadataOnly", "1");
+  for (const path of params.paths ?? []) url.searchParams.append("path", path);
 
   const response = await fetch(url, {
     method: "GET",

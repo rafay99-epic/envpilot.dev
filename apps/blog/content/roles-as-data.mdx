@@ -342,7 +342,7 @@ And because "your edit survived, the code default didn't propagate" otherwise lo
 flowchart LR
     S["SEED_ROLES (code)"] -->|"full overwrite"| OW["owner row<br/>never editable"]
     S -->|"project_manager, team_lead, developer"| MG["mergeSystemRoleCapabilities(defaults, stored)"]
-    S -->|"editor, viewer"| IN["insert-only, skipped if present<br/>panel owns them after seed"]
+    S -->|"editor, viewer"| IN["metadata insert-only<br/>capabilities merge like system roles"]
     MG --> R1["stored has key: stored value WINS"]
     MG --> R2["stored lacks key: code default fills in"]
     MG --> R3["not in catalog: dropped"]

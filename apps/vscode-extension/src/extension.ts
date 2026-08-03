@@ -530,11 +530,12 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "envpilot.toggleCloaking",
       wrapCommand(async () => {
-        // Same gate as reveal: turning cloaking off unmasks every managed
-        // file indefinitely, which is strictly more permissive than a
-        // 30-second reveal. Gating one and not the other left the
-        // restriction trivially bypassable.
-        if (!(await canRevealSecrets())) {
+        // Gate the UNMASKING direction only. Turning cloaking off unmasks
+        // every managed file indefinitely — strictly more permissive than a
+        // 30-second reveal, so it needs the same capability. Turning it back
+        // ON is strictly more restrictive: someone who lost the capability
+        // while cloaking was off must still be able to re-mask.
+        if (cloakService.isEnabled() && !(await canRevealSecrets())) {
           vscode.window.showWarningMessage(
             "Envpilot: your role does not allow unmasking secret values."
           );

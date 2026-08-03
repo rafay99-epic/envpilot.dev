@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@envpilot/eslint-config": "workspace:*",
+    "@envpilot/secret-files": "workspace:*",
     "@envpilot/tsconfig": "workspace:*",
     "@types/cross-spawn": "^6.0.6",
     "@types/node": "^22.10.10",

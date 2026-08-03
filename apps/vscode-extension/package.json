@@ -458,6 +458,7 @@
   },
   "devDependencies": {
     "@envpilot/eslint-config": "workspace:*",
+    "@envpilot/secret-files": "workspace:*",
     "@envpilot/tsconfig": "workspace:*",
     "@types/node": "^22",
     "@types/vscode": "^1.85.0",

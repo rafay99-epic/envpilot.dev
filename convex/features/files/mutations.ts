@@ -241,14 +241,43 @@ export const create = internalMutation({
       throw new ConvexError(filePathConflictMessage(args.path, clashes));
     }
 
-    // Re-check the count INSIDE the transaction. preflight runs before the
-    // (slow) encrypt, so two concurrent uploads can both pass it and both
-    // land — overshooting the tier limit. The action already destroys the
-    // blob and vault object when this mutation rejects.
+    // Re-check the tier gates INSIDE the transaction. preflight runs before
+    // the (slow) encrypt, so the tier can be downgraded, the feature can be
+    // switched off, or a concurrent upload can consume the last slot while
+    // the bytes are in flight. The action already destroys the blob and
+    // vault object when this mutation rejects, so refusing here is free.
     const insertGate = await resolveOrgGateContext(
       ctx.db,
       project.organizationId
     );
+
+    const insertBoolGate = await checkBooleanFeature(
+      ctx.db,
+      project.organizationId,
+      "secret_files",
+      insertGate
+    );
+    if (!insertBoolGate.allowed) {
+      throw new ConvexError(
+        insertBoolGate.reason ?? "Secret files are not enabled for your tier."
+      );
+    }
+
+    const insertByteGate = await checkNumericLimit(
+      ctx.db,
+      project.organizationId,
+      "secret_files_max_bytes",
+      0,
+      insertGate
+    );
+    if (insertByteGate.limit !== null && args.size > insertByteGate.limit) {
+      throw new ConvexError(
+        `File is too large (${Math.ceil(args.size / 1024)} KB). Your plan allows up to ${Math.floor(
+          insertByteGate.limit / 1024
+        )} KB per file.`
+      );
+    }
+
     const countGate = await checkCountedLimit(
       ctx.db,
       project.organizationId,
@@ -747,8 +776,14 @@ export const grantAccess = mutation({
 
     // A falsy expiry is treated as "no expiry" by every grant reader, so
     // expiresAt: 0 would grant permanent access instead of instant denial.
-    if (args.expiresAt !== undefined && args.expiresAt <= now) {
-      throw new ConvexError("Grant expiry must be in the future");
+    // NaN and Infinity need the same refusal: `NaN <= now` is false, so a
+    // non-finite expiry sailed past this check and then compared false in
+    // every `expiresAt <= now` reader — a grant that never expires.
+    if (
+      args.expiresAt !== undefined &&
+      (!Number.isFinite(args.expiresAt) || args.expiresAt <= now)
+    ) {
+      throw new ConvexError("Grant expiry must be a timestamp in the future");
     }
 
     const target = await ctx.db.get(args.userId);

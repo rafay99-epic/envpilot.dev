@@ -153,24 +153,28 @@ export const list = query({
       // invisible to a scoped developer even when explicitly shared.
       if (!isEnvironmentScopeAllowed(envScope, file.environments)) continue;
 
+      // SAME precedence as resolveResourceAccess: blanket write, then
+      // blanket read, then the grant. Consulting the grant before blanket
+      // read gave a role holding BOTH access.blanket_read and
+      // access.grant_fallback a "write" here that the server resolves back
+      // down to read — replace/edit controls the mutation then refuses.
       let access: "read" | "write" | null = null;
       if (blanketWrite) {
         access = "write";
+      } else if (blanketRead) {
+        access = "read";
       } else {
         const grant = grantsByFile.get(file._id as string);
         if (grant) {
-          // Cap exactly as getFileAccess does. An unassigned member (the
-          // viewer-sharing path), or one whose role lacks grant fallback,
-          // resolves to read even holding a write grant — surfacing "write"
-          // here would render replace/edit controls the server refuses.
+          // An unassigned member (the viewer-sharing path), or one whose
+          // role lacks grant fallback, resolves to read even holding a write
+          // grant.
           const grantFallback =
             assignmentBypassed ||
             (assignment !== null &&
               hasCapability(profile, "access.grant_fallback"));
           access =
             grantFallback && grant.permission === "write" ? "write" : "read";
-        } else if (blanketRead) {
-          access = "read";
         }
       }
       if (!access) continue;

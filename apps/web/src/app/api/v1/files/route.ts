@@ -110,10 +110,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: message }, { status: 403 });
     }
     if (/rate ?limit/i.test(message)) {
-      // Surface the limiter's cooldown so a CI client can wait it out
-      // rather than retrying straight into another 429.
-      const retryMatch = /retry (?:after |in )?(\d+)/i.exec(message);
-      const retryAfter = retryMatch ? retryMatch[1] : "60";
+      // Surface the limiter's cooldown so a CI client can wait it out rather
+      // than retrying straight into another 429. The limiter reports
+      // MILLISECONDS and Retry-After is SECONDS — emitting the raw number
+      // told CI to wait 16.7 hours for a 60-second cooldown.
+      const retryMatch = /retry (?:after |in )?(\d+)ms/i.exec(message);
+      const retryAfterMs = retryMatch ? Number(retryMatch[1]) : 60_000;
+      const retryAfter = String(Math.max(1, Math.ceil(retryAfterMs / 1000)));
       return NextResponse.json(
         { error: "Rate limit exceeded — retry shortly" },
         { status: 429, headers: { "Retry-After": retryAfter } }
