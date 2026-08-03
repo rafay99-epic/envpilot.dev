@@ -180,6 +180,13 @@ export const CAPABILITIES = {
     description: "Soft-delete and restore secret files",
     risk: "high",
   },
+  "project.secrets.reveal": {
+    label: "Reveal secret values locally",
+    category: "Access model",
+    description:
+      "Temporarily unmask synced .env values and secret file contents in the VS Code editor",
+    risk: "high",
+  },
   "project.requests.submit": {
     label: "Submit requests",
     category: "Requests",
@@ -298,6 +305,7 @@ export const PROJECT_ACTION_TO_CAPABILITY = {
   "project:update_file": "project.files.update",
   "project:delete_file": "project.files.delete",
   "project:manage_file_permissions": "project.permissions.manage",
+  "project:reveal_secrets": "project.secrets.reveal",
 } as const satisfies Record<string, CapabilityKey>;
 
 export type OrgAction = keyof typeof ORG_ACTION_TO_CAPABILITY;

@@ -12,6 +12,8 @@ import {
   throwForDenial,
   type Authorization,
 } from "./helpers";
+import { open as openSealedFile, toBase64 } from "../files/crypto";
+import { get as blobStoreGet } from "../files/blobStore";
 
 /**
  * Public REST API v1 — read actions.
@@ -217,6 +219,61 @@ export const _readActiveAccounts = internalQuery({
       websiteUrl: r.websiteUrl,
       environments: r.environments,
       updatedAt: r.updatedAt,
+    }));
+  },
+});
+
+/**
+ * Active secret files for a project.
+ *
+ * Metadata only — the vault ref and storage id come with it so the calling
+ * action can decrypt, but nothing here reads a blob. Same bounded,
+ * refuse-partial contract as variables and accounts: a project past the cap
+ * fails loudly rather than handing back a silently truncated set, which for
+ * a build pulling signing material would fail much later and far less
+ * obviously.
+ */
+export const _readActiveFiles = internalQuery({
+  args: { projectId: v.id("projects") },
+  returns: v.array(
+    v.object({
+      name: v.string(),
+      path: v.string(),
+      mode: v.string(),
+      size: v.number(),
+      sha256: v.string(),
+      contentType: v.optional(v.string()),
+      environments: v.array(v.string()),
+      updatedAt: v.number(),
+      vaultRef: v.string(),
+      storageId: v.id("_storage"),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("projectFiles")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+      )
+      .take(MAX_PULL_ROWS + 1);
+
+    if (rows.length > MAX_PULL_ROWS) {
+      throw new ConvexError(
+        `Project has more than ${MAX_PULL_ROWS} active secret files — refusing a partial pull. Contact support to raise the limit.`
+      );
+    }
+
+    return rows.map((r) => ({
+      name: r.name,
+      path: r.path,
+      mode: r.mode ?? "0600",
+      size: r.size,
+      sha256: r.sha256,
+      contentType: r.contentType,
+      environments: r.environments,
+      updatedAt: r.updatedAt,
+      vaultRef: r.vaultRef,
+      storageId: r.storageId,
     }));
   },
 });
@@ -706,6 +763,199 @@ export const getProjectAccounts = action({
         username: credentials.username,
         password: credentials.password,
       });
+    }
+
+    return results;
+  },
+});
+
+/**
+ * Secret files for a project, over the public API / MCP surface.
+ *
+ * RBAC, in the order it is enforced:
+ *   1. The key must be valid, unrevoked and unexpired.
+ *   2. Its `surfaces` must include the presenting surface (REST vs MCP).
+ *   3. Its `scopeResources` must include "files" — never granted by default,
+ *      so a key reaches file content only because its creator deliberately
+ *      ticked that box.
+ *   4. Its `scopeEnvironments` and `scopeProjects` must admit this request.
+ *   5. The tier gate for the surface must still be on.
+ * Every one of those is `_authorizeRequest`, the same core the REST API, the
+ * MCP server and the GitHub Action all share — no surface re-implements it.
+ *
+ * `metadataOnly` returns path/size/checksum and never touches the vault or
+ * the blob store, so an agent can see WHICH files a build needs without any
+ * of them being decrypted. Content pulls are rate-limited on the heavier
+ * bucket and written to the audit log individually.
+ */
+export const getProjectFiles = action({
+  args: {
+    token: v.string(),
+    projectSlug: v.string(),
+    environment: v.optional(v.string()),
+    metadataOnly: v.optional(v.boolean()),
+    /** Restrict to these destination paths (an agent fetching one keystore). */
+    paths: v.optional(v.array(v.string())),
+    gateFeature: gateFeatureArg,
+    surface: surfaceArg,
+  },
+  returns: v.array(
+    v.object({
+      name: v.string(),
+      path: v.string(),
+      mode: v.string(),
+      size: v.number(),
+      sha256: v.string(),
+      contentType: v.optional(v.string()),
+      environments: v.array(v.string()),
+      updatedAt: v.number(),
+      /** base64; omitted when metadataOnly. */
+      content: v.optional(v.string()),
+    })
+  ),
+  handler: async (
+    ctx,
+    args
+  ): Promise<
+    Array<{
+      name: string;
+      path: string;
+      mode: string;
+      size: number;
+      sha256: string;
+      contentType?: string;
+      environments: string[];
+      updatedAt: number;
+      content?: string;
+    }>
+  > => {
+    assertKeyFormat(args.token);
+    const metadataOnly = args.metadataOnly ?? false;
+
+    const tokenHash = await hashToken(args.token);
+    await consumeRateLimit(
+      ctx,
+      metadataOnly ? "apiMetadata" : "cicdPull",
+      tokenHash
+    );
+
+    const bootstrap: Authorization = await ctx.runMutation(
+      internal.features.api.authorize._authorizeRequest,
+      {
+        tokenHash,
+        requirement: { resource: "files", environment: args.environment },
+        gateFeature: args.gateFeature,
+        surface: args.surface,
+      }
+    );
+    if (!bootstrap.ok) throwForDenial(bootstrap.denied);
+
+    const projectDoc = await ctx.runQuery(
+      internal.features.projects.queries._getBySlug,
+      {
+        organizationId: bootstrap.organizationId,
+        slug: args.projectSlug,
+      }
+    );
+    if (!projectDoc) throw new ConvexError("Project not found");
+
+    const scoped: Authorization = await ctx.runMutation(
+      internal.features.api.authorize._authorizeRequest,
+      {
+        tokenHash,
+        requirement: {
+          resource: "files",
+          environment: args.environment,
+          projectId: projectDoc._id,
+        },
+        gateFeature: args.gateFeature,
+        surface: args.surface,
+        recordUse: metadataOnly
+          ? undefined
+          : {
+              auditAction: "api.secrets_pulled",
+              details: JSON.stringify({
+                keyId: bootstrap.keyId,
+                projectId: projectDoc._id,
+                projectSlug: args.projectSlug,
+                environment: args.environment,
+                resource: "files",
+                source: "public-api",
+              }),
+            },
+      }
+    );
+    if (!scoped.ok) throwForDenial(scoped.denied);
+
+    const rows = await ctx.runQuery(
+      internal.features.api.reads._readActiveFiles,
+      { projectId: projectDoc._id }
+    );
+
+    const wanted = args.paths ? new Set(args.paths) : null;
+    const filtered = rows.filter((row) => {
+      if (
+        !environmentAllowedByScope(row.environments, scoped.scopeEnvironments)
+      )
+        return false;
+      if (args.environment && !row.environments.includes(args.environment))
+        return false;
+      if (wanted && !wanted.has(row.path)) return false;
+      return true;
+    });
+
+    const results: Array<{
+      name: string;
+      path: string;
+      mode: string;
+      size: number;
+      sha256: string;
+      contentType?: string;
+      environments: string[];
+      updatedAt: number;
+      content?: string;
+    }> = [];
+
+    for (const row of filtered) {
+      const meta = {
+        name: row.name,
+        path: row.path,
+        mode: row.mode,
+        size: row.size,
+        sha256: row.sha256,
+        contentType: row.contentType,
+        environments: row.environments,
+        updatedAt: row.updatedAt,
+      };
+
+      if (metadataOnly) {
+        results.push(meta);
+        continue;
+      }
+
+      // Envelope: the blob is useless without the vault key, so both have to
+      // resolve. Either failing aborts the WHOLE pull — a build that gets
+      // some of its signing material and not the rest fails later and far
+      // more confusingly than one that fails here.
+      let plaintext: Uint8Array;
+      try {
+        const ciphertext = await blobStoreGet(ctx, row.storageId);
+        const keyMaterial = await ctx.runAction(
+          internal.features.vault.vault.readSecret,
+          { vaultRef: row.vaultRef }
+        );
+        plaintext = await openSealedFile(ciphertext, keyMaterial);
+      } catch (error) {
+        console.error("api.reads.getProjectFiles.decryptFailed", {
+          projectId: projectDoc._id,
+          file: row.path,
+        });
+        throw new ConvexError(
+          `Failed to decrypt secret file "${row.path}" — pull aborted (transient vault errors are retryable; persistent ones need the file re-uploaded)`
+        );
+      }
+
+      results.push({ ...meta, content: toBase64(plaintext) });
     }
 
     return results;

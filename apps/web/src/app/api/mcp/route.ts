@@ -274,6 +274,139 @@ const baseHandler = createMcpHandler(
       }
     );
 
+    // ── Secret files ──────────────────────────────────────────────────
+    //
+    // Two tools, deliberately split. Listing is metadata-only so an agent
+    // can discover WHICH files a build needs — path, size, checksum — with
+    // nothing decrypted and nothing written to the audit log. Fetching
+    // content is a separate, explicit call that decrypts one file at a time
+    // and IS audited.
+    //
+    // Both go through the same `_authorizeRequest` core as every other
+    // surface, and both require the key to carry the "files" resource,
+    // which Envpilot never grants by default. A key minted for variables
+    // cannot reach a signing key no matter what the agent asks for.
+    const fileShape = {
+      name: z.string(),
+      path: z.string(),
+      mode: z.string(),
+      size: z.number(),
+      sha256: z.string(),
+      contentType: z.string().optional(),
+      environments: z.array(z.string()),
+      updatedAt: z.number(),
+    };
+
+    server.registerTool(
+      "envpilot_list_files",
+      {
+        title: "List Secret Files",
+        description:
+          "List the secret files (keystores, SSH keys, certificates, service-account JSON) for a project the API key is scoped to. METADATA ONLY — returns each file's destination path, size, mode and checksum, and never its contents, so it is safe to call while exploring what a build needs. Requires the key to carry the 'files' resource. Use envpilot_get_file to fetch the bytes of a specific file once you know you need it.",
+        inputSchema: {
+          project: z.string().describe("Project slug"),
+          environment: environmentEnum
+            .optional()
+            .describe(
+              "Exact environment name. Omit to return files across all in-scope environments."
+            ),
+        },
+        outputSchema: { files: z.array(z.object(fileShape)) },
+        annotations: { readOnlyHint: true },
+      },
+      async (args, extra) => {
+        const authInfo = extra.authInfo as AuthInfo | undefined;
+        if (!authInfo) return unauthorizedResult;
+        try {
+          const convex = new ConvexHttpClient(requireConvexUrl());
+          const files = await convex.action(
+            api.features.api.reads.getProjectFiles,
+            {
+              token: authInfo.token,
+              projectSlug: args.project,
+              environment: args.environment,
+              metadataOnly: true,
+              surface: "mcp_server",
+            }
+          );
+          return {
+            content: [{ type: "text", text: JSON.stringify({ files }) }],
+            structuredContent: { files },
+          };
+        } catch (err) {
+          return toolError(err);
+        }
+      }
+    );
+
+    server.registerTool(
+      "envpilot_get_file",
+      {
+        title: "Get Secret File Contents",
+        description:
+          "Fetch the DECRYPTED contents of ONE secret file, base64-encoded, so it can be written to disk for a build (a signing keystore, a service-account JSON, an SSH key). Requires the key to carry the 'files' resource. Every call is recorded in the audit log against the API key. Call envpilot_list_files first to find the exact path. Request only the file the task needs — this returns real secret material, so never fetch files speculatively, never echo the contents back to the user, and write them straight to the path the file records.",
+        inputSchema: {
+          project: z.string().describe("Project slug"),
+          path: z
+            .string()
+            .describe(
+              "Exact destination path from envpilot_list_files, e.g. android/app/upload.jks"
+            ),
+          environment: environmentEnum
+            .optional()
+            .describe(
+              "Exact environment name. Required when the same path exists in more than one environment."
+            ),
+        },
+        outputSchema: {
+          file: z.object({ ...fileShape, content: z.string() }),
+        },
+        annotations: { readOnlyHint: true },
+      },
+      async (args, extra) => {
+        const authInfo = extra.authInfo as AuthInfo | undefined;
+        if (!authInfo) return unauthorizedResult;
+        try {
+          const convex = new ConvexHttpClient(requireConvexUrl());
+          const files = await convex.action(
+            api.features.api.reads.getProjectFiles,
+            {
+              token: authInfo.token,
+              projectSlug: args.project,
+              environment: args.environment,
+              paths: [args.path],
+              surface: "mcp_server",
+            }
+          );
+
+          if (files.length === 0) {
+            return toolError(
+              new Error(
+                `No secret file at "${args.path}" in scope for this key.`
+              )
+            );
+          }
+          if (files.length > 1) {
+            // The same path can legitimately exist in several environments.
+            // Guessing which one a build wants would be worse than asking.
+            return toolError(
+              new Error(
+                `"${args.path}" exists in ${files.length} environments — pass \`environment\` to disambiguate.`
+              )
+            );
+          }
+
+          const file = files[0];
+          return {
+            content: [{ type: "text", text: JSON.stringify({ file }) }],
+            structuredContent: { file },
+          };
+        } catch (err) {
+          return toolError(err);
+        }
+      }
+    );
+
     const requestStatusShape = {
       requestId: z.string(),
       key: z.string(),

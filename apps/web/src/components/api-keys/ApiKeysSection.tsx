@@ -53,7 +53,13 @@ const ENV_CHIP_SELECTED: Record<Environment, string> = {
   production: "border-green-500/40 bg-green-500/10 text-green-400",
 };
 
-const RESOURCES = ["variables", "accounts", "projects", "requests"] as const;
+const RESOURCES = [
+  "variables",
+  "accounts",
+  "files",
+  "projects",
+  "requests",
+] as const;
 type Resource = (typeof RESOURCES)[number];
 
 // "requests" is the one mutating capability: the key may FILE variable
@@ -61,6 +67,9 @@ type Resource = (typeof RESOURCES)[number];
 // surface — CI can't wait on human approval.
 const RESOURCE_HINT: Partial<Record<Resource, string>> = {
   requests: "may file variable requests for human approval (agents)",
+  // Never on by default: this is the switch that lets a credential reach
+  // keystores and signing material, not just env vars.
+  files: "may read secret file contents (keystores, SSH keys, certificates)",
 };
 
 // Which MCP tools each resource unlocks — mirrors the `requirement` each
@@ -72,6 +81,7 @@ const MCP_RESOURCE_TOOLS: Record<Resource, string> = {
     "envpilot_list_projects, envpilot_search (key matches also need variables)",
   variables: "envpilot_get_variables, envpilot_get_variable",
   accounts: "envpilot_list_accounts",
+  files: "envpilot_list_files, envpilot_get_file",
   requests: "envpilot_request_variable, envpilot_get_request_status",
 };
 
@@ -942,8 +952,13 @@ function CreateKeyDrawer({
             <div className="mt-2 flex flex-wrap gap-2">
               {RESOURCES.map((resource) => {
                 const selected = selectedResources.has(resource);
+                // The Action pulls variables and, optionally, secret files.
+                // Everything else stays off so an Action credential never
+                // doubles as broader REST/MCP access.
                 const disabled =
-                  githubActionSelected && resource !== "variables";
+                  githubActionSelected &&
+                  resource !== "variables" &&
+                  resource !== "files";
                 return (
                   <button
                     key={resource}

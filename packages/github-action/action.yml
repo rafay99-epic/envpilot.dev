@@ -24,10 +24,22 @@ inputs:
   env-file:
     description: "Optional path to write the pulled variables as a dotenv file. Skipped when unset."
     required: false
+  files:
+    description: "When true, also pulls the project's secret files (keystores, SSH keys, certificates) and writes each to its recorded path. The API key must carry the 'files' resource, which is never granted by default."
+    required: false
+    default: "false"
+  project:
+    description: "Project slug. Required when files is true — the files endpoint is project-scoped, unlike variables which the token scope resolves."
+    required: false
+  files-dir:
+    description: "Directory that secret file paths are resolved against. Defaults to the workspace root."
+    required: false
 
 outputs:
   count:
     description: "Number of variables pulled from Envpilot."
+  files-count:
+    description: "Number of secret files written. Zero when files is false."
 
 runs:
   using: "node20"

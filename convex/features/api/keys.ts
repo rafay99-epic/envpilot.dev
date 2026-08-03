@@ -48,6 +48,10 @@ export const VALID_RESOURCES = [
   "accounts",
   "projects",
   "requests",
+  // Secret files (keystores, SSH keys, certificates). Never granted by
+  // default — a key only reaches file CONTENT when its holder deliberately
+  // ticked this resource, which is the opt-in that makes agent access safe.
+  "files",
 ];
 const MAX_KEYS_PER_ORG = 25; // hygiene bound, not a tier limit
 
@@ -105,9 +109,10 @@ function assertValidExpiry(expiresAt: number | undefined): void {
 
 /**
  * Surfaces are required and explicit on every new key. A github_action key
- * must be shaped like the one credential the Action pull path accepts: a
- * single project with the "variables" resource — anything else would mint
- * fine and then fail only at CI time (⚖️ PLAN G3).
+ * must be shaped like the credentials the Action pull path accepts: a single
+ * project carrying "variables" and, when the workflow also pulls secret
+ * files, "files" — anything else would mint fine and then fail only at CI
+ * time (⚖️ PLAN G3).
  */
 function assertValidSurfaces(
   surfaces: Surface[],
@@ -126,9 +131,18 @@ function assertValidSurfaces(
         "A GitHub Action key must be scoped to exactly one project — the Action's pull endpoint takes no project parameter, the key IS the project scope"
       );
     }
-    if (scopeResources.length !== 1 || scopeResources[0] !== "variables") {
+    // "files" is opt-in on top of "variables": a workflow that only needs
+    // env vars must not end up holding a credential that also reaches
+    // signing material. An Action key still cannot double as broader
+    // REST/MCP access — projects and requests stay out.
+    const allowedForAction = new Set(["variables", "files"]);
+    if (
+      scopeResources.length === 0 ||
+      !scopeResources.includes("variables") ||
+      scopeResources.some((r) => !allowedForAction.has(r))
+    ) {
       throw new ConvexError(
-        'A GitHub Action key must have exactly the "variables" resource — that is all the Action pulls, and an Action credential must not double as broader REST/MCP access'
+        'A GitHub Action key must carry "variables", and may additionally carry "files" — nothing else, so an Action credential never doubles as broader REST/MCP access'
       );
     }
     if (scopeResources.includes("requests")) {

@@ -80,11 +80,18 @@ function assertTrustedWorkspace(): void {
  * Atomic env-file write: write a temp sibling, then rename over the target so
  * a reader (or a crash mid-write) never observes a half-written secrets file.
  */
+let tmpCounter = 0;
+
 async function atomicWriteFile(
   filePath: string,
   content: string
 ): Promise<void> {
-  const tmpPath = `${filePath}.tmp-envpilot`;
+  // UNIQUE per write. A fixed temp name collides whenever two syncs target
+  // the same file — two projects linked to one directory both write
+  // `.env.local`, the first rename succeeds, and the second fails with
+  // ENOENT because its temp was already renamed away. The suffix stays after
+  // `.tmp-envpilot` so the activation sweeper still recognises leftovers.
+  const tmpPath = `${filePath}.tmp-envpilot.${process.pid}.${tmpCounter++}`;
   try {
     await fs.writeFile(tmpPath, content, "utf-8");
     await fs.rename(tmpPath, filePath);
@@ -684,6 +691,28 @@ export class SyncService {
     return fileProtectionMode(
       this.buildProjectAccess(projectId, variables),
       this.api.getAccessMeta(projectId)?.capabilities
+    );
+  }
+
+  /**
+   * Whether the signed-in user may unmask secret values on screen.
+   *
+   * Driven by the `project.secrets.reveal` capability, which admins toggle
+   * per role in the registry — so a viewer or a locked-down developer never
+   * gets the 30-second reveal, while an owner or team lead does.
+   *
+   * FAIL CLOSED, twice over: a project whose capability map has not arrived
+   * yet denies, and a single denying project denies overall. The reveal
+   * command is global (it unmasks every managed file at once), so the most
+   * restrictive linked project has to win — otherwise access to one
+   * permissive project would unmask another project's secrets.
+   */
+  canRevealSecrets(projectIds: string[]): boolean {
+    if (projectIds.length === 0) return false;
+    return projectIds.every(
+      (id) =>
+        this.api.getAccessMeta(id)?.capabilities?.["project.secrets.reveal"] ===
+        true
     );
   }
 

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { existsSync } from "fs";
-import { chmod, stat, unlink } from "fs/promises";
+import { chmod, readdir, stat, unlink } from "fs/promises";
 import { AuthService } from "./services/auth";
 import { ApiService } from "./services/api";
 import { SyncService } from "./services/sync";
@@ -223,14 +223,59 @@ async function initializeConvexService(): Promise<void> {
  * Fire-and-forget removal of a crash-leftover atomic-write temp, but only
  * when it is old enough that no live window can still be mid-write on it.
  */
-async function sweepStaleTemp(tmpPath: string): Promise<void> {
+/**
+ * Whether the signed-in user may unmask secrets, across every linked project.
+ *
+ * Fails closed: no linked projects, or any project whose capability map is
+ * missing or denies, means no reveal.
+ */
+async function canRevealSecrets(): Promise<boolean> {
   try {
-    const s = await stat(tmpPath);
-    if (Date.now() - s.mtimeMs > 60_000) {
-      await unlink(tmpPath);
-    }
+    const projects = await storageService.getLinkedProjectsV2();
+    return syncService.canRevealSecrets(projects.map((p) => p.projectId));
   } catch {
-    // Missing temp (the common case) — nothing to sweep.
+    return false;
+  }
+}
+
+/** Keep the palette entry in step with the capability. */
+async function refreshRevealContext(): Promise<void> {
+  await vscode.commands.executeCommand(
+    "setContext",
+    "envpilot.canRevealSecrets",
+    await canRevealSecrets()
+  );
+}
+
+async function sweepStaleTemp(targetPath: string): Promise<void> {
+  // Temp names are `<file>.tmp-envpilot.<pid>.<n>` (unique per write, so two
+  // syncs writing the same file cannot clobber each other's temp). Scan the
+  // directory for every leftover belonging to this file rather than stat-ing
+  // one fixed name. Each still holds plaintext, so none may be left behind.
+  const dir = path.dirname(targetPath);
+  const prefix = `${path.basename(targetPath)}.tmp-envpilot`;
+
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    return; // Directory gone — nothing to sweep.
+  }
+
+  for (const entry of entries) {
+    if (!entry.startsWith(prefix)) continue;
+    const tmpPath = path.join(dir, entry);
+    try {
+      const s = await stat(tmpPath);
+      // Age-gated: the manifest is shared across extension hosts, and another
+      // live window may be mid-atomic-write on this very path — its temp is
+      // milliseconds old, a crash leftover is minutes+.
+      if (Date.now() - s.mtimeMs > 60_000) {
+        await unlink(tmpPath);
+      }
+    } catch {
+      // Raced with the owning write finishing — fine.
+    }
   }
 }
 
@@ -307,7 +352,7 @@ export async function activate(context: vscode.ExtensionContext) {
     // Age-gated: the manifest is shared across extension hosts, and another
     // live window may be mid-atomic-write on this very path — its temp is
     // milliseconds old, a crash leftover is minutes+.
-    void sweepStaleTemp(`${entry.path}.tmp-envpilot`);
+    void sweepStaleTemp(entry.path);
     if (rearmAuthenticated && existsSync(entry.path)) {
       clipboardGuardService.protectFile(
         entry.path,
@@ -487,6 +532,16 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "envpilot.revealValues",
       wrapCommand(async () => {
+        // Role-gated: unmasking is a capability an admin grants per role, not
+        // something every synced user gets. Checked HERE as well as via the
+        // palette's `when` clause — a context key only hides the entry, it
+        // does not stop the command being invoked by keybinding or by URI.
+        if (!(await canRevealSecrets())) {
+          vscode.window.showWarningMessage(
+            "Envpilot: your role does not allow revealing secret values. Ask an organization owner if you need this."
+          );
+          return;
+        }
         cloakService.reveal();
       })
     ),
@@ -631,6 +686,9 @@ export async function activate(context: vscode.ExtensionContext) {
     dashboardPanelProvider.notifySyncCompleted();
     // Sync may have registered new managed files — re-apply cloaking.
     cloakService.refresh();
+    // Capabilities arrive with the variables response, so the reveal gate can
+    // only be resolved once a sync has landed.
+    void refreshRevealContext();
     void maybeShowUnsyncNotice(context);
   });
 
