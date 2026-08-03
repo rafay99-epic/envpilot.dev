@@ -5,6 +5,7 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -63,6 +64,38 @@ export function resolveInsideRoot(root: string, filePath: string): string {
   return destination;
 }
 
+/** The numeric mode a stored "0600"/"0400" string maps to. */
+export function numericMode(mode: string): number {
+  return mode === "0400" ? 0o400 : 0o600;
+}
+
+/**
+ * True when the local file's permission bits already match the server's.
+ *
+ * Content and permissions drift independently: a careless `chmod -R`, a zip
+ * extract, or a checkout can leave a byte-identical keystore world-readable.
+ * Digest comparison alone reports that as "in sync", so the mode is checked
+ * separately and repaired without re-downloading anything.
+ */
+export function modeMatches(
+  root: string,
+  filePath: string,
+  mode: string
+): boolean {
+  try {
+    const destination = resolveInsideRoot(root, filePath);
+    if (!existsSync(destination)) return true;
+    return (statSync(destination).mode & 0o777) === numericMode(mode);
+  } catch {
+    return true;
+  }
+}
+
+/** Re-apply the recorded permissions to an already-correct local file. */
+export function applyMode(root: string, filePath: string, mode: string): void {
+  chmodSync(resolveInsideRoot(root, filePath), numericMode(mode));
+}
+
 /** Compare a secret file's server digest against the local copy. */
 export function statusOf(file: SecretFileRow, root: string): FileStatus {
   let destination: string;
@@ -94,11 +127,11 @@ export function writeSecretFile(
   const destination = resolveInsideRoot(root, filePath);
   mkdirSync(dirname(destination), { recursive: true });
 
-  const numericMode = mode === "0400" ? 0o400 : 0o600;
+  const target = numericMode(mode);
   const temp = `${destination}.envpilot-${process.pid}.tmp`;
   try {
     writeFileSync(temp, contents, { mode: 0o600 });
-    chmodSync(temp, numericMode);
+    chmodSync(temp, target);
     renameSync(temp, destination);
   } catch (error) {
     if (existsSync(temp)) {
@@ -112,7 +145,7 @@ export function writeSecretFile(
   }
   // rename preserves the temp file's mode, but an existing destination that
   // was replaced in some other way could differ. Assert it explicitly.
-  chmodSync(destination, numericMode);
+  chmodSync(destination, target);
   return destination;
 }
 

@@ -20,7 +20,9 @@ import {
   getActiveProject,
 } from "../lib/project-config.js";
 import {
+  applyMode,
   ignoreSecretFilePaths,
+  modeMatches,
   statusOf,
   writeSecretFile,
 } from "../lib/secret-files.js";
@@ -94,7 +96,7 @@ function printFileRow(file: SecretFileRow, status?: string): void {
   const marker =
     status === "in-sync"
       ? chalk.green("✓")
-      : status === "modified"
+      : status === "modified" || status === "wrong-mode"
         ? chalk.yellow("!")
         : status === "missing"
           ? chalk.red("✗")
@@ -104,7 +106,9 @@ function printFileRow(file: SecretFileRow, status?: string): void {
       ? chalk.yellow("  local differs from remote")
       : status === "missing"
         ? chalk.red("  missing locally")
-        : "";
+        : status === "wrong-mode"
+          ? chalk.yellow("  wrong permissions")
+          : "";
   console.log(
     `  ${marker} ${chalk.bold(file.path.padEnd(38))} ${formatBytes(file.size).padStart(9)}  ${file.mode}  ${chalk.dim(
       file.environments.join(",")
@@ -169,8 +173,13 @@ const statusCommand = new Command("status")
       for (const file of files) {
         // Hash the LOCAL copy and compare — no network, no decrypt, no audit.
         const status = statusOf(file, process.cwd());
-        if (status !== "in-sync") drifted += 1;
-        printFileRow(file, status);
+        // Content and permissions drift independently: a byte-identical file
+        // left world-readable is still wrong for a keystore.
+        const wrongMode =
+          status === "in-sync" &&
+          !modeMatches(process.cwd(), file.path, file.mode);
+        if (status !== "in-sync" || wrongMode) drifted += 1;
+        printFileRow(file, wrongMode ? "wrong-mode" : status);
       }
       blank();
       if (drifted === 0) {
@@ -243,9 +252,20 @@ const pullCommand = new Command("pull")
       let written = 0;
       for (const file of files) {
         if (statuses.get(file._id) === "in-sync") {
-          console.log(
-            `  ${chalk.dim("=")} ${file.path} ${chalk.dim("(unchanged)")}`
-          );
+          // Content matches, so no fetch and no decrypt — but repair the
+          // permissions if something loosened them since the last pull.
+          if (!modeMatches(root, file.path, file.mode)) {
+            applyMode(root, file.path, file.mode);
+            console.log(
+              `  ${chalk.yellow("~")} ${file.path} ${chalk.dim(
+                `(permissions restored to ${file.mode})`
+              )}`
+            );
+          } else {
+            console.log(
+              `  ${chalk.dim("=")} ${file.path} ${chalk.dim("(unchanged)")}`
+            );
+          }
           continue;
         }
         // One decrypt per file, each audited server-side.

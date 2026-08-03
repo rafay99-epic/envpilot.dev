@@ -11,7 +11,9 @@ import {
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import {
+  applyMode,
   ignoreSecretFilePaths,
+  modeMatches,
   statusOf,
   writeSecretFile,
 } from "../lib/secret-files.js";
@@ -316,7 +318,13 @@ async function pullSecretFiles(
   console.log();
   let written = 0;
   for (const file of files) {
-    if (statusOf(file, root) === "in-sync") continue;
+    if (statusOf(file, root) === "in-sync") {
+      // Repair loosened permissions without re-downloading anything.
+      if (!modeMatches(root, file.path, file.mode)) {
+        applyMode(root, file.path, file.mode);
+      }
+      continue;
+    }
     const content = await client.getSecretFileContent(file._id);
     writeSecretFile(
       root,

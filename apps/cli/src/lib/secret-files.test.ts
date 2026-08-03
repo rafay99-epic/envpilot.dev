@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
+  chmodSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -12,8 +13,10 @@ import { tmpdir } from "node:os";
 import { webcrypto } from "node:crypto";
 
 import {
+  applyMode,
   ignoreSecretFilePaths,
   localDigest,
+  modeMatches,
   resolveInsideRoot,
   statusOf,
   writeSecretFile,
@@ -154,6 +157,47 @@ describe("drift detection", () => {
   it("treats an unresolvable path as missing rather than throwing", () => {
     // A hostile or buggy server response must not crash `files status`.
     expect(statusOf(row({ path: "../evil" }), root)).toBe("missing");
+  });
+});
+
+describe("permission drift", () => {
+  it("detects a byte-identical file whose mode was loosened", async () => {
+    // The digest still matches, so statusOf reports in-sync — but a keystore
+    // left world-readable is still wrong. This is the case a careless
+    // `chmod -R`, a zip extract, or a checkout produces.
+    const salt = newDigestSalt();
+    const contents = Buffer.from("keystore");
+    const sha = await serverDigest(new Uint8Array(contents), salt);
+    const file = row({
+      path: "k.jks",
+      mode: "0400",
+      sha256: sha,
+      digestSalt: salt,
+    });
+
+    writeSecretFile(root, "k.jks", contents, "0400");
+    expect(statusOf(file, root)).toBe("in-sync");
+    expect(modeMatches(root, "k.jks", "0400")).toBe(true);
+
+    chmodSync(join(root, "k.jks"), 0o644);
+    expect(statusOf(file, root), "content is still identical").toBe("in-sync");
+    expect(modeMatches(root, "k.jks", "0400"), "mode drift is caught").toBe(
+      false
+    );
+  });
+
+  it("repairs the mode without touching the contents", () => {
+    writeSecretFile(root, "k.jks", Buffer.from("keystore"), "0400");
+    chmodSync(join(root, "k.jks"), 0o644);
+
+    applyMode(root, "k.jks", "0400");
+
+    expect(statSync(join(root, "k.jks")).mode & 0o777).toBe(0o400);
+    expect(readFileSync(join(root, "k.jks")).toString()).toBe("keystore");
+  });
+
+  it("treats a missing file as no drift (statusOf owns that case)", () => {
+    expect(modeMatches(root, "absent.key", "0400")).toBe(true);
   });
 });
 

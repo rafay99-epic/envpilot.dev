@@ -5,6 +5,7 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -84,6 +85,31 @@ export function statusOf(file: SecretFileRow, root: string): FileStatus {
     : "modified";
 }
 
+function numericMode(mode: string): number {
+  return mode === "0400" ? 0o400 : 0o600;
+}
+
+/**
+ * True when the local file's permission bits match the server's.
+ *
+ * Content and permissions drift independently — a byte-identical keystore
+ * left world-readable still needs repairing, and the digest alone reports it
+ * as in sync.
+ */
+export function modeMatches(
+  root: string,
+  filePath: string,
+  mode: string
+): boolean {
+  try {
+    const destination = resolveInsideRoot(root, filePath);
+    if (!existsSync(destination)) return true;
+    return (statSync(destination).mode & 0o777) === numericMode(mode);
+  } catch {
+    return true;
+  }
+}
+
 /** Count of files whose local copy is absent or stale. */
 export function countDrift(files: SecretFileRow[], root: string): number {
   return files.filter((file) => statusOf(file, root) !== "in-sync").length;
@@ -98,11 +124,11 @@ function writeSecretFile(
   const destination = resolveInsideRoot(root, filePath);
   mkdirSync(dirname(destination), { recursive: true });
 
-  const numericMode = mode === "0400" ? 0o400 : 0o600;
+  const target = numericMode(mode);
   const temp = `${destination}.envpilot-${process.pid}.tmp`;
   try {
     writeFileSync(temp, contents, { mode: 0o600 });
-    chmodSync(temp, numericMode);
+    chmodSync(temp, target);
     renameSync(temp, destination);
   } catch (error) {
     if (existsSync(temp)) {
@@ -114,7 +140,7 @@ function writeSecretFile(
     }
     throw error;
   }
-  chmodSync(destination, numericMode);
+  chmodSync(destination, target);
   return destination;
 }
 
@@ -183,6 +209,15 @@ export async function materialiseSecretFiles(
   for (const file of files) {
     const status = statusOf(file, root);
     if (status === "in-sync") {
+      // Repair loosened permissions without a fetch, a decrypt, or an audit
+      // entry — the bytes are already correct.
+      if (!modeMatches(root, file.path, file.mode)) {
+        try {
+          chmodSync(resolveInsideRoot(root, file.path), numericMode(file.mode));
+        } catch {
+          // Non-fatal: the contents are right, only the mode is not.
+        }
+      }
       result.unchanged.push(file.path);
     } else if (status === "modified" && !options.force) {
       result.conflicts.push(file.path);
