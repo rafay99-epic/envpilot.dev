@@ -1,0 +1,39 @@
+convex/features/featureRegistry/gates.ts
+  s_e94a11bf9b2f48::t_11ce7bbb0d7ef3 395-398,401-403,406,412
+apps/vscode-extension/src/services/sync.ts
+  s_e94a11bf9b2f48::t_5c9fc02cf70143 490-496,521,566-572
+apps/vscode-extension/src/services/secretFiles.ts
+  s_e94a11bf9b2f48::t_5c9fc02cf70143 76-81,83-84,124-131
+convex/features/files/mutations.ts
+  s_e94a11bf9b2f48::t_f839ee93c9102b 423-498
+apps/cli/src/commands/files.ts
+  s_e94a11bf9b2f48::t_d95c0b92417274 511-515,518
+apps/cli/src/lib/api.ts
+  s_e94a11bf9b2f48::t_d95c0b92417274 376,378-380,1027-1030,1032,1034-1036
+convex/lib/rateLimits.ts
+  s_e94a11bf9b2f48::t_e76102bb829cf1 48-53,56,58
+convex/features/files/queries.ts
+  s_e94a11bf9b2f48::t_e76102bb829cf1 285-309
+  s_e94a11bf9b2f48::t_ee61eacb377444 8-12
+apps/web/src/lib/__tests__/secret-file-path.test.ts
+  s_e94a11bf9b2f48::t_3f7b72463a983d 50-63
+convex/features/files/helpers.ts
+  s_e94a11bf9b2f48::t_b5f0039a5ebf86 206-210,212,214-223
+  s_e94a11bf9b2f48::t_a7262318c69782 31-37,84-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "0254df644a72d07ac179518808e2d8b789c75a20",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
