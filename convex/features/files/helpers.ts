@@ -93,14 +93,17 @@ export function normalizeFilePath(rawPath: string): string {
   }
 
   const normalized = segments.join("/");
+  // macOS and Windows filesystems are case-insensitive, so ".GIT/config"
+  // targets the same file as ".git/config" on pull. Compare folded.
+  const folded = normalized.toLowerCase();
 
-  if (FORBIDDEN_EXACT.has(normalized)) {
+  if (FORBIDDEN_EXACT.has(folded)) {
     throw new ConvexError(
       `"${normalized}" is reserved and cannot be used as a secret file path`
     );
   }
   for (const prefix of FORBIDDEN_PREFIXES) {
-    if (normalized.startsWith(prefix)) {
+    if (folded.startsWith(prefix)) {
       throw new ConvexError(
         `Secret files cannot be written inside "${prefix}"`
       );
@@ -180,6 +183,25 @@ export async function findFilePathConflicts(
       if (args.environments.includes(env)) clashes.add(env);
     }
   }
+
+  // Case-folded collisions too: "Config.json" and "config.json" are one file
+  // on a case-insensitive checkout, so pulling both would have them
+  // overwrite each other silently.
+  const foldedTarget = args.path.toLowerCase();
+  const allInProject = await ctx.db
+    .query("projectFiles")
+    .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+    .collect();
+  for (const existing of allInProject) {
+    if (existing.deletedAt) continue;
+    if (args.excludeFileId && existing._id === args.excludeFileId) continue;
+    if (existing.path === args.path) continue; // exact match handled above
+    if (existing.path.toLowerCase() !== foldedTarget) continue;
+    for (const env of existing.environments) {
+      if (args.environments.includes(env)) clashes.add(env);
+    }
+  }
+
   return [...clashes];
 }
 

@@ -386,6 +386,7 @@ const getCommand = new Command("get")
   .description("Write a single secret file to its recorded path")
   .argument("<path>", "The secret file's destination path")
   .option("-e, --env <environment>", "Filter by environment")
+  .option("--force", "Overwrite a local file that differs from the server")
   .option("--project <name-or-id>", "Use a specific linked project")
   .action(async (targetPath, options) => {
     try {
@@ -410,11 +411,28 @@ const getCommand = new Command("get")
       }
       const match = matches[0];
 
+      // Same preflight `files pull` runs. `get` writes to exactly the same
+      // place with the same consequences, so it cannot be the one command
+      // that silently clobbers a local keystore or leaves a secret
+      // untracked-and-offerable to git.
+      const root = process.cwd();
+      if (statusOf(match, root) === "modified" && !options.force) {
+        error(`Local ${match.path} differs from the server.`);
+        info("Re-run with --force to replace it.");
+        process.exitCode = 1;
+        return;
+      }
+
+      const ignored = ignoreSecretFilePaths(root, [match.path]);
+      if (ignored.length > 0) {
+        success(`Added ${match.path} to .gitignore`);
+      }
+
       const content = await withSpinner(`Fetching ${match.path}...`, () =>
         client.getSecretFileContent(match._id)
       );
       writeSecretFile(
-        process.cwd(),
+        root,
         content.path,
         Buffer.from(content.content, "base64"),
         content.mode
@@ -430,7 +448,11 @@ const rmCommand = new Command("rm")
   .argument("<path>", "The secret file's destination path")
   .option(
     "-e, --env <environment>",
-    "Environment used to FIND the file (defaults to the linked one). Deletion always trashes the whole file, including its other environments."
+    "Environment to remove the file from (defaults to the linked one). If the file also belongs to other environments, only this one is detached."
+  )
+  .option(
+    "--all-envs",
+    "Trash the file for every environment it belongs to, not just --env"
   )
   .option("-y, --yes", "Skip the confirmation prompt")
   .option("--project <name-or-id>", "Use a specific linked project")
@@ -456,13 +478,24 @@ const rmCommand = new Command("rm")
       }
       const match = matches[0];
 
+      // A file shared across environments is ONE row, so trashing it removes
+      // production's copy too. Detaching just the named environment is what
+      // "remove it from staging" actually means; full deletion needs
+      // --all-envs (or is implied when this is the only environment left).
+      const detachOnly =
+        !options.allEnvs &&
+        match.environments.length > 1 &&
+        match.environments.includes(env);
+      const remaining = match.environments.filter((e) => e !== env);
+
       if (!options.yes) {
         const { confirmed } = await inquirer.prompt<{ confirmed: boolean }>([
           {
             type: "confirm",
             name: "confirmed",
-            message:
-              match.environments.length > 1
+            message: detachOnly
+              ? `Remove "${match.name}" (${match.path}) from ${env}? It stays in ${remaining.join(", ")}.`
+              : match.environments.length > 1
                 ? `"${match.name}" (${match.path}) belongs to ${match.environments.join(", ")}. Deleting trashes it for ALL of them — continue?`
                 : `Move "${match.name}" (${match.path}, ${env}) to trash?`,
             default: false,
@@ -472,6 +505,16 @@ const rmCommand = new Command("rm")
           info("Cancelled.");
           return;
         }
+      }
+
+      if (detachOnly) {
+        await withSpinner(`Removing from ${env}...`, () =>
+          client.setSecretFileEnvironments(match._id, remaining)
+        );
+        success(
+          `${match.name} removed from ${env}. Still in ${remaining.join(", ")}.`
+        );
+        return;
       }
 
       await withSpinner("Deleting...", () =>

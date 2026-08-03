@@ -44,7 +44,6 @@ export function FilePermissionsDrawer({
   const revokeAccess = useRevokeSecretFileAccess();
 
   const [selectedUser, setSelectedUser] = useState("");
-  const [permission, setPermission] = useState<"read" | "write">("read");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,7 +61,8 @@ export function FilePermissionsDrawer({
       await grantAccess({
         fileId: file._id,
         userId: selectedUser as Id<"users">,
-        permission,
+        // Always read — see the note below the picker.
+        permission: "read",
       });
       setSelectedUser("");
     } catch (e) {
@@ -120,26 +120,15 @@ export function FilePermissionsDrawer({
             ))}
           </select>
 
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Grants are read-only: the person can download this one file, nothing
+            else. Only members assigned to the project can replace a file, so
+            offering &ldquo;write&rdquo; here would hand out access the server
+            then resolves back down to read.
+          </p>
+
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <label
-                htmlFor="file-grant-permission"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Permission
-              </label>
-              <select
-                id="file-grant-permission"
-                value={permission}
-                onChange={(e) =>
-                  setPermission(e.target.value as "read" | "write")
-                }
-                className={selectClasses}
-              >
-                <option value="read">Read — can download</option>
-                <option value="write">Write — can replace</option>
-              </select>
-            </div>
+            <div className="flex-1" />
             <button
               type="button"
               onClick={handleGrant}

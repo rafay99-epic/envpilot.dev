@@ -681,7 +681,8 @@ export const logDownload = internalMutation({
   args: {
     fileId: v.id("projectFiles"),
     userId: v.id("users"),
-    source: v.string(),
+    /** Untrusted client hint — see values.getFileContent. */
+    clientHint: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -699,7 +700,11 @@ export const logDownload = internalMutation({
         fileId: args.fileId,
         fileName: file.name,
         path: file.path,
-        source: args.source,
+        // Server-derived: this mutation is only reachable from the
+        // getFileContent action, so the surface is known regardless of what
+        // the caller claimed.
+        source: "file-content-action",
+        clientHint: args.clientHint,
       },
       involvesSensitiveData: true,
       resourceType: "file",

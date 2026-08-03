@@ -13,6 +13,7 @@ import {
   toBase64,
 } from "./crypto";
 import * as blobStore from "./blobStore";
+import { rateLimiter } from "../../lib/rateLimits";
 
 /**
  * Composed secret-file actions — the ONLY place plaintext and key material
@@ -137,6 +138,12 @@ export const uploadFile = action({
   // includes this action — so inference would be circular (TS7022).
   handler: async (ctx, args): Promise<UploadResult> => {
     const userId = await requireCurrentUserId(ctx);
+    // Throttle BEFORE the encrypt/blob/vault work, not after — the point is
+    // to stop a loop consuming storage and WorkOS calls at all.
+    await rateLimiter.limit(ctx, "fileUpload", {
+      key: userId,
+      throws: true,
+    });
 
     let plaintext: Uint8Array;
     try {
@@ -272,6 +279,10 @@ export const getFileContent = action({
   // Explicit return type — see uploadFile.
   handler: async (ctx, args): Promise<FileContentResult> => {
     const userId = await requireCurrentUserId(ctx);
+    await rateLimiter.limit(ctx, "fileDownload", {
+      key: userId,
+      throws: true,
+    });
 
     // Authorization happens inside the internal query, which also hands back
     // the refs that the metadata queries deliberately never expose.
@@ -293,7 +304,7 @@ export const getFileContent = action({
     await ctx.runMutation(internal.features.files.mutations.logDownload, {
       fileId: args.fileId,
       userId,
-      source: args.source ?? "web",
+      clientHint: args.source ?? "unknown",
     });
 
     return {

@@ -1,5 +1,9 @@
 import { v, ConvexError } from "convex/values";
-import { action, internalQuery } from "../../_generated/server";
+import {
+  action,
+  internalQuery,
+  internalMutation,
+} from "../../_generated/server";
 import type { ActionCtx } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
@@ -275,6 +279,38 @@ export const _readActiveFiles = internalQuery({
       vaultRef: r.vaultRef,
       storageId: r.storageId,
     }));
+  },
+});
+
+/** One audit row per secret file returned by an API/MCP content pull. */
+export const _logFilePull = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    projectId: v.id("projects"),
+    userId: v.id("apiKeys"),
+    path: v.string(),
+    name: v.string(),
+    environment: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const key = await ctx.db.get(args.userId);
+    if (!key) return null;
+    await ctx.db.insert("auditLogs", {
+      organizationId: args.organizationId,
+      projectId: args.projectId,
+      userId: key.createdBy,
+      action: "file.downloaded",
+      details: JSON.stringify({
+        keyId: args.userId,
+        path: args.path,
+        fileName: args.name,
+        environment: args.environment,
+        source: "public-api",
+      }),
+      createdAt: Date.now(),
+    });
+    return null;
   },
 });
 
@@ -978,6 +1014,18 @@ export const getProjectFiles = action({
       }
 
       results.push({ ...meta, content: toBase64(plaintext) });
+
+      // One entry PER FILE. A single generic "files pulled" row cannot
+      // answer "who pulled the production signing key", which is the
+      // question this audit trail exists for.
+      await ctx.runMutation(internal.features.api.reads._logFilePull, {
+        organizationId: bootstrap.organizationId,
+        projectId: projectDoc._id,
+        userId: bootstrap.keyId,
+        path: row.path,
+        name: row.name,
+        environment: args.environment,
+      });
     }
 
     return results;

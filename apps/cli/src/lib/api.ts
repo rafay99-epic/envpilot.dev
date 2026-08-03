@@ -373,6 +373,11 @@ const refs = {
   removeFile: fnRef<"mutation", { fileId: string }, string>(
     "features/files/mutations:remove"
   ),
+  updateFile: fnRef<
+    "mutation",
+    { fileId: string; environments?: string[] },
+    string
+  >("features/files/mutations:update"),
   pushBulk: fnRef<
     "action",
     {
@@ -1016,6 +1021,17 @@ export class APIClient {
   /** Move a secret file to the trash. */
   async removeSecretFile(fileId: string): Promise<string> {
     return convexMutation(refs.removeFile, { fileId });
+  }
+
+  /**
+   * Narrow a secret file's environments. Used by `files rm --env` to detach
+   * one environment instead of trashing the file for all of them.
+   */
+  async setSecretFileEnvironments(
+    fileId: string,
+    environments: string[]
+  ): Promise<string> {
+    return convexMutation(refs.updateFile, { fileId, environments });
   }
 
   /**

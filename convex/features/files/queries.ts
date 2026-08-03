@@ -5,6 +5,7 @@ import type { Doc } from "../../_generated/dataModel";
 import { requireFileAccess, authorizeFileAccess } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import { requireAuthedUser } from "../../lib/identity";
+import { checkCountedLimit, countActiveFiles } from "../featureRegistry/gates";
 import {
   isEnvironmentScopeAllowed,
   getActiveMembership,
@@ -240,6 +241,49 @@ export const get = query({
       createdAt: file.createdAt,
       updatedAt: file.updatedAt,
       access,
+    };
+  },
+});
+
+/**
+ * Remaining upload quota for the caller's organization.
+ *
+ * The cap is ORG-wide, but a project page only knows its own files — gating
+ * the Upload button on that local count leaves it enabled right up to a
+ * server rejection whenever the org's other projects hold the slots. This
+ * runs the same checkCountedLimit the mutation runs, so the button and the
+ * server agree.
+ */
+export const uploadQuota = query({
+  args: { projectId: v.id("projects") },
+  returns: v.object({
+    allowed: v.boolean(),
+    current: v.number(),
+    limit: v.union(v.number(), v.null()),
+  }),
+  handler: async (ctx, args) => {
+    const user = await requireAuthedUser(ctx);
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) {
+      return { allowed: false, current: 0, limit: null };
+    }
+    const membership = await getActiveMembership(
+      ctx,
+      project.organizationId,
+      user._id
+    );
+    if (!membership) return { allowed: false, current: 0, limit: null };
+
+    const gate = await checkCountedLimit(
+      ctx.db,
+      project.organizationId,
+      "secret_files_limit",
+      (limit) => countActiveFiles(ctx.db, project.organizationId, limit)
+    );
+    return {
+      allowed: gate.allowed,
+      current: gate.current ?? 0,
+      limit: gate.limit ?? null,
     };
   },
 });

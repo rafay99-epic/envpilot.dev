@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ENVIRONMENTS, type Environment } from "@/constants/project";
+import {
+  ENVIRONMENTS,
+  type Environment,
+  envToggleClasses,
+} from "@/constants/project";
 import { RotateCcw } from "lucide-react";
 import type { Tag } from "@/hooks/useTags";
 import { TagSelector } from "./tag-selector";

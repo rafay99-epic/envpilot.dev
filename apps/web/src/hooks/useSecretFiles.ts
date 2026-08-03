@@ -55,6 +55,19 @@ export function useSecretFiles(projectId: Id<"projects"> | undefined) {
   ) as SecretFile[] | undefined;
 }
 
+/**
+ * Org-wide remaining upload quota. The project page cannot compute this
+ * itself — the cap counts every project in the organization.
+ */
+export function useSecretFileUploadQuota(
+  projectId: Id<"projects"> | undefined
+) {
+  return useQuery(
+    convexApi.features.files.queries.uploadQuota,
+    projectId ? { projectId } : "skip"
+  ) as { allowed: boolean; current: number; limit: number | null } | undefined;
+}
+
 export function useDeletedSecretFiles(projectId: Id<"projects"> | undefined) {
   return useQuery(
     convexApi.features.files.queries.getDeleted,

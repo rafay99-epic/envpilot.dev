@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ENVIRONMENTS, type Environment } from "@/constants/project";
+import {
+  ENVIRONMENTS,
+  type Environment,
+  envToggleClasses,
+} from "@/constants/project";
 import {
   parseEnvFile,
   type ParsedEnvEntry,

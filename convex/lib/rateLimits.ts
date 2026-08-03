@@ -35,6 +35,25 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 120,
   },
 
+  // Secret-file uploads: 20 per minute per user. Each one encrypts, writes
+  // a blob and creates a vault object, so an unthrottled loop is expensive
+  // in storage and in WorkOS calls, not just CPU.
+  fileUpload: {
+    kind: "token bucket",
+    rate: 20,
+    period: 60_000,
+    capacity: 20,
+  },
+
+  // Secret-file content reads: 60 per minute per user. Each one is a blob
+  // read plus a vault read plus a decrypt, and returns plaintext.
+  fileDownload: {
+    kind: "token bucket",
+    rate: 60,
+    period: 60_000,
+    capacity: 60,
+  },
+
   // Machine-originated variable requests: 5 per hour per key, burst 2.
   // Each create fans out a reviewer email — a retry-looping agent must be
   // blocked before it becomes reviewer alert fatigue. A standing cap on

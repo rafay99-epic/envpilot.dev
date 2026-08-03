@@ -120,4 +120,38 @@ describe("secret file crypto", () => {
     const second = await digest(plaintext, newDigestSalt());
     expect(first).not.toEqual(second);
   });
+
+  it("rejects every malformed key blob with the documented error", async () => {
+    const { ciphertext } = await seal(new TextEncoder().encode("x"));
+    // Anything that is not a well-formed A256GCM blob must surface
+    // `invalid_key_blob`, not a raw TypeError/DOMException from subtle —
+    // the vault object is attacker-influencable if the vault is ever
+    // compromised, so this is a trust boundary, not defensive noise.
+    const malformed = [
+      "not json at all",
+      "null",
+      '"a string"',
+      "[]",
+      JSON.stringify({ alg: "A128GCM", k: "AA", iv: "AA" }),
+      JSON.stringify({ alg: "A256GCM", iv: "AA" }),
+      JSON.stringify({ alg: "A256GCM", k: 5, iv: "AA" }),
+      // Right shape, wrong lengths.
+      JSON.stringify({
+        alg: "A256GCM",
+        k: toBase64(new Uint8Array(16)),
+        iv: toBase64(new Uint8Array(12)),
+      }),
+      JSON.stringify({
+        alg: "A256GCM",
+        k: toBase64(new Uint8Array(32)),
+        iv: toBase64(new Uint8Array(8)),
+      }),
+    ];
+
+    for (const keyMaterial of malformed) {
+      await expect(open(ciphertext, keyMaterial)).rejects.toThrow(
+        /invalid_key_blob/
+      );
+    }
+  });
 });

@@ -141,24 +141,51 @@ export async function open(
   ciphertext: Uint8Array,
   keyMaterial: string
 ): Promise<Uint8Array> {
+  // Validate EVERYTHING here so a tampered vault object always surfaces the
+  // documented code. Previously only two narrow shapes were caught: JSON
+  // "null" threw a TypeError on property access, non-base64 `k` threw a raw
+  // DOMException from atob, and a wrong-length key threw an OperationError
+  // from importKey — three different low-level errors for one condition,
+  // all of which prod redacts to "Server Error".
+  const malformed = () =>
+    new Error("File key material is malformed (code=invalid_key_blob)");
+
   let material: FileKeyMaterial;
   try {
-    material = JSON.parse(keyMaterial) as FileKeyMaterial;
+    const parsed: unknown = JSON.parse(keyMaterial);
+    if (typeof parsed !== "object" || parsed === null) throw malformed();
+    material = parsed as FileKeyMaterial;
   } catch {
-    throw new Error("File key material is malformed (code=invalid_key_blob)");
+    throw malformed();
   }
-  if (material.alg !== "A256GCM" || !material.k || !material.iv) {
-    throw new Error("File key material is malformed (code=invalid_key_blob)");
+  if (
+    material.alg !== "A256GCM" ||
+    typeof material.k !== "string" ||
+    typeof material.iv !== "string"
+  ) {
+    throw malformed();
+  }
+
+  let rawKey: Uint8Array;
+  let iv: Uint8Array;
+  try {
+    rawKey = fromBase64(material.k);
+    iv = fromBase64(material.iv);
+  } catch {
+    throw malformed();
+  }
+  if (rawKey.length !== KEY_BYTES || iv.length !== IV_BYTES) {
+    throw malformed();
   }
   const key = await crypto.subtle.importKey(
     "raw",
-    bufferOf(fromBase64(material.k)),
+    bufferOf(rawKey),
     "AES-GCM",
     false,
     ["decrypt"]
   );
   const plaintext = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: bufferOf(fromBase64(material.iv)) },
+    { name: "AES-GCM", iv: bufferOf(iv) },
     key,
     bufferOf(ciphertext)
   );

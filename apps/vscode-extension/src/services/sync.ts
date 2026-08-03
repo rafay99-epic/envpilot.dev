@@ -480,7 +480,14 @@ export class SyncService {
   private async syncSecretFiles(
     projectId: string,
     environments: string[],
-    root: string | undefined
+    root: string | undefined,
+    /**
+     * Overwrite locally-modified files instead of reporting them as
+     * conflicts. Only the edit watcher sets this: a routine sync must never
+     * silently destroy someone's hand-placed keystore, but a revert exists
+     * precisely to undo the edit that triggered it.
+     */
+    force = false
   ): Promise<void> {
     if (!root) return;
 
@@ -499,6 +506,7 @@ export class SyncService {
         environment,
         root,
         {
+          force,
           setSyncing: (syncing) => this.fileProtection?.setSyncing(syncing),
           onWritten: async (file, contents) => {
             // Secret files get the SAME guards a synced .env gets. Mirrors
@@ -532,7 +540,11 @@ export class SyncService {
             this.fileProtection?.watchFile(
               file.absolutePath,
               async () => {
-                await this.syncSecretFiles(projectId, environments, root);
+                // force: the file IS modified — that is why the watcher
+                // fired. Without it materialise classes it a conflict and
+                // leaves the unauthorized edit in place, so the warning
+                // ("you cannot modify it") is the only thing that happens.
+                await this.syncSecretFiles(projectId, environments, root, true);
               },
               "strict-readonly",
               { writable: 0o600, readonly: file.numericMode }

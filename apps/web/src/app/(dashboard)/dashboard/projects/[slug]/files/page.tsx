@@ -8,10 +8,10 @@ import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { ConfirmDialog } from "@/components/ui";
 import { FeatureGate } from "@/components/tier/FeatureGate";
-import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { useProjectBySlug, useConvexUser } from "@/hooks";
 import {
   useSecretFiles,
+  useSecretFileUploadQuota,
   useUploadSecretFile,
   useUpdateSecretFile,
   useDeleteSecretFile,
@@ -86,11 +86,11 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
 
   const fileList = files ?? [];
-  const { allowed: canCreateGate } = useFeatureGate(
-    orgId,
-    "secret_files_limit",
-    { currentCount: fileList.length }
-  );
+  // Server-computed and ORG-wide. A project-local count would leave Upload
+  // enabled while a sibling project already consumed the org's slots, so the
+  // click failed on a server error instead of the button being disabled.
+  const quota = useSecretFileUploadQuota(projectId);
+  const canCreateGate = quota === undefined ? true : quota.allowed;
 
   const filteredFiles = fileList.filter(
     (f) =>
@@ -277,8 +277,8 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
                 onClick={() => setShowCreateDrawer(true)}
                 disabled={!canCreateGate}
                 title={
-                  !canCreateGate
-                    ? "Secret file limit reached. Upgrade to add more."
+                  !canCreateGate && quota
+                    ? `Secret file limit reached (${quota.current}/${quota.limit}) across this organization. Upgrade to add more.`
                     : undefined
                 }
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:justify-start dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"

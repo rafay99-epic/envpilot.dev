@@ -368,10 +368,14 @@ export async function countActiveAccounts(
 /**
  * Count active (non-deleted) secret files across an organization's projects.
  *
- * Same limit-first fan-out as countActiveAccounts: pass the resolved tier
- * limit to stop as soon as capacity is provably full instead of scanning
- * every project. Unlimited (Pro) tiers early-return in checkCountedLimit
- * before this runs at all.
+ * Genuinely bounded, unlike a countMatchingUpTo delegation: that helper
+ * collect()s a project's whole range and ignores its `limit`, so the
+ * free-tier gate would scan every file row of every project — exactly the
+ * scan the bound is supposed to avoid — and report an inflated current
+ * count like "5/3". This takes `remaining + 1` rows per project and stops
+ * as soon as capacity is provably full.
+ *
+ * Unlimited (Pro) tiers early-return in checkCountedLimit before this runs.
  */
 export async function countActiveFiles(
   db: DatabaseReader,
@@ -388,15 +392,21 @@ export async function countActiveFiles(
   for (const project of projects) {
     if (limit !== undefined && count >= limit) break;
 
-    const remaining = limit === undefined ? undefined : limit - count;
-    count += await countMatchingUpTo(
-      () =>
-        db
-          .query("projectFiles")
-          .withIndex("by_project", (q) => q.eq("projectId", project._id)),
-      (f) => f.deletedAt === undefined,
-      remaining
-    );
+    const query = db
+      .query("projectFiles")
+      .withIndex("by_project", (q) => q.eq("projectId", project._id));
+
+    if (limit === undefined) {
+      const rows = await query.collect();
+      count += rows.filter((f) => f.deletedAt === undefined).length;
+      continue;
+    }
+
+    // One more than we need: enough to prove the limit is exceeded without
+    // reading the rest of the project.
+    const remaining = limit - count;
+    const rows = await query.take(remaining + 1);
+    count += rows.filter((f) => f.deletedAt === undefined).length;
   }
   return count;
 }
