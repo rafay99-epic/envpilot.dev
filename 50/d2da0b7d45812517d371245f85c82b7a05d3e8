@@ -1,0 +1,69 @@
+apps/vscode-extension/src/extension.ts
+  s_e94a11bf9b2f48::t_49650500a096aa 226-232,234-249,535-544,689-691
+  s_e94a11bf9b2f48::t_39ba66e2c116ba 250-254,257-260,262-266,268-278,355
+  s_e94a11bf9b2f48::t_bfbae31148ffff 4,255-256,267
+packages/github-action/src/main.ts
+  s_e94a11bf9b2f48::t_b9c45ebdad52fc 1-2,5-10,18-44,95-151
+apps/web/src/app/api/mcp/route.ts
+  s_e94a11bf9b2f48::t_09533937a3959f 277-409
+packages/github-action/package.json
+  s_e94a11bf9b2f48::t_eaf1ff12b594dd 3
+convex/features/api/reads.ts
+  s_e94a11bf9b2f48::t_92a6a07f9e65dc 771-958,962
+  s_e94a11bf9b2f48::t_c293a95af0dd88 15-16
+  s_e94a11bf9b2f48::t_807f70832c912e 226-280,959,963
+  s_e94a11bf9b2f48::t_d30df95a1a0ce3 960-961
+apps/vscode-extension/src/utils/cloakRanges.ts
+  s_e94a11bf9b2f48::t_0f5a3938ae45f3 85-89,187,213-219,245-248
+  s_e94a11bf9b2f48::t_fe2366e9cd8a67 143-146,234-238
+  s_e94a11bf9b2f48::t_12738e1b34e1c0 1-84,90-142,147-186,188-212,220-233,239-244,249-255
+apps/vscode-extension/src/services/sync.ts
+  s_e94a11bf9b2f48::t_e25750ea8106f8 698-718
+  s_e94a11bf9b2f48::t_39ba66e2c116ba 83-84,89-94
+  s_e94a11bf9b2f48::t_2b72c94adb1778 697
+apps/web/src/lib/__tests__/role-parity.test.ts
+  s_e94a11bf9b2f48::t_985694f86c94e8 88,107,125
+apps/vscode-extension/package.json
+  s_e94a11bf9b2f48::t_ecc36d322d11e1 232-235
+apps/vscode-extension/src/utils/cloakRanges.test.ts
+  s_e94a11bf9b2f48::t_fe2366e9cd8a67 1-66,91-98,104-106,112-114,117,119,121-147,159-186,192-208,217-224
+  s_e94a11bf9b2f48::t_43859605f346fe 67-90,99-103,107-111,115-116,118,120
+  s_e94a11bf9b2f48::t_0f5a3938ae45f3 148-158,187-191,209-216
+apps/vscode-extension/src/services/cloak.ts
+  s_e94a11bf9b2f48::t_16421164c685ea 2
+  s_e94a11bf9b2f48::t_c239bf8d89342c 76-86,88,90-96
+convex/lib/capabilities.ts
+  s_e94a11bf9b2f48::t_985694f86c94e8 183-189,308
+convex/lib/roleProfiles.ts
+  s_e94a11bf9b2f48::t_985694f86c94e8 71,119,152,214
+apps/web/src/app/api/v1/files/route.ts
+  s_e94a11bf9b2f48::t_ce2973637453a2 83-87
+  s_e94a11bf9b2f48::t_de0aa3e52031cf 1-82,88-148
+packages/github-action/src/api.ts
+  s_e94a11bf9b2f48::t_6bd26afceeead9 37-114,130
+convex/features/community/changelog/seed.ts
+  s_e94a11bf9b2f48::t_b9213bbf67363c 1444-1481
+packages/github-action/action.yml
+  s_e94a11bf9b2f48::t_b9c45ebdad52fc 27-36,41-42
+apps/web/src/components/api-keys/ApiKeysSection.tsx
+  s_e94a11bf9b2f48::t_42a48210b0caac 56-62,70-72,84,955-957,959-961
+convex/features/api/keys.ts
+  s_e94a11bf9b2f48::t_807f70832c912e 51-54
+  s_e94a11bf9b2f48::t_42a48210b0caac 112-115,134-143,145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "50d2da0b7d45812517d371245f85c82b7a05d3e8",
+  "prompts": {},
+  "sessions": {
+    "s_e94a11bf9b2f48": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7203424c-72b3-401a-b6f2-42d9c6543afc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
