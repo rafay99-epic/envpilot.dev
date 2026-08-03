@@ -55,8 +55,12 @@ export interface MaterialiseResult {
 }
 
 /** Count of files whose local copy is absent or stale. */
-export function countDrift(files: SecretFileRow[], root: string): number {
-  return files.filter((file) => statusOf(file, root) !== "in-sync").length;
+export async function countDrift(
+  files: SecretFileRow[],
+  root: string
+): Promise<number> {
+  const statuses = await Promise.all(files.map((f) => statusOf(f, root)));
+  return statuses.filter((status) => status !== "in-sync").length;
 }
 
 /**
@@ -108,7 +112,7 @@ export async function materialiseSecretFiles(
   const alreadyPresent: SecretFileRow[] = [];
 
   for (const file of files) {
-    const status = statusOf(file, root);
+    const status = await statusOf(file, root);
     if (status === "in-sync") {
       // Repair loosened permissions without a fetch, a decrypt, or an audit
       // entry — the bytes are already correct.
@@ -179,7 +183,7 @@ export async function materialiseSecretFiles(
       try {
         const content = await api.getSecretFileContent(file._id);
         const bytes = Buffer.from(content.content, "base64");
-        const absolutePath = writeSecretFile(
+        const absolutePath = await writeSecretFile(
           root,
           content.path,
           bytes,

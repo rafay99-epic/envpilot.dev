@@ -24,6 +24,7 @@ import {
   ignoreSecretFilePaths,
   modeMatches,
   statusOf,
+  type FileStatus,
   writeSecretFile,
 } from "../lib/secret-files.js";
 import {
@@ -172,7 +173,7 @@ const statusCommand = new Command("status")
       let drifted = 0;
       for (const file of files) {
         // Hash the LOCAL copy and compare — no network, no decrypt, no audit.
-        const status = statusOf(file, process.cwd());
+        const status = await statusOf(file, process.cwd());
         // Content and permissions drift independently: a byte-identical file
         // left world-readable is still wrong for a keystore.
         const wrongMode =
@@ -221,7 +222,8 @@ const pullCommand = new Command("pull")
       // Read each local file ONCE. statusOf hashes the file on disk, so
       // calling it in both the conflict filter and the write loop hashed
       // every keystore twice per pull.
-      const statuses = new Map(files.map((f) => [f._id, statusOf(f, root)]));
+      const statuses = new Map<string, FileStatus>();
+      for (const f of files) statuses.set(f._id, await statusOf(f, root));
 
       // Refuse silently-destructive overwrites. A local keystore that differs
       // may be someone's debug copy; losing it without a word is worse than
@@ -274,7 +276,7 @@ const pullCommand = new Command("pull")
         const content = await withSpinner(`Fetching ${file.path}...`, () =>
           client.getSecretFileContent(file._id)
         );
-        writeSecretFile(
+        await writeSecretFile(
           root,
           content.path,
           Buffer.from(content.content, "base64"),
@@ -416,7 +418,7 @@ const getCommand = new Command("get")
       // that silently clobbers a local keystore or leaves a secret
       // untracked-and-offerable to git.
       const root = process.cwd();
-      if (statusOf(match, root) === "modified" && !options.force) {
+      if ((await statusOf(match, root)) === "modified" && !options.force) {
         error(`Local ${match.path} differs from the server.`);
         info("Re-run with --force to replace it.");
         process.exitCode = 1;
@@ -431,7 +433,7 @@ const getCommand = new Command("get")
       const content = await withSpinner(`Fetching ${match.path}...`, () =>
         client.getSecretFileContent(match._id)
       );
-      writeSecretFile(
+      await writeSecretFile(
         root,
         content.path,
         Buffer.from(content.content, "base64"),

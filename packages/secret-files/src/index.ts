@@ -2,21 +2,17 @@ import { createHash } from "node:crypto";
 import { randomBytes } from "node:crypto";
 import {
   chmodSync,
-  closeSync,
   constants as fsConstants,
   existsSync,
-  fchmodSync,
   lstatSync,
   mkdirSync,
-  openSync,
   readFileSync,
   realpathSync,
   renameSync,
   statSync,
-  unlinkSync,
   writeFileSync,
-  writeSync,
 } from "node:fs";
+import { open as openFile, readFile, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 /**
@@ -171,8 +167,20 @@ export function applyMode(root: string, filePath: string, mode: string): void {
   chmodSync(resolveInsideRoot(root, filePath), numericMode(mode));
 }
 
-/** Compare a secret file's server digest against the local copy. */
-export function statusOf(file: SecretFileDigestRow, root: string): FileStatus {
+/**
+ * Compare a secret file's server digest against the local copy.
+ *
+ * Async because the CONTENT read is the one genuinely slow step, and the VS
+ * Code extension calls this per file on every sync — a synchronous read of
+ * several multi-megabyte keystores blocks the extension host, freezing
+ * command and UI processing until the loop finishes. The metadata syscalls
+ * around it stay synchronous: they are sub-millisecond and making them async
+ * would only widen the symlink races the checks exist to close.
+ */
+export async function statusOf(
+  file: SecretFileDigestRow,
+  root: string
+): Promise<FileStatus> {
   let destination: string;
   try {
     destination = resolveInsideRoot(root, file.path);
@@ -200,7 +208,7 @@ export function statusOf(file: SecretFileDigestRow, root: string): FileStatus {
   if (!stats.isFile()) return "modified";
 
   try {
-    const local = readFileSync(destination);
+    const local = await readFile(destination);
     return localDigest(local, file.digestSalt) === file.sha256
       ? "in-sync"
       : "modified";
@@ -255,12 +263,12 @@ function mkdirNoFollow(absoluteRoot: string, destination: string): string {
  * never world-readable, not even for the instant between create and chmod,
  * and a crash mid-write cannot leave a truncated keystore in place.
  */
-export function writeSecretFile(
+export async function writeSecretFile(
   root: string,
   filePath: string,
   contents: Buffer,
   mode: string
-): string {
+): Promise<string> {
   const absoluteRoot = realpathSync.native(resolve(root));
   const destination = resolveInsideRoot(absoluteRoot, filePath);
   const dir = mkdirNoFollow(absoluteRoot, destination);
@@ -280,9 +288,8 @@ export function writeSecretFile(
   // pre-created as a symlink by another local user, and a following write
   // would deliver the plaintext secret somewhere else entirely.
   const temp = `${destination}.envpilot-${process.pid}-${randomBytes(8).toString("hex")}.tmp`;
-  let fd: number | undefined;
   try {
-    fd = openSync(
+    const handle = await openFile(
       temp,
       fsConstants.O_WRONLY |
         fsConstants.O_CREAT |
@@ -290,22 +297,17 @@ export function writeSecretFile(
         fsConstants.O_NOFOLLOW,
       0o600
     );
-    writeSync(fd, contents);
-    fchmodSync(fd, target);
-    closeSync(fd);
-    fd = undefined;
+    try {
+      await handle.write(contents);
+      await handle.chmod(target);
+    } finally {
+      await handle.close();
+    }
     renameSync(temp, destination);
   } catch (error) {
-    if (fd !== undefined) {
-      try {
-        closeSync(fd);
-      } catch {
-        // Nothing useful to do — the write already failed.
-      }
-    }
     if (existsSync(temp)) {
       try {
-        unlinkSync(temp);
+        await unlink(temp);
       } catch {
         // Nothing useful to do — the write already failed.
       }

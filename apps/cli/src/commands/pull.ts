@@ -305,7 +305,7 @@ async function pullSecretFiles(
     console.log();
     info(`${files.length} secret file(s) for ${environment}:`);
     for (const file of files) {
-      const status = statusOf(file, root);
+      const status = await statusOf(file, root);
       // Permission drift is drift: a real pull chmods a byte-identical file
       // whose mode was loosened, so a preview that calls it "in-sync" is
       // lying about what the pull will do.
@@ -318,7 +318,10 @@ async function pullSecretFiles(
     return true;
   }
 
-  const conflicts = files.filter((file) => statusOf(file, root) === "modified");
+  const conflicts: typeof files = [];
+  for (const file of files) {
+    if ((await statusOf(file, root)) === "modified") conflicts.push(file);
+  }
   if (conflicts.length > 0 && !force) {
     console.log();
     warning(
@@ -341,7 +344,7 @@ async function pullSecretFiles(
   console.log();
   let written = 0;
   for (const file of files) {
-    if (statusOf(file, root) === "in-sync") {
+    if ((await statusOf(file, root)) === "in-sync") {
       // Repair loosened permissions without re-downloading anything.
       if (!modeMatches(root, file.path, file.mode)) {
         applyMode(root, file.path, file.mode);
@@ -349,7 +352,7 @@ async function pullSecretFiles(
       continue;
     }
     const content = await client.getSecretFileContent(file._id);
-    writeSecretFile(
+    await writeSecretFile(
       root,
       content.path,
       Buffer.from(content.content, "base64"),

@@ -78,8 +78,8 @@ function row(overrides: Partial<Record<string, unknown>> = {}) {
   } as Parameters<typeof statusOf>[0];
 }
 
-describe("path containment", () => {
-  it("accepts a normal nested path", () => {
+describe("path containment", async () => {
+  it("accepts a normal nested path", async () => {
     // Compare against the REAL root: containment now resolves symlinks, and
     // on macOS /tmp is itself a symlink to /private/tmp.
     expect(resolveInsideRoot(root, "android/app/upload.jks")).toBe(
@@ -87,7 +87,7 @@ describe("path containment", () => {
     );
   });
 
-  it("refuses a path that escapes through a symlinked directory", () => {
+  it("refuses a path that escapes through a symlinked directory", async () => {
     // The lexical check passes here — "link/escaped.key" normalises inside
     // the root — so only resolving the real ancestor catches it.
     const outside = mkdtempSync(join(tmpdir(), "envpilot-outside-"));
@@ -101,7 +101,7 @@ describe("path containment", () => {
     }
   });
 
-  it("refuses to write through a symlinked destination", () => {
+  it("refuses to write through a symlinked destination", async () => {
     const outside = mkdtempSync(join(tmpdir(), "envpilot-outside-"));
     try {
       writeFileSync(join(outside, "target"), "x");
@@ -112,7 +112,7 @@ describe("path containment", () => {
     }
   });
 
-  it("refuses traversal, absolute paths, and the root itself", () => {
+  it("refuses traversal, absolute paths, and the root itself", async () => {
     // The server rejects these too, but this is the process that actually
     // creates files in someone's repo — it must not rely on that.
     expect(() => resolveInsideRoot(root, "../escaped.jks")).toThrow(/outside/);
@@ -124,9 +124,9 @@ describe("path containment", () => {
   });
 });
 
-describe("writeSecretFile", () => {
-  it("creates missing directories and writes the bytes", () => {
-    const written = writeSecretFile(
+describe("writeSecretFile", async () => {
+  it("creates missing directories and writes the bytes", async () => {
+    const written = await writeSecretFile(
       root,
       "android/app/upload.jks",
       Buffer.from("keystore-bytes"),
@@ -135,71 +135,73 @@ describe("writeSecretFile", () => {
     expect(readFileSync(written).toString()).toBe("keystore-bytes");
   });
 
-  it("applies 0600 and 0400 exactly", () => {
-    const a = writeSecretFile(root, "a.key", Buffer.from("x"), "0600");
-    const b = writeSecretFile(root, "b.key", Buffer.from("x"), "0400");
+  it("applies 0600 and 0400 exactly", async () => {
+    const a = await writeSecretFile(root, "a.key", Buffer.from("x"), "0600");
+    const b = await writeSecretFile(root, "b.key", Buffer.from("x"), "0400");
     // Mask to the permission bits — the file type bits are not ours.
     expect(statSync(a).mode & 0o777).toBe(0o600);
     expect(statSync(b).mode & 0o777).toBe(0o400);
   });
 
-  it("overwrites a read-only file left by a previous pull", () => {
+  it("overwrites a read-only file left by a previous pull", async () => {
     // 0400 means the destination is not writable. The atomic rename is what
     // makes a second pull work at all — a plain write would EACCES.
-    writeSecretFile(root, "rotating.key", Buffer.from("v1"), "0400");
-    writeSecretFile(root, "rotating.key", Buffer.from("v2"), "0400");
+    await writeSecretFile(root, "rotating.key", Buffer.from("v1"), "0400");
+    await writeSecretFile(root, "rotating.key", Buffer.from("v2"), "0400");
     expect(readFileSync(join(root, "rotating.key")).toString()).toBe("v2");
   });
 
-  it("leaves no temp file behind on success", () => {
-    writeSecretFile(root, "clean.key", Buffer.from("x"), "0600");
+  it("leaves no temp file behind on success", async () => {
+    await writeSecretFile(root, "clean.key", Buffer.from("x"), "0600");
     const stray = readFileSync(join(root, "clean.key"));
     expect(stray.toString()).toBe("x");
     expect(() => statSync(join(root, "clean.key.envpilot-1.tmp"))).toThrow();
   });
 
-  it("round-trips arbitrary binary, not just text", () => {
+  it("round-trips arbitrary binary, not just text", async () => {
     const binary = Buffer.from(
       Array.from({ length: 512 }, (_, i) => (i * 31) % 256)
     );
-    const written = writeSecretFile(root, "bin/blob.p12", binary, "0600");
+    const written = await writeSecretFile(root, "bin/blob.p12", binary, "0600");
     expect(readFileSync(written).equals(binary)).toBe(true);
   });
 });
 
-describe("drift detection", () => {
+describe("drift detection", async () => {
   it("reports missing, in-sync, then modified as the file changes", async () => {
     const salt = newDigestSalt();
     const contents = Buffer.from('{"type":"service_account"}');
     const sha = await serverDigest(new Uint8Array(contents), salt);
     const file = row({ path: "gcp.json", sha256: sha, digestSalt: salt });
 
-    expect(statusOf(file, root)).toBe("missing");
+    expect(await statusOf(file, root)).toBe("missing");
 
-    writeSecretFile(root, "gcp.json", contents, "0600");
-    expect(statusOf(file, root)).toBe("in-sync");
+    await writeSecretFile(root, "gcp.json", contents, "0600");
+    expect(await statusOf(file, root)).toBe("in-sync");
 
     writeFileSync(join(root, "gcp.json"), "tampered");
-    expect(statusOf(file, root)).toBe("modified");
+    expect(await statusOf(file, root)).toBe("modified");
   });
 
-  it("reports an unsafe path as a conflict, not as missing", () => {
+  it("reports an unsafe path as a conflict, not as missing", async () => {
     // A hostile or buggy server response must not crash `files status` — and
     // it must not read as "missing" either. Missing means "safe to write",
     // which would send pull off to decrypt a file it then refuses to write.
-    expect(statusOf(row({ path: "../evil" }), root)).toBe("modified");
+    expect(await statusOf(row({ path: "../evil" }), root)).toBe("modified");
   });
 
-  it("reports an unreadable local entry as a conflict, not as missing", () => {
+  it("reports an unreadable local entry as a conflict, not as missing", async () => {
     // Only ENOENT is an absence. EACCES/EIO mean we cannot tell what is
     // there, and "safe to overwrite" must never be a guess.
     const dir = join(root, "as-directory");
     mkdirSync(dir, { recursive: true });
-    expect(statusOf(row({ path: "as-directory" }), root)).toBe("modified");
+    expect(await statusOf(row({ path: "as-directory" }), root)).toBe(
+      "modified"
+    );
   });
 });
 
-describe("permission drift", () => {
+describe("permission drift", async () => {
   it("detects a byte-identical file whose mode was loosened", async () => {
     // The digest still matches, so statusOf reports in-sync — but a keystore
     // left world-readable is still wrong. This is the case a careless
@@ -214,19 +216,21 @@ describe("permission drift", () => {
       digestSalt: salt,
     });
 
-    writeSecretFile(root, "k.jks", contents, "0400");
-    expect(statusOf(file, root)).toBe("in-sync");
+    await writeSecretFile(root, "k.jks", contents, "0400");
+    expect(await statusOf(file, root)).toBe("in-sync");
     expect(modeMatches(root, "k.jks", "0400")).toBe(true);
 
     chmodSync(join(root, "k.jks"), 0o644);
-    expect(statusOf(file, root), "content is still identical").toBe("in-sync");
+    expect(await statusOf(file, root), "content is still identical").toBe(
+      "in-sync"
+    );
     expect(modeMatches(root, "k.jks", "0400"), "mode drift is caught").toBe(
       false
     );
   });
 
-  it("repairs the mode without touching the contents", () => {
-    writeSecretFile(root, "k.jks", Buffer.from("keystore"), "0400");
+  it("repairs the mode without touching the contents", async () => {
+    await writeSecretFile(root, "k.jks", Buffer.from("keystore"), "0400");
     chmodSync(join(root, "k.jks"), 0o644);
 
     applyMode(root, "k.jks", "0400");
@@ -235,12 +239,12 @@ describe("permission drift", () => {
     expect(readFileSync(join(root, "k.jks")).toString()).toBe("keystore");
   });
 
-  it("treats a missing file as no drift (statusOf owns that case)", () => {
+  it("treats a missing file as no drift (statusOf owns that case)", async () => {
     expect(modeMatches(root, "absent.key", "0400")).toBe(true);
   });
 });
 
-describe("cross-client digest agreement", () => {
+describe("cross-client digest agreement", async () => {
   it("CLI localDigest matches the server digest byte for byte", async () => {
     // If these diverge, every file reports as permanently modified and every
     // pull re-downloads everything. Assert against the real server function.
@@ -260,7 +264,7 @@ describe("cross-client digest agreement", () => {
   });
 });
 
-describe("full encrypt → transport → disk round trip", () => {
+describe("full encrypt → transport → disk round trip", async () => {
   it("a sealed file decrypts and lands on disk byte-identical", async () => {
     // Exercises the whole content path without a network: seal on the
     // server, base64 over the wire, decrypt, write, read back.
@@ -275,7 +279,7 @@ describe("full encrypt → transport → disk round trip", () => {
       await serverOpen(sealed.ciphertext, sealed.keyMaterial)
     );
 
-    const written = writeSecretFile(
+    const written = await writeSecretFile(
       root,
       "android/app/upload.jks",
       Buffer.from(fromBase64(overTheWire)),
@@ -285,14 +289,14 @@ describe("full encrypt → transport → disk round trip", () => {
     expect(readFileSync(written).equals(original)).toBe(true);
     expect(statSync(written).mode & 0o777).toBe(0o400);
     expect(
-      statusOf(row({ sha256: sha, digestSalt: salt }), root),
+      await statusOf(row({ sha256: sha, digestSalt: salt }), root),
       "a freshly pulled file must read back as in-sync"
     ).toBe("in-sync");
   });
 });
 
-describe("gitignore", () => {
-  it("creates .gitignore when the repo has none", () => {
+describe("gitignore", async () => {
+  it("creates .gitignore when the repo has none", async () => {
     // Returning early here left secrets untracked-and-offerable in exactly
     // the repo most likely to commit one by accident.
     const added = ignoreSecretFilePaths(root, ["a.key"]);
@@ -300,7 +304,7 @@ describe("gitignore", () => {
     expect(readFileSync(join(root, ".gitignore"), "utf-8")).toContain("a.key");
   });
 
-  it("appends missing paths plus the temp-file pattern, and is idempotent", () => {
+  it("appends missing paths plus the temp-file pattern, and is idempotent", async () => {
     writeFileSync(join(root, ".gitignore"), "node_modules\n");
 
     const first = ignoreSecretFilePaths(root, ["android/app/upload.jks"]);
@@ -315,14 +319,14 @@ describe("gitignore", () => {
     expect(content.startsWith("node_modules\n")).toBe(true);
   });
 
-  it("does not duplicate a path already ignored with a leading slash", () => {
+  it("does not duplicate a path already ignored with a leading slash", async () => {
     writeFileSync(join(root, ".gitignore"), "/secrets/key.pem\n");
     expect(ignoreSecretFilePaths(root, ["secrets/key.pem"])).not.toContain(
       "secrets/key.pem"
     );
   });
 
-  it("appends cleanly to a .gitignore with no trailing newline", () => {
+  it("appends cleanly to a .gitignore with no trailing newline", async () => {
     writeFileSync(join(root, ".gitignore"), "dist");
     ignoreSecretFilePaths(root, ["a.key"]);
     const lines = readFileSync(join(root, ".gitignore"), "utf-8").split("\n");
@@ -332,8 +336,8 @@ describe("gitignore", () => {
   });
 });
 
-describe("ordering guarantee", () => {
-  it("gitignore is written before the file exists", () => {
+describe("ordering guarantee", async () => {
+  it("gitignore is written before the file exists", async () => {
     mkdirSync(join(root, "android/app"), { recursive: true });
     writeFileSync(join(root, ".gitignore"), "node_modules\n");
 
@@ -345,7 +349,12 @@ describe("ordering guarantee", () => {
       "utf-8"
     ).includes("android/app/upload.jks");
 
-    writeSecretFile(root, "android/app/upload.jks", Buffer.from("k"), "0600");
+    await writeSecretFile(
+      root,
+      "android/app/upload.jks",
+      Buffer.from("k"),
+      "0600"
+    );
 
     expect(ignoredAtWriteTime).toBe(true);
   });
