@@ -232,6 +232,9 @@ export async function materialiseSecretFiles(
   if (files.length === 0) return result;
 
   const pending: SecretFileRow[] = [];
+  /** Files already correct on disk — they still need their guards attached. */
+  const alreadyPresent: SecretFileRow[] = [];
+
   for (const file of files) {
     const status = statusOf(file, root);
     if (status === "in-sync") {
@@ -245,10 +248,37 @@ export async function materialiseSecretFiles(
         }
       }
       result.unchanged.push(file.path);
+      alreadyPresent.push(file);
     } else if (status === "modified" && !options.force) {
       result.conflicts.push(file.path);
+      // Still guard it: the bytes differ from the server, but it IS a secret
+      // file sitting in the workspace and must not be copyable.
+      alreadyPresent.push(file);
     } else {
       pending.push(file);
+    }
+  }
+
+  // Attach guards to files this run did NOT write. Without this the guards
+  // only ever existed on the sync that first created a file: every later
+  // sync (and every window reload) saw "in-sync", skipped the write, and left
+  // a decrypted secret sitting in the editor with no clipboard protection.
+  for (const file of alreadyPresent) {
+    if (!options.onWritten) break;
+    try {
+      const absolutePath = resolveInsideRoot(root, file.path);
+      if (!existsSync(absolutePath)) continue;
+      await options.onWritten(
+        {
+          path: file.path,
+          absolutePath,
+          mode: file.mode,
+          numericMode: numericMode(file.mode),
+        },
+        readFileSync(absolutePath)
+      );
+    } catch {
+      // Guard registration must never break a sync.
     }
   }
 
