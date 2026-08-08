@@ -33,6 +33,7 @@ const fn = {
 };
 
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
+const APP_ORIGIN = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
 const STAMP = Date.now();
 const MODULE_NAME = `E2E Docs ${STAMP}`;
@@ -347,8 +348,13 @@ test.describe.serial("Project documentation", () => {
     }
   });
 
-  test("cleanup: revoke the key and trash the pages", async ({ page }) => {
-    test.skip(!projectSlug, "no project");
+  // Cleanup as a hook, not a final test: serial mode skips every case after
+  // a failure, which would leak a live API key and stale pages into each
+  // rerun. afterAll only sees worker-scoped fixtures, so it opens its own
+  // authenticated context.
+  test.afterAll(async ({ browser }) => {
+    test.setTimeout(120_000);
+    if (!hasE2ECredentials || !projectSlug) return;
 
     if (docsKeyId && CONVEX_URL) {
       const convex = new ConvexHttpClient(CONVEX_URL);
@@ -357,24 +363,33 @@ test.describe.serial("Project documentation", () => {
     }
 
     // Delete every page this spec created so reruns stay green.
-    await page.goto(`/dashboard/projects/${projectSlug}/docs`, {
-      waitUntil: "domcontentloaded",
+    const context = await browser.newContext({
+      storageState: STORAGE_STATE_PATH,
+      baseURL: APP_ORIGIN,
     });
+    const page = await context.newPage();
+    try {
+      await page.goto(`/dashboard/projects/${projectSlug}/docs`, {
+        waitUntil: "domcontentloaded",
+      });
 
-    for (const title of [UI_TITLE, MCP_TITLE]) {
-      const row = page
-        .locator('[data-testid^="doc-row-"]')
-        .filter({ hasText: title });
-      if ((await row.count()) === 0) continue;
-      await row.first().click();
-      await expect(page.getByTestId("doc-title")).toHaveText(title, {
-        timeout: 20_000,
-      });
-      await page.getByTestId("doc-delete").click();
-      await page.getByRole("button", { name: /move to trash/i }).click();
-      await page.waitForURL(`**/projects/${projectSlug}/docs`, {
-        timeout: 20_000,
-      });
+      for (const title of [UI_TITLE, MCP_TITLE]) {
+        const row = page
+          .locator('[data-testid^="doc-row-"]')
+          .filter({ hasText: title });
+        if ((await row.count()) === 0) continue;
+        await row.first().click();
+        await expect(page.getByTestId("doc-title")).toHaveText(title, {
+          timeout: 20_000,
+        });
+        await page.getByTestId("doc-delete").click();
+        await page.getByRole("button", { name: /move to trash/i }).click();
+        await page.waitForURL(`**/projects/${projectSlug}/docs`, {
+          timeout: 20_000,
+        });
+      }
+    } finally {
+      await context.close();
     }
   });
 });

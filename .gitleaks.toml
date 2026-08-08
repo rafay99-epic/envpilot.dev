@@ -27,6 +27,14 @@ paths = [
   # KEY markers — the "key" between them is a 16-char stub, not a key. The
   # markers alone trip the private-key rule.
   '''apps/vscode-extension/src/utils/cloakRanges\.test\.ts$''',
+  # The doc secret-scanner's OWN test corpus. It asserts that scanDocBody
+  # rejects credential shapes and ignores the high-entropy strings that are
+  # normal in API docs, so it must contain PEM markers, provider-key shapes
+  # and base64 blobs by construction. Every value is invented; the provider
+  # shapes are additionally assembled at runtime so no literal reaches the
+  # file, but the PEM armour and base64 fixtures cannot be split without
+  # destroying what they test.
+  '''apps/web/src/lib/__tests__/doc-guards\.test\.ts$''',
   '''(^|/)\.claude/''',
   '''apps/web/src/components/landing/.*''',
   # Build output, dependencies, lockfiles, sourcemaps — never source secrets,

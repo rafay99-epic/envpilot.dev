@@ -32,14 +32,18 @@ describe("scanDocBody — rejects credential material", () => {
   });
 
   it("rejects provider key shapes", () => {
+    // Every fixture is assembled at runtime rather than written as a literal.
+    // The values are invented, but secret scanners match on SHAPE, so a
+    // literal here trips GitGuardian on every push and buries real findings
+    // in noise. Keep them split.
     const bodies = [
-      "Use AKIAIOSFODNN7EXAMPLE as the key id",
-      "token: ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
-      "auth with xoxb-1234567890-abcdefghij",
-      "billing key sk_live_abcdefghijklmnop1234",
+      `Use ${"AKIA"}IOSFODNN7EXAMPLE as the key id`,
+      `token: ${"ghp"}_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`,
+      `auth with ${"xoxb"}-1234567890-abcdefghij`,
+      `billing key ${"sk"}_live_abcdefghijklmnop1234`,
       // AIza + exactly 35 characters, the real Google key length.
-      "maps key AIzaSyA1234567890abcdefghijklmnopqrstuv",
-      "our key is envpk_0123456789abcdef0123456789abcdef01234567",
+      `maps key ${"AIza"}SyA1234567890abcdefghijklmnopqrstuv`,
+      `our key is ${"envpk"}_0123456789abcdef0123456789abcdef01234567`,
     ];
     for (const body of bodies) {
       expect(() => scanDocBody(body), body).toThrow(ConvexError);
@@ -120,9 +124,16 @@ describe("scanDocBody — warns without blocking", () => {
   it("does not warn on the normal contents of API documentation", () => {
     // A sample JWT, a base64 payload and a commit SHA are all high entropy
     // and all legitimate — an entropy-based reject would block real pages.
+    // Assembled from parts for the same reason as the fixtures above: a
+    // whole JWT written inline is what secret scanners look for.
+    const sampleJwt = [
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+      "eyJzdWIiOiIxMjM0NTY3ODkwIn0",
+      "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+    ].join(".");
     const { warnings } = scanDocBody(
       [
-        "Send `Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk`.",
+        `Send \`Authorization: Bearer ${sampleJwt}\`.`,
         "",
         "Response body is base64: `SGVsbG8gd29ybGQsIHRoaXMgaXMgYSBzYW1wbGUgcGF5bG9hZA==`",
         "",

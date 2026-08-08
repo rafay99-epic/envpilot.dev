@@ -91,6 +91,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // in a single burst, and a draft costs no email and no vault call. The cap
   // still exists because every draft is a human review item, and review
   // capacity — not storage — is the scarce resource here.
+  // Documented publicly in docs/rate-limits — keep the page in sync.
   docCreate: {
     kind: "token bucket",
     rate: 30,

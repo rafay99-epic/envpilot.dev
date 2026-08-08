@@ -24,7 +24,10 @@ import {
 type Command =
   | { kind: "wrap"; before: string; after: string }
   | { kind: "prefix"; prefix: string }
-  | { kind: "insert"; text: string };
+  | { kind: "insert"; text: string }
+  // Link is its own kind so the button and Ctrl/⌘K run the SAME code — a
+  // plain wrap selects the whole `[text](url)` instead of just `url`.
+  | { kind: "link" };
 
 const INLINE: {
   label: string;
@@ -34,27 +37,27 @@ const INLINE: {
 }[] = [
   {
     label: "Bold",
-    shortcut: "⌘B",
+    shortcut: "Ctrl/⌘B",
     icon: Bold,
     command: { kind: "wrap", before: "**", after: "**" },
   },
   {
     label: "Italic",
-    shortcut: "⌘I",
+    shortcut: "Ctrl/⌘I",
     icon: Italic,
     command: { kind: "wrap", before: "*", after: "*" },
   },
   {
     label: "Code",
-    shortcut: "⌘E",
+    shortcut: "Ctrl/⌘E",
     icon: Code,
     command: { kind: "wrap", before: "`", after: "`" },
   },
   {
     label: "Link",
-    shortcut: "⌘K",
+    shortcut: "Ctrl/⌘K",
     icon: Link2,
-    command: { kind: "wrap", before: "[", after: "](url)" },
+    command: { kind: "link" },
   },
 ];
 
@@ -100,6 +103,7 @@ interface DocEditorToolbarProps {
   onWrap: (before: string, after: string) => void;
   onPrefix: (prefix: string) => void;
   onInsert: (text: string) => void;
+  onLink: () => void;
   disabled?: boolean;
 }
 
@@ -107,6 +111,7 @@ export function DocEditorToolbar({
   onWrap,
   onPrefix,
   onInsert,
+  onLink,
   disabled = false,
 }: DocEditorToolbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -133,6 +138,7 @@ export function DocEditorToolbar({
   const run = (command: Command) => {
     if (command.kind === "wrap") onWrap(command.before, command.after);
     else if (command.kind === "prefix") onPrefix(command.prefix);
+    else if (command.kind === "link") onLink();
     else onInsert(command.text);
   };
 
@@ -163,7 +169,6 @@ export function DocEditorToolbar({
           onClick={() => setMenuOpen((open) => !open)}
           disabled={disabled}
           aria-expanded={menuOpen}
-          aria-haspopup="menu"
           data-testid="doc-tool-insert"
           className="ml-1 flex items-center gap-1 rounded px-2 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
         >
@@ -172,11 +177,12 @@ export function DocEditorToolbar({
           <ChevronDown className="h-3 w-3" />
         </button>
 
-        {menuOpen && (
-          <div
-            role="menu"
-            className="absolute top-full left-0 z-20 mt-1 w-48 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
-          >
+        {/* A plain disclosure, not a `menu`: menu semantics promise
+            arrow-key roving focus, which this doesn't implement. Tab
+            reaches the buttons natively. Never open while disabled — the
+            menu could otherwise outlive the prop flipping mid-save. */}
+        {menuOpen && !disabled && (
+          <div className="absolute top-full left-0 z-20 mt-1 w-48 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
             {INSERT_GROUPS.map((group, groupIndex) => (
               <div key={group.heading}>
                 {groupIndex > 0 && (
@@ -189,7 +195,6 @@ export function DocEditorToolbar({
                   <button
                     key={label}
                     type="button"
-                    role="menuitem"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
                       run(command);

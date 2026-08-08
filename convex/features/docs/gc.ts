@@ -4,6 +4,7 @@
  * destroy outside Convex.
  */
 import { v } from "convex/values";
+import { internal } from "../../_generated/api";
 import { internalMutation } from "../../_generated/server";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import { deleteBody } from "./content";
@@ -61,10 +62,13 @@ export const purgeProjectDocs = internalMutation({
   args: { projectId: v.id("projects") },
   returns: v.object({ purged: v.number() }),
   handler: async (ctx, args) => {
+    // Lower bound instead of a filter: `undefined` sorts first, so an open
+    // range would read every live doc just to discard it.
     const trashed = await ctx.db
       .query("docs")
-      .withIndex("by_project_deleted", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.neq(q.field("deletedAt"), undefined))
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).gt("deletedAt", 0)
+      )
       .take(PURGE_BATCH);
 
     let purged = 0;
@@ -73,6 +77,18 @@ export const purgeProjectDocs = internalMutation({
       await ctx.db.delete(doc._id);
       purged++;
     }
+
+    // A full batch means there is more trash than one transaction should
+    // hold: continue in a fresh one, so "Empty trash" really empties it.
+    // Each round deletes rows, so this always terminates.
+    if (trashed.length === PURGE_BATCH) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.docs.gc.purgeProjectDocs,
+        { projectId: args.projectId }
+      );
+    }
+
     return { purged };
   },
 });

@@ -17,18 +17,26 @@ export type OutlineHeading = {
   end: number;
 };
 
-const HEADING_RE = /^(#{1,6})\s+(.*\S)/;
-const FENCE_RE = /^(```|~~~)/;
+// Up to 3 leading spaces still make an ATX heading (CommonMark); 4 is code.
+const HEADING_RE = /^ {0,3}(#{1,6})\s+(.*\S)/;
+const FENCE_RE = /^(`{3,}|~{3,})/;
 
 export function parseOutline(content: string): OutlineHeading[] {
   const headings: OutlineHeading[] = [];
-  let inFence = false;
+  /** Marker that opened the current fence, or null outside one. */
+  let fence: string | null = null;
   let offset = 0;
 
   for (const line of content.split("\n")) {
-    if (FENCE_RE.test(line.trimStart())) {
-      inFence = !inFence;
-    } else if (!inFence) {
+    const marker = FENCE_RE.exec(line.trimStart())?.[1];
+    if (marker) {
+      // A fence only closes on its own marker, at least as long — so a ~~~
+      // sample inside a ``` block doesn't end it early.
+      if (fence === null) fence = marker;
+      else if (marker[0] === fence[0] && marker.length >= fence.length) {
+        fence = null;
+      }
+    } else if (fence === null) {
       const match = HEADING_RE.exec(line);
       if (match) {
         headings.push({

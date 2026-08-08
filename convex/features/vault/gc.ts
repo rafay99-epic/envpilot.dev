@@ -672,6 +672,7 @@ export const recordTrashEmptied = internalMutation({
     // Optional so a web build deployed before this convex deploy keeps
     // working — it simply records nothing for files.
     purgedFiles: v.optional(v.number()),
+    purgedDocs: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -684,6 +685,7 @@ export const recordTrashEmptied = internalMutation({
         purgedVariables: args.purgedVariables,
         purgedAccounts: args.purgedAccounts,
         purgedFiles: args.purgedFiles ?? 0,
+        purgedDocs: args.purgedDocs ?? 0,
       }),
       createdAt: Date.now(),
     });
@@ -842,6 +844,7 @@ export const emptyProjectTrash = action({
       purgedVariables,
       purgedAccounts,
       purgedFiles,
+      purgedDocs,
     });
 
     return {

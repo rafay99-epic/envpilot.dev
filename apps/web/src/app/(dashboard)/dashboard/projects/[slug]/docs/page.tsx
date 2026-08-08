@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { BookText, Plus, FileText, Clock, Search } from "lucide-react";
+import { BookText, Plus, FileText, Clock, Search, Trash2 } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAuthContext } from "@/components/auth";
@@ -13,9 +13,13 @@ import {
   useProjectBySlug,
   useProjectDocs,
   useDocSearch,
+  useFeatureGate,
   groupDocsByModule,
   type DocSummary,
 } from "@/hooks";
+
+/** Mirrors SEARCH_LIMIT in convex/features/docs/queries.ts. */
+const SEARCH_LIMIT = 20;
 
 interface DocsPageProps {
   params: Promise<{ slug: string }>;
@@ -41,7 +45,13 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
   const isLoadingProject = project === undefined && !!slug;
   const projectId = project?._id as Id<"projects"> | undefined;
 
-  const docs = useProjectDocs(projectId);
+  // The docs queries throw for an org without the feature, which would blow
+  // up before FeatureGate could render its upgrade state — so skip them
+  // until the gate says yes. The server still enforces.
+  const { allowed: docsAllowed } = useFeatureGate(orgId, "project_docs");
+  const gatedProjectId = docsAllowed ? projectId : undefined;
+
+  const docs = useProjectDocs(gatedProjectId);
   const isLoadingDocs = docs === undefined;
 
   const [filter, setFilter] = useState("");
@@ -54,12 +64,12 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
     return () => clearTimeout(id);
   }, [filter]);
 
-  const results = useDocSearch(projectId, searchTerm);
+  const results = useDocSearch(gatedProjectId, searchTerm);
   const isSearching = searchTerm.length > 0 && results === undefined;
 
   const allDocs = docs ?? [];
   // Search results replace the listing while a term is active.
-  const visible: DocSummary[] =
+  const visible: Array<DocSummary & { matchedBody?: boolean }> =
     searchTerm.length > 0 ? (results ?? []) : allDocs;
   const visibleCount = visible.length;
   const groups = groupDocsByModule(visible);
@@ -86,14 +96,28 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
           title="Documentation"
           description={`How ${project.name} works — written as the work happens, read by whoever picks it up next, and by their agent.`}
           actions={
-            <Link
-              href={`/dashboard/projects/${slug}/docs/new`}
-              data-testid="doc-new"
-              className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-white"
-            >
-              <Plus className="h-4 w-4" />
-              New Page
-            </Link>
+            <>
+              {/* Deleting a page from here otherwise gave no route back —
+                  the only Trash link lives on the project detail page and is
+                  gated on variable-delete, which a doc author may not hold. */}
+              <Link
+                href={`/dashboard/projects/${slug}/trash`}
+                data-testid="doc-trash-link"
+                title="Deleted pages are recoverable for 7 days"
+                className="flex shrink-0 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+              >
+                <Trash2 className="h-4 w-4" />
+                Trash
+              </Link>
+              <Link
+                href={`/dashboard/projects/${slug}/docs/new`}
+                data-testid="doc-new"
+                className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-white"
+              >
+                <Plus className="h-4 w-4" />
+                New Page
+              </Link>
+            </>
           }
         />
 
@@ -125,13 +149,13 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
               {isSearching
                 ? "searching…"
                 : searchTerm
-                  ? `${visibleCount} found`
+                  ? `${visibleCount}${visibleCount >= SEARCH_LIMIT ? "+" : ""} found`
                   : ""}
             </span>
           </div>
         )}
 
-        {isLoadingDocs ? (
+        {isLoadingDocs || isSearching ? (
           <TerminalLoading />
         ) : groups.length === 0 ? (
           <div className="py-16 text-center">
@@ -171,7 +195,7 @@ function DocRow({
   doc,
   projectSlug,
 }: {
-  doc: DocSummary;
+  doc: DocSummary & { matchedBody?: boolean };
   projectSlug: string;
 }) {
   return (
@@ -195,6 +219,11 @@ function DocRow({
               className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] text-amber-700 uppercase dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400"
             >
               draft
+            </span>
+          )}
+          {doc.matchedBody && (
+            <span className="font-mono text-[10px] text-zinc-500">
+              matched in page text
             </span>
           )}
         </div>

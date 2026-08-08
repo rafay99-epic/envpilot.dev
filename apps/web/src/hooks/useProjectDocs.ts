@@ -107,10 +107,10 @@ export function useRestoreDoc() {
 }
 
 /** Group docs by module, preserving each module's most-recent-first order. */
-export function groupDocsByModule(
-  docs: DocSummary[]
-): Array<{ module: string; docs: DocSummary[] }> {
-  const byModule = new Map<string, DocSummary[]>();
+export function groupDocsByModule<T extends DocSummary>(
+  docs: T[]
+): Array<{ module: string; docs: T[] }> {
+  const byModule = new Map<string, T[]>();
   for (const doc of docs) {
     const bucket = byModule.get(doc.module);
     if (bucket) bucket.push(doc);

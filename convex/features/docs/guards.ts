@@ -23,11 +23,8 @@ type SecretPattern = { label: string; re: RegExp };
 
 /** Unambiguous credential material — a false positive blocks a write. */
 const REJECT_PATTERNS: SecretPattern[] = [
+  // Also covers OPENSSH, RSA, EC and the rest — the label names the shape.
   { label: "a PEM private key block", re: /-----BEGIN[ A-Z]*PRIVATE KEY-----/ },
-  {
-    label: "an OpenSSH private key block",
-    re: /-----BEGIN OPENSSH PRIVATE KEY-----/,
-  },
   { label: "an AWS access key id", re: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/ },
   { label: "a GitHub token", re: /\bgh[pousr]_[A-Za-z0-9]{36,}\b/ },
   { label: "a Slack token", re: /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/ },
@@ -40,7 +37,8 @@ const REJECT_PATTERNS: SecretPattern[] = [
   // placeholders so documenting the URL SHAPE stays legal.
   {
     label: "a connection string with an inline password",
-    re: /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:(?!(?:password|pass|secret|token|xxx+|\.{3}|<|\$|%|\*+|your[-_]?)\b)[^\s:/@]{6,}@/i,
+    // Any length: a five-character password is still a password.
+    re: /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:(?!(?:password|pass|secret|token|xxx+|\.{3}|<|\$|%|\*+|your[-_]?)\b)[^\s:/@]+@/i,
   },
 ];
 
@@ -80,9 +78,11 @@ export type DocScanResult = {
 /** Validates a body before storage. ConvexError (plain Error is redacted in
  *  prod) on anything that must not persist; soft warnings otherwise. */
 export function scanDocBody(body: string): DocScanResult {
-  if (body.length > MAX_DOC_BODY_BYTES) {
+  // UTF-8 bytes, not UTF-16 units — the bound is on what Convex stores.
+  const bytes = new TextEncoder().encode(body).length;
+  if (bytes > MAX_DOC_BODY_BYTES) {
     throw new ConvexError(
-      `Document is too large (${Math.ceil(body.length / 1024)}KB). The limit is ${MAX_DOC_BODY_BYTES / 1024}KB.`
+      `Document is too large (${Math.ceil(bytes / 1024)}KB). The limit is ${MAX_DOC_BODY_BYTES / 1024}KB.`
     );
   }
 
@@ -123,9 +123,11 @@ export function buildExcerpt(body: string): string {
     // Fenced code blocks make useless previews.
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/^#{1,6}\s+/gm, "")
+    // List markers only — an inline hyphen belongs to the word (rate-limit).
+    .replace(/^[ \t]*[-*+][ \t]+/gm, "")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/[*_`>#|-]/g, " ")
+    .replace(/[*_`>#|]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   return plain.length <= EXCERPT_LENGTH
@@ -171,6 +173,10 @@ export function normalizePrUrl(raw: string | undefined): string | undefined {
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new ConvexError("Pull request URL must use http or https");
+  }
+  // Basic-auth userinfo is credential material the body scanner never sees.
+  if (parsed.username !== "" || parsed.password !== "") {
+    throw new ConvexError("Pull request URL must not contain credentials");
   }
   return parsed.toString();
 }

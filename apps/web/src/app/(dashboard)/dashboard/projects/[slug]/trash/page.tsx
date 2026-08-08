@@ -104,7 +104,8 @@ export default function TrashPage({ params }: TrashPageProps) {
     project === undefined ||
     deletedVariables === undefined ||
     deletedAccounts === undefined ||
-    deletedFiles === undefined;
+    deletedFiles === undefined ||
+    deletedDocs === undefined;
 
   const totalCount =
     (deletedVariables?.length ?? 0) +

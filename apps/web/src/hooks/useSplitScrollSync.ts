@@ -148,8 +148,12 @@ export function useSplitScrollSync(enabled: boolean) {
       owner.current = "editor";
       scheduleFollow();
     };
-    const manualIntent = () => {
+    // Wheel/touch also claims ownership — otherwise wheeling a pane the
+    // pointer never clicked leaves the other pane owning, and the sync is
+    // dropped as a foreign scroll.
+    const manualIntent = (event: Event) => {
       typing.current = false;
+      owner.current = event.currentTarget === preview ? "preview" : "editor";
     };
 
     textarea.addEventListener("input", onInput);

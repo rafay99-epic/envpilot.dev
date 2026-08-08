@@ -93,6 +93,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const canCreateVariable = capabilities["project.variables.create"] === true;
   const canUpdateVariable = capabilities["project.variables.update"] === true;
   const canDeleteVariable = capabilities["project.variables.delete"] === true;
+  // Trash holds docs too, and any project member can delete a page they wrote.
+  // Gating the link on variable-delete alone hid the only route back for a
+  // member who trashed their own doc.
+  const canSeeTrash =
+    canDeleteVariable || capabilities["project.read"] === true;
   const canRequestVariable = capabilities["project.requests.submit"] === true;
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
@@ -648,7 +653,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               </svg>
               Members
             </Link>
-            {canDeleteVariable && (
+            {canSeeTrash && (
               <Link
                 href={`/dashboard/projects/${project.slug}/trash`}
                 className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"

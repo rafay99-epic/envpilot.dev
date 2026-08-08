@@ -230,6 +230,20 @@ export const _searchScopedDocs = internalQuery({
           push(await ctx.db.get(row.docId));
         }
       }
+      // Neither index covers `module`, which the tool contract says `query`
+      // matches — bounded metadata scan, only when the indexes underfill.
+      if (matched.length < limit) {
+        const needle = term.toLowerCase();
+        for (const doc of await ctx.db
+          .query("docs")
+          .withIndex("by_project_and_status", (q) =>
+            q.eq("projectId", args.projectId).eq("status", "published")
+          )
+          .filter((q) => q.eq(q.field("deletedAt"), undefined))
+          .take(SEARCH_SCAN_LIMIT)) {
+          if (doc.module.toLowerCase().includes(needle)) push(doc);
+        }
+      }
     } else {
       for (const doc of await ctx.db
         .query("docs")
@@ -500,7 +514,9 @@ export const _createDocDraft = internalMutation({
 
     const body = args.body ?? templateFor(args.type);
     // Blocks credential material and instructions aimed at the reader's tool
-    // belt BEFORE anything is stored.
+    // belt BEFORE anything is stored. Title and module are scanned too: both
+    // are returned by search, so they reach an agent exactly like the body.
+    scanDocBody(`${title}\n${moduleName}`);
     const { warnings } = scanDocBody(body);
 
     const slug = await uniqueSlug(ctx, args.projectId, slugifyTitle(title));

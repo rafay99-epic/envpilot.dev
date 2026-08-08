@@ -19,6 +19,7 @@ Each limit is scoped **per key**. Two keys never share a bucket.
 | Secret file reads   | refill 60 / min, burst 1000 | Any call returning secret-file **contents** — CLI pull, Action, REST, MCP      |
 | Secret file uploads | 20 / min                    | Uploading a secret file (per user, dashboard or CLI)                           |
 | Variable requests   | 5 / hour, burst 2           | Machine-filed variable requests (`envpilot_request_variable`)                  |
+| Documentation pages | 30 / hour, burst 10         | Machine-authored documentation drafts (`envpilot_create_doc`)                  |
 
 The **value-pull** bucket has full capacity available as a burst (deploys fan out matrix builds, so a spike is normal) while the sustained rate stays at 30/min. The **metadata** bucket is higher because those reads never touch the vault — no decrypt cost.
 

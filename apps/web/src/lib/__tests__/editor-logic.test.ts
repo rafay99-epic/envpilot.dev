@@ -117,6 +117,24 @@ describe("parseOutline", () => {
     ]);
   });
 
+  it("does not end a fence on a shorter or mismatched marker", () => {
+    // A ~~~ line inside a ``` block used to close the fence, promoting every
+    // following # to a heading.
+    const body = "# Real\n\n```md\n~~~\n# not a heading\n```\n\n## Also real\n";
+    expect(parseOutline(body).map((h) => h.text)).toEqual([
+      "Real",
+      "Also real",
+    ]);
+  });
+
+  it("allows up to three spaces of indent, not four", () => {
+    expect(parseOutline("   # Indented").map((h) => h.text)).toEqual([
+      "Indented",
+    ]);
+    // Four spaces is an indented code block, not a heading.
+    expect(parseOutline("    # Code")).toEqual([]);
+  });
+
   it("strips closing hashes", () => {
     expect(parseOutline("## Title ##")[0]?.text).toBe("Title");
   });

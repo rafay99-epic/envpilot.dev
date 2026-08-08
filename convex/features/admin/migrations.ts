@@ -138,6 +138,15 @@ export const listMigrations = query({
         destructive: false,
         runOnce: true,
       },
+      {
+        name: "backfill-doc-content-status",
+        description:
+          "Backfills docContent.status from the parent doc for body rows written before the field existed — without it those pages can never match a published-only body search. Bounded to 200 rows per run; re-run while it reports hadMore: true.",
+        category: "One-Time Migrations",
+        priority: 4,
+        destructive: false,
+        runOnce: true,
+      },
     ] as Array<{
       name: string;
       description: string;
@@ -774,13 +783,19 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
    * The body search index filters on `docContent.status`, so any row written
    * before that field existed carries `undefined` and can never match a
    * published-only search — the page would be silently unfindable by its own
-   * text, with no error anywhere. Idempotent: rows already in step are
-   * skipped, so it is safe to re-run after every deploy.
+   * text, with no error anywhere.
+   *
+   * Bounded per run — a body row holds up to 256KB, so an unbounded collect()
+   * would blow the transaction read limit. Only rows still missing the field
+   * are read, so every run makes progress: re-run until `hadMore` is false.
    */
   if (args.name === "backfill-doc-content-status") {
-    const rows = await ctx.db.query("docContent").collect();
+    const BATCH = 200;
+    const rows = await ctx.db
+      .query("docContent")
+      .filter((q) => q.eq(q.field("status"), undefined))
+      .take(BATCH);
     let updated = 0;
-    let skipped = 0;
     let orphaned = 0;
 
     for (const row of rows) {
@@ -789,15 +804,17 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         orphaned++;
         continue;
       }
-      if (row.status === doc.status) {
-        skipped++;
-        continue;
-      }
       await ctx.db.patch(row._id, { status: doc.status });
       updated++;
     }
 
-    return { success: true, total: rows.length, updated, skipped, orphaned };
+    return {
+      success: true,
+      total: rows.length,
+      updated,
+      orphaned,
+      hadMore: rows.length === BATCH,
+    };
   }
 
   if (args.name === "clear-changelog") {

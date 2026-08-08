@@ -2,7 +2,7 @@
 
 **Single source of truth: [`CLAUDE.md`](./CLAUDE.md).** Read it fully and
 follow every rule in it — branching/PR workflow, never starting the dev
-server, CLI sandbox isolation, testing policy, the CircleCI pipeline, the
+server, CLI sandbox isolation, testing policy, the GitHub Actions pipeline, the
 feature-registry/tier-gating patterns, versioning + release-manifest rules,
 per-environment variable-key uniqueness, the ConvexError requirement, and
 the no-AI-attribution rule.

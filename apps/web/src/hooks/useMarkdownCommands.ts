@@ -117,6 +117,25 @@ export function useMarkdownCommands(
     [textareaRef]
   );
 
+  /** Wrap the selection in a link and leave "url" selected to type over.
+   *  Shared so the toolbar button and Ctrl/⌘K behave identically. */
+  const insertLink = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const { selectionStart, selectionEnd, value } = textarea;
+    const selected = value.slice(selectionStart, selectionEnd);
+    textarea.focus();
+    textarea.setRangeText(
+      `[${selected}](url)`,
+      selectionStart,
+      selectionEnd,
+      "end"
+    );
+    const urlStart = selectionStart + selected.length + 3;
+    textarea.setSelectionRange(urlStart, urlStart + 3);
+    notifyInput(textarea);
+  }, [textareaRef, notifyInput]);
+
   /** List continuation on Enter, Tab/Shift+Tab indent, formatting shortcuts. */
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -142,19 +161,7 @@ export function useMarkdownCommands(
         }
         if (key === "k") {
           event.preventDefault();
-          const { selectionStart, selectionEnd, value } = textarea;
-          const selected = value.slice(selectionStart, selectionEnd);
-          textarea.focus();
-          textarea.setRangeText(
-            `[${selected}](url)`,
-            selectionStart,
-            selectionEnd,
-            "end"
-          );
-          // "url" stays selected to type over.
-          const urlStart = selectionStart + selected.length + 3;
-          textarea.setSelectionRange(urlStart, urlStart + 3);
-          notifyInput(textarea);
+          insertLink();
           return;
         }
       }
@@ -219,11 +226,12 @@ export function useMarkdownCommands(
         notifyInput(textarea);
       }
     },
-    [wrapSelection, insertAtCursor, notifyInput]
+    [wrapSelection, insertAtCursor, insertLink, notifyInput]
   );
 
   return {
     insertAtCursor,
+    insertLink,
     wrapSelection,
     prefixLines,
     selectRange,

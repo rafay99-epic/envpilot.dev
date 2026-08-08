@@ -6,6 +6,7 @@ import { v, ConvexError } from "convex/values";
 import { query } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
+import { checkBooleanFeature } from "../featureRegistry/gates";
 import { listForUserCore } from "../projects/helpers";
 import { readBody } from "./content";
 import {
@@ -49,7 +50,15 @@ export const listByProject = query({
       .query("docs")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .take(MAX_DOC_ROWS);
+      .take(MAX_DOC_ROWS + 1);
+
+    // Loud, like the secret-file listing: a silently truncated list reads as
+    // "that page does not exist".
+    if (rows.length > MAX_DOC_ROWS) {
+      throw new ConvexError(
+        `Project has more than ${MAX_DOC_ROWS} documentation pages — refusing a partial listing. Contact support to raise the limit.`
+      );
+    }
 
     return rows
       .filter((doc) => canSeeDoc(doc, actor._id, access))
@@ -123,8 +132,23 @@ export const globalSearch = query({
       projectColor?: string;
     }> = [];
 
+    // One gate lookup per org, not per project — a downgraded org's pages
+    // must not keep surfacing in the palette.
+    const gated = new Map<string, boolean>();
+
     for (const project of projects) {
       if (results.length >= RESULT_LIMIT) break;
+      const orgId = project.organizationId as string;
+      if (!gated.has(orgId)) {
+        const gate = await checkBooleanFeature(
+          ctx.db,
+          project.organizationId,
+          "project_docs"
+        );
+        gated.set(orgId, gate.allowed);
+      }
+      if (!gated.get(orgId)) continue;
+
       const rows = await ctx.db
         .query("docs")
         .withIndex("by_project_and_status", (q) =>
@@ -170,15 +194,19 @@ export const listTrashed = query({
     const actor = await requireAuthedUser(ctx);
     const access = await requireDocAccess(ctx, actor._id, args.projectId);
 
+    // `undefined` sorts first in the index, so the lower bound skips every
+    // live row instead of reading it to filter it out; descending keeps the
+    // NEWEST deletions when a project overflows the cap.
     const rows = await ctx.db
       .query("docs")
-      .withIndex("by_project_deleted", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.neq(q.field("deletedAt"), undefined))
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).gt("deletedAt", 0)
+      )
+      .order("desc")
       .take(MAX_DOC_ROWS);
 
     return rows
       .filter((doc) => doc.authorId === actor._id || access.canManage)
-      .sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0))
       .map((doc) => ({ ...toSummary(doc), deletedAt: doc.deletedAt }));
   },
 });
@@ -211,6 +239,9 @@ export const search = query({
           .eq("projectId", args.projectId)
           .eq("status", "published")
       )
+      // Trashed rows keep their published status, so without this they eat
+      // hits and a live page falls off the end of the limit.
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .take(SEARCH_LIMIT);
 
     // Published bodies → parent metadata rows.

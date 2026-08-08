@@ -62,6 +62,7 @@ export function DocEditor({
 
   const {
     insertAtCursor,
+    insertLink,
     wrapSelection,
     prefixLines,
     selectRange,
@@ -132,6 +133,7 @@ export function DocEditor({
                 onWrap={wrapSelection}
                 onPrefix={prefixLines}
                 onInsert={insertAtCursor}
+                onLink={insertLink}
                 disabled={disabled}
               />
             </>
@@ -191,7 +193,11 @@ export function DocEditor({
                       type="button"
                       onClick={() => {
                         setMode("write");
-                        selectRange(heading.start, heading.end);
+                        // From Read the textarea is unmounted, so selecting
+                        // now is a no-op — wait for the commit.
+                        requestAnimationFrame(() =>
+                          selectRange(heading.start, heading.end)
+                        );
                       }}
                       style={{ paddingLeft: `${(heading.level - 1) * 10}px` }}
                       className="w-full truncate rounded px-1.5 py-1 text-left text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"

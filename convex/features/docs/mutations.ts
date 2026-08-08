@@ -141,7 +141,12 @@ export const update = mutation({
       patch.module = args.module.trim();
     }
 
-    if (args.prUrl !== undefined) patch.prUrl = normalizePrUrl(args.prUrl);
+    if (args.prUrl !== undefined) {
+      // Compared, like title and module: an unchanged resubmit must not count
+      // as an edit, or it would return a published page to draft for nothing.
+      const prUrl = normalizePrUrl(args.prUrl);
+      if (prUrl !== doc.prUrl) patch.prUrl = prUrl;
+    }
 
     if (Object.keys(patch).length === 0) {
       return { slug: doc.slug, warnings, unpublished: false };
