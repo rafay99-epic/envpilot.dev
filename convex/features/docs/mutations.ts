@@ -16,7 +16,7 @@ import { v, ConvexError } from "convex/values";
 import { mutation } from "../../_generated/server";
 import { requireAuthedUser } from "../../lib/identity";
 import { createAuditLog } from "../../lib/audit";
-import { createBody, writeBody } from "./content";
+import { createBody, setContentStatus, writeBody } from "./content";
 import { normalizePrUrl, scanDocBody, slugifyTitle } from "./guards";
 import { templateFor } from "./templates";
 import {
@@ -168,6 +168,7 @@ export const update = mutation({
     }
     patch.updatedAt = Date.now();
     await ctx.db.patch(doc._id, patch);
+    if (unpublished) await setContentStatus(ctx, doc._id, "draft");
 
     await createAuditLog(ctx, {
       organizationId: access.project.organizationId,
@@ -219,6 +220,10 @@ export const publish = mutation({
       publishedBy: actor._id,
       updatedAt: now,
     });
+    // Keep the body row's denormalized status in step — it is what the
+    // search index filters on, so a stale value would either hide a
+    // published page from search or expose a draft to it.
+    await setContentStatus(ctx, doc._id, "published");
 
     await createAuditLog(ctx, {
       organizationId: access.project.organizationId,
@@ -254,6 +259,7 @@ export const unpublish = mutation({
       publishedBy: undefined,
       updatedAt: Date.now(),
     });
+    await setContentStatus(ctx, doc._id, "draft");
 
     await createAuditLog(ctx, {
       organizationId: access.project.organizationId,
@@ -329,6 +335,7 @@ export const restore = mutation({
       slug,
       updatedAt: Date.now(),
     });
+    await setContentStatus(ctx, doc._id, "draft");
 
     await createAuditLog(ctx, {
       organizationId: access.project.organizationId,

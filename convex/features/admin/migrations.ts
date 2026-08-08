@@ -768,6 +768,38 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
     };
   }
 
+  /**
+   * Backfill `docContent.status` from the parent `docs` row.
+   *
+   * The body search index filters on `docContent.status`, so any row written
+   * before that field existed carries `undefined` and can never match a
+   * published-only search — the page would be silently unfindable by its own
+   * text, with no error anywhere. Idempotent: rows already in step are
+   * skipped, so it is safe to re-run after every deploy.
+   */
+  if (args.name === "backfill-doc-content-status") {
+    const rows = await ctx.db.query("docContent").collect();
+    let updated = 0;
+    let skipped = 0;
+    let orphaned = 0;
+
+    for (const row of rows) {
+      const doc = await ctx.db.get(row.docId);
+      if (!doc) {
+        orphaned++;
+        continue;
+      }
+      if (row.status === doc.status) {
+        skipped++;
+        continue;
+      }
+      await ctx.db.patch(row._id, { status: doc.status });
+      updated++;
+    }
+
+    return { success: true, total: rows.length, updated, skipped, orphaned };
+  }
+
   if (args.name === "clear-changelog") {
     const all = await ctx.db.query("changelog").collect();
     for (const entry of all) {

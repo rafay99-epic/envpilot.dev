@@ -29,15 +29,45 @@ export async function readBody(
   return row?.body ?? "";
 }
 
-/** Create the body row for a freshly inserted doc. Returns the excerpt. */
+/**
+ * Create the body row for a freshly inserted doc. Returns the excerpt.
+ * Always starts as a draft — nothing creates a published page directly.
+ */
 export async function createBody(
   ctx: MutationCtx,
   docId: Id<"docs">,
   projectId: Id<"projects">,
   body: string
 ): Promise<string> {
-  await ctx.db.insert("docContent", { docId, projectId, body });
+  await ctx.db.insert("docContent", {
+    docId,
+    projectId,
+    body,
+    status: "draft",
+  });
   return buildExcerpt(body);
+}
+
+/**
+ * Mirror a status change onto the body row.
+ *
+ * THE sync point for `docContent.status`. It exists only to let the body
+ * search index pre-filter drafts, and it is worthless — worse, dangerous —
+ * if it drifts from `docs.status`, so every mutation that changes status
+ * calls this in the same transaction. Nothing else may write the field.
+ */
+export async function setContentStatus(
+  ctx: MutationCtx,
+  docId: Id<"docs">,
+  status: "draft" | "published"
+): Promise<void> {
+  const row = await ctx.db
+    .query("docContent")
+    .withIndex("by_docId", (q) => q.eq("docId", docId))
+    .first();
+  if (row && row.status !== status) {
+    await ctx.db.patch(row._id, { status });
+  }
 }
 
 /**

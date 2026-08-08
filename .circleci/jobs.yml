@@ -297,7 +297,7 @@ jobs:
           # INTERNAL migrations:run entrypoint — only callable with the
           # deploy key, so no shared secret is involved at all.
           command: |
-            for migration in seed-feature-registry seed-tier-features seed-role-registry migrate-roles seed-changelog; do
+            for migration in seed-feature-registry seed-tier-features seed-role-registry migrate-roles seed-changelog backfill-doc-content-status; do
               echo "Running $migration..."
               bunx convex run features/admin/migrations:run \
                 "$(jq -cn --arg name "$migration" '{name: $name}')"

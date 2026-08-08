@@ -177,6 +177,7 @@ export {
 // Project documentation hooks
 export {
   useProjectDocs,
+  useDocSearch,
   useProjectDoc,
   useCreateDoc,
   useUpdateDoc,
@@ -186,6 +187,7 @@ export {
   useRestoreDoc,
   groupDocsByModule,
   type DocSummary,
+  type DocSearchResult,
   type DocDetail,
   type DocType,
   type DocStatus,

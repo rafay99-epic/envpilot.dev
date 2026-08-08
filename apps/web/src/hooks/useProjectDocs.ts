@@ -31,10 +31,35 @@ export interface DocSummary {
   publishedAt?: number;
 }
 
+/** A search hit. `matchedBody` is true when the term was found in the page
+ *  text rather than the title — the UI says so, so a result whose title does
+ *  not contain the term does not look like a bug. */
+export interface DocSearchResult extends DocSummary {
+  matchedBody: boolean;
+}
+
 export interface DocDetail extends DocSummary {
   body: string;
   authorName: string;
   canEdit: boolean;
+}
+
+/**
+ * Full-text search over a project's pages, backed by two Convex search
+ * indexes (titles and page bodies). Skips entirely on an empty term so
+ * clearing the box costs nothing, and callers should debounce — every call
+ * is an index read.
+ */
+export function useDocSearch(
+  projectId: Id<"projects"> | undefined,
+  term: string
+): DocSearchResult[] | undefined {
+  return useQuery(
+    convexApi.features.docs.queries.search,
+    projectId && term.trim().length > 0
+      ? { projectId, term: term.trim() }
+      : "skip"
+  );
 }
 
 /** All docs in a project the caller may see. Drafts are author-private. */

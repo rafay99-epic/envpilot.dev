@@ -694,11 +694,16 @@ export default defineSchema({
     // Serves the per-project trash listing.
     .index("by_project_deleted", ["projectId", "deletedAt"])
     // Bounds the daily purge sweep to soft-deleted rows.
-    .index("by_deleted_at", ["deletedAt"]),
-  // No searchIndex: the schema has none anywhere, the corpus is tens of pages
-  // per project, and a body index could not filter drafts (search filterFields
-  // only reference fields on the indexed table, and `status` lives on `docs`).
-  // MCP search is a bounded metadata scan; the dashboard filters client-side.
+    .index("by_deleted_at", ["deletedAt"])
+    // Full-text over titles. `filterFields` are equality pre-filters applied
+    // INSIDE the index, so a published-only search never reads a draft row —
+    // that is both the cost win and the security property (drafts must not
+    // leak through search). Both filter fields live on this table, which is
+    // the constraint Convex search indexes impose.
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["projectId", "status"],
+    }),
 
   // Doc bodies, 1:1 with `docs`. Split out for the same reason the rest of
   // this schema keeps hot rows small: the sidebar, module index and palette
@@ -709,9 +714,23 @@ export default defineSchema({
     docId: v.id("docs"),
     projectId: v.id("projects"),
     body: v.string(),
+    // DENORMALIZED from docs.status, purely so the body search index can
+    // pre-filter drafts. A Convex search index may only filter on fields of
+    // the table it indexes, and without this a body search would have to read
+    // every matching row — drafts included — and post-filter in the handler,
+    // which both costs bandwidth and puts unreviewed text one bug away from
+    // leaking. Every write goes through features/docs/content.ts, which is
+    // the ONLY module allowed to set it, so the two rows cannot drift.
+    status: v.optional(v.union(v.literal("draft"), v.literal("published"))),
   })
     .index("by_docId", ["docId"])
-    .index("by_projectId", ["projectId"]),
+    .index("by_projectId", ["projectId"])
+    // Full-text over page bodies — this is what makes search find a page by
+    // what it SAYS rather than only by its title.
+    .searchIndex("search_body", {
+      searchField: "body",
+      filterFields: ["projectId", "status"],
+    }),
 
   // ==========================================
   // PROJECT ACCESS (for extension linking)

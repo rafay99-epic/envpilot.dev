@@ -38,7 +38,7 @@ import {
   internalMutation,
 } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import type { Id } from "../../_generated/dataModel";
+import type { Doc, Id } from "../../_generated/dataModel";
 import { createAuditLog } from "../../lib/audit";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { createBody } from "../docs/content";
@@ -222,46 +222,76 @@ export const _searchScopedDocs = internalQuery({
       throw new ConvexError("Project not found");
     }
 
-    const rows = await ctx.db
-      .query("docs")
-      .withIndex("by_project_and_status", (q) =>
-        q.eq("projectId", args.projectId).eq("status", "published")
-      )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .take(SEARCH_SCAN_LIMIT);
-
-    const needle = args.query?.trim().toLowerCase();
-    const moduleFilter = args.module?.trim().toLowerCase();
-
-    const matched = rows.filter((doc) => {
-      if (moduleFilter && doc.module.toLowerCase() !== moduleFilter) {
-        return false;
-      }
-      if (!needle) return true;
-      return (
-        doc.title.toLowerCase().includes(needle) ||
-        doc.module.toLowerCase().includes(needle) ||
-        (doc.excerpt?.toLowerCase().includes(needle) ?? false)
-      );
-    });
-
     const limit = Math.min(
       Math.max(args.limit ?? MAX_SEARCH_ROWS, 1),
       MAX_SEARCH_ROWS
     );
+    const term = args.query?.trim();
+    const moduleFilter = args.module?.trim().toLowerCase();
 
-    return matched
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, limit)
-      .map((doc) => ({
-        docId: doc._id,
-        title: doc.title,
-        slug: doc.slug,
-        module: doc.module,
-        type: doc.type,
-        excerpt: doc.excerpt,
-        updatedAt: doc.updatedAt,
-      }));
+    // An agent hitting this in a loop is the traffic shape that turns a
+    // full-table scan into a real bill, so a query goes through the search
+    // INDEXES (title, then body) and only falls back to a bounded listing
+    // when no term was supplied. `status` is a filterField on both indexes,
+    // so a draft is never read here — cost and confidentiality, same control.
+    const matched: Doc<"docs">[] = [];
+    const seen = new Set<string>();
+    const push = (doc: Doc<"docs"> | null) => {
+      if (!doc || doc.deletedAt !== undefined) return;
+      if (doc.status !== "published") return;
+      if (moduleFilter && doc.module.toLowerCase() !== moduleFilter) return;
+      if (seen.has(doc._id)) return;
+      seen.add(doc._id);
+      matched.push(doc);
+    };
+
+    if (term) {
+      for (const doc of await ctx.db
+        .query("docs")
+        .withSearchIndex("search_title", (q) =>
+          q
+            .search("title", term)
+            .eq("projectId", args.projectId)
+            .eq("status", "published")
+        )
+        .take(limit)) {
+        push(doc);
+      }
+      if (matched.length < limit) {
+        for (const row of await ctx.db
+          .query("docContent")
+          .withSearchIndex("search_body", (q) =>
+            q
+              .search("body", term)
+              .eq("projectId", args.projectId)
+              .eq("status", "published")
+          )
+          .take(limit)) {
+          push(await ctx.db.get(row.docId));
+        }
+      }
+    } else {
+      for (const doc of await ctx.db
+        .query("docs")
+        .withIndex("by_project_and_status", (q) =>
+          q.eq("projectId", args.projectId).eq("status", "published")
+        )
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .take(SEARCH_SCAN_LIMIT)) {
+        push(doc);
+      }
+      matched.sort((a, b) => b.updatedAt - a.updatedAt);
+    }
+
+    return matched.slice(0, limit).map((doc) => ({
+      docId: doc._id,
+      title: doc.title,
+      slug: doc.slug,
+      module: doc.module,
+      type: doc.type,
+      excerpt: doc.excerpt,
+      updatedAt: doc.updatedAt,
+    }));
   },
 });
 

@@ -20,6 +20,9 @@ import {
   requireDocsFeature,
 } from "./helpers";
 
+/** Hard ceiling on one search response. Keeps a keystroke cheap. */
+const SEARCH_LIMIT = 20;
+
 /** Shape returned by every list surface — no body, no excerpt-less rows. */
 function toSummary(doc: Doc<"docs">) {
   return {
@@ -188,5 +191,104 @@ export const listTrashed = query({
       .filter((doc) => doc.authorId === actor._id || access.canManage)
       .sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0))
       .map((doc) => ({ ...toSummary(doc), deletedAt: doc.deletedAt }));
+  },
+});
+
+/**
+ * Full-text search across a project's pages.
+ *
+ * Two Convex search indexes, merged: `docs.search_title` and
+ * `docContent.search_body`. Title hits rank above body hits, because someone
+ * typing "wallet" almost always wants the page called Wallet before a page
+ * that merely mentions it.
+ *
+ * Cost shape — this is the read path an impatient user hits on every
+ * keystroke, so it is bounded at every step:
+ *   - `filterFields` pre-filter INSIDE each index, so a published-only search
+ *     never reads a draft row at all (also why drafts cannot leak here).
+ *   - Each index is capped with `.take()`, never `.collect()`.
+ *   - Body hits return the parent's stored `excerpt`, never the body — the
+ *     large rows are read by the index, never serialized back to the client.
+ *   - Own drafts are folded in from a small metadata-only index read rather
+ *     than a second search, so the private-draft case costs no extra index.
+ */
+export const search = query({
+  args: { projectId: v.id("projects"), term: v.string() },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const access = await requireDocAccess(ctx, actor._id, args.projectId);
+    await requireDocsFeature(ctx, access.project.organizationId);
+
+    const term = args.term.trim();
+    if (term.length === 0) return [];
+
+    // Published titles.
+    const titleHits = await ctx.db
+      .query("docs")
+      .withSearchIndex("search_title", (q) =>
+        q
+          .search("title", term)
+          .eq("projectId", args.projectId)
+          .eq("status", "published")
+      )
+      .take(SEARCH_LIMIT);
+
+    // Published bodies → parent metadata rows.
+    const bodyHits = await ctx.db
+      .query("docContent")
+      .withSearchIndex("search_body", (q) =>
+        q
+          .search("body", term)
+          .eq("projectId", args.projectId)
+          .eq("status", "published")
+      )
+      .take(SEARCH_LIMIT);
+
+    const ranked = new Map<
+      string,
+      { doc: Doc<"docs">; matchedBody: boolean }
+    >();
+    for (const doc of titleHits) {
+      if (doc.deletedAt !== undefined) continue;
+      ranked.set(doc._id, { doc, matchedBody: false });
+    }
+    for (const row of bodyHits) {
+      if (ranked.has(row.docId)) continue;
+      const doc = await ctx.db.get(row.docId);
+      if (!doc || doc.deletedAt !== undefined) continue;
+      if (doc.status !== "published") continue; // belt and braces
+      ranked.set(doc._id, { doc, matchedBody: true });
+    }
+
+    // The caller's own drafts never reach a search index (they are filtered
+    // out by `status`), so match them here against the same term. Bounded
+    // metadata read, no bodies.
+    const ownDrafts = await ctx.db
+      .query("docs")
+      .withIndex("by_project_and_status", (q) =>
+        q.eq("projectId", args.projectId).eq("status", "draft")
+      )
+      .take(MAX_DOC_ROWS);
+    const needle = term.toLowerCase();
+    for (const doc of ownDrafts) {
+      if (doc.deletedAt !== undefined) continue;
+      if (!canSeeDoc(doc, actor._id, access)) continue;
+      if (ranked.has(doc._id)) continue;
+      if (
+        doc.title.toLowerCase().includes(needle) ||
+        (doc.excerpt?.toLowerCase().includes(needle) ?? false)
+      ) {
+        ranked.set(doc._id, { doc, matchedBody: false });
+      }
+    }
+
+    return [...ranked.values()]
+      .slice(0, SEARCH_LIMIT)
+      .map(({ doc, matchedBody }) => ({
+        ...toSummary(doc),
+        // Tells the UI why this row matched, so it can say "matched in page
+        // text" instead of showing a title that does not contain the term.
+        matchedBody,
+      }));
   },
 });
