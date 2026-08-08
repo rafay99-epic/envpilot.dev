@@ -27,7 +27,8 @@ export type AuditResourceType =
   | "billing"
   | "security"
   | "account"
-  | "file";
+  | "file"
+  | "doc";
 
 // Severity mapping for different action types
 const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
@@ -102,6 +103,14 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "integration.webhook_created": "info",
   "integration.webhook_updated": "info",
   "integration.webhook_deleted": "warning",
+  // Project documentation
+  "doc.created": "info",
+  "doc.updated": "info",
+  // Publishing is the human gate that makes a draft readable by teammates
+  // and by every docs-scoped agent — worth surfacing above routine edits.
+  "doc.published": "info",
+  "doc.deleted": "warning",
+  "doc.restored": "info",
 };
 
 // Resource type mapping for different action types
@@ -214,6 +223,12 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "integration.webhook_created": "organization",
   "integration.webhook_updated": "organization",
   "integration.webhook_deleted": "organization",
+  // Project documentation
+  "doc.created": "doc",
+  "doc.updated": "doc",
+  "doc.published": "doc",
+  "doc.deleted": "doc",
+  "doc.restored": "doc",
 };
 
 export interface AuditLogInput {

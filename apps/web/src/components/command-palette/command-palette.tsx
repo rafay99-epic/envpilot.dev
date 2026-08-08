@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
 import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
 import { AnimatePresence, motion } from "framer-motion";
+import { useQuery } from "convex/react";
 import { Search, Lock, X, Tag } from "lucide-react";
+import { api as convexApi } from "@convex/_generated/api";
 import { useAuthContext } from "@/components/auth";
 import { useConvexUser, useGlobalSearch } from "@/hooks";
 import { ENVIRONMENTS } from "@/constants/project";
@@ -37,6 +39,17 @@ export function CommandPalette() {
   const { convexUserId } = useConvexUser(user?.id);
   const { searchTerm, setSearchTerm, results, isLoading } =
     useGlobalSearch(convexUserId);
+
+  // Published documentation across every visible project. Its own query so
+  // the variable search keeps its shape, but the SAME palette — one Cmd+K.
+  // Debounced by reusing the palette's term, and skipped below 2 chars.
+  const docResults =
+    useQuery(
+      convexApi.features.docs.queries.globalSearch,
+      convexUserId && searchTerm.trim().length >= 2
+        ? { searchTerm: searchTerm.trim() }
+        : "skip"
+    ) ?? [];
 
   // Collect unique tags from results for tag filter chips
   const availableTags = useMemo(() => {
@@ -307,9 +320,9 @@ export function CommandPalette() {
                       Searching...
                     </span>
                   </div>
-                ) : filteredResults.length === 0 ? (
+                ) : filteredResults.length === 0 && docResults.length === 0 ? (
                   <div className="px-4 py-8 text-center text-sm text-zinc-500">
-                    No variables found for &ldquo;{searchTerm}&rdquo;
+                    Nothing found for &ldquo;{searchTerm}&rdquo;
                   </div>
                 ) : (
                   filteredResults.map((result, index) => (
@@ -377,10 +390,52 @@ export function CommandPalette() {
                     </button>
                   ))
                 )}
+
+                {/* Documentation — published pages across every visible
+                    project. Appended rather than given its own palette so
+                    there is one Cmd+K and one shortcut. Metadata only; the
+                    body is loaded when the page opens. */}
+                {searchTerm.length >= 2 && docResults.length > 0 && (
+                  <>
+                    <div className="border-t border-zinc-700/50 px-4 pt-3 pb-1 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
+                      Documentation
+                    </div>
+                    {docResults.map((doc) => (
+                      <button
+                        key={doc._id}
+                        data-testid={`palette-doc-${doc.slug}`}
+                        onClick={() => {
+                          closePalette();
+                          router.push(
+                            `/dashboard/projects/${doc.projectSlug}/docs/${doc.slug}`
+                          );
+                        }}
+                        className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-zinc-800/50"
+                      >
+                        <div
+                          className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{
+                            backgroundColor: doc.projectColor || "#71717a",
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <span className="truncate text-sm font-medium text-zinc-100">
+                            {doc.title}
+                          </span>
+                          <p className="mt-0.5 truncate text-xs text-zinc-500">
+                            {doc.projectName}
+                            <span className="mx-1.5 text-zinc-700">/</span>
+                            {doc.module}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
 
               {/* Footer */}
-              {filteredResults.length > 0 && (
+              {(filteredResults.length > 0 || docResults.length > 0) && (
                 <div className="flex items-center gap-4 border-t border-zinc-700/50 px-4 py-2 text-[10px] text-zinc-600">
                   <span>
                     <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1 py-0.5 font-mono">

@@ -27,13 +27,14 @@ import { useOrganizationProjects } from "@/hooks/useProjects";
 import { sanitizeConvexError } from "@/lib/error-messages";
 
 type Provider = "slack" | "discord";
-type EventGroup = "variables" | "requests" | "members" | "security";
+type EventGroup = "variables" | "requests" | "members" | "security" | "docs";
 
 const EVENT_GROUPS: { key: EventGroup; label: string; hint: string }[] = [
   { key: "variables", label: "Variables", hint: "Created, updated, deleted" },
   { key: "requests", label: "Requests", hint: "Filed, approved, rejected" },
   { key: "members", label: "Members", hint: "Invites, removals, permissions" },
   { key: "security", label: "Security", hint: "Denials and token changes" },
+  { key: "docs", label: "Docs", hint: "Documentation pages published" },
 ];
 const DEFAULT_GROUPS: EventGroup[] = ["variables", "requests"];
 

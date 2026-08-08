@@ -638,6 +638,82 @@ export default defineSchema({
     .index("by_active_and_expires", ["isActive", "expiresAt"]),
 
   // ==========================================
+  // PROJECT DOCUMENTATION (agent-authored, human-published)
+  // ==========================================
+  // Handoff documentation: an agent proposes a DRAFT over MCP, the developer
+  // who wrote the feature reviews it against their own plan, and publishing
+  // is a human act. Drafts are invisible to teammates AND to every MCP read —
+  // that gate is the primary control against a prompt-injected page reaching
+  // another agent's context.
+  //
+  // Docs name variable KEYS and never carry values: every variable value
+  // lives behind a WorkOS Vault reference, and the only authorized decrypt
+  // path is features/api/reads.ts, gated on the "variables" resource plus
+  // environment scope plus per-variable RBAC. Resolving a value here would
+  // route around all of it.
+  docs: defineTable({
+    projectId: v.id("projects"),
+    // Sidebar grouping, e.g. "E-Commerce Platform". A plain string, not a
+    // tree: grouping is all the navigation needs, and a tree would drag in
+    // move/reorder/orphan/breadcrumb handling for no gain.
+    module: v.string(),
+    // Chooses the markdown template inserted at create time and the sidebar
+    // icon. Deliberately NOT a structured contract: request/response schemas
+    // would be opaque strings either way, so the structure buys no validation
+    // and costs a second authoring mode.
+    type: v.union(v.literal("api"), v.literal("guide")),
+    title: v.string(),
+    // Unique per project among non-deleted rows (enforced in mutations).
+    slug: v.string(),
+    status: v.union(v.literal("draft"), v.literal("published")),
+    // Denormalized first ~200 chars of the body, maintained on every content
+    // write. Lets the sidebar, module index and command palette render
+    // previews without reading docContent — Convex bills bytes READ, and
+    // these are reactive subscriptions that re-run on any write.
+    excerpt: v.optional(v.string()),
+    authorId: v.id("users"),
+    // Who last published it (may differ from the author for Team Lead+).
+    publishedBy: v.optional(v.id("users")),
+    // Optional link back to the PR the page documents. A plain string: a
+    // pasted URL works with zero integration, and a GitHub App can fill it
+    // automatically later without a schema change.
+    prUrl: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    publishedAt: v.optional(v.number()),
+    // Soft delete — the project Trash page lists these and the daily GC cron
+    // purges past the retention window, same contract as variables/files.
+    deletedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_and_status", ["projectId", "status"])
+    .index("by_project_and_module", ["projectId", "module"])
+    // O(log n) slug resolution for the page route. Without it every page view
+    // scans the project's whole doc list.
+    .index("by_project_and_slug", ["projectId", "slug"])
+    // Serves the per-project trash listing.
+    .index("by_project_deleted", ["projectId", "deletedAt"])
+    // Bounds the daily purge sweep to soft-deleted rows.
+    .index("by_deleted_at", ["deletedAt"]),
+  // No searchIndex: the schema has none anywhere, the corpus is tens of pages
+  // per project, and a body index could not filter drafts (search filterFields
+  // only reference fields on the indexed table, and `status` lives on `docs`).
+  // MCP search is a bounded metadata scan; the dashboard filters client-side.
+
+  // Doc bodies, 1:1 with `docs`. Split out for the same reason the rest of
+  // this schema keeps hot rows small: the sidebar, module index and palette
+  // must never read markdown they will not render. `by_projectId` exists so
+  // project deletion can drain rows without walking the parent table.
+  // All reads/writes go through features/docs/content.ts.
+  docContent: defineTable({
+    docId: v.id("docs"),
+    projectId: v.id("projects"),
+    body: v.string(),
+  })
+    .index("by_docId", ["docId"])
+    .index("by_projectId", ["projectId"]),
+
+  // ==========================================
   // PROJECT ACCESS (for extension linking)
   // ==========================================
   projectAccess: defineTable({
@@ -746,13 +822,18 @@ export default defineSchema({
     urlPreview: v.string(),
     // Channel name from the OAuth response (e.g. "#eng-alerts")
     channel: v.optional(v.string()),
-    // Subscribed event groups: "variables" | "requests" | "members" | "security"
+    // Subscribed event groups:
+    // "variables" | "requests" | "members" | "security" | "docs"
     eventGroups: v.array(
       v.union(
         v.literal("variables"),
         v.literal("requests"),
         v.literal("members"),
-        v.literal("security")
+        v.literal("security"),
+        // Documentation publishes. Its own group rather than piggybacking
+        // "variables": a handoff notice and a secret change are different
+        // events, and nobody subscribing to one wants the other.
+        v.literal("docs")
       )
     ),
     enabled: v.boolean(),
@@ -1115,7 +1196,13 @@ export default defineSchema({
       // Notification webhook (Slack/Discord) actions
       v.literal("integration.webhook_created"),
       v.literal("integration.webhook_updated"),
-      v.literal("integration.webhook_deleted")
+      v.literal("integration.webhook_deleted"),
+      // Project documentation actions
+      v.literal("doc.created"),
+      v.literal("doc.updated"),
+      v.literal("doc.published"),
+      v.literal("doc.deleted"),
+      v.literal("doc.restored")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),
@@ -1144,7 +1231,8 @@ export default defineSchema({
         v.literal("billing"),
         v.literal("security"),
         v.literal("account"),
-        v.literal("file")
+        v.literal("file"),
+        v.literal("doc")
       )
     ),
     // Whether this action involved sensitive data

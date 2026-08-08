@@ -703,9 +703,23 @@ export const emptyProjectTrash = action({
     purgedVariables: v.number(),
     purgedAccounts: v.number(),
     purgedFiles: v.number(),
+    purgedDocs: v.number(),
     skipped: v.number(),
   }),
-  handler: async (ctx, args) => {
+  // Written out, not inferred: this handler now calls into
+  // internal.features.docs.gc, and `internal` is typed from every module
+  // including this one, so inference would be circular and collapse to `any`
+  // (TS7022/7023) — the same reason reads.ts annotates its handlers.
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    purgedVariables: number;
+    purgedAccounts: number;
+    purgedFiles: number;
+    purgedDocs: number;
+    skipped: number;
+  }> => {
     const authz = await ctx.runQuery(
       internal.features.vault.gc.authorizeEmptyTrash,
       { projectId: args.projectId }
@@ -813,6 +827,14 @@ export const emptyProjectTrash = action({
       }
     }
 
+    // Documentation, last and in one call. A doc owns no Vault object and no
+    // blob, so there is no external delete to retry per row and nothing that
+    // can half-succeed — the per-row skip accounting above does not apply.
+    const { purged: purgedDocs } = await ctx.runMutation(
+      internal.features.docs.gc.purgeProjectDocs,
+      { projectId: args.projectId }
+    );
+
     await ctx.runMutation(internal.features.vault.gc.recordTrashEmptied, {
       projectId: args.projectId,
       organizationId: authz.organizationId,
@@ -822,6 +844,12 @@ export const emptyProjectTrash = action({
       purgedFiles,
     });
 
-    return { purgedVariables, purgedAccounts, purgedFiles, skipped };
+    return {
+      purgedVariables,
+      purgedAccounts,
+      purgedFiles,
+      purgedDocs,
+      skipped,
+    };
   },
 });

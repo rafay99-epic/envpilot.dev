@@ -173,3 +173,20 @@ export {
   type SecretFile,
   type DeletedSecretFile,
 } from "./useSecretFiles";
+
+// Project documentation hooks
+export {
+  useProjectDocs,
+  useProjectDoc,
+  useCreateDoc,
+  useUpdateDoc,
+  usePublishDoc,
+  useUnpublishDoc,
+  useDeleteDoc,
+  useRestoreDoc,
+  groupDocsByModule,
+  type DocSummary,
+  type DocDetail,
+  type DocType,
+  type DocStatus,
+} from "./useProjectDocs";

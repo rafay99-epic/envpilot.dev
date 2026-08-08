@@ -144,4 +144,14 @@ crons.daily(
   {}
 );
 
+// Permanently delete trashed documentation past the same 7-day window. Not
+// part of the vault sweep above: a doc has no Vault object and no blob, so
+// it is two row deletes with no external calls.
+crons.daily(
+  "purge expired trashed docs",
+  { hourUTC: 4, minuteUTC: 15 },
+  internal.features.docs.gc.purgeExpiredDocs,
+  {}
+);
+
 export default crons;

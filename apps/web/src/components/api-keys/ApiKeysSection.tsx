@@ -57,10 +57,19 @@ const RESOURCES = [
   "variables",
   "accounts",
   "files",
+  "docs",
   "projects",
   "requests",
 ] as const;
 type Resource = (typeof RESOURCES)[number];
+
+// Resource pairs the backend refuses to mint together
+// (convex/features/api/keys.ts::assertResourceCombination). Mirrored here so
+// the form disables the second chip instead of failing on submit.
+const MUTUALLY_EXCLUSIVE: Partial<Record<Resource, Resource>> = {
+  docs: "files",
+  files: "docs",
+};
 
 // "requests" is the one mutating capability: the key may FILE variable
 // requests (a human approves them). Not compatible with the GitHub Action
@@ -70,6 +79,8 @@ const RESOURCE_HINT: Partial<Record<Resource, string>> = {
   // Never on by default: this is the switch that lets a credential reach
   // keystores and signing material, not just env vars.
   files: "may read secret file contents (keystores, SSH keys, certificates)",
+  // Excludes "files" — see MUTUALLY_EXCLUSIVE.
+  docs: "may read published docs and propose drafts — not combinable with files",
 };
 
 // Which MCP tools each resource unlocks — mirrors the `requirement` each
@@ -82,6 +93,7 @@ const MCP_RESOURCE_TOOLS: Record<Resource, string> = {
   variables: "envpilot_get_variables, envpilot_get_variable",
   accounts: "envpilot_list_accounts",
   files: "envpilot_list_files, envpilot_get_file",
+  docs: "envpilot_search_docs, envpilot_get_doc, envpilot_create_doc",
   requests: "envpilot_request_variable, envpilot_get_request_status",
 };
 
@@ -559,6 +571,10 @@ function CreateKeyDrawer({
         next.delete(resource);
       } else {
         next.add(resource);
+        // Selecting one half of an exclusive pair clears the other, so the
+        // form can never submit a combination the backend refuses.
+        const excluded = MUTUALLY_EXCLUSIVE[resource];
+        if (excluded) next.delete(excluded);
       }
       return next;
     });
@@ -973,6 +989,12 @@ function CreateKeyDrawer({
                   githubActionSelected &&
                   resource !== "variables" &&
                   resource !== "files";
+                // The other half of an exclusive pair stays clickable — it
+                // swaps the selection rather than being blocked — but says so.
+                const excluded = MUTUALLY_EXCLUSIVE[resource];
+                const swaps = Boolean(
+                  excluded && selectedResources.has(excluded)
+                );
                 return (
                   <button
                     key={resource}
@@ -983,7 +1005,9 @@ function CreateKeyDrawer({
                     title={
                       disabled
                         ? "GitHub Action keys carry variables, and optionally files — nothing else"
-                        : RESOURCE_HINT[resource]
+                        : swaps
+                          ? `Selecting "${resource}" clears "${excluded}" — a key cannot carry both`
+                          : RESOURCE_HINT[resource]
                     }
                     onClick={() => toggleResource(resource)}
                     className={`${CHIP_BASE} ${

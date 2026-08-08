@@ -56,6 +56,24 @@ test("MCP requirements panel reacts to surface + resource selection", async ({
   await expect(panel.getByTestId("api-key-mcp-tools-requests")).toContainText(
     "envpilot_request_variable"
   );
+  await expect(panel.getByTestId("api-key-mcp-tools-docs")).toContainText(
+    "envpilot_search_docs"
+  );
+
+  // docs and files are mutually exclusive: documentation is untrusted text an
+  // agent reads into context, and file access returns decrypted key material.
+  // Selecting one clears the other, so the form can never submit a pair the
+  // backend refuses (convex/features/api/keys.ts::assertResourceCombination).
+  const docsChip = page.getByTestId("api-key-resource-docs");
+  const filesChip = page.getByTestId("api-key-resource-files");
+  await filesChip.click();
+  await expect(filesChip).toHaveAttribute("aria-pressed", "true");
+  await docsChip.click();
+  await expect(docsChip).toHaveAttribute("aria-pressed", "true");
+  await expect(filesChip).toHaveAttribute("aria-pressed", "false");
+  // Clear docs again so the rest of the assertions run on the default scope.
+  await docsChip.click();
+  await expect(docsChip).toHaveAttribute("aria-pressed", "false");
 
   // projects is on by default, so no warning yet.
   const warning = page.getByTestId("api-key-mcp-projects-warning");

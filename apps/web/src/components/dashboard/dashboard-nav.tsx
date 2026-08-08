@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { UserButton, OrganizationSwitcher } from "@/components/auth";
 import { useAuthContext } from "@/components/auth";
 import {
+  BookText,
   FileKey,
   LayoutDashboard,
   FolderOpen,
@@ -231,6 +232,11 @@ export function DashboardNav() {
           href: `/dashboard/projects/${projectSlug}/files`,
           label: "Files",
           icon: <FileKey className="h-4 w-4" />,
+        },
+        {
+          href: `/dashboard/projects/${projectSlug}/docs`,
+          label: "Docs",
+          icon: <BookText className="h-4 w-4" />,
         },
         {
           href: `/dashboard/projects/${projectSlug}/shared`,

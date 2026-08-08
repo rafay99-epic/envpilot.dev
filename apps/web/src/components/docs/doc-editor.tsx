@@ -1,0 +1,300 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { AlertTriangle, Columns2, Eye, ListTree, Pencil } from "lucide-react";
+import { useMarkdownCommands } from "@/hooks/useMarkdownCommands";
+import { useSplitScrollSync } from "@/hooks/useSplitScrollSync";
+import { parseOutline } from "@/lib/editor/outline";
+import { resolveDoubleClickOffset } from "@/lib/editor/source-lines";
+import { DocEditorToolbar } from "./doc-editor-toolbar";
+
+// The renderer is only reachable through Split and Read, so Write — the
+// default — never pays for the markdown chain.
+const DocMarkdown = dynamic(
+  () => import("./doc-markdown").then((m) => m.DocMarkdown),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="p-4 text-sm text-zinc-500">Loading preview…</p>
+    ),
+  }
+);
+
+type ViewMode = "write" | "split" | "read";
+
+const VIEW_MODES: {
+  value: ViewMode;
+  label: string;
+  icon: React.ElementType;
+}[] = [
+  { value: "write", label: "Write", icon: Pencil },
+  { value: "split", label: "Split", icon: Columns2 },
+  { value: "read", label: "Read", icon: Eye },
+];
+
+interface DocEditorProps {
+  body: string;
+  onChange: (body: string) => void;
+  /** Soft notices from the server's secret scan — shown, never blocking. */
+  warnings?: string[];
+  disabled?: boolean;
+}
+
+/**
+ * Markdown editor with Write / Split / Read modes.
+ *
+ * Chrome is deliberately minimal: one rule under the controls and one between
+ * the panes, no card around the whole thing. The editor IS the page here, and
+ * a border around a border around a border eats the width that writing needs.
+ *
+ * The writing affordances are ported from wryte.xyz: caret-following split
+ * scroll sync, list continuation and Tab indent, formatting over
+ * `setRangeText` (so the native undo stack survives), an outline rail, and
+ * double-click-in-preview to jump the caret to that spot in the source.
+ *
+ * Still a textarea, deliberately: the primary author of these pages is an
+ * agent writing markdown over MCP, so a WYSIWYG surface would be a large
+ * dependency serving the secondary case.
+ */
+export function DocEditor({
+  body,
+  onChange,
+  warnings = [],
+  disabled = false,
+}: DocEditorProps) {
+  const [mode, setMode] = useState<ViewMode>("write");
+  const [showOutline, setShowOutline] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const {
+    insertAtCursor,
+    wrapSelection,
+    prefixLines,
+    selectRange,
+    handleKeyDown,
+  } = useMarkdownCommands(textareaRef);
+
+  const {
+    editorPaneRef,
+    previewRef,
+    onEditorScroll,
+    onPreviewScroll,
+    setOwner,
+  } = useSplitScrollSync(mode === "split");
+
+  const outline = useMemo(
+    () => (showOutline ? parseOutline(body) : []),
+    [showOutline, body]
+  );
+
+  // The textarea is uncontrolled so `setRangeText` can drive the native undo
+  // stack; this pushes external changes (template load, draft switch) back in
+  // without clobbering what the user is typing.
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea && textarea.value !== body) textarea.value = body;
+  }, [body]);
+
+  const showEditor = mode === "write" || mode === "split";
+  const showPreview = mode === "read" || mode === "split";
+
+  /** Double-click a rendered block to put the caret on that source line. */
+  const handlePreviewDoubleClick = (event: React.MouseEvent) => {
+    if (mode !== "split") return;
+    const offset = resolveDoubleClickOffset(event.target as HTMLElement, body);
+    if (offset === null) return;
+    selectRange(offset, offset);
+  };
+
+  // Height chain, ported from wryte's editor-layout: this component fills
+  // whatever height its parent gives it (`h-full`), the control row is a
+  // fixed-size child, and the pane row takes the rest via `min-h-0 flex-1`.
+  // `min-h-0` is the load-bearing bit — without it a flex child refuses to
+  // shrink below its content, the row grows past the container, and the PAGE
+  // scrolls as well as the pane. That double scrollbar is exactly what this
+  // replaces; there is deliberately no hardcoded pane height anywhere.
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {/* The controls share the WRITING COLUMN's grid — same centered
+          max-w as the textarea below — so they sit over the text, not
+          floating at the viewport edge hundreds of px to its left. */}
+      <div className="mx-auto flex w-full max-w-[920px] flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-white/10 px-4 pb-2">
+        <div className="flex items-center gap-3">
+          <div className="flex gap-0.5">
+            {VIEW_MODES.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                data-testid={`doc-editor-${value}`}
+                onClick={() => setMode(value)}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  mode === value
+                    ? "bg-green-500/10 text-green-400"
+                    : "text-zinc-400 hover:text-zinc-100"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+          {showEditor && (
+            <>
+              <span className="h-4 w-px bg-zinc-700" />
+              <DocEditorToolbar
+                onWrap={wrapSelection}
+                onPrefix={prefixLines}
+                onInsert={insertAtCursor}
+                disabled={disabled}
+              />
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            data-testid="doc-outline-toggle"
+            onClick={() => setShowOutline((value) => !value)}
+            aria-pressed={showOutline}
+            title="Outline"
+            className={`flex items-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition-colors ${
+              showOutline
+                ? "bg-green-500/10 text-green-400"
+                : "text-zinc-400 hover:text-zinc-100"
+            }`}
+          >
+            <ListTree className="h-3.5 w-3.5" />
+            Outline
+          </button>
+          <span className="font-mono text-[11px] text-zinc-400">
+            {body.length.toLocaleString()} chars
+          </span>
+        </div>
+      </div>
+
+      {warnings.length > 0 && (
+        <div className="flex items-start gap-2 border-b border-amber-900/40 px-8 py-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-1">
+            {warnings.map((warning) => (
+              <p
+                key={warning}
+                className="text-xs text-amber-700 dark:text-amber-300"
+              >
+                {warning}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1">
+        {showOutline && (
+          <nav className="slim-scrollbar w-56 shrink-0 overflow-y-auto border-r border-white/10 px-4 py-5">
+            <p className="mb-2 text-[10px] font-semibold tracking-wider text-zinc-400 uppercase">
+              Outline
+            </p>
+            {outline.length === 0 ? (
+              <p className="text-xs text-zinc-500">No headings yet.</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {outline.map((heading) => (
+                  <li key={`${heading.start}-${heading.text}`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("write");
+                        selectRange(heading.start, heading.end);
+                      }}
+                      style={{ paddingLeft: `${(heading.level - 1) * 10}px` }}
+                      className="w-full truncate rounded px-1.5 py-1 text-left text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                    >
+                      {heading.text}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </nav>
+        )}
+
+        {showEditor && (
+          <div
+            ref={editorPaneRef}
+            onScroll={onEditorScroll}
+            onPointerDown={() => setOwner("editor")}
+            // overflow-HIDDEN, not auto. The textarea below is the single
+            // scroller for this column: a scrollable pane wrapping a
+            // scrollable textarea gives two scrollbars over the same content,
+            // and the caret-follow sync then moves one while the user drags
+            // the other. `getEditorScroller()` in useSplitScrollSync already
+            // detects and drives the textarea in exactly this arrangement.
+            className={`min-w-0 overflow-hidden ${
+              mode === "split" ? "w-1/2 border-r border-white/10" : "w-full"
+            }`}
+          >
+            <textarea
+              ref={textareaRef}
+              data-testid="doc-body-input"
+              defaultValue={body}
+              onChange={(event) => onChange(event.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={disabled}
+              spellCheck={false}
+              autoComplete="off"
+              autoCorrect="off"
+              data-gramm="false"
+              // The writing column IS the surface: a flat tint on the
+              // centred textarea whose own edges mark the editor's extent
+              // against the untinted page — the thing a full-width wash
+              // could never do (measured ~1.2:1, no edge, invisible). Type
+              // metrics from wryte's editor: 15px/1.85 and generous padding
+              // are what made it pleasant to write in. `h-full` (not
+              // min-h-full) keeps the textarea exactly as tall as its pane
+              // so it stays the single scroller.
+              className="slim-scrollbar mx-auto block h-full w-full max-w-[920px] resize-none overflow-y-auto bg-white/[0.04] px-10 py-8 font-mono text-[15px] leading-[1.85] text-zinc-200 caret-green-400 outline-none selection:bg-green-500/25 placeholder:text-zinc-600 disabled:opacity-60"
+              placeholder="Write the page in markdown…"
+            />
+          </div>
+        )}
+
+        {showPreview && (
+          <div
+            ref={previewRef}
+            onScroll={onPreviewScroll}
+            onPointerDown={() => setOwner("preview")}
+            onDoubleClick={handlePreviewDoubleClick}
+            data-testid="doc-preview"
+            title={
+              mode === "split"
+                ? "Double-click any block to jump the caret there"
+                : undefined
+            }
+            className={`slim-scrollbar min-w-0 overflow-y-auto px-10 py-8 ${
+              mode === "split" ? "w-1/2 bg-white/[0.02]" : "w-full"
+            }`}
+          >
+            {/* Read mode: prose centred on the same grid as the writing
+                column, slightly narrower because proportional type reads
+                tighter than monospace. Split: a faint pane tint tells the
+                two sides apart without a border-heavy divider. */}
+            <div
+              className={
+                mode === "read"
+                  ? "mx-auto max-w-[820px]"
+                  : "mx-auto max-w-[640px]"
+              }
+            >
+              {body.trim().length > 0 ? (
+                <DocMarkdown body={body} />
+              ) : (
+                <p className="text-sm text-zinc-500">Nothing to preview yet.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

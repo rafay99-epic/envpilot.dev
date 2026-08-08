@@ -555,6 +555,7 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         custom_branding: "false",
         analytics_retention_days: "7",
         priority_support: "false",
+        project_docs: "false",
       },
       pro: {
         max_projects: "null",
@@ -592,6 +593,7 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         custom_branding: "true",
         analytics_retention_days: "30",
         priority_support: "true",
+        project_docs: "true",
       },
     };
 
