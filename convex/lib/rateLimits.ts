@@ -85,6 +85,20 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 2,
   },
 
+  // Machine-authored documentation drafts: 30 per hour per key, burst 10.
+  // Looser than machineRequestCreate because the unit of work is different:
+  // an agent finishing a feature legitimately writes one page per endpoint
+  // in a single burst, and a draft costs no email and no vault call. The cap
+  // still exists because every draft is a human review item, and review
+  // capacity — not storage — is the scarce resource here.
+  // Documented publicly in docs/rate-limits — keep the page in sync.
+  docCreate: {
+    kind: "token bucket",
+    rate: 30,
+    period: 3_600_000,
+    capacity: 10,
+  },
+
   // CLI device code generation: 5 per minute per device
   cliAuthInitiate: {
     kind: "token bucket",

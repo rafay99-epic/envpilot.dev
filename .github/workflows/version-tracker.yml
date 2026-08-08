@@ -1,7 +1,10 @@
 name: Version Tracker
 
-# ⛔ DORMANT — moved to CircleCI (version-tracker job in .circleci/config.yml,
-# 2026-07-16). Kept for reference/revert; workflow_dispatch is the escape hatch.
+# ⛔ DORMANT — and currently running NOWHERE. It moved to CircleCI in
+# 2026-07-16, but was dropped from that config during a later refactor, and
+# .circleci/ is now deleted entirely. Re-enable the `pull_request` trigger
+# here if the PR version-bump reminders are still wanted; workflow_dispatch
+# is the manual escape hatch meanwhile.
 on:
   workflow_dispatch:
 

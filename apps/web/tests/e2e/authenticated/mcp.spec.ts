@@ -162,7 +162,7 @@ test.describe.serial("MCP server (/api/mcp)", () => {
     expect(result?.serverInfo?.version?.length ?? 0).toBeGreaterThan(0);
   });
 
-  test("tools/list returns exactly the 9 documented tools", async ({
+  test("tools/list returns exactly the 12 documented tools", async ({
     request,
   }) => {
     test.skip(!plaintextToken, "no key from the mint test");
@@ -188,6 +188,11 @@ test.describe.serial("MCP server (/api/mcp)", () => {
         "envpilot_list_projects",
         "envpilot_request_variable",
         "envpilot_search",
+        // Project documentation. Advertised to every key; the "docs"
+        // resource is what any actual call requires.
+        "envpilot_search_docs",
+        "envpilot_get_doc",
+        "envpilot_create_doc",
       ].sort()
     );
   });

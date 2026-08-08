@@ -15,7 +15,8 @@ name: CI
 # ✅ ACTIVE — CI/CD runs on GitHub Actions (2026-07-18). Envpilot is now
 # open source, so Actions minutes are free; the full pipeline (quality gate
 # + per-surface builds + main-only deploys + release) lives here. CircleCI
-# is retired (.circleci/config.yml renamed to .old so it no longer runs).
+# is gone — .circleci/ was deleted once the repo went public and Actions
+# became free for it.
 # The E2E gate stays disabled (see the e2e job's `false &&`).
 on:
   push:

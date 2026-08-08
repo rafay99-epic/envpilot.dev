@@ -138,6 +138,15 @@ export const listMigrations = query({
         destructive: false,
         runOnce: true,
       },
+      {
+        name: "backfill-doc-content-status",
+        description:
+          "Backfills docContent.status from the parent doc for body rows written before the field existed — without it those pages can never match a published-only body search. Bounded to 200 rows per run; re-run while it reports hadMore: true.",
+        category: "One-Time Migrations",
+        priority: 4,
+        destructive: false,
+        runOnce: true,
+      },
     ] as Array<{
       name: string;
       description: string;
@@ -555,6 +564,7 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         custom_branding: "false",
         analytics_retention_days: "7",
         priority_support: "false",
+        project_docs: "false",
       },
       pro: {
         max_projects: "null",
@@ -592,6 +602,7 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         custom_branding: "true",
         analytics_retention_days: "30",
         priority_support: "true",
+        project_docs: "true",
       },
     };
 
@@ -763,6 +774,52 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
       migrated: created,
       skipped,
       duplicatesRemoved: deduped,
+    };
+  }
+
+  /**
+   * Backfill `docContent.status` from the parent `docs` row.
+   *
+   * The body search index filters on `docContent.status`, so any row written
+   * before that field existed carries `undefined` and can never match a
+   * published-only search — the page would be silently unfindable by its own
+   * text, with no error anywhere.
+   *
+   * Batch sized against the read limit, not convenience: a body row holds up
+   * to 256KB, so 20 rows plus their parents is ~5MB — 200 would be ~51MB and
+   * roll back forever. Only rows still missing the field are read, and
+   * orphans are deleted rather than skipped, so every run makes progress:
+   * re-run until `hadMore` is false.
+   */
+  if (args.name === "backfill-doc-content-status") {
+    const BATCH = 20;
+    const rows = await ctx.db
+      .query("docContent")
+      .filter((q) => q.eq(q.field("status"), undefined))
+      .take(BATCH);
+    let updated = 0;
+    let orphaned = 0;
+
+    for (const row of rows) {
+      const doc = await ctx.db.get(row.docId);
+      if (!doc) {
+        // Unreachable garbage — its parent is gone, so nothing can ever read
+        // it. Deleting is what lets the batch drain; skipping would leave it
+        // matching the filter forever and pin `hadMore` to true.
+        await ctx.db.delete(row._id);
+        orphaned++;
+        continue;
+      }
+      await ctx.db.patch(row._id, { status: doc.status });
+      updated++;
+    }
+
+    return {
+      success: true,
+      total: rows.length,
+      updated,
+      orphaned,
+      hadMore: rows.length === BATCH,
     };
   }
 

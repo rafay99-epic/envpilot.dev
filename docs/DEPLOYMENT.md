@@ -5,8 +5,8 @@
 Envpilot deploys to multiple platforms. The **GitHub Actions** pipeline
 (`.github/workflows/ci.yml` + `deploy-*.yml`) handles all deployments on push
 to `main` — see [CI docs](ci.md) for how the workflow is built. Deploy jobs
-run only on `main`, backend first (clients require `deploy-convex`). The old
-CircleCI config is retained, disabled, at `.circleci/config.yml.old`.
+run only on `main`, backend first (clients require `deploy-convex`). CircleCI
+ran the pipeline while the repo was private; `.circleci/` is now deleted.
 
 | Component                 | Platform                        | Trigger                                              |
 | ------------------------- | ------------------------------- | ---------------------------------------------------- |
@@ -165,9 +165,7 @@ quality → per-surface build → deploy-convex → publish-cli / publish-extens
 publish-action → deploy-homebrew → deploy-web / -blog / -docs / -admin → release
 ```
 
-See [CI docs](ci.md) for how the pipeline is built, the required secrets, and
-how to run on CircleCI instead (its config is retained, disabled, at
-`.circleci/config.yml.old`).
+See [CI docs](ci.md) for how the pipeline is built and the required secrets.
 
 Publish/deploy credentials are stored as **GitHub repository secrets** (Convex
 deploy key, npm token, Open VSX token, Vercel token/project ids, the

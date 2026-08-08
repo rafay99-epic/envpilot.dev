@@ -16,7 +16,16 @@ import {
   TerminalLoading,
 } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
-import { Pencil, Trash2, Plus, ListPlus, X, Loader2 } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  Plus,
+  ListPlus,
+  X,
+  Loader2,
+  Settings,
+} from "lucide-react";
+import { PageHeader } from "@envpilot/ui";
 import {
   useOrganizationTags,
   useCreateTag,
@@ -282,14 +291,11 @@ function OrganizationSettingsPageContent({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-zinc-100">
-          Organization Settings
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Manage your organization settings and preferences.
-        </p>
-      </div>
+      <PageHeader
+        icon={Settings}
+        title="Organization Settings"
+        description="Manage your organization settings and preferences."
+      />
 
       {/* Tabs */}
       <div className="border-b border-zinc-800">

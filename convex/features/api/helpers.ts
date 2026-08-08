@@ -90,7 +90,7 @@ export function throwForDenial(
  */
 export async function consumeRateLimit(
   ctx: ActionCtx,
-  bucket: "apiMetadata" | "cicdPull" | "machineRequestCreate",
+  bucket: "apiMetadata" | "cicdPull" | "machineRequestCreate" | "docCreate",
   tokenHash: string
 ): Promise<void> {
   try {

@@ -1479,4 +1479,43 @@ The goal, in one line: \`git clone && envpilot pull\` should produce a repositor
 - Deleted files go to the trash with the same retention window as variables and accounts, and can be restored
 - Available on the free plan up to three files, unlimited on Pro`,
   },
+  // ============================================================
+  // Project Documentation — agent drafts, human publishes (2026-08-09)
+  // ============================================================
+  {
+    title: "Project Documentation: Agents Draft, You Publish",
+    version: "v1.56.0",
+    type: "feature",
+    publishedAt: ts("2026-08-09T10:00:00Z"),
+    content: `Handing a finished feature to the person who has to integrate it usually means opening a throwaway agent session, pasting PR links, and asking it to reconstruct documentation from diffs — archaeology, under deadline, by a session with no context. Project Documentation makes the pages a by-product of the work instead: your coding agent writes them as it builds, you review them against the plan you wrote, and publishing is the act that makes them real.
+
+### Agents Draft, Humans Publish
+- A coding agent proposes pages over MCP with \`envpilot_create_doc\`; every one lands as a **draft**
+- Drafts are invisible to your team and returned by no MCP read at all — nothing an agent wrote reaches another agent until a person publishes it
+- You review against the plan the work came from, which catches implementation drift as well as prose errors
+- Editing a published page returns it to draft, so changed text gets a second look before readers see it
+
+### A Real Writing Surface
+- Write, Split and Read modes, with the preview scrolling to the block your caret is in rather than guessing by ratio
+- Double-click any block in Split to jump the caret to that spot in the markdown
+- List continuation, Tab indent, a formatting toolbar over the native undo stack, and a heading outline you can navigate
+- Pages group into modules, so an e-commerce project can keep wallet, warehouse and rider endpoints apart
+
+### Search That Finds What a Page Says
+- Full-text search across titles **and** page bodies, backed by Convex search indexes
+- Drafts are filtered inside the index, so an unreviewed page can never surface in a teammate's search
+- The same search is available to agents through \`envpilot_search_docs\` and \`envpilot_get_doc\`
+
+### Documentation Never Carries Secrets
+- Every write is scanned: credential shapes are rejected outright, and assignment-shaped lines are flagged for review
+- Pages may name a variable such as \`API_BASE_URL\`, never its value — readers resolve values through their own access
+- An API key cannot hold both the \`docs\` and \`files\` scopes, so documentation and decrypted key material never share one credential
+- Text that instructs an agent to call a tool is refused, and every publish, edit and deletion is audit-logged
+
+### Deleting and Restoring
+- Deleted pages go to the project trash with the same 7-day window as variables, accounts and files
+- Restoring always returns a page to draft — content that has not been reviewed since deletion does not go straight back to readers
+
+Available on Pro.`,
+  },
 ];

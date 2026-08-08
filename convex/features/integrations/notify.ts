@@ -18,6 +18,7 @@ export const WEBHOOK_EVENT_GROUPS = [
   "requests",
   "members",
   "security",
+  "docs",
 ] as const;
 export type WebhookEventGroup = (typeof WEBHOOK_EVENT_GROUPS)[number];
 
@@ -44,6 +45,10 @@ const NOTIFY_GROUP: Record<string, WebhookEventGroup> = {
   "api.request_denied": "security",
   "access.token_revoked": "security",
   "access.extension_unlinked": "security",
+  // Only the publish. Drafts and edits are working state — notifying on
+  // them would be noise, and a draft is precisely the thing nobody else is
+  // supposed to know about yet.
+  "doc.published": "docs",
 };
 
 export function isNotifiableAction(action: string): boolean {

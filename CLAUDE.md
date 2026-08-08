@@ -51,8 +51,8 @@ The developer has the **production `@envpilot/cli` installed globally** and uses
 #### E2E in CI is DISABLED — the local suite is the gate of record
 
 CI runs NO Playwright suite (it was disabled on the old GitHub Actions CI
-because every run exhausted the Convex free-tier Database I/O quota, and it
-was deliberately NOT ported to the CircleCI pipeline). Consequences:
+because every run exhausted the Convex free-tier Database I/O quota, and the
+`e2e` job in ci.yml is deliberately skipped). Consequences:
 
 - **The full local run before every merge is mandatory and is the only
   gate** — never skip it.
@@ -142,21 +142,21 @@ Only the built surface is ever published: `action.yml`, `dist/index.js`
 (committed, esbuild bundle), `README.md`, `LICENSE`. Never monorepo source.
 
 - **Releasing**: bump `packages/github-action/package.json` version and merge
-  to main. The CircleCI `publish-action` job publishes to the public repo,
+  to main. The `deploy-action.yml` workflow publishes to the public repo,
   tags the exact version (`vX.Y.Z`), and force-moves the floating major tag
   (`v1`) — the GitHub convention that gives `@v1` pinners non-breaking updates.
 - **Ordering is STRICT — backend first**: when convex/ changed in the same
   merge, `publish-action` requires `deploy-convex` (same rule as
   CLI/extension: never ship a client before the backend contract it calls).
-- **Secret**: publishing needs the `ACTION_PUBLISH_TOKEN` CircleCI project
-  env var — a fine-grained PAT with Contents read/write on the public repo
+- **Secret**: publishing needs the `ACTION_PUBLISH_TOKEN` GitHub Actions
+  secret — a fine-grained PAT with Contents read/write on the public repo
   ONLY. The job fails loudly with instructions if it is missing.
 - **Backend counterpart**: CI/CD service tokens (`convex/features/cicd/`) —
   read-only, SHA-256-hash-stored, project+environment scoped, pro-gated
   (`cicd_service_tokens`), managed in Project → Settings → CI/CD Tokens.
   Every pull/denial is audit-logged; pulls fail LOUDLY (never partial data,
   never sentinel values). Prod feature-registry seeding is automatic after
-  every convex deploy (the CircleCI `deploy-convex` job runs the seed migrations).
+  every convex deploy (`deploy-convex.yml` runs the seed migrations).
 
 ### Versioning
 
@@ -253,37 +253,42 @@ bun run test:cli
 bunx convex deploy                                 # manual prod deploy (normally via CI on merge)
 ```
 
-### CI/CD — CircleCI "pipeline v2" (CRITICAL)
+### CI/CD — GitHub Actions (CRITICAL)
 
-ALL CI/CD runs on CircleCI (`.circleci/config.yml` + `.circleci/jobs.yml`).
-GitHub Actions is DORMANT: every `.github/workflows/*.yml` is kept for
-reference but triggers only on `workflow_dispatch` — nothing runs there.
+ALL CI/CD runs on GitHub Actions. `.github/workflows/ci.yml` is the entry
+point (push to main + every PR) and calls the `deploy-*.yml` workflows via
+`workflow_call`. CircleCI is GONE — `.circleci/` was deleted once the repo
+went public and Actions became free for it; do not re-add config there.
 
-- **Dynamic config**: a ~15s `detect` setup job diffs the push, maps changed
-  paths to surfaces (convex, web, blog, docs, admin, cli, extension, action;
-  `packages/ui` fans out to web+blog+docs; root manifests and `.circleci/`
-  fan out to everything), ORs in manual force parameters, and GENERATES the
-  continuation workflow — only relevant jobs exist, with `requires` chains
-  computed so any failure blocks everything downstream.
-- **Quality gate first, every pipeline**: prettier + lint + typecheck (Next
-  route types via `next typegen`, no builds) + convex typecheck. Red = nothing
-  else runs.
+- **Change detection**: the `changes` job diffs the push and emits a
+  `run_<surface>` output per surface (convex, web, blog, docs, admin, cli,
+  extension, action). Every downstream job is `if:`-gated on those outputs,
+  so only relevant work runs and `needs:` chains stop everything downstream
+  of a failure.
+- **Quality gate first, every run**: the `checks` job (format, lint,
+  typecheck, build, test) plus a `gitleaks` secret scan. `checks-passed`
+  aggregates them and every deploy needs it. Red = nothing ships.
+- **Secret scan**: `gitleaks dir . --config .gitleaks.toml` runs on every PR.
+  Known example/placeholder strings are allowlisted in `.gitleaks.toml` —
+  add a path or regex there (with a comment saying why it is not a secret)
+  rather than deleting a legitimate test fixture.
 - **CLI and extension ALWAYS build directly** (`bun run build`, never turbo —
   turbo once dropped build-time env vars and shipped a broken CLI). Publishes
   verify `WORKOS_CLIENT_ID` + `NEXT_PUBLIC_CONVEX_URL` are embedded in the
   artifact before shipping.
-- **Deploys exist ONLY on main pipelines** (the generator never emits them
-  for branches): deploy-convex(+seeds) first → publish-cli/extension/action →
-  deploy-homebrew → CI-gated Vercel deploys → GitHub release.
+- **Deploys are main-only** (each is `if:`-gated on the branch):
+  deploy-convex(+seeds) first → cli/extension/action → homebrew → Vercel
+  (web, admin, blog, docs) → GitHub release.
 - **Vercel git integration is fully OFF** (previews included) in all four
-  apps' `vercel.json` — prod web/blog/docs/admin deploy ONLY via the CircleCI
-  `vercel deploy --prod` jobs (builds run on Vercel's infra).
-- **Manual control**: CircleCI "Trigger Pipeline" (UI or API) with parameters
-  `force-<surface>: true` or `run-everything: true`. Forcing on a branch runs
-  builds only — deploys still never leave main.
-- **Adding a surface** (e.g. a future Android app): one path rule in detect,
-  one force parameter, one jobs block — recipe in the config.yml header.
-- Config changes: ALWAYS `circleci config validate` locally before pushing.
+  apps' `vercel.json` — prod deploys go ONLY through the `deploy-vercel.yml`
+  workflow (builds still run on Vercel's infra).
+- **The E2E gate is disabled** — the `e2e` job is skipped, and every
+  downstream `needs.e2e.result` condition accepts `skipped` OR `success`.
+  The local Playwright run is the gate of record (see the testing policy).
+- **Manual control**: `workflow_dispatch` on `ci.yml`, or on an individual
+  `deploy-*.yml` to retry one surface.
+- **Adding a surface**: one path rule in the `changes` job, one output, one
+  `if:`-gated job block.
 
 ## Architecture
 
@@ -386,3 +391,7 @@ Optional: `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`, `NEXT_PUBLIC_PAYMENTS_EN
 `NEXT_PUBLIC_BLOG_URL` / `NEXT_PUBLIC_DOCS_URL` (local: http://localhost:3001 / :3002;
 prod defaults https://blog.envpilot.dev / https://docs.envpilot.dev are baked into `SITE_URLS`).
 The blog and docs apps read the root `.env.local` via symlinks created by `bun run setup`.
+
+## Comments
+
+When adding comments make sure the comments are too the point and logicall and not all over the codebase you don't need to esplain all the codebase as well. Just one comment to reference something or which is very important then don't add useless comments to the codebase.

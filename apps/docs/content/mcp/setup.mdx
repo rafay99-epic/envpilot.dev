@@ -23,6 +23,7 @@ Create a dedicated key in **Organization → Settings → API Keys → New API K
 | `accounts`  | `envpilot_list_accounts`                                                                                                                  |
 | `files`     | `envpilot_list_files`, `envpilot_get_file`                                                                                                |
 | `requests`  | `envpilot_request_variable`, `envpilot_get_request_status`                                                                                |
+| `docs`      | `envpilot_search_docs`, `envpilot_get_doc`, `envpilot_create_doc`. **Cannot be combined with `files`** — see below                        |
 
 For the common project-discovery and variable-read workflow, select `projects` and `variables`. Most assistants begin with `envpilot_list_projects`; without `projects`, that opening call is denied. An accounts-only or requests-only key is still valid, but only for the corresponding tools.
 
@@ -34,6 +35,11 @@ For the common project-discovery and variable-read workflow, select `projects` a
 </Callout>
 
 6. Choose an expiry, create the key, and copy the `envpk_...` value immediately.
+
+`docs` and `files` are mutually exclusive: a key may carry one or the other,
+never both. Documentation is prose an agent reads into its context and `files`
+returns decrypted key material, so a single credential holding both is an
+exfiltration chain. An agent that needs each gets two keys.
 
 Project, environment, resource, and surface scopes are **immutable**. You cannot widen or edit them after creation; create a replacement key when the required access changes. The plaintext is also displayed **once**: Envpilot stores only its SHA-256 hash and cannot recover a lost key.
 

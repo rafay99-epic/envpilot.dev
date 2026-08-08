@@ -2,6 +2,8 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
+import { Settings } from "lucide-react";
+import { PageHeader } from "@envpilot/ui";
 import { useAuthContext } from "@/components/auth";
 import {
   TerminalCard,
@@ -294,12 +296,11 @@ export default function ProjectSettingsPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-zinc-100">Project Settings</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Manage settings for {project?.name}
-        </p>
-      </div>
+      <PageHeader
+        icon={Settings}
+        title="Project Settings"
+        description={<>Manage settings for {project?.name}</>}
+      />
 
       {/* Tabs */}
       <div className="border-b border-zinc-800">

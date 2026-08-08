@@ -672,6 +672,7 @@ export const recordTrashEmptied = internalMutation({
     // Optional so a web build deployed before this convex deploy keeps
     // working — it simply records nothing for files.
     purgedFiles: v.optional(v.number()),
+    purgedDocs: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -684,6 +685,7 @@ export const recordTrashEmptied = internalMutation({
         purgedVariables: args.purgedVariables,
         purgedAccounts: args.purgedAccounts,
         purgedFiles: args.purgedFiles ?? 0,
+        purgedDocs: args.purgedDocs ?? 0,
       }),
       createdAt: Date.now(),
     });
@@ -703,9 +705,23 @@ export const emptyProjectTrash = action({
     purgedVariables: v.number(),
     purgedAccounts: v.number(),
     purgedFiles: v.number(),
+    purgedDocs: v.number(),
     skipped: v.number(),
   }),
-  handler: async (ctx, args) => {
+  // Written out, not inferred: this handler now calls into
+  // internal.features.docs.gc, and `internal` is typed from every module
+  // including this one, so inference would be circular and collapse to `any`
+  // (TS7022/7023) — the same reason reads.ts annotates its handlers.
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    purgedVariables: number;
+    purgedAccounts: number;
+    purgedFiles: number;
+    purgedDocs: number;
+    skipped: number;
+  }> => {
     const authz = await ctx.runQuery(
       internal.features.vault.gc.authorizeEmptyTrash,
       { projectId: args.projectId }
@@ -813,6 +829,22 @@ export const emptyProjectTrash = action({
       }
     }
 
+    // Documentation, last and in one call. A doc owns no Vault object and no
+    // blob, so there is no external delete to retry per row and nothing that
+    // can half-succeed — the per-row skip accounting above does not apply.
+    // Loop rather than fire-and-forget: this is an action, so each call is
+    // its own transaction and the total below is the real one. A background
+    // continuation would audit only the first batch and report done.
+    let purgedDocs = 0;
+    for (let round = 0; round < 200; round++) {
+      const result: { purged: number; hadMore: boolean } =
+        await ctx.runMutation(internal.features.docs.gc.purgeProjectDocs, {
+          projectId: args.projectId,
+        });
+      purgedDocs += result.purged;
+      if (!result.hadMore) break;
+    }
+
     await ctx.runMutation(internal.features.vault.gc.recordTrashEmptied, {
       projectId: args.projectId,
       organizationId: authz.organizationId,
@@ -820,8 +852,15 @@ export const emptyProjectTrash = action({
       purgedVariables,
       purgedAccounts,
       purgedFiles,
+      purgedDocs,
     });
 
-    return { purgedVariables, purgedAccounts, purgedFiles, skipped };
+    return {
+      purgedVariables,
+      purgedAccounts,
+      purgedFiles,
+      purgedDocs,
+      skipped,
+    };
   },
 });

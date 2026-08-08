@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
 import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
 import { AnimatePresence, motion } from "framer-motion";
+import { useQuery } from "convex/react";
 import { Search, Lock, X, Tag } from "lucide-react";
+import { api as convexApi } from "@convex/_generated/api";
 import { useAuthContext } from "@/components/auth";
 import { useConvexUser, useGlobalSearch } from "@/hooks";
 import { ENVIRONMENTS } from "@/constants/project";
@@ -37,6 +39,29 @@ export function CommandPalette() {
   const { convexUserId } = useConvexUser(user?.id);
   const { searchTerm, setSearchTerm, results, isLoading } =
     useGlobalSearch(convexUserId);
+
+  // Published documentation across every visible project. Its own query so
+  // the variable search keeps its shape, but the SAME palette — one Cmd+K.
+  // Debounced like the variable search: the query fans out per project, so a
+  // read per keystroke is exactly the cost being avoided.
+  const [docTerm, setDocTerm] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setDocTerm(searchTerm.trim()), 300);
+    return () => clearTimeout(id);
+  }, [searchTerm]);
+
+  const docResults =
+    useQuery(
+      convexApi.features.docs.queries.globalSearch,
+      convexUserId && docTerm.length >= 2 ? { searchTerm: docTerm } : "skip"
+    ) ?? [];
+
+  // Gated on the CURRENT term, not the debounced one. `docTerm` lags 300ms,
+  // so clearing the box left the previous hits in `navCount` and reachable by
+  // Enter while the section itself had already stopped rendering — Enter
+  // opened an invisible document. Everything below uses this, never the raw
+  // query result.
+  const visibleDocs = searchTerm.trim().length >= 2 ? docResults : [];
 
   // Collect unique tags from results for tag filter chips
   const availableTags = useMemo(() => {
@@ -84,11 +109,10 @@ export function CommandPalette() {
     return true;
   });
 
-  // Clamp selectedIndex to valid range
+  // One navigable list: variables first, doc hits after them.
+  const navCount = filteredResults.length + visibleDocs.length;
   const clampedIndex =
-    filteredResults.length === 0
-      ? 0
-      : Math.min(selectedIndex, filteredResults.length - 1);
+    navCount === 0 ? 0 : Math.min(selectedIndex, navCount - 1);
 
   function handleSearch(value: string) {
     setSearchTerm(value);
@@ -158,29 +182,30 @@ export function CommandPalette() {
       window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, handleOpen);
   }, []);
 
-  // Scroll selected item into view
+  // Scroll selected item into view — the "Documentation" heading is a child
+  // too, so doc rows sit one further along than their nav index.
   useEffect(() => {
     if (!listRef.current) return;
-    const selected = listRef.current.children[clampedIndex] as HTMLElement;
+    const domIndex =
+      clampedIndex < filteredResults.length ? clampedIndex : clampedIndex + 1;
+    const selected = listRef.current.children[domIndex] as HTMLElement;
     if (selected) {
       selected.scrollIntoView({ block: "nearest" });
     }
-  }, [clampedIndex]);
+  }, [clampedIndex, filteredResults.length]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex((prev) =>
-        prev < filteredResults.length - 1 ? prev + 1 : 0
-      );
+      setSelectedIndex((prev) => (prev < navCount - 1 ? prev + 1 : 0));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedIndex((prev) =>
-        prev > 0 ? prev - 1 : filteredResults.length - 1
-      );
-    } else if (e.key === "Enter" && filteredResults[clampedIndex]) {
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : navCount - 1));
+    } else if (e.key === "Enter" && navCount > 0) {
       e.preventDefault();
-      navigateToResult(filteredResults[clampedIndex]);
+      const variable = filteredResults[clampedIndex];
+      if (variable) navigateToResult(variable);
+      else navigateToDoc(visibleDocs[clampedIndex - filteredResults.length]);
     } else if (e.key === "Escape") {
       e.preventDefault();
       closePalette();
@@ -190,6 +215,11 @@ export function CommandPalette() {
   function navigateToResult(result: (typeof filteredResults)[0]) {
     closePalette();
     router.push(`/dashboard/projects/${result.projectSlug}`);
+  }
+
+  function navigateToDoc(doc: (typeof visibleDocs)[0]) {
+    closePalette();
+    router.push(`/dashboard/projects/${doc.projectSlug}/docs/${doc.slug}`);
   }
 
   return (
@@ -307,9 +337,9 @@ export function CommandPalette() {
                       Searching...
                     </span>
                   </div>
-                ) : filteredResults.length === 0 ? (
+                ) : filteredResults.length === 0 && visibleDocs.length === 0 ? (
                   <div className="px-4 py-8 text-center text-sm text-zinc-500">
-                    No variables found for &ldquo;{searchTerm}&rdquo;
+                    Nothing found for &ldquo;{searchTerm}&rdquo;
                   </div>
                 ) : (
                   filteredResults.map((result, index) => (
@@ -377,10 +407,51 @@ export function CommandPalette() {
                     </button>
                   ))
                 )}
+
+                {/* Documentation — published pages across every visible
+                    project. Appended rather than given its own palette so
+                    there is one Cmd+K and one shortcut. Metadata only; the
+                    body is loaded when the page opens. */}
+                {visibleDocs.length > 0 && (
+                  <>
+                    <div className="border-t border-zinc-700/50 px-4 pt-3 pb-1 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
+                      Documentation
+                    </div>
+                    {visibleDocs.map((doc, index) => (
+                      <button
+                        key={doc._id}
+                        data-testid={`palette-doc-${doc.slug}`}
+                        onClick={() => navigateToDoc(doc)}
+                        className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
+                          filteredResults.length + index === clampedIndex
+                            ? "bg-green-500/10"
+                            : "hover:bg-zinc-800/50"
+                        }`}
+                      >
+                        <div
+                          className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{
+                            backgroundColor: doc.projectColor || "#71717a",
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <span className="truncate text-sm font-medium text-zinc-100">
+                            {doc.title}
+                          </span>
+                          <p className="mt-0.5 truncate text-xs text-zinc-500">
+                            {doc.projectName}
+                            <span className="mx-1.5 text-zinc-700">/</span>
+                            {doc.module}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
 
               {/* Footer */}
-              {filteredResults.length > 0 && (
+              {(filteredResults.length > 0 || visibleDocs.length > 0) && (
                 <div className="flex items-center gap-4 border-t border-zinc-700/50 px-4 py-2 text-[10px] text-zinc-600">
                   <span>
                     <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1 py-0.5 font-mono">
@@ -401,8 +472,7 @@ export function CommandPalette() {
                     close
                   </span>
                   <span className="ml-auto text-zinc-600">
-                    {filteredResults.length} result
-                    {filteredResults.length !== 1 ? "s" : ""}
+                    {navCount} result{navCount !== 1 ? "s" : ""}
                   </span>
                 </div>
               )}

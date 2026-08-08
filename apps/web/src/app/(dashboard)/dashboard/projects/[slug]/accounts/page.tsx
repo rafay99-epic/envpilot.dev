@@ -3,6 +3,7 @@
 import { useState, use } from "react";
 import Link from "next/link";
 import { KeyRound } from "lucide-react";
+import { PageHeader } from "@envpilot/ui";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
@@ -251,17 +252,13 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
       <div className="space-y-8">
         {/* Header */}
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <KeyRound className="h-6 w-6 text-zinc-400" />
-            <div>
-              <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                Accounts
-              </h1>
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                Shared service account credentials for {project.name}.
-              </p>
-            </div>
-          </div>
+          <PageHeader
+            icon={KeyRound}
+            title="Accounts"
+            description={
+              <>Shared service account credentials for {project.name}.</>
+            }
+          />
         </div>
 
         {notice && (

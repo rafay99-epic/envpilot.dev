@@ -23,11 +23,15 @@ import { WEBHOOK_EVENT_GROUPS } from "./notify";
 import { enqueueWebhookDelivery } from "./queue";
 import { MAX_WEBHOOKS_PER_ORGANIZATION } from "../../lib/integrationLimits";
 
+// Must stay in step with WEBHOOK_EVENT_GROUPS (notify.ts) and the
+// orgWebhooks.eventGroups union in schema.ts — all three are checked against
+// each other by validateEventGroups and by the Doc<> type below.
 const eventGroupValidator = v.union(
   v.literal("variables"),
   v.literal("requests"),
   v.literal("members"),
-  v.literal("security")
+  v.literal("security"),
+  v.literal("docs")
 );
 
 type WebhookType = Doc<"orgWebhooks">["type"];

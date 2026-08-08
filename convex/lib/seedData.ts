@@ -339,6 +339,18 @@ export const SEED_FEATURES = [
     resettable: false,
     sortOrder: 4,
   },
+  // Passive stored content — no cron, no email, no per-resource background
+  // work — so a boolean gate with no companion numeric limit, the same class
+  // as variable_version_history.
+  {
+    key: "project_docs",
+    displayName: "Project Documentation",
+    valueType: "boolean" as const,
+    category: "Collaboration",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 0,
+  },
 ];
 
 // ─── Role registry seeds ──────────────────────────────────────────────────────

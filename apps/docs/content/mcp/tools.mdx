@@ -19,15 +19,22 @@ Every tool runs against the same scope, rate limits and plan gate as the REST AP
 | `envpilot_list_files`    | Secret-file **metadata** for a project: path, size, mode, checksum. Never contents                    | `files`                                       |
 | `envpilot_get_file`      | The decrypted contents of **one** secret file, base64-encoded                                         | `files`                                       |
 | `envpilot_search`        | Search project names/slugs and variable **keys** — never values. Bounded to 20 projects / 100 matches | `projects` (plus `variables` for key matches) |
+| `envpilot_search_docs`   | Full-text search over **published** documentation — titles and page bodies. Never returns drafts      | `docs`                                        |
+| `envpilot_get_doc`       | One **published** documentation page with its markdown body                                           | `docs`                                        |
 
 ## Write-adjacent tools
 
-The only mutation a machine credential can perform is filing a request. Available only when the key carries `requests`:
+A machine credential can perform exactly two mutations, and both end at a human:
 
 | Tool                          | What it does                                                                                         | Resource   |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------- | ---------- |
 | `envpilot_request_variable`   | File a request with a **required justification**. A human approves it and supplies the value         | `requests` |
 | `envpilot_get_request_status` | Poll a filed request — `pending`, `approved`, `rejected` (with the reviewer's reason), or `canceled` | `requests` |
+| `envpilot_create_doc`         | Propose a documentation page. Always creates a **draft**; a human publishes it                       | `docs`     |
+
+Neither writes anything a reader sees on its own. A requested variable has no
+value until a person supplies one, and a proposed page is invisible to your
+team — and to every other agent — until a person publishes it.
 
 ## Secret file tools in detail
 
@@ -52,6 +59,37 @@ Returns real secret material. The tool description tells the agent as much: fetc
 
 If the path exists in more than one environment and no `environment` was given, the call fails with a message naming the count. Guessing which one a build wanted would be worse than asking.
 
+## Documentation tools in detail
+
+### Drafts are invisible
+
+`envpilot_create_doc` always writes a draft. Nothing on this surface can
+publish, and `envpilot_search_docs` / `envpilot_get_doc` return **published
+pages only** — a draft is not merely hidden from search, it cannot be fetched
+by id either. That gate is what stops a page one agent wrote from reaching
+another agent's context before a person has read it.
+
+### Pages name variables, never values
+
+A page may reference `API_BASE_URL`; it never contains the value. Resolving it
+is the reader's own `envpilot_get_variables` call under its own `variables` and
+environment scope, so reading documentation can never become reading secrets.
+
+### `docs` and `files` cannot share a key
+
+A key carrying `docs` may not also carry `files`, and the dashboard refuses to
+mint one. Documentation is prose an agent pulls into its context; `files`
+returns decrypted keystores and SSH keys. On one credential those two are an
+exfiltration chain, so they are kept apart at mint time. Use two keys.
+
+### Content is scanned on write
+
+Every proposed page is checked before it is stored. Credential shapes (PEM
+blocks, provider key prefixes, connection strings with inline passwords) are
+rejected outright, and text instructing an agent to call a tool is refused.
+High-entropy strings that are normal in API documentation — sample JWTs, base64
+payloads, commit SHAs — pass through untouched.
+
 ## Cost of each call
 
 | Tool                                                    | Bucket                                | Audited |
@@ -60,13 +98,16 @@ If the path exists in more than one environment and no `environment` was given, 
 | `get_variables`, `get_variable`, `list_accounts`        | 30/min value pulls                    | Yes     |
 | `get_file`                                              | file reads: refill 60/min, burst 1000 | Yes     |
 | `request_variable`                                      | 5/hour per key, burst 2               | Yes     |
+| `search_docs`, `get_doc`                                | 120/min metadata                      | No      |
+| `create_doc`                                            | 30/hour per key, burst 10             | Yes     |
 
 ## Limits
 
 - A tool whose resource is missing from the key is denied with a message naming the resource — scopes are immutable, so the fix is a replacement key.
 - A project outside scope behaves exactly as if it does not exist.
 - `envpilot_search` never returns values, only names and keys.
-- There is no tool that writes a variable, uploads a file, or approves a request. There is no plan on which one appears.
+- There is no tool that writes a variable, uploads a file, publishes a documentation page, or approves a request. There is no plan on which one appears.
+- Documentation search is full-text: whole words, with only the last term prefix-matched. It is not a substring match and does not correct typos.
 
 ## Next
 

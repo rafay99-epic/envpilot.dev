@@ -51,6 +51,7 @@ const ACTION_TITLES: Record<string, { glyph: string; title: string }> = {
     glyph: "✗",
     title: "Extension session revoked",
   },
+  "doc.published": { glyph: "✓", title: "Documentation published" },
 };
 
 function escapeSlack(value: string): string {
@@ -175,6 +176,11 @@ function subject(
     action === "access.extension_unlinked"
   ) {
     return firstString(details, ["deviceName", "type"]);
+  }
+  if (action === "doc.published") {
+    const title = firstString(details, ["title"]);
+    const moduleName = firstString(details, ["module"]);
+    return title && moduleName ? `${moduleName} → ${title}` : title;
   }
   return undefined;
 }

@@ -4,11 +4,9 @@ CI/CD runs on **GitHub Actions**. The workflows live in `.github/workflows/`,
 with `ci.yml` as the entry point that fans out to per-surface build and deploy
 jobs.
 
-> **History:** the pipeline previously ran on CircleCI. Envpilot is open source
-> now, so GitHub Actions minutes are free and CI moved back to it. The CircleCI
-> config is retained (disabled) at `.circleci/config.yml.old` and
-> `.circleci/jobs.yml` — see [Running on CircleCI instead](#running-on-circleci-instead)
-> if you want to use or maintain both.
+> **History:** the pipeline ran on CircleCI while the repo was private.
+> Envpilot is open source now, so GitHub Actions minutes are free and CI moved
+> back to it. `.circleci/` has been deleted.
 
 ## Triggers
 
@@ -90,19 +88,3 @@ jobs accept an `e2e` result of `skipped`, so they keep working. The full local
 suite is the gate of record; see
 [`apps/web/tests/e2e/README.md`](../apps/web/tests/e2e/README.md). To re-enable,
 remove the `false &&` in the `e2e` job's condition.
-
-## Running on CircleCI instead
-
-The CircleCI "pipeline v2" config is kept, disabled, for anyone who prefers it
-or wants to run both:
-
-- `.circleci/config.yml.old` — the dynamic setup config. **Rename it back to
-  `.circleci/config.yml`** and enable the project in the CircleCI UI to
-  reactivate it.
-- `.circleci/jobs.yml` — the job definitions it generates from.
-
-If you enable CircleCI **and** leave GitHub Actions deploys on, every merge
-deploys twice. Pick one as the deployer: either disable the GitHub `deploy-*`
-jobs, or keep CircleCI for builds only (it never deploys off `main` anyway).
-CircleCI's own docs for this config are in the header comments of
-`.circleci/config.yml.old`.

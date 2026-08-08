@@ -638,6 +638,80 @@ export default defineSchema({
     .index("by_active_and_expires", ["isActive", "expiresAt"]),
 
   // ==========================================
+  // PROJECT DOCUMENTATION (agent-authored, human-published)
+  // ==========================================
+  // An agent proposes a DRAFT over MCP; publishing is a human act. Drafts are
+  // invisible to teammates AND to every MCP read — the primary control against
+  // a prompt-injected page reaching another agent.
+  //
+  // Docs name variable KEYS, never values: the only authorized decrypt path is
+  // features/api/reads.ts, and resolving a value here would route around it.
+  docs: defineTable({
+    projectId: v.id("projects"),
+    // Sidebar grouping. A string, not a tree — a tree drags in
+    // move/reorder/orphan/breadcrumb handling for no gain.
+    module: v.string(),
+    // Picks the create-time template. NOT a structured contract: schemas
+    // would be opaque strings either way, so structure buys no validation.
+    type: v.union(v.literal("api"), v.literal("guide")),
+    title: v.string(),
+    // Unique per project among non-deleted rows (enforced in mutations).
+    slug: v.string(),
+    status: v.union(v.literal("draft"), v.literal("published")),
+    // First ~200 chars, so list views render previews without reading
+    // docContent — these are reactive subscriptions and Convex bills reads.
+    excerpt: v.optional(v.string()),
+    authorId: v.id("users"),
+    // May differ from the author for Team Lead+.
+    publishedBy: v.optional(v.id("users")),
+    // Plain string: a pasted URL needs no integration, and a GitHub App can
+    // fill it later without a schema change.
+    prUrl: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    publishedAt: v.optional(v.number()),
+    // Soft delete; daily GC purges past the retention window.
+    deletedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_and_status", ["projectId", "status"])
+    .index("by_project_and_module", ["projectId", "module"])
+    // O(log n) slug resolution for the page route. Without it every page view
+    // scans the project's whole doc list.
+    .index("by_project_and_slug", ["projectId", "slug"])
+    // Serves the per-project trash listing.
+    .index("by_project_deleted", ["projectId", "deletedAt"])
+    // Bounds the daily purge sweep to soft-deleted rows.
+    .index("by_deleted_at", ["deletedAt"])
+    // `filterFields` pre-filter INSIDE the index, so a published-only search
+    // never reads a draft row — cost win and security property at once.
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["projectId", "status"],
+    }),
+
+  // Bodies, 1:1 with `docs`. Split so list views never read markdown they
+  // won't render. `by_projectId` lets project deletion drain without walking
+  // the parent. All access via features/docs/content.ts.
+  docContent: defineTable({
+    docId: v.id("docs"),
+    projectId: v.id("projects"),
+    body: v.string(),
+    // Denormalized from docs.status so the body index can pre-filter drafts —
+    // a search index may only filter on its own table's fields. Without it a
+    // body search reads every match, drafts included. features/docs/content.ts
+    // is the ONLY writer, so the rows cannot drift.
+    status: v.optional(v.union(v.literal("draft"), v.literal("published"))),
+  })
+    .index("by_docId", ["docId"])
+    .index("by_projectId", ["projectId"])
+    // Finds a page by what it SAYS, not just its title.
+    .searchIndex("search_body", {
+      searchField: "body",
+      filterFields: ["projectId", "status"],
+    }),
+
+  // ==========================================
   // PROJECT ACCESS (for extension linking)
   // ==========================================
   projectAccess: defineTable({
@@ -746,13 +820,18 @@ export default defineSchema({
     urlPreview: v.string(),
     // Channel name from the OAuth response (e.g. "#eng-alerts")
     channel: v.optional(v.string()),
-    // Subscribed event groups: "variables" | "requests" | "members" | "security"
+    // Subscribed event groups:
+    // "variables" | "requests" | "members" | "security" | "docs"
     eventGroups: v.array(
       v.union(
         v.literal("variables"),
         v.literal("requests"),
         v.literal("members"),
-        v.literal("security")
+        v.literal("security"),
+        // Documentation publishes. Its own group rather than piggybacking
+        // "variables": a handoff notice and a secret change are different
+        // events, and nobody subscribing to one wants the other.
+        v.literal("docs")
       )
     ),
     enabled: v.boolean(),
@@ -1115,7 +1194,13 @@ export default defineSchema({
       // Notification webhook (Slack/Discord) actions
       v.literal("integration.webhook_created"),
       v.literal("integration.webhook_updated"),
-      v.literal("integration.webhook_deleted")
+      v.literal("integration.webhook_deleted"),
+      // Project documentation actions
+      v.literal("doc.created"),
+      v.literal("doc.updated"),
+      v.literal("doc.published"),
+      v.literal("doc.deleted"),
+      v.literal("doc.restored")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),
@@ -1144,7 +1229,8 @@ export default defineSchema({
         v.literal("billing"),
         v.literal("security"),
         v.literal("account"),
-        v.literal("file")
+        v.literal("file"),
+        v.literal("doc")
       )
     ),
     // Whether this action involved sensitive data

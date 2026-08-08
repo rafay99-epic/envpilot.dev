@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { FolderPlus } from "lucide-react";
+import { PageHeader } from "@envpilot/ui";
 import { useAuthContext } from "@/components/auth";
 import { useTierLimitCheck } from "@/hooks/useTierLimits";
 import { LimitWarning } from "@/components/tier/FeatureGate";
@@ -243,19 +245,11 @@ export default function NewProjectPage() {
             />
           </svg>
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-            Create New Project
-          </h1>
-          {organization && (
-            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              in{" "}
-              <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                {organization.name}
-              </span>
-            </p>
-          )}
-        </div>
+        <PageHeader
+          icon={FolderPlus}
+          title="Create New Project"
+          description={organization ? `in ${organization.name}` : undefined}
+        />
       </div>
 
       {/* Tier limit warning */}

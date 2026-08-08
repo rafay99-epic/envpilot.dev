@@ -11,25 +11,26 @@ import {
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
 import {
-  Shield,
-  Check,
-  ExternalLink,
-  Copy,
-  Lock,
-  Terminal,
-  Monitor,
-  Variable,
-  Users,
-  KeyRound,
-  ShieldAlert,
-  Keyboard,
-  RotateCcw,
-  Pencil,
-  X,
-  CreditCard,
   AlertTriangle,
   Calendar,
+  Check,
+  Copy,
+  CreditCard,
+  ExternalLink,
+  KeyRound,
+  Keyboard,
+  Lock,
+  Monitor,
+  Pencil,
   Receipt,
+  RotateCcw,
+  Settings,
+  Shield,
+  ShieldAlert,
+  Terminal,
+  Users,
+  Variable,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { FeatureGate } from "@/components/tier/FeatureGate";
@@ -44,6 +45,7 @@ import {
 import { TierBadge } from "@/components/tier/TierBadge";
 import { usePaymentsEnabled } from "@/hooks/usePaymentsEnabled";
 import Link from "next/link";
+import { PageHeader } from "@envpilot/ui";
 
 type SettingsTab =
   | "general"
@@ -88,12 +90,11 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-zinc-100">Account Settings</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Manage your account preferences
-        </p>
-      </div>
+      <PageHeader
+        icon={Settings}
+        title="Account Settings"
+        description="Manage your account preferences"
+      />
 
       {/* Tabs */}
       <div className="border-b border-zinc-800">
