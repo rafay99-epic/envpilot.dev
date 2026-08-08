@@ -262,6 +262,45 @@ describe("seeded custom roles (editor / viewer)", () => {
   });
 });
 
+describe("documentation capabilities", () => {
+  const DOC_MATRIX: Record<string, [boolean, boolean, boolean, boolean]> = {
+    // [create, update-anyone's, publish, delete-anyone's]
+    owner: [true, true, true, true],
+    project_manager: [true, true, true, true],
+    team_lead: [true, true, true, true],
+    editor: [true, true, true, false],
+    developer: [true, false, false, false],
+    viewer: [false, false, false, false],
+  };
+
+  const profileFor = (slug: string) =>
+    SYSTEM_PROFILES[slug as keyof typeof SYSTEM_PROFILES] ??
+    SEEDED_CUSTOM_PROFILES[slug as keyof typeof SEEDED_CUSTOM_PROFILES];
+
+  for (const [slug, [create, update, publish, remove]] of Object.entries(
+    DOC_MATRIX
+  )) {
+    it(`${slug} holds the expected doc capabilities`, () => {
+      const profile = profileFor(slug);
+      expect(hasCapability(profile, "project.docs.create")).toBe(create);
+      expect(hasCapability(profile, "project.docs.update")).toBe(update);
+      expect(hasCapability(profile, "project.docs.publish")).toBe(publish);
+      expect(hasCapability(profile, "project.docs.delete")).toBe(remove);
+    });
+  }
+
+  // Publishing is the human gate that makes a draft readable over MCP, so a
+  // role that cannot publish must never acquire it by accident.
+  it("a role without publish cannot reach it through another doc capability", () => {
+    expect(
+      hasCapability(SYSTEM_PROFILES.developer, "project.docs.create")
+    ).toBe(true);
+    expect(
+      hasCapability(SYSTEM_PROFILES.developer, "project.docs.publish")
+    ).toBe(false);
+  });
+});
+
 describe("merge-seed semantics (system-role capability sync)", () => {
   const defaults = SYSTEM_PROFILES.team_lead.capabilities;
 

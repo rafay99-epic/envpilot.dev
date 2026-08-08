@@ -413,3 +413,54 @@ export async function countActiveFiles(
   }
   return count;
 }
+
+/**
+ * Active documentation pages in one project.
+ *
+ * `by_project_deleted` with `deletedAt: undefined` rather than a filter over
+ * `by_project` — trashed rows sort at the front of that range, so a filtered
+ * `take()` reports zero for a project whose first N docs are all trashed and
+ * lets the limit be exceeded (the bug already fixed for secret files).
+ */
+export async function countProjectDocs(
+  db: DatabaseReader,
+  projectId: Id<"projects">,
+  limit?: number
+): Promise<number> {
+  const query = db
+    .query("docs")
+    .withIndex("by_project_deleted", (q) =>
+      q.eq("projectId", projectId).eq("deletedAt", undefined)
+    );
+  if (limit === undefined) return (await query.collect()).length;
+  // One more than needed: enough to prove the limit is exceeded.
+  return (await query.take(limit + 1)).length;
+}
+
+/** Active documentation pages across every live project in an organization. */
+export async function countOrgDocs(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">,
+  limit?: number
+): Promise<number> {
+  const allProjects = await db
+    .query("projects")
+    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+    .collect();
+  const projects = allProjects.filter((p) => p.deletedAt === undefined);
+
+  let count = 0;
+  for (const project of projects) {
+    if (limit !== undefined && count > limit) break;
+    const query = db
+      .query("docs")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", project._id).eq("deletedAt", undefined)
+      );
+    count +=
+      limit === undefined
+        ? (await query.collect()).length
+        : (await query.take(limit - count + 1)).length;
+  }
+  return count;
+}

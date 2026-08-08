@@ -37,6 +37,10 @@ Level is a hierarchy, not decoration: several actions (removing a member, applyi
 | Create variables / accounts / files      | ✓     | ✓               | ✓         | ✓      | ✓         | —      |
 | Update / delete variables & files        | ✓     | ✓               | ✓         | ✓      | —         | —      |
 | Reveal secret values locally             | ✓     | ✓               | ✓         | ✓      | —         | —      |
+| Draft documentation pages                | ✓     | ✓               | ✓         | ✓      | ✓         | —      |
+| Edit anyone's documentation page         | ✓     | ✓               | ✓         | ✓      | —         | —      |
+| Publish a documentation page             | ✓     | ✓               | ✓         | ✓      | —         | —      |
+| Delete anyone's documentation page       | ✓     | ✓               | ✓         | —      | —         | —      |
 | Review requests                          | ✓     | ✓               | ✓         | —      | —         | —      |
 | File a request                           | —     | —               | —         | —      | ✓         | —      |
 | Manage per-secret permissions            | ✓     | ✓               | ✓         | —      | —         | —      |
@@ -52,9 +56,9 @@ Owners do not file requests because they never need to — they create directly.
 
 <Callout type="info" title="Capabilities, not hardcoded branches">
   Every row above is a capability key (`project.variables.create`,
-  `org.members.invite`, `project.requests.review`, …) stored on the role.
-  Nothing in the codebase asks "is this user an admin?" — it asks whether the
-  role carries the capability. That is what makes custom roles possible at all.
+  `org.members.invite`, `project.docs.publish`, …) stored on the role. Nothing
+  in the codebase asks "is this user an admin?" — it asks whether the role
+  carries the capability. That is what makes custom roles possible at all.
 </Callout>
 
 ## Project assignments and environment scope

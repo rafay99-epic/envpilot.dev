@@ -12,6 +12,7 @@ import { FeatureGate } from "@/components/tier/FeatureGate";
 import {
   useProjectBySlug,
   useProjectDocs,
+  useDocAccess,
   useDocSearch,
   useFeatureGate,
   groupDocsByModule,
@@ -52,6 +53,12 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
   const gatedProjectId = docsAllowed ? projectId : undefined;
 
   const docs = useProjectDocs(gatedProjectId);
+  const access = useDocAccess(gatedProjectId);
+  const atLimit = Boolean(access?.atProjectLimit || access?.atOrgLimit);
+  // Show the action while access is still loading — hiding it on every page
+  // load until a second query lands reads as a broken button, and the
+  // mutation refuses anyway if the role or the tier says no.
+  const showNew = access ? access.canCreate && !atLimit : true;
   const isLoadingDocs = docs === undefined;
 
   const [filter, setFilter] = useState("");
@@ -109,17 +116,34 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
                 <Trash2 className="h-4 w-4" />
                 Trash
               </Link>
-              <Link
-                href={`/dashboard/projects/${slug}/docs/new`}
-                data-testid="doc-new"
-                className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-white"
-              >
-                <Plus className="h-4 w-4" />
-                New Page
-              </Link>
+              {showNew && (
+                <Link
+                  href={`/dashboard/projects/${slug}/docs/new`}
+                  data-testid="doc-new"
+                  className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  New Page
+                </Link>
+              )}
             </>
           }
         />
+
+        {atLimit && (
+          <p
+            data-testid="doc-limit-banner"
+            className="border-l-2 border-amber-500/60 py-1 pl-3 text-xs text-zinc-600 dark:text-zinc-400"
+          >
+            <span className="font-medium text-amber-700 dark:text-amber-400">
+              Documentation limit reached
+            </span>{" "}
+            {access?.atProjectLimit
+              ? `This project holds ${access.projectCount} of ${access.projectLimit} pages.`
+              : `Your organization holds ${access?.orgCount} of ${access?.orgLimit} pages.`}{" "}
+            Delete a page or upgrade for unlimited pages.
+          </p>
+        )}
 
         {draftTotal > 0 && (
           <p

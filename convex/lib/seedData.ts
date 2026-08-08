@@ -342,14 +342,36 @@ export const SEED_FEATURES = [
   // Passive stored content — no cron, no email, no per-resource background
   // work — so a boolean gate with no companion numeric limit, the same class
   // as variable_version_history.
+  // Available on every tier — documentation is how a project explains itself,
+  // and gating it entirely would make the free tier worse at onboarding, the
+  // exact job it exists to demonstrate. The free tier is bounded by COUNT
+  // instead, below.
   {
     key: "project_docs",
     displayName: "Project Documentation",
     valueType: "boolean" as const,
     category: "Collaboration",
-    defaultValue: "false",
+    defaultValue: "true",
     resettable: false,
     sortOrder: 0,
+  },
+  {
+    key: "max_docs_per_project",
+    displayName: "Max Documentation Pages per Project",
+    valueType: "numeric" as const,
+    category: "Collaboration",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 1,
+  },
+  {
+    key: "max_docs_per_org",
+    displayName: "Max Documentation Pages per Organization",
+    valueType: "numeric" as const,
+    category: "Collaboration",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 2,
   },
 ];
 

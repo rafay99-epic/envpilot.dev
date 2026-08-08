@@ -180,6 +180,33 @@ export const CAPABILITIES = {
     description: "Soft-delete and restore secret files",
     risk: "high",
   },
+
+  "project.docs.create": {
+    label: "Write documentation",
+    category: "Documentation",
+    description:
+      "Create documentation pages and edit the ones you authored. Everyone with project access can read published pages",
+    risk: "low",
+  },
+  "project.docs.update": {
+    label: "Edit any documentation page",
+    category: "Documentation",
+    description: "Edit pages written by other people, not only your own drafts",
+    risk: "medium",
+  },
+  "project.docs.publish": {
+    label: "Publish documentation",
+    category: "Documentation",
+    description:
+      "Publish a draft, or return a published page to draft. Publishing is what makes a page readable by the team and by agents over MCP",
+    risk: "medium",
+  },
+  "project.docs.delete": {
+    label: "Delete / restore documentation",
+    category: "Documentation",
+    description: "Move pages to trash and restore them",
+    risk: "medium",
+  },
   /**
    * DISPLAY capability, enforced at the client — deliberately, not by
    * omission.

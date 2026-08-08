@@ -177,6 +177,7 @@ export {
 // Project documentation hooks
 export {
   useProjectDocs,
+  useDocAccess,
   useDocSearch,
   useProjectDoc,
   useCreateDoc,

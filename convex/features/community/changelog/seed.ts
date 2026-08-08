@@ -1518,4 +1518,26 @@ The goal, in one line: \`git clone && envpilot pull\` should produce a repositor
 
 Available on Pro.`,
   },
+  // ============================================================
+  // Documentation on Free, and doc roles (2026-08-09)
+  // ============================================================
+  {
+    title: "Documentation on the Free Plan, and Roles That Govern It",
+    version: "v1.57.0",
+    type: "improvement",
+    publishedAt: ts("2026-08-09T18:00:00Z"),
+    content: `Documentation is how a project explains itself, and locking it behind Pro made the free plan worse at the one thing it exists to show. Project Documentation is now on every plan, bounded by page count rather than by a gate — and it answers to the same role system as everything else in the platform.
+
+### Available on Every Plan
+- Free organizations get **10 pages per project** and **25 pages across the organization**; Pro is unlimited
+- Only active pages count — moving a page to the trash frees its slot immediately, and restoring one re-checks both caps
+- The dashboard hides **New Page** and explains which cap is full before you write a page it would refuse to save
+- Creation over MCP is bounded by the same numbers, so an agent cannot route around a limit the dashboard enforces
+
+### Roles Now Govern Documentation
+- Four new capabilities — draft a page, edit anyone's page, publish, and delete anyone's page — replace the blanket write access every member previously held
+- Publishing is its own capability: Editors and above hold it, Developers can draft but never publish, and Viewers hold none of the four
+- Your own draft follows your create right, so an author can always edit and trash their own page
+- Buttons you cannot use no longer appear, and the trash lists only pages you can actually restore`,
+  },
 ];
