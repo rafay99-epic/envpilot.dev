@@ -1,0 +1,86 @@
+apps/web/src/lib/__tests__/role-parity.test.ts
+  s_ef310eae7bd2d7::t_2e45cae793b4d8 295-297
+  s_ef310eae7bd2d7::t_8b33457562b457 265-294,298-303
+apps/web/src/lib/versions.ts
+  s_ef310eae7bd2d7::t_dce807df3170cc 17
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/docs/[docSlug]/page.tsx
+  s_ef310eae7bd2d7::t_2e45cae793b4d8 286-290,292,294-295,298-300,302-303,306-327
+  s_ef310eae7bd2d7::t_0bf1638d096de1 259,283,328
+apps/docs/package.json
+  s_ef310eae7bd2d7::t_dce807df3170cc 3
+apps/docs/content/limits/plans.mdx
+  s_ef310eae7bd2d7::t_afdc1467780622 60
+  s_ef310eae7bd2d7::t_2e45cae793b4d8 52-56
+  s_ef310eae7bd2d7::t_3e111035da4a0f 50-51,57-59,61
+convex/features/community/changelog/seed.ts
+  s_ef310eae7bd2d7::t_6526c7e67a98ba 1521-1542
+apps/web/src/hooks/index.ts
+  s_ef310eae7bd2d7::t_e36468650aac07 180
+convex/features/api/docs.ts
+  s_ef310eae7bd2d7::t_46901b1b9562ff 530-533
+  s_ef310eae7bd2d7::t_4a8ef044fd177f 28
+apps/web/package.json
+  s_ef310eae7bd2d7::t_dce807df3170cc 3
+convex/features/docs/mutations.ts
+  s_ef310eae7bd2d7::t_61e267ef32d447 284,316
+  s_ef310eae7bd2d7::t_741e9c120e8dcd 15,17,20,56-61,209-210,248,285,317,319-320
+  s_ef310eae7bd2d7::t_2e45cae793b4d8 249
+convex/lib/capabilities.ts
+  s_ef310eae7bd2d7::t_2e45cae793b4d8 194
+  s_ef310eae7bd2d7::t_2296fe4679eb07 183-193,195-209
+apps/web/tests/e2e/authenticated/project-docs.spec.ts
+  s_ef310eae7bd2d7::t_6ef6d27a129d21 130-148
+apps/docs/content/platform/rbac.mdx
+  s_ef310eae7bd2d7::t_2e45cae793b4d8 59-61
+  s_ef310eae7bd2d7::t_ea6d95885f61a6 40-43
+package.json
+  s_ef310eae7bd2d7::t_dce807df3170cc 3
+convex/features/featureRegistry/gates.ts
+  s_ef310eae7bd2d7::t_8d84f5a3ca00a1 416-466
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/docs/new/page.tsx
+  s_ef310eae7bd2d7::t_318fe4550ef2c0 11-16,43,59-70,72-75
+  s_ef310eae7bd2d7::t_42fc08c83ad875 128-136
+convex/lib/seedData.ts
+  s_ef310eae7bd2d7::t_e9cb81597b075b 345-348,354,358-375
+convex/features/docs/queries.ts
+  s_ef310eae7bd2d7::t_01e0bcc8a0cf8e 9-14,47-58,61-88
+  s_ef310eae7bd2d7::t_38b8317abcc87c 19,146-149
+  s_ef310eae7bd2d7::t_61e267ef32d447 18,150,263
+  s_ef310eae7bd2d7::t_2e45cae793b4d8 59-60
+  s_ef310eae7bd2d7::t_a9994baaf3c2b2 89
+convex/features/admin/migrations.ts
+  s_ef310eae7bd2d7::t_e9cb81597b075b 567-569,608-609
+convex/lib/roleProfiles.ts
+  s_ef310eae7bd2d7::t_77c3e5bb844de3 71-74,121-124,158-161,192,225-227
+apps/web/src/hooks/useProjectDocs.ts
+  s_ef310eae7bd2d7::t_0bf1638d096de1 45-46
+  s_ef310eae7bd2d7::t_e879ef8a7d2449 86-107
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/docs/page.tsx
+  s_ef310eae7bd2d7::t_ec4d95cd649d3b 58-61,119
+  s_ef310eae7bd2d7::t_754ba5c59bc085 120-128,133-146
+  s_ef310eae7bd2d7::t_e879ef8a7d2449 15
+  s_ef310eae7bd2d7::t_e36468650aac07 56-57
+  s_ef310eae7bd2d7::t_fd20892e504867 147
+apps/docs/content/mcp/tools.mdx
+  s_ef310eae7bd2d7::t_e8fe92fb7953ff 72-78
+convex/features/docs/helpers.ts
+  s_ef310eae7bd2d7::t_f6668f79d08ec2 29-36,44-49,81-84,106-107,115,118-123,129-140,150,209
+  s_ef310eae7bd2d7::t_61e267ef32d447 141-149
+  s_ef310eae7bd2d7::t_5580344d7a8d1c 17-22,173-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "5d60fb0c4aaa10d64b305108d73ce8f1bcb6d6f5",
+  "prompts": {},
+  "sessions": {
+    "s_ef310eae7bd2d7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4d6e2b4a-adf8-4bc0-9a7d-1d8ad19fb4bb",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
