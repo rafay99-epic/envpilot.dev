@@ -18,6 +18,7 @@ import {
   Share2,
   AlertTriangle,
 } from "lucide-react";
+import { PageHeader } from "@envpilot/ui";
 import { useAuthContext } from "@/components/auth";
 import {
   TerminalLoading,
@@ -496,18 +497,11 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <Share2 className="h-5 w-5 text-zinc-400" />
-          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
-            Shared Variables
-          </h1>
-        </div>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Manage shared access links for this project&apos;s environment
-          variables.
-        </p>
-      </div>
+      <PageHeader
+        icon={Share2}
+        title="Shared Variables"
+        description="Manage shared access links for this project's environment variables."
+      />
 
       {/* Stats Row */}
       {isLoadingShares ? (

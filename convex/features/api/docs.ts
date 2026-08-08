@@ -1,35 +1,15 @@
 /**
- * Public API / MCP surface for project documentation.
+ * MCP / public-API surface for project documentation.
  *
- * Same contract as the rest of `features/api`: nothing here re-implements
- * authorization. Every call hashes the bearer token, picks a rate bucket,
- * and defers the decision to `internal.features.api.authorize._authorizeRequest`
- * with `requirement.resource = "docs"`. Cross-project reads work because the
- * key's `scopeProjects` already names the source project — there is no grant
- * table and no second authorization path.
+ * Three invariants:
+ * 1. Reads are PUBLISHED ONLY — checked in the handler, since the slug index
+ *    has no status component. Serving a draft would defeat the human gate.
+ * 2. Writes only ever produce drafts. Publishing is a dashboard mutation.
+ * 3. The `project_docs` gate is checked caller-side; `_authorizeRequest`
+ *    derives its gate from the surface alone and cannot carry a third key.
  *
- * Three rules specific to this surface:
- *
- * 1. **Published only, on BOTH reads.** `by_project_and_slug` has no status
- *    component, so published-only is an explicit check in the handler, not a
- *    property of an index. A draft is unreviewed, possibly agent-written
- *    text; serving one to a second agent would defeat the human publication
- *    gate that the whole security story rests on.
- *
- * 2. **Writes produce drafts, never publications.** `createDoc` inserts with
- *    `status: "draft"` and nothing on this surface can change that. Publishing
- *    is a dashboard mutation behind a real user identity.
- *
- * 3. **The tier gate is checked here, caller-side.** `_authorizeRequest`
- *    derives its gate from the surface alone (`mcp_server` / `public_api`)
- *    and its `gateFeature` argument is a closed two-literal union, so
- *    `project_docs` cannot ride it — same reason `cicd/pull.ts` checks its
- *    own feature after authorizing.
- *
- * Docs never carry secret VALUES. A page may name `API_BASE_URL`; resolving
- * that name is the reader's own `envpilot_get_variables` call under its own
- * variables + environment scope. Resolving it here would hand a docs-scoped
- * key a vault decrypt that skips every control in `reads.ts`.
+ * Docs name variable KEYS, never values — resolving one here would be a vault
+ * read that skips every control in reads.ts.
  */
 import { v, ConvexError } from "convex/values";
 import {
@@ -80,12 +60,8 @@ const docSummaryValidator = v.object({
   updatedAt: v.number(),
 });
 
-/**
- * Handler return types are written out rather than inferred. Each action
- * calls back into `internal.features.api.docs.*`, and `api`/`internal` are
- * typed from every module including this one — so inference would be
- * circular and collapse to `any` (TS7022/7023), exactly as in reads.ts.
- */
+/** Return types are explicit: inferring them is circular via `internal` and
+ *  collapses to `any` (TS7022/7023). Same as reads.ts. */
 type DocSummary = {
   docId: Id<"docs">;
   title: string;
@@ -115,15 +91,7 @@ type CreatedDraft = {
   warnings: string[];
 };
 
-/**
- * Search a project's PUBLISHED documentation.
- *
- * A bounded metadata scan, deliberately not a search index: the schema has
- * none, the corpus is tens of pages per project, and a body index could not
- * filter drafts (search filter fields may only reference columns on the
- * indexed table, and `status` lives on `docs`). Same shape as
- * `envpilot_search`.
- */
+/** Search a project's PUBLISHED documentation. */
 export const searchDocs = action({
   args: {
     token: v.string(),
@@ -140,10 +108,8 @@ export const searchDocs = action({
     const tokenHash = await hashToken(args.token);
     await consumeRateLimit(ctx, "apiMetadata", tokenHash);
 
-    // Two-step, exactly like the slug-addressed reads in reads.ts: resolving
-    // a slug needs the key's organizationId, which only a successful
-    // authorize returns. The SECOND call, carrying projectId, is what
-    // actually enforces project scope.
+    // Two-step (as in reads.ts): the slug needs an organizationId, which only
+    // a successful authorize returns. The second call enforces project scope.
     const bootstrap: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
       {
@@ -170,8 +136,7 @@ export const searchDocs = action({
         surface: args.surface,
       }
     );
-    // Out-of-scope is indistinguishable from unknown — never confirm a
-    // project's existence to a key that cannot see it.
+    // Out-of-scope must be indistinguishable from unknown.
     if (!scoped.ok) {
       if (scoped.denied === "project_scope") {
         throw new ConvexError("Project not found");
@@ -210,9 +175,7 @@ export const _searchScopedDocs = internalQuery({
       );
     }
 
-    // The project must belong to the authorized key's organization. Scope
-    // was already enforced by _authorizeRequest; this closes the gap where a
-    // projectId from another tenant is passed with a valid key.
+    // Closes the gap where another tenant's projectId is passed with a valid key.
     const project = await ctx.db.get(args.projectId);
     if (
       !project ||
@@ -229,11 +192,8 @@ export const _searchScopedDocs = internalQuery({
     const term = args.query?.trim();
     const moduleFilter = args.module?.trim().toLowerCase();
 
-    // An agent hitting this in a loop is the traffic shape that turns a
-    // full-table scan into a real bill, so a query goes through the search
-    // INDEXES (title, then body) and only falls back to a bounded listing
-    // when no term was supplied. `status` is a filterField on both indexes,
-    // so a draft is never read here — cost and confidentiality, same control.
+    // Index-backed: agents loop, and a full scan here is the shape that bills.
+    // `status` is a filterField on both indexes, so drafts are never read.
     const matched: Doc<"docs">[] = [];
     const seen = new Set<string>();
     const push = (doc: Doc<"docs"> | null) => {

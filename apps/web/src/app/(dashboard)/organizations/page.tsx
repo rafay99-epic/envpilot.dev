@@ -13,6 +13,7 @@ import { useFeatureGate } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { normalizeOrgRole, roleLabel } from "@/lib/roles";
 import { Plus, Building2, ChevronRight } from "lucide-react";
+import { PageHeader } from "@envpilot/ui";
 
 interface Organization {
   _id: string;
@@ -86,31 +87,30 @@ export default function OrganizationsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Organizations</h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            Manage your organizations and team workspaces.
-          </p>
-        </div>
-        {orgLimitReached ? (
-          <span
-            className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-500 cursor-not-allowed"
-            title={`Organization limit reached (${ownedOrgs.length}/${maxOrgs}). Upgrade to Pro for unlimited organizations.`}
-          >
-            <Plus className="h-4 w-4" />
-            New Organization
-          </span>
-        ) : (
-          <Link
-            href="/organizations/new"
-            className="inline-flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:border-green-500/50 hover:bg-green-500/20"
-          >
-            <Plus className="h-4 w-4" />
-            New Organization
-          </Link>
-        )}
-      </div>
+      <PageHeader
+        icon={Building2}
+        title="Organizations"
+        description="Manage your organizations and team workspaces."
+        actions={
+          orgLimitReached ? (
+            <span
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-500 cursor-not-allowed"
+              title={`Organization limit reached (${ownedOrgs.length}/${maxOrgs}). Upgrade to Pro for unlimited organizations.`}
+            >
+              <Plus className="h-4 w-4" />
+              New Organization
+            </span>
+          ) : (
+            <Link
+              href="/organizations/new"
+              className="inline-flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:border-green-500/50 hover:bg-green-500/20"
+            >
+              <Plus className="h-4 w-4" />
+              New Organization
+            </Link>
+          )
+        }
+      />
 
       {organizations.length === 0 ? (
         <div className="rounded-xl border border-zinc-700/50 bg-zinc-900 p-12 text-center">

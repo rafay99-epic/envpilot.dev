@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { BookText, Plus, FileText, Clock, Search } from "lucide-react";
+import { PageHeader } from "@envpilot/ui";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
@@ -46,8 +47,8 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
   const [filter, setFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Debounced: the query runs against two Convex search indexes, so firing it
-  // per keystroke would bill an index read for every character typed.
+  // Debounced — two search indexes per call, so per-keystroke would bill an
+  // index read per character.
   useEffect(() => {
     const id = setTimeout(() => setSearchTerm(filter.trim()), 250);
     return () => clearTimeout(id);
@@ -57,8 +58,7 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
   const isSearching = searchTerm.length > 0 && results === undefined;
 
   const allDocs = docs ?? [];
-  // Full-text results replace the listing while a term is active; the
-  // unfiltered list is what the page shows otherwise.
+  // Search results replace the listing while a term is active.
   const visible: DocSummary[] =
     searchTerm.length > 0 ? (results ?? []) : allDocs;
   const visibleCount = visible.length;
@@ -81,32 +81,21 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
       featureName="Project Documentation"
     >
       <div className="space-y-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          {/* The icon used to sit in a flex row with a two-line block, so
-              `items-center` centred it against title AND subtitle — it landed
-              level with the gap between them. Now it's inline with the title
-              only, on the title's own baseline grid. */}
-          <div className="min-w-0">
-            <div className="flex items-center gap-2.5">
-              <BookText className="h-5 w-5 shrink-0 text-green-500/70" />
-              <h1 className="text-2xl leading-none font-bold text-zinc-100">
-                Documentation
-              </h1>
-            </div>
-            <p className="mt-2 max-w-xl text-sm text-zinc-400">
-              How {project.name} works — written as the work happens, read by
-              whoever picks it up next, and by their agent.
-            </p>
-          </div>
-          <Link
-            href={`/dashboard/projects/${slug}/docs/new`}
-            data-testid="doc-new"
-            className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            <Plus className="h-4 w-4" />
-            New Page
-          </Link>
-        </div>
+        <PageHeader
+          icon={BookText}
+          title="Documentation"
+          description={`How ${project.name} works — written as the work happens, read by whoever picks it up next, and by their agent.`}
+          actions={
+            <Link
+              href={`/dashboard/projects/${slug}/docs/new`}
+              data-testid="doc-new"
+              className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-white"
+            >
+              <Plus className="h-4 w-4" />
+              New Page
+            </Link>
+          }
+        />
 
         {draftTotal > 0 && (
           <p
@@ -163,8 +152,7 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
                 <h2 className="mb-2 font-mono text-xs tracking-wider text-zinc-500 uppercase dark:text-zinc-500">
                   {group.module}
                 </h2>
-                {/* Rows on the page surface, divided by rules — a card per
-                    module stacked boxes inside boxes for no added meaning. */}
+                {/* Rules, not a card per module — boxes inside boxes. */}
                 <AnimatedList className="divide-y divide-zinc-200/70 border-t border-zinc-200/70 dark:divide-zinc-800 dark:border-zinc-800">
                   {group.docs.map((doc) => (
                     <DocRow key={doc._id} doc={doc} projectSlug={slug} />

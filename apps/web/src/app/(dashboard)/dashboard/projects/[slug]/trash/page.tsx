@@ -14,6 +14,7 @@ import {
   BookText,
   FileKey,
 } from "lucide-react";
+import { PageHeader } from "@envpilot/ui";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useProjectBySlug, useConvexUser } from "@/hooks";
@@ -224,32 +225,29 @@ export default function TrashPage({ params }: TrashPageProps) {
           <ArrowLeft className="h-4 w-4" />
           Back to {project?.name ?? "project"}
         </Link>
-        <div className="mt-4 flex items-end justify-between gap-4">
-          <div>
-            <h1 className="flex items-center gap-2.5 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-              <Trash2 className="h-6 w-6 text-zinc-400" />
-              Trash
-            </h1>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Deleted items stay restorable for {RETENTION_DAYS} days, then they
-              are destroyed permanently.
-            </p>
-          </div>
-          {canEmpty && totalCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setConfirmOpen(true)}
-              disabled={emptying}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400"
-            >
-              {emptying ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              {emptying ? "Emptying…" : "Empty trash"}
-            </button>
-          )}
+        <div className="mt-4">
+          <PageHeader
+            icon={Trash2}
+            title="Trash"
+            description={`Deleted items stay restorable for ${RETENTION_DAYS} days, then they are destroyed permanently.`}
+            actions={
+              canEmpty && totalCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmOpen(true)}
+                  disabled={emptying}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400"
+                >
+                  {emptying ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  {emptying ? "Emptying…" : "Empty trash"}
+                </button>
+              ) : undefined
+            }
+          />
         </div>
       </div>
 

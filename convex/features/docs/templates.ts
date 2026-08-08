@@ -1,14 +1,9 @@
 /**
- * Starter markdown for a new page.
+ * Starter markdown. `type: "api"` is a template, not a structured record —
+ * schemas would be opaque strings either way, so structure buys no validation.
  *
- * `type: "api"` is a TEMPLATE, not a structured record. Request and response
- * schemas would be opaque strings in a typed field either way, so structure
- * would buy no validation while costing a second authoring mode the reviewer
- * also has to learn. A template gets the same consistency for one function.
- *
- * The API template names the base-URL VARIABLE rather than a URL. Docs never
- * carry values: readers resolve them through their own Envpilot access, which
- * is what keeps a documentation read from becoming a credential read.
+ * The API template names the base-URL VARIABLE, never a value: readers resolve
+ * it through their own access, so a doc read never becomes a credential read.
  */
 
 const API_TEMPLATE = `## Overview

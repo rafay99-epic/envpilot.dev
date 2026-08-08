@@ -1,16 +1,8 @@
 /**
- * Project documentation — writes.
- *
- * The one invariant worth stating twice: **publishing is a human act.**
- * `publish` is the only function that sets `status: "published"`, it is a
- * dashboard mutation behind a real user identity, and no MCP tool calls it.
- * Everything an agent can reach produces a draft, and drafts are returned by
- * no MCP read at all — that gate is what stops a prompt-injected page from
- * ever reaching another agent's context.
- *
- * Every write runs `scanDocBody` first: documentation may NAME a variable and
- * must never carry its value, and it may describe the MCP tools but never
- * issue instructions to them.
+ * Writes. `publish` is the ONLY function that sets `status: "published"`, and
+ * it is a dashboard mutation behind a real user identity — everything an
+ * agent can reach produces a draft. That gate is what stops a prompt-injected
+ * page from reaching another agent. Every write runs `scanDocBody` first.
  */
 import { v, ConvexError } from "convex/values";
 import { mutation } from "../../_generated/server";
@@ -93,8 +85,7 @@ export const create = mutation({
       projectId: args.projectId,
       userId: actor._id,
       action: "doc.created",
-      // Never the body: it is already stored once in docContent, and an
-      // audit row is the wrong place for a second copy.
+      // Never the body — it is already stored once in docContent.
       details: { title: args.title.trim(), module: args.module.trim(), slug },
     });
 
@@ -102,11 +93,8 @@ export const create = mutation({
   },
 });
 
-/**
- * Update a page. Editing a PUBLISHED page returns it to draft: the reviewed
- * state was the published one, so changed prose needs a human to look again
- * before teammates and agents read it.
- */
+/** Editing a published page returns it to draft — changed prose needs a
+ *  second look before teammates and agents read it. */
 export const update = mutation({
   args: {
     docId: v.id("docs"),
@@ -133,8 +121,7 @@ export const update = mutation({
     if (args.body !== undefined) {
       warnings = scanDocBody(args.body).warnings;
       const excerpt = await writeBody(ctx, doc._id, doc.projectId, args.body);
-      // null = byte-identical to what is stored; skip the metadata write so
-      // an unchanged re-submit costs one read and no writes.
+      // null = unchanged; skip the metadata write.
       if (excerpt !== null) patch.excerpt = excerpt;
     }
 
@@ -191,12 +178,9 @@ export const update = mutation({
 });
 
 /**
- * Publish a draft. THE human gate.
- *
- * Only after this does a page become visible to teammates and returnable by
- * `envpilot_search_docs` / `envpilot_get_doc`. Authors publish their own
- * pages — the review is a correctness check by the person who holds the
- * intent, not an approval hierarchy — and Team Lead+ may publish anyone's.
+ * THE human gate — only after this is a page visible to teammates or MCP.
+ * Authors publish their own (the review is a correctness check by whoever
+ * holds the intent, not an approval hierarchy); Team Lead+ publishes anyone's.
  */
 export const publish = mutation({
   args: { docId: v.id("docs") },
@@ -220,9 +204,8 @@ export const publish = mutation({
       publishedBy: actor._id,
       updatedAt: now,
     });
-    // Keep the body row's denormalized status in step — it is what the
-    // search index filters on, so a stale value would either hide a
-    // published page from search or expose a draft to it.
+    // Search index filters on this; a stale value hides published pages or
+    // exposes drafts.
     await setContentStatus(ctx, doc._id, "published");
 
     await createAuditLog(ctx, {
@@ -305,11 +288,7 @@ export const remove = mutation({
   },
 });
 
-/**
- * Restore from trash. Always comes back as a DRAFT: whatever it said when it
- * was deleted has not been reviewed since, and restoring straight to
- * published would hand unreviewed text back to every reader.
- */
+/** Restores as a DRAFT — the content has not been reviewed since deletion. */
 export const restore = mutation({
   args: { docId: v.id("docs") },
   handler: async (ctx, args) => {

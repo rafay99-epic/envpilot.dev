@@ -5,32 +5,15 @@ import { caretRect } from "@/lib/editor/textarea-caret";
 import { lineOfIndex } from "@/lib/editor/source-lines";
 
 /**
- * Scroll behavior for the split view.
+ * Split-view scroll sync. Ported from wryte.xyz; takes pane refs directly
+ * rather than reading a zustand store.
  *
- * Ported from wryte.xyz (features/editor/hooks/use-split-scroll-sync.ts).
- * The only change is the dependency direction: wryte reads the textarea out
- * of a zustand-backed editor context, this takes the pane refs directly, so
- * the hook works with a plain local-state editor.
- *
- * Two cooperating mechanisms:
- *
- * 1. Manual scrolling — ratio-based bidirectional sync. One pane "owns" the
- *    scroll at any time (decided by where the pointer, touch, or keyboard
- *    last acted) and only the owner pushes its ratio to the other pane. The
- *    scroll event echoed by that push lands on the non-owner and is ignored,
- *    so the panes can never fight each other.
- *
- * 2. Typing — caret-follow. A growing textarea never scrolls anything by
- *    itself, so no scroll event fires and ratio sync alone leaves both panes
- *    behind the caret. On every input the editor pane is nudged to keep the
- *    caret visible and the preview is scrolled to the rendered block carrying
- *    the caret's `data-source-line` — exact, not a ratio guess. The
- *    ResizeObserver re-runs the follow once the (deferred) preview re-render
- *    actually lands, since it commits after the keystroke.
- *
- * The editor side is scroll-container-agnostic: it drives whichever element
- * actually scrolls (the pane wrapper, or the textarea itself when its content
- * overflows a fixed height).
+ * Two mechanisms. Manual scrolling is ratio-based with a single owning pane,
+ * so the echoed scroll event lands on the non-owner and the panes never
+ * fight. Typing uses caret-follow instead: a growing textarea fires no
+ * scroll event, so the preview is aligned to the block carrying the caret's
+ * `data-source-line` — exact, not a ratio guess — and a ResizeObserver
+ * re-runs it once the deferred re-render lands.
  */
 
 type Pane = "editor" | "preview";
@@ -84,8 +67,8 @@ export function useSplitScrollSync(enabled: boolean) {
     const paneBox = pane.getBoundingClientRect();
     let caretTop = textarea.getBoundingClientRect().top + rect.top;
 
-    // Editor pane: nudge only in the wrapper-scroll case. When the textarea
-    // scrolls internally the browser already keeps the caret visible.
+    // Only in the wrapper-scroll case — an internally scrolling textarea
+    // already keeps its own caret visible.
     if (textarea.scrollHeight <= textarea.clientHeight + 1) {
       let delta = 0;
       if (caretTop + rect.height > paneBox.bottom - CARET_MARGIN) {
@@ -100,8 +83,7 @@ export function useSplitScrollSync(enabled: boolean) {
       }
     }
 
-    // Preview: scroll the block containing the caret's source line to the
-    // same viewport fraction the caret sits at in the editor.
+    // Align the caret's source-line block to the caret's viewport fraction.
     const caretLine = lineOfIndex(textarea.value, textarea.selectionStart);
     let target: HTMLElement | null = null;
     for (const el of preview.querySelectorAll<HTMLElement>(
@@ -142,8 +124,7 @@ export function useSplitScrollSync(enabled: boolean) {
       return;
     }
     if (owner.current !== "editor") return;
-    // While typing, followCaret positions the preview precisely — a ratio
-    // pass on the same frame would overwrite it with a worse guess.
+    // followCaret is precise; a ratio pass would overwrite it with a guess.
     if (typing.current) return;
     syncTo(getEditorScroller(), previewRef.current);
   }, [syncTo, getEditorScroller]);
@@ -153,9 +134,8 @@ export function useSplitScrollSync(enabled: boolean) {
     syncTo(previewRef.current, getEditorScroller());
   }, [syncTo, getEditorScroller]);
 
-  // Typing → follow; manual scroll intent (wheel, touch, scrollbar drag) →
-  // back to ratio sync. Listeners attach imperatively because the internal-
-  // scroll case needs a scroll listener the JSX can't reach.
+  // Typing → follow; wheel/touch/drag → back to ratio sync. Imperative
+  // because the internal-scroll case needs a listener JSX can't reach.
   useEffect(() => {
     if (!enabled) return;
     const pane = editorPaneRef.current;
@@ -180,8 +160,7 @@ export function useSplitScrollSync(enabled: boolean) {
       el.addEventListener("pointerdown", manualIntent);
     }
 
-    // Re-align once the deferred preview re-render lands: its height changes
-    // after the keystroke that caused it, so the follow must run again.
+    // The deferred re-render changes height after the keystroke.
     const observer = new ResizeObserver(() => {
       if (typing.current) scheduleFollow();
       else if (owner.current === "editor") {

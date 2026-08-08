@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { Building2 } from "lucide-react";
+import { PageHeader } from "@envpilot/ui";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import {
@@ -130,52 +132,49 @@ export default function OrganizationPage({
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-4">
-          {organization.logoUrl ? (
+      <PageHeader
+        // The org's own logo (or its initial) — identity, not decoration.
+        leading={
+          organization.logoUrl ? (
             <img
               src={organization.logoUrl}
               alt={organization.name}
-              className="h-16 w-16 rounded-xl object-cover"
+              className="h-10 w-10 shrink-0 rounded-lg object-cover"
             />
           ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800">
-              <span className="text-2xl font-semibold text-zinc-600 dark:text-zinc-400">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800">
+              <span className="text-base font-semibold text-zinc-400">
                 {organization.name.charAt(0).toUpperCase()}
               </span>
             </div>
-          )}
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                {organization.name}
-              </h1>
-              {orgTier === "pro" && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                  Pro
-                </span>
-              )}
-            </div>
-            <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-              {organization.slug}
-            </p>
+          )
+        }
+        title={organization.name}
+        description={
+          <>
+            {organization.slug}
             {organization.description && (
-              <p className="mt-2 max-w-lg text-sm text-zinc-600 dark:text-zinc-400">
-                {organization.description}
-              </p>
+              <span className="mt-2 block">{organization.description}</span>
             )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${roleBadgeColor(
-              ROLE_FALLBACK_COLOR[role] ?? "zinc"
-            )}`}
-          >
-            {roleLabel(role)}
-          </span>
-        </div>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            {orgTier === "pro" && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                Pro
+              </span>
+            )}
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${roleBadgeColor(
+                ROLE_FALLBACK_COLOR[role] ?? "zinc"
+              )}`}
+            >
+              {roleLabel(role)}
+            </span>
+          </>
+        }
+      />
 
       {/* Quick Actions */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

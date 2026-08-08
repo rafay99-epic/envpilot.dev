@@ -1,18 +1,9 @@
 /**
- * Shared authorization and lookup helpers for project documentation.
+ * Authorization helpers. Docs sit at project granularity — members already
+ * hold the project's secrets, so a per-doc ACL would be theatre.
  *
- * Docs sit at project granularity, deliberately: a project's members already
- * hold that project's secrets, so gating its documentation more tightly than
- * its credentials would be theatre. There is no per-doc grant table and no
- * per-doc ACL.
- *
- * Two rules the whole feature rests on:
- *   1. DRAFTS ARE PRIVATE to their author (plus roles that can publish).
- *      A draft is unreviewed, possibly agent-written text; the human
- *      publication gate is what keeps it out of teammates' hands and out of
- *      every MCP read.
- *   2. PUBLISHING IS A HUMAN ACT. No code path outside a dashboard mutation
- *      may set `status: "published"`.
+ * Two rules the feature rests on: drafts are private to their author (plus
+ * publishers), and publishing only ever happens in a dashboard mutation.
  */
 import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../../_generated/dataModel";
@@ -80,12 +71,8 @@ export async function requireDocAccess(
   };
 }
 
-/**
- * Tier gate. Kept OUT of `_authorizeRequest` on purpose: that core derives
- * its gate from the surface alone (`mcp_server` / `public_api`) and its
- * `gateFeature` argument is a closed two-literal union, so a third feature
- * key cannot ride it. Callers check here, the same shape `cicd/pull.ts` uses.
- */
+/** Tier gate. Cannot ride `_authorizeRequest` (its gate arg is a closed
+ *  two-literal union), so callers check here — the cicd/pull.ts shape. */
 export async function requireDocsFeature(
   ctx: QueryCtx | MutationCtx,
   organizationId: Id<"organizations">
@@ -122,10 +109,7 @@ export function canEditDoc(
   return doc.authorId === userId || access.canManage;
 }
 
-/**
- * Resolve a unique slug within a project, ignoring soft-deleted rows.
- * Appends -2, -3, … on collision. `excludeId` lets an update keep its own.
- */
+/** Unique slug within a project, ignoring soft-deleted rows. */
 export async function uniqueSlug(
   ctx: QueryCtx | MutationCtx,
   projectId: Id<"projects">,

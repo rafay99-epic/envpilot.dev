@@ -640,49 +640,37 @@ export default defineSchema({
   // ==========================================
   // PROJECT DOCUMENTATION (agent-authored, human-published)
   // ==========================================
-  // Handoff documentation: an agent proposes a DRAFT over MCP, the developer
-  // who wrote the feature reviews it against their own plan, and publishing
-  // is a human act. Drafts are invisible to teammates AND to every MCP read —
-  // that gate is the primary control against a prompt-injected page reaching
-  // another agent's context.
+  // An agent proposes a DRAFT over MCP; publishing is a human act. Drafts are
+  // invisible to teammates AND to every MCP read — the primary control against
+  // a prompt-injected page reaching another agent.
   //
-  // Docs name variable KEYS and never carry values: every variable value
-  // lives behind a WorkOS Vault reference, and the only authorized decrypt
-  // path is features/api/reads.ts, gated on the "variables" resource plus
-  // environment scope plus per-variable RBAC. Resolving a value here would
-  // route around all of it.
+  // Docs name variable KEYS, never values: the only authorized decrypt path is
+  // features/api/reads.ts, and resolving a value here would route around it.
   docs: defineTable({
     projectId: v.id("projects"),
-    // Sidebar grouping, e.g. "E-Commerce Platform". A plain string, not a
-    // tree: grouping is all the navigation needs, and a tree would drag in
+    // Sidebar grouping. A string, not a tree — a tree drags in
     // move/reorder/orphan/breadcrumb handling for no gain.
     module: v.string(),
-    // Chooses the markdown template inserted at create time and the sidebar
-    // icon. Deliberately NOT a structured contract: request/response schemas
-    // would be opaque strings either way, so the structure buys no validation
-    // and costs a second authoring mode.
+    // Picks the create-time template. NOT a structured contract: schemas
+    // would be opaque strings either way, so structure buys no validation.
     type: v.union(v.literal("api"), v.literal("guide")),
     title: v.string(),
     // Unique per project among non-deleted rows (enforced in mutations).
     slug: v.string(),
     status: v.union(v.literal("draft"), v.literal("published")),
-    // Denormalized first ~200 chars of the body, maintained on every content
-    // write. Lets the sidebar, module index and command palette render
-    // previews without reading docContent — Convex bills bytes READ, and
-    // these are reactive subscriptions that re-run on any write.
+    // First ~200 chars, so list views render previews without reading
+    // docContent — these are reactive subscriptions and Convex bills reads.
     excerpt: v.optional(v.string()),
     authorId: v.id("users"),
-    // Who last published it (may differ from the author for Team Lead+).
+    // May differ from the author for Team Lead+.
     publishedBy: v.optional(v.id("users")),
-    // Optional link back to the PR the page documents. A plain string: a
-    // pasted URL works with zero integration, and a GitHub App can fill it
-    // automatically later without a schema change.
+    // Plain string: a pasted URL needs no integration, and a GitHub App can
+    // fill it later without a schema change.
     prUrl: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
     publishedAt: v.optional(v.number()),
-    // Soft delete — the project Trash page lists these and the daily GC cron
-    // purges past the retention window, same contract as variables/files.
+    // Soft delete; daily GC purges past the retention window.
     deletedAt: v.optional(v.number()),
   })
     .index("by_project", ["projectId"])
@@ -695,38 +683,29 @@ export default defineSchema({
     .index("by_project_deleted", ["projectId", "deletedAt"])
     // Bounds the daily purge sweep to soft-deleted rows.
     .index("by_deleted_at", ["deletedAt"])
-    // Full-text over titles. `filterFields` are equality pre-filters applied
-    // INSIDE the index, so a published-only search never reads a draft row —
-    // that is both the cost win and the security property (drafts must not
-    // leak through search). Both filter fields live on this table, which is
-    // the constraint Convex search indexes impose.
+    // `filterFields` pre-filter INSIDE the index, so a published-only search
+    // never reads a draft row — cost win and security property at once.
     .searchIndex("search_title", {
       searchField: "title",
       filterFields: ["projectId", "status"],
     }),
 
-  // Doc bodies, 1:1 with `docs`. Split out for the same reason the rest of
-  // this schema keeps hot rows small: the sidebar, module index and palette
-  // must never read markdown they will not render. `by_projectId` exists so
-  // project deletion can drain rows without walking the parent table.
-  // All reads/writes go through features/docs/content.ts.
+  // Bodies, 1:1 with `docs`. Split so list views never read markdown they
+  // won't render. `by_projectId` lets project deletion drain without walking
+  // the parent. All access via features/docs/content.ts.
   docContent: defineTable({
     docId: v.id("docs"),
     projectId: v.id("projects"),
     body: v.string(),
-    // DENORMALIZED from docs.status, purely so the body search index can
-    // pre-filter drafts. A Convex search index may only filter on fields of
-    // the table it indexes, and without this a body search would have to read
-    // every matching row — drafts included — and post-filter in the handler,
-    // which both costs bandwidth and puts unreviewed text one bug away from
-    // leaking. Every write goes through features/docs/content.ts, which is
-    // the ONLY module allowed to set it, so the two rows cannot drift.
+    // Denormalized from docs.status so the body index can pre-filter drafts —
+    // a search index may only filter on its own table's fields. Without it a
+    // body search reads every match, drafts included. features/docs/content.ts
+    // is the ONLY writer, so the rows cannot drift.
     status: v.optional(v.union(v.literal("draft"), v.literal("published"))),
   })
     .index("by_docId", ["docId"])
     .index("by_projectId", ["projectId"])
-    // Full-text over page bodies — this is what makes search find a page by
-    // what it SAYS rather than only by its title.
+    // Finds a page by what it SAYS, not just its title.
     .searchIndex("search_body", {
       searchField: "body",
       filterFields: ["projectId", "status"],

@@ -16,8 +16,17 @@ import {
 } from "@/components/dashboard/terminal-ui";
 import { ConfirmDialog } from "@/components/ui";
 import { ENVIRONMENTS } from "@/constants/project";
-import { Eye, EyeOff, Loader2, Lock, Check, X } from "lucide-react";
+import {
+  Check,
+  Eye,
+  EyeOff,
+  GitPullRequest,
+  Loader2,
+  Lock,
+  X,
+} from "lucide-react";
 import { createLogger } from "@/lib/logger";
+import { PageHeader } from "@envpilot/ui";
 
 const log = createLogger("app/dashboard/requests");
 
@@ -248,14 +257,11 @@ export default function RequestsPage() {
   }
 
   const header = (
-    <div className="flex items-center justify-between">
-      <div>
-        <h1 className="text-xl font-bold text-zinc-100">Variable Requests</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Review and approve developer-submitted variables
-        </p>
-      </div>
-    </div>
+    <PageHeader
+      icon={GitPullRequest}
+      title="Variable Requests"
+      description="Review and approve developer-submitted variables"
+    />
   );
 
   if (!canReview) {

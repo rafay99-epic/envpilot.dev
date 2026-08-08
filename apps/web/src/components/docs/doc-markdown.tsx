@@ -6,29 +6,19 @@ import remarkGfm from "remark-gfm";
 import { remarkSourceLines } from "@/lib/editor/source-lines";
 
 /**
- * Renders a documentation page body.
+ * Renders a doc body. Loaded via `next/dynamic` — the remark chain is a few
+ * hundred KB and the module index renders no markdown at all.
  *
- * Loaded through `next/dynamic` by its callers: react-markdown plus the
- * remark chain is a few hundred KB, and the module index — the page people
- * land on — renders no markdown at all, so it should not pay for it.
+ * NO `rehype-raw`: bodies are written by teammates and agents, so raw HTML
+ * would be stored XSS in every other reader's browser.
  *
- * NO `rehype-raw`. Bodies here are written by teammates and by agents, which
- * makes them untrusted input to every other reader's browser; letting raw
- * HTML through would turn a documentation page into stored XSS. Markdown
- * only, deliberately. (wryte.xyz's preview does enable it behind
- * rehype-sanitize, because there the author IS the site owner — a different
- * threat model.)
- *
- * `remarkSourceLines` stamps `data-source-line` on every block. Every block
- * override below therefore spreads `...props` — dropping them would strip
- * those stamps and silently break both split-view scroll sync and
- * double-click-to-edit, with no visible error.
+ * Every block override spreads `...props` — dropping them strips the
+ * `data-source-line` stamps and silently breaks split sync and
+ * double-click-to-edit.
  */
 export function DocMarkdown({ body }: { body: string }) {
-  // Deferred + memoized: a keystroke re-renders this urgently but hits the
-  // memo with the old body, while the expensive remark re-parse runs as an
-  // interruptible background render — typing in split mode never blocks on
-  // it. Same trick as wryte's MarkdownPreview.
+  // Deferred + memoized so the remark re-parse runs as an interruptible
+  // background render — typing in split mode never blocks on it.
   const deferredBody = useDeferredValue(body);
 
   const rendered = useMemo(
@@ -100,8 +90,7 @@ export function DocMarkdown({ body }: { body: string }) {
           a: ({ href, children, ...props }) => (
             <a
               href={href}
-              // Agent- and teammate-authored links are untrusted: noopener
-              // stops the target reaching back through window.opener.
+              // Untrusted authors: noopener stops window.opener reach-back.
               target="_blank"
               rel="noopener noreferrer nofollow"
               className="text-green-600 underline underline-offset-2 hover:text-green-500 dark:text-green-400"

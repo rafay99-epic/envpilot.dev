@@ -172,39 +172,22 @@ export default function DocDetailPage({ params }: DocPageProps) {
       featureKey="project_docs"
       featureName="Project Documentation"
     >
-      {/*
-        Two layouts, one page.
-
-        READING is a document: normal flow, the dashboard's own scroll
-        container handles it, exactly like every other project page.
-
-        EDITING is an application: the page is pinned to the visible area and
-        `overflow-hidden`, so the dashboard scroller has nothing to scroll and
-        the editor panes are the ONLY things that move. Without this the page
-        scrolled AND the pane scrolled — two scrollbars racing each other,
-        which is what made writing here feel wrong.
-
-        The 7rem offset covers the shell's `py-8` (4rem total) plus this
-        page's header rows; `min-h-0` lets the editor shrink inside it.
-      */}
+      {/* Reading is a document (normal flow); editing is an application —
+          pinned and overflow-hidden, so the page scroller has nothing to
+          scroll and the editor panes are the only things that move. */}
       <div
-        // `data-full-bleed` drops the shell's max-w-7xl + horizontal padding
-        // (one :has() rule in globals.css) so the writing surface runs the
-        // full width of the page. Only while editing — reading keeps the
-        // normal dashboard measure.
+        // Drops the shell's max-w-7xl + padding via the :has() rule in
+        // globals.css. Editing only; reading keeps the normal measure.
         data-full-bleed={isEditing ? "" : undefined}
         className={
           isEditing
-            ? // h-screen, not a calc: full-bleed mode zeroes the shell's
-              // padding entirely, so this container owns the whole viewport
-              // column and the surface ends flush with the bottom edge.
+            ? // h-screen, not a calc: full-bleed zeroes the shell's padding,
+              // so this owns the viewport column and ends flush at the bottom.
               "flex h-screen min-h-0 flex-col gap-4 overflow-hidden pt-6"
             : "space-y-5"
         }
       >
-        {/* While editing, every header row shares the writing column's
-            centered 920px grid — chrome sits over the text, not floating at
-            the viewport edge. */}
+        {/* Header rows share the writing column's grid while editing. */}
         <Link
           href={`/dashboard/projects/${slug}/docs`}
           className={`inline-flex shrink-0 items-center gap-1.5 text-sm text-zinc-500 transition-colors hover:text-zinc-100 ${
@@ -219,16 +202,9 @@ export default function DocDetailPage({ params }: DocPageProps) {
           <TerminalLoading />
         ) : (
           <>
-            {/*
-              One header block, not seven stacked rows.
-
-              The title used to render TWICE while editing — a static <h1>
-              plus the edit input right below it — under a module line, a meta
-              line, a PR line and a full-width draft banner. The input IS the
-              title now; everything else that is not the title collapses into
-              a single muted meta line, and publication state is a pill rather
-              than a banner. Writing starts one screen higher.
-            */}
+            {/* One header block. The title used to render twice while
+                editing — a static h1 plus the edit input — under four more
+                rows. The input IS the title; the rest is one meta line. */}
             <div
               className={`flex shrink-0 items-start justify-between gap-4 ${
                 isEditing ? "mx-auto w-full max-w-[920px] px-4" : ""
@@ -351,8 +327,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
               )}
             </div>
 
-            {/* The one thing the banner said that was worth keeping: what
-                publishing actually changes. Shown only while it is true. */}
+            {/* What publishing actually changes. */}
             {doc.status === "draft" && !isEditing && (
               <p className="shrink-0 text-xs text-zinc-500">
                 Not visible to your team, and no agent can read it over MCP
@@ -372,9 +347,8 @@ export default function DocDetailPage({ params }: DocPageProps) {
             )}
 
             {isEditing ? (
-              // min-h-0 so the editor can shrink inside the pinned page
-              // instead of pushing it taller and re-creating a page scroll.
-              // The title input lives in the header — there is exactly one.
+              // min-h-0 so the editor shrinks inside the pinned page instead
+              // of pushing it taller and re-creating a page scroll.
               <div className="min-h-0 flex-1">
                 <DocEditor
                   body={draftBody}

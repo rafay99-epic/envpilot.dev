@@ -4,16 +4,8 @@ interface DocStatusPillProps {
   status: "draft" | "published";
 }
 
-/**
- * Publication state, as a pill beside the title.
- *
- * This used to be a full-width banner with an icon, a heading, a paragraph
- * and its own Publish button — a whole row of chrome above the writing
- * surface restating one boolean. The state still matters (a draft is
- * invisible to teammates and returned by no MCP read), but the place to say
- * so is next to the title, with the consequence spelled out once underneath
- * and the action living with the page's other actions.
- */
+/** Publication state, as a pill beside the title. Was a full-width banner —
+ *  a row of chrome above the writing surface restating one boolean. */
 export function DocStatusPill({ status }: DocStatusPillProps) {
   const isDraft = status === "draft";
   return (

@@ -19,7 +19,8 @@ import {
 } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedGrid } from "@/components/dashboard/animated-list";
-import { Plus, Clock, ChevronRight, Star } from "lucide-react";
+import { ChevronRight, Clock, FolderGit2, Plus, Star } from "lucide-react";
+import { PageHeader } from "@envpilot/ui";
 
 export default function ProjectsPage() {
   const { canDo, organization, user } = useAuthContext();
@@ -68,38 +69,37 @@ export default function ProjectsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-zinc-100">Projects</h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Organize your environment variables by project
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {projects.length > 0 && (
-            <button
-              onClick={() => setShowFavoritesFirst(!showFavoritesFirst)}
-              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                showFavoritesFirst
-                  ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
-                  : "border-zinc-700/50 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
-              }`}
-            >
-              <Star
-                className="h-3.5 w-3.5"
-                fill={showFavoritesFirst ? "currentColor" : "none"}
-              />
-              Favorites first
-            </button>
-          )}
-          {canCreateProject && (
-            <TerminalButtonLink href="/dashboard/projects/new">
-              <Plus className="h-4 w-4" />
-              New Project
-            </TerminalButtonLink>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        icon={FolderGit2}
+        title="Projects"
+        description="Organize your environment variables by project"
+        actions={
+          <>
+            {projects.length > 0 && (
+              <button
+                onClick={() => setShowFavoritesFirst(!showFavoritesFirst)}
+                className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  showFavoritesFirst
+                    ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                    : "border-zinc-700/50 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+                }`}
+              >
+                <Star
+                  className="h-3.5 w-3.5"
+                  fill={showFavoritesFirst ? "currentColor" : "none"}
+                />
+                Favorites first
+              </button>
+            )}
+            {canCreateProject && (
+              <TerminalButtonLink href="/dashboard/projects/new">
+                <Plus className="h-4 w-4" />
+                New Project
+              </TerminalButtonLink>
+            )}
+          </>
+        }
+      />
 
       {/* Projects Grid */}
       {isLoading ? (

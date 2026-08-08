@@ -1,17 +1,10 @@
 /**
  * The ONLY place doc bodies are read or written.
  *
- * `docContent` is split 1:1 out of `docs` because Convex bills bytes READ and
- * the sidebar, module index and command palette are reactive subscriptions:
- * if the body lived on the metadata row, every one of those queries would
- * re-read every markdown body in the project on any write. Keeping the two
- * apart only pays off if nothing bypasses this module and reads the body
- * inside a list — hence one door.
- *
- * This module also owns the invariants that keep the split honest: the
- * denormalized `excerpt`, and the unchanged-body short-circuit (a plain
- * string compare — the row is already in hand, so a hash would add a
- * collision risk to save nothing).
+ * `docContent` is split 1:1 out of `docs` because Convex bills bytes read and
+ * the list views are reactive — an inline body would re-read every page in
+ * the project on any write. The split only pays off if nothing bypasses this
+ * module, hence one door. Also owns `excerpt` and `status` denormalization.
  */
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
@@ -29,10 +22,7 @@ export async function readBody(
   return row?.body ?? "";
 }
 
-/**
- * Create the body row for a freshly inserted doc. Returns the excerpt.
- * Always starts as a draft — nothing creates a published page directly.
- */
+/** Create the body row. Always a draft — nothing publishes directly. */
 export async function createBody(
   ctx: MutationCtx,
   docId: Id<"docs">,
@@ -49,12 +39,10 @@ export async function createBody(
 }
 
 /**
- * Mirror a status change onto the body row.
- *
- * THE sync point for `docContent.status`. It exists only to let the body
- * search index pre-filter drafts, and it is worthless — worse, dangerous —
- * if it drifts from `docs.status`, so every mutation that changes status
- * calls this in the same transaction. Nothing else may write the field.
+ * THE sync point for `docContent.status`, which exists only so the body
+ * search index can pre-filter drafts. Dangerous if it drifts from
+ * `docs.status`, so every status mutation calls this in the same
+ * transaction and nothing else writes the field.
  */
 export async function setContentStatus(
   ctx: MutationCtx,
@@ -70,13 +58,8 @@ export async function setContentStatus(
   }
 }
 
-/**
- * Replace a doc's body.
- *
- * Returns the new excerpt, or `null` when the body is byte-identical to what
- * is already stored — callers use that to skip the metadata patch entirely,
- * so an agent re-submitting an unchanged page costs one read and no writes.
- */
+/** Returns the new excerpt, or null when byte-identical — callers skip the
+ *  metadata patch, so an unchanged re-submit costs no writes. */
 export async function writeBody(
   ctx: MutationCtx,
   docId: Id<"docs">,
@@ -89,7 +72,7 @@ export async function writeBody(
     .first();
 
   if (!row) {
-    // Defensive: a doc whose body row went missing is repaired, not failed.
+    // A missing body row is repaired, not failed.
     return await createBody(ctx, docId, projectId, body);
   }
   if (row.body === body) return null;

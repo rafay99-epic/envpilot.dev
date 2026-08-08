@@ -223,13 +223,10 @@ input[type="radio"]:focus-visible {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
 }
 
-/* Keyboard focus must always be visible on dark surfaces.
-   Inside @layer base ON PURPOSE: un-layered author CSS beats every layered
-   rule, so the previous un-layered version of this ring overrode Tailwind's
-   `outline-none` utility everywhere — text fields match :focus-visible on
-   ANY focus, which drew a permanent 2px green rectangle around the docs
-   editor's writing column. In the base layer the ring still beats browser
-   defaults but loses, correctly, to an explicit `outline-none` opt-out. */
+/* Keyboard focus ring. Inside @layer base ON PURPOSE: un-layered author CSS
+   beats every layered rule, so this previously overrode Tailwind's
+   `outline-none` everywhere — text fields match :focus-visible on any focus,
+   which drew a green rectangle around the docs editor. */
 @layer base {
   :focus-visible {
     outline: 2px solid rgba(34, 197, 94, 0.6);
@@ -250,11 +247,9 @@ input[type="radio"]:focus-visible {
   }
 }
 
-/* Unobtrusive scrollbar for the writing surface. Ported from wryte.xyz.
-   The editor is a full-height app region whose panes scroll independently;
-   a default chunky scrollbar per pane reads as clutter next to prose.
-   `scrollbar-gutter: stable` reserves the track permanently so content does
-   not shift sideways when a document grows past one screen. */
+/* Slim scrollbar for the editor panes (ported from wryte.xyz).
+   `scrollbar-gutter: stable` stops content shifting sideways when a document
+   grows past one screen. */
 .slim-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
@@ -274,22 +269,15 @@ input[type="radio"]:focus-visible {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Full-bleed pages inside the dashboard shell.
-   
-   Every dashboard route is wrapped in `mx-auto max-w-7xl px-4 py-8` by
-   dashboard-shell.tsx, which is right for tables and forms and wrong for a
-   writing surface — it caps the editor at 1280px and then the page's own
-   measure narrows it further. A page opts out by putting `data-full-bleed`
-   on its root; `:has()` lets the wrapper respond without the shell needing
-   to know anything about its children, so no other route changes.
-   Vertical padding stays, because the editor's height math depends on it. */
+/* Full-bleed opt-out. Every dashboard route is wrapped in
+   `mx-auto max-w-7xl px-4 py-8`, which is right for tables and wrong for a
+   writing surface. `:has()` lets the wrapper respond to `data-full-bleed`
+   without the shell knowing anything about its children. */
 main:has([data-full-bleed]) > div {
   max-width: none;
   padding: 0;
 }
 
-/* No .editor-surface gradient any more. Measured attempts at a full-width
-   wash over #0f172a topped out around a 1.2 contrast ratio — a tint with no
-   edge cannot read as a surface. The writing column now carries a flat tint
-   itself (see doc-editor.tsx): the column's own left/right edges against the
-   untinted page are the boundary, which is what a wash never provided. */
+/* No .editor-surface wash: measured ~1.2:1 over #0f172a, and a tint with no
+   edge cannot read as a surface. The writing column carries a flat tint
+   instead, so its own edges are the boundary (see doc-editor.tsx). */

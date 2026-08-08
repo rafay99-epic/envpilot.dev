@@ -1,11 +1,6 @@
 /**
- * Project documentation — reads.
- *
- * Everything except `get` returns METADATA ONLY. `docs` rows are small by
- * construction and bodies live in `docContent`; the sidebar and module index
- * are reactive subscriptions, so pulling markdown into them would re-read
- * every body in the project on every write. One body per page view, never a
- * body per list.
+ * Reads. Everything except `getBySlug` returns METADATA ONLY — one body per
+ * page view, never a body per list, since these are reactive subscriptions.
  */
 import { v, ConvexError } from "convex/values";
 import { query } from "../../_generated/server";
@@ -41,13 +36,8 @@ function toSummary(doc: Doc<"docs">) {
   };
 }
 
-/**
- * Every doc in a project the caller may see, newest first.
- *
- * Drafts are filtered per-row rather than by index: a caller sees published
- * pages plus their OWN drafts (plus everyone's, for Team Lead+), which is not
- * expressible as a single index range.
- */
+/** Docs the caller may see, newest first. Drafts filter per-row: "published
+ *  plus my own" is not expressible as one index range. */
 export const listByProject = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
@@ -84,8 +74,7 @@ export const getBySlug = query({
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .first();
 
-    // A draft the caller may not see is indistinguishable from a missing
-    // page — an unreviewed page should not even be known to exist.
+    // An unseeable draft must be indistinguishable from a missing page.
     if (!doc || !canSeeDoc(doc, actor._id, access)) {
       throw new ConvexError("Document not found");
     }
@@ -195,22 +184,13 @@ export const listTrashed = query({
 });
 
 /**
- * Full-text search across a project's pages.
+ * Full-text search: `docs.search_title` merged with `docContent.search_body`,
+ * titles ranked first.
  *
- * Two Convex search indexes, merged: `docs.search_title` and
- * `docContent.search_body`. Title hits rank above body hits, because someone
- * typing "wallet" almost always wants the page called Wallet before a page
- * that merely mentions it.
- *
- * Cost shape — this is the read path an impatient user hits on every
- * keystroke, so it is bounded at every step:
- *   - `filterFields` pre-filter INSIDE each index, so a published-only search
- *     never reads a draft row at all (also why drafts cannot leak here).
- *   - Each index is capped with `.take()`, never `.collect()`.
- *   - Body hits return the parent's stored `excerpt`, never the body — the
- *     large rows are read by the index, never serialized back to the client.
- *   - Own drafts are folded in from a small metadata-only index read rather
- *     than a second search, so the private-draft case costs no extra index.
+ * Bounded at every step, since a user hits this per keystroke: `filterFields`
+ * pre-filter drafts inside each index (cost AND confidentiality), every read
+ * is `.take()`, and body hits return the parent's `excerpt` rather than the
+ * body itself.
  */
 export const search = query({
   args: { projectId: v.id("projects"), term: v.string() },
@@ -260,9 +240,8 @@ export const search = query({
       ranked.set(doc._id, { doc, matchedBody: true });
     }
 
-    // The caller's own drafts never reach a search index (they are filtered
-    // out by `status`), so match them here against the same term. Bounded
-    // metadata read, no bodies.
+    // Own drafts are filtered out of the indexes by `status`, so match them
+    // here. Bounded metadata read, no bodies.
     const ownDrafts = await ctx.db
       .query("docs")
       .withIndex("by_project_and_status", (q) =>
@@ -286,8 +265,7 @@ export const search = query({
       .slice(0, SEARCH_LIMIT)
       .map(({ doc, matchedBody }) => ({
         ...toSummary(doc),
-        // Tells the UI why this row matched, so it can say "matched in page
-        // text" instead of showing a title that does not contain the term.
+        // Lets the UI explain a hit whose title lacks the term.
         matchedBody,
       }));
   },

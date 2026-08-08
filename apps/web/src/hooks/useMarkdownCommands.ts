@@ -4,17 +4,12 @@ import { useCallback, type RefObject } from "react";
 import { listEnterAction, listIndentAction } from "@/lib/editor/lists";
 
 /**
- * Text-manipulation commands for a markdown `<textarea>`.
+ * Markdown textarea commands. Ported from wryte's `EditorProvider`, flattened
+ * to a hook since this editor is one component.
  *
- * Ported from wryte.xyz's `EditorProvider` (features/editor/components/
- * editor-context.tsx), flattened from a React context into a hook: wryte
- * shares one textarea across a dozen sibling panels and needs the context to
- * avoid prop drilling, whereas this editor is a single component.
- *
- * Every mutation goes through the native `setRangeText` so the browser's own
- * undo stack survives — rewriting `value` from React state would destroy it,
- * and Cmd+Z is not optional in a writing surface. A synthetic `input` event
- * is dispatched after each one so React's onChange still fires.
+ * Every mutation uses native `setRangeText` so the browser's undo stack
+ * survives — rewriting `value` from state would destroy Cmd+Z. A synthetic
+ * `input` event follows each one so React's onChange still fires.
  */
 export function useMarkdownCommands(
   textareaRef: RefObject<HTMLTextAreaElement | null>
@@ -36,12 +31,8 @@ export function useMarkdownCommands(
     [textareaRef, notifyInput]
   );
 
-  /**
-   * Wrap the selection: `wrapSelection("**", "**")` turns `hello` into
-   * `**hello**`. With nothing selected it inserts both markers and leaves the
-   * caret between them. Re-running it on an already-wrapped selection strips
-   * the markers, so the toolbar buttons toggle instead of stacking.
-   */
+  /** Wrap the selection; re-running on wrapped text unwraps it, so toolbar
+   *  buttons toggle instead of stacking markers. */
   const wrapSelection = useCallback(
     (before: string, after: string) => {
       const textarea = textareaRef.current;
@@ -74,7 +65,7 @@ export function useMarkdownCommands(
           selectionEnd,
           "end"
         );
-        // Park the caret between the markers so typing lands inside them.
+        // Caret between the markers so typing lands inside.
         const caret = selectionStart + before.length;
         textarea.setSelectionRange(caret, caret);
       } else {
@@ -90,10 +81,7 @@ export function useMarkdownCommands(
     [textareaRef, notifyInput]
   );
 
-  /**
-   * Prefix every line the selection touches, e.g. `> ` or `- `. Toggles off
-   * when every touched line already carries the prefix.
-   */
+  /** Prefix every touched line; toggles off when all already carry it. */
   const prefixLines = useCallback(
     (prefix: string) => {
       const textarea = textareaRef.current;
@@ -129,12 +117,7 @@ export function useMarkdownCommands(
     [textareaRef]
   );
 
-  /**
-   * Keydown handler supplying the editing affordances a markdown textarea has
-   * to have: list continuation on Enter, Tab/Shift+Tab indent, and the
-   * standard formatting shortcuts. Returns nothing — it calls
-   * `preventDefault` itself when it handles a key.
-   */
+  /** List continuation on Enter, Tab/Shift+Tab indent, formatting shortcuts. */
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
       const textarea = event.currentTarget;
@@ -168,7 +151,7 @@ export function useMarkdownCommands(
             selectionEnd,
             "end"
           );
-          // Leave "url" selected so it can be typed straight over.
+          // "url" stays selected to type over.
           const urlStart = selectionStart + selected.length + 3;
           textarea.setSelectionRange(urlStart, urlStart + 3);
           notifyInput(textarea);
@@ -188,7 +171,7 @@ export function useMarkdownCommands(
             "end"
           );
         } else {
-          // Empty list item: drop the marker instead of continuing.
+          // Empty item: drop the marker.
           textarea.setRangeText("", action.start, action.end, "end");
         }
         notifyInput(textarea);
@@ -202,7 +185,7 @@ export function useMarkdownCommands(
           event.shiftKey
         );
         if (!action) {
-          // Not a list line — insert two spaces rather than leaving the field.
+          // Not a list line: indent rather than leaving the field.
           if (event.shiftKey) return;
           event.preventDefault();
           insertAtCursor("  ");

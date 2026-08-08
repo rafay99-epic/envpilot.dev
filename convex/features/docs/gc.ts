@@ -1,13 +1,7 @@
 /**
- * Trashed-documentation purge.
- *
- * Same 7-day contract as trashed variables, accounts and secret files
- * (`PURGE_RETENTION_DAYS`), but a plain mutation rather than an action:
- * a doc owns no WorkOS Vault object and no blob, so there is nothing to
- * destroy outside Convex — two row deletes, no external calls.
- *
- * Soft delete without a purge is rot forever, which is the only reason this
- * file exists.
+ * Trashed-doc purge. Same 7-day contract as variables/accounts/files, but a
+ * plain mutation — a doc owns no vault object or blob, so there is nothing to
+ * destroy outside Convex.
  */
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";

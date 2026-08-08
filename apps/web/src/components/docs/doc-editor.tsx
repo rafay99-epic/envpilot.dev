@@ -42,20 +42,13 @@ interface DocEditorProps {
 }
 
 /**
- * Markdown editor with Write / Split / Read modes.
+ * Markdown editor with Write / Split / Read modes. Writing affordances
+ * ported from wryte.xyz: caret-following split sync, list continuation,
+ * Tab indent, formatting via `setRangeText` (keeps the native undo stack),
+ * outline rail, double-click-in-preview to jump to source.
  *
- * Chrome is deliberately minimal: one rule under the controls and one between
- * the panes, no card around the whole thing. The editor IS the page here, and
- * a border around a border around a border eats the width that writing needs.
- *
- * The writing affordances are ported from wryte.xyz: caret-following split
- * scroll sync, list continuation and Tab indent, formatting over
- * `setRangeText` (so the native undo stack survives), an outline rail, and
- * double-click-in-preview to jump the caret to that spot in the source.
- *
- * Still a textarea, deliberately: the primary author of these pages is an
- * agent writing markdown over MCP, so a WYSIWYG surface would be a large
- * dependency serving the secondary case.
+ * A textarea, deliberately — the primary author is an agent writing markdown
+ * over MCP, so WYSIWYG would be a large dependency for the secondary case.
  */
 export function DocEditor({
   body,
@@ -88,9 +81,8 @@ export function DocEditor({
     [showOutline, body]
   );
 
-  // The textarea is uncontrolled so `setRangeText` can drive the native undo
-  // stack; this pushes external changes (template load, draft switch) back in
-  // without clobbering what the user is typing.
+  // Uncontrolled so `setRangeText` drives the native undo stack; this pushes
+  // external changes in without clobbering what the user is typing.
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea && textarea.value !== body) textarea.value = body;
@@ -107,18 +99,12 @@ export function DocEditor({
     selectRange(offset, offset);
   };
 
-  // Height chain, ported from wryte's editor-layout: this component fills
-  // whatever height its parent gives it (`h-full`), the control row is a
-  // fixed-size child, and the pane row takes the rest via `min-h-0 flex-1`.
-  // `min-h-0` is the load-bearing bit — without it a flex child refuses to
-  // shrink below its content, the row grows past the container, and the PAGE
-  // scrolls as well as the pane. That double scrollbar is exactly what this
-  // replaces; there is deliberately no hardcoded pane height anywhere.
+  // `min-h-0` is load-bearing: without it a flex child won't shrink below
+  // its content, the row grows past the container, and the page scrolls as
+  // well as the pane. No hardcoded pane height anywhere.
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* The controls share the WRITING COLUMN's grid — same centered
-          max-w as the textarea below — so they sit over the text, not
-          floating at the viewport edge hundreds of px to its left. */}
+      {/* Same centred grid as the textarea, so controls sit over the text. */}
       <div className="mx-auto flex w-full max-w-[920px] flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-white/10 px-4 pb-2">
         <div className="flex items-center gap-3">
           <div className="flex gap-0.5">
@@ -224,12 +210,8 @@ export function DocEditor({
             ref={editorPaneRef}
             onScroll={onEditorScroll}
             onPointerDown={() => setOwner("editor")}
-            // overflow-HIDDEN, not auto. The textarea below is the single
-            // scroller for this column: a scrollable pane wrapping a
-            // scrollable textarea gives two scrollbars over the same content,
-            // and the caret-follow sync then moves one while the user drags
-            // the other. `getEditorScroller()` in useSplitScrollSync already
-            // detects and drives the textarea in exactly this arrangement.
+            // overflow-HIDDEN: the textarea is the single scroller for this
+            // column. Nesting two scrollers gives duelling scrollbars.
             className={`min-w-0 overflow-hidden ${
               mode === "split" ? "w-1/2 border-r border-white/10" : "w-full"
             }`}
@@ -245,14 +227,10 @@ export function DocEditor({
               autoComplete="off"
               autoCorrect="off"
               data-gramm="false"
-              // The writing column IS the surface: a flat tint on the
-              // centred textarea whose own edges mark the editor's extent
-              // against the untinted page — the thing a full-width wash
-              // could never do (measured ~1.2:1, no edge, invisible). Type
-              // metrics from wryte's editor: 15px/1.85 and generous padding
-              // are what made it pleasant to write in. `h-full` (not
-              // min-h-full) keeps the textarea exactly as tall as its pane
-              // so it stays the single scroller.
+              // The writing column IS the surface — its own edges mark the
+              // editor's extent, which a full-width wash never could.
+              // Type metrics from wryte. `h-full` (not min-h-full) keeps it
+              // exactly as tall as its pane, so it stays the single scroller.
               className="slim-scrollbar mx-auto block h-full w-full max-w-[920px] resize-none overflow-y-auto bg-white/[0.04] px-10 py-8 font-mono text-[15px] leading-[1.85] text-zinc-200 caret-green-400 outline-none selection:bg-green-500/25 placeholder:text-zinc-600 disabled:opacity-60"
               placeholder="Write the page in markdown…"
             />
@@ -275,10 +253,8 @@ export function DocEditor({
               mode === "split" ? "w-1/2 bg-white/[0.02]" : "w-full"
             }`}
           >
-            {/* Read mode: prose centred on the same grid as the writing
-                column, slightly narrower because proportional type reads
-                tighter than monospace. Split: a faint pane tint tells the
-                two sides apart without a border-heavy divider. */}
+            {/* Narrower than the writing column: proportional type reads
+                tighter than monospace. */}
             <div
               className={
                 mode === "read"

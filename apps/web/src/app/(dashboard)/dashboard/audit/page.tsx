@@ -22,7 +22,9 @@ import {
   AlertTriangle,
   Lock,
   Search,
+  ScrollText,
 } from "lucide-react";
+import { PageHeader } from "@envpilot/ui";
 import { AuditExportDialog } from "@/components/audit/export-dialog";
 
 const PAGE_SIZE = 25;
@@ -263,22 +265,21 @@ function AuditPageContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-zinc-100">Audit Logs</h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Track all activity across your organization
-          </p>
-        </div>
-        <TerminalButton
-          variant="secondary"
-          onClick={() => setShowExportDialog(true)}
-          disabled={isExporting}
-        >
-          <Download className="h-4 w-4" />
-          {isExporting ? "Exporting..." : "Export"}
-        </TerminalButton>
-      </div>
+      <PageHeader
+        icon={ScrollText}
+        title="Audit Logs"
+        description="Track all activity across your organization"
+        actions={
+          <TerminalButton
+            variant="secondary"
+            onClick={() => setShowExportDialog(true)}
+            disabled={isExporting}
+          >
+            <Download className="h-4 w-4" />
+            {isExporting ? "Exporting..." : "Export"}
+          </TerminalButton>
+        }
+      />
 
       {/* Summary Cards — always render structure, pulse values while loading */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
