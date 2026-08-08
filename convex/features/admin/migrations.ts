@@ -785,12 +785,14 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
    * published-only search — the page would be silently unfindable by its own
    * text, with no error anywhere.
    *
-   * Bounded per run — a body row holds up to 256KB, so an unbounded collect()
-   * would blow the transaction read limit. Only rows still missing the field
-   * are read, so every run makes progress: re-run until `hadMore` is false.
+   * Batch sized against the read limit, not convenience: a body row holds up
+   * to 256KB, so 20 rows plus their parents is ~5MB — 200 would be ~51MB and
+   * roll back forever. Only rows still missing the field are read, and
+   * orphans are deleted rather than skipped, so every run makes progress:
+   * re-run until `hadMore` is false.
    */
   if (args.name === "backfill-doc-content-status") {
-    const BATCH = 200;
+    const BATCH = 20;
     const rows = await ctx.db
       .query("docContent")
       .filter((q) => q.eq(q.field("status"), undefined))
@@ -801,6 +803,10 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
     for (const row of rows) {
       const doc = await ctx.db.get(row.docId);
       if (!doc) {
+        // Unreachable garbage — its parent is gone, so nothing can ever read
+        // it. Deleting is what lets the batch drain; skipping would leave it
+        // matching the filter forever and pin `hadMore` to true.
+        await ctx.db.delete(row._id);
         orphaned++;
         continue;
       }

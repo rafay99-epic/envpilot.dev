@@ -60,7 +60,7 @@ export const purgeExpiredDocs = internalMutation({
  */
 export const purgeProjectDocs = internalMutation({
   args: { projectId: v.id("projects") },
-  returns: v.object({ purged: v.number() }),
+  returns: v.object({ purged: v.number(), hadMore: v.boolean() }),
   handler: async (ctx, args) => {
     // Lower bound instead of a filter: `undefined` sorts first, so an open
     // range would read every live doc just to discard it.
@@ -78,17 +78,11 @@ export const purgeProjectDocs = internalMutation({
       purged++;
     }
 
-    // A full batch means there is more trash than one transaction should
-    // hold: continue in a fresh one, so "Empty trash" really empties it.
-    // Each round deletes rows, so this always terminates.
-    if (trashed.length === PURGE_BATCH) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.features.docs.gc.purgeProjectDocs,
-        { projectId: args.projectId }
-      );
-    }
-
-    return { purged };
+    // A full batch means more trash than one transaction should hold. The
+    // CALLER re-invokes rather than this rescheduling itself: the caller is
+    // an action, so it can loop across transactions and report a true total.
+    // A background continuation would let "Empty trash" audit a partial count
+    // and call itself done. Each round deletes rows, so the loop terminates.
+    return { purged, hadMore: trashed.length === PURGE_BATCH };
   },
 });

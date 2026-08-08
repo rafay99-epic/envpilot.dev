@@ -551,7 +551,7 @@ const baseHandler = createMcpHandler(
             .string()
             .optional()
             .describe(
-              "Full-text search over page titles and body text, plus a module-name match. Whole words, last term prefix-matched, typo-tolerant — not a substring match. Omit to list everything published."
+              "Full-text search over page titles and body text, plus a module-name match. Whole words, with only the LAST term prefix-matched — not a substring match and not typo-tolerant, so spell terms correctly. Omit to list everything published."
             ),
           module: z
             .string()

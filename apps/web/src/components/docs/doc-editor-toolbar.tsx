@@ -117,6 +117,15 @@ export function DocEditorToolbar({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Adjust-during-render rather than an effect: disabling mid-open (a save
+  // starting) otherwise left menuOpen true, so the trigger reported
+  // aria-expanded with nothing shown and the menu sprang back on re-enable.
+  const [wasDisabled, setWasDisabled] = useState(disabled);
+  if (disabled !== wasDisabled) {
+    setWasDisabled(disabled);
+    if (disabled) setMenuOpen(false);
+  }
+
   // Close on outside click or Escape. No dropdown primitive exists in this
   // app and Radix is not a dependency — one effect is cheaper than adding one.
   useEffect(() => {
@@ -168,7 +177,7 @@ export function DocEditorToolbar({
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => setMenuOpen((open) => !open)}
           disabled={disabled}
-          aria-expanded={menuOpen}
+          aria-expanded={menuOpen && !disabled}
           data-testid="doc-tool-insert"
           className="ml-1 flex items-center gap-1 rounded px-2 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
         >

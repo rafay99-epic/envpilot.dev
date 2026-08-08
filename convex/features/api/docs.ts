@@ -39,6 +39,30 @@ const MAX_SEARCH_ROWS = 25;
 /** How many metadata rows a single search may examine before ranking. */
 const SEARCH_SCAN_LIMIT = 500;
 
+/**
+ * Whole-word module matching, to sit alongside the full-text indexes rather
+ * than contradict them. A plain `includes` made "wall" match "Firewall" and
+ * handed agents documents the search contract never promised.
+ */
+function moduleMatchesTerm(moduleName: string, term: string): boolean {
+  const tokens = moduleName
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  const needles = term
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  if (needles.length === 0) return false;
+  // Every term must match a whole token, except the last, which may be a
+  // prefix — the same rule the Convex search indexes apply.
+  return needles.every((needle, i) =>
+    i === needles.length - 1
+      ? tokens.some((token) => token.startsWith(needle))
+      : tokens.includes(needle)
+  );
+}
+
 const gateFeatureArg = v.optional(
   v.union(v.literal("public_api"), v.literal("mcp_server"))
 );
@@ -241,7 +265,7 @@ export const _searchScopedDocs = internalQuery({
           )
           .filter((q) => q.eq(q.field("deletedAt"), undefined))
           .take(SEARCH_SCAN_LIMIT)) {
-          if (doc.module.toLowerCase().includes(needle)) push(doc);
+          if (moduleMatchesTerm(doc.module, needle)) push(doc);
         }
       }
     } else {
@@ -516,8 +540,11 @@ export const _createDocDraft = internalMutation({
     // Blocks credential material and instructions aimed at the reader's tool
     // belt BEFORE anything is stored. Title and module are scanned too: both
     // are returned by search, so they reach an agent exactly like the body.
-    scanDocBody(`${title}\n${moduleName}`);
-    const { warnings } = scanDocBody(body);
+    const meta = scanDocBody(`${title}\n${moduleName}`);
+    const bodyScan = scanDocBody(body);
+    // Both sets reach the reviewer — a warning about the title is exactly as
+    // worth seeing as one about the body, and discarding it hid half of them.
+    const warnings = [...meta.warnings, ...bodyScan.warnings];
 
     const slug = await uniqueSlug(ctx, args.projectId, slugifyTitle(title));
     const now = Date.now();

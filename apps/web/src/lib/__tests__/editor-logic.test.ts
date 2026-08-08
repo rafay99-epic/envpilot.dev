@@ -135,6 +135,16 @@ describe("parseOutline", () => {
     expect(parseOutline("    # Code")).toEqual([]);
   });
 
+  it("ignores a fence that is itself indented code", () => {
+    // 4-space-indented backticks are an indented code block, not a fence —
+    // treating them as one hid every heading that followed.
+    const body = "# Real\n\n    ```\n    code\n\n## Also real\n";
+    expect(parseOutline(body).map((h) => h.text)).toEqual([
+      "Real",
+      "Also real",
+    ]);
+  });
+
   it("strips closing hashes", () => {
     expect(parseOutline("## Title ##")[0]?.text).toBe("Title");
   });

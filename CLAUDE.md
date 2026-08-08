@@ -51,8 +51,8 @@ The developer has the **production `@envpilot/cli` installed globally** and uses
 #### E2E in CI is DISABLED — the local suite is the gate of record
 
 CI runs NO Playwright suite (it was disabled on the old GitHub Actions CI
-because every run exhausted the Convex free-tier Database I/O quota, and it
-and the `e2e` job in ci.yml is deliberately skipped). Consequences:
+because every run exhausted the Convex free-tier Database I/O quota, and the
+`e2e` job in ci.yml is deliberately skipped). Consequences:
 
 - **The full local run before every merge is mandatory and is the only
   gate** — never skip it.
@@ -391,3 +391,7 @@ Optional: `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`, `NEXT_PUBLIC_PAYMENTS_EN
 `NEXT_PUBLIC_BLOG_URL` / `NEXT_PUBLIC_DOCS_URL` (local: http://localhost:3001 / :3002;
 prod defaults https://blog.envpilot.dev / https://docs.envpilot.dev are baked into `SITE_URLS`).
 The blog and docs apps read the root `.env.local` via symlinks created by `bun run setup`.
+
+## Comments
+
+When adding comments make sure the comments are too the point and logicall and not all over the codebase you don't need to esplain all the codebase as well. Just one comment to reference something or which is very important then don't add useless comments to the codebase.

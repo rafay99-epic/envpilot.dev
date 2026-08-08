@@ -56,6 +56,13 @@ export function CommandPalette() {
       convexUserId && docTerm.length >= 2 ? { searchTerm: docTerm } : "skip"
     ) ?? [];
 
+  // Gated on the CURRENT term, not the debounced one. `docTerm` lags 300ms,
+  // so clearing the box left the previous hits in `navCount` and reachable by
+  // Enter while the section itself had already stopped rendering — Enter
+  // opened an invisible document. Everything below uses this, never the raw
+  // query result.
+  const visibleDocs = searchTerm.trim().length >= 2 ? docResults : [];
+
   // Collect unique tags from results for tag filter chips
   const availableTags = useMemo(() => {
     const tagMap = new Map<
@@ -103,7 +110,7 @@ export function CommandPalette() {
   });
 
   // One navigable list: variables first, doc hits after them.
-  const navCount = filteredResults.length + docResults.length;
+  const navCount = filteredResults.length + visibleDocs.length;
   const clampedIndex =
     navCount === 0 ? 0 : Math.min(selectedIndex, navCount - 1);
 
@@ -198,7 +205,7 @@ export function CommandPalette() {
       e.preventDefault();
       const variable = filteredResults[clampedIndex];
       if (variable) navigateToResult(variable);
-      else navigateToDoc(docResults[clampedIndex - filteredResults.length]);
+      else navigateToDoc(visibleDocs[clampedIndex - filteredResults.length]);
     } else if (e.key === "Escape") {
       e.preventDefault();
       closePalette();
@@ -210,7 +217,7 @@ export function CommandPalette() {
     router.push(`/dashboard/projects/${result.projectSlug}`);
   }
 
-  function navigateToDoc(doc: (typeof docResults)[0]) {
+  function navigateToDoc(doc: (typeof visibleDocs)[0]) {
     closePalette();
     router.push(`/dashboard/projects/${doc.projectSlug}/docs/${doc.slug}`);
   }
@@ -330,7 +337,7 @@ export function CommandPalette() {
                       Searching...
                     </span>
                   </div>
-                ) : filteredResults.length === 0 && docResults.length === 0 ? (
+                ) : filteredResults.length === 0 && visibleDocs.length === 0 ? (
                   <div className="px-4 py-8 text-center text-sm text-zinc-500">
                     Nothing found for &ldquo;{searchTerm}&rdquo;
                   </div>
@@ -405,12 +412,12 @@ export function CommandPalette() {
                     project. Appended rather than given its own palette so
                     there is one Cmd+K and one shortcut. Metadata only; the
                     body is loaded when the page opens. */}
-                {searchTerm.length >= 2 && docResults.length > 0 && (
+                {visibleDocs.length > 0 && (
                   <>
                     <div className="border-t border-zinc-700/50 px-4 pt-3 pb-1 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
                       Documentation
                     </div>
-                    {docResults.map((doc, index) => (
+                    {visibleDocs.map((doc, index) => (
                       <button
                         key={doc._id}
                         data-testid={`palette-doc-${doc.slug}`}
@@ -444,7 +451,7 @@ export function CommandPalette() {
               </div>
 
               {/* Footer */}
-              {(filteredResults.length > 0 || docResults.length > 0) && (
+              {(filteredResults.length > 0 || visibleDocs.length > 0) && (
                 <div className="flex items-center gap-4 border-t border-zinc-700/50 px-4 py-2 text-[10px] text-zinc-600">
                   <span>
                     <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1 py-0.5 font-mono">

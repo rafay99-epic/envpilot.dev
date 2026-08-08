@@ -19,7 +19,9 @@ export type OutlineHeading = {
 
 // Up to 3 leading spaces still make an ATX heading (CommonMark); 4 is code.
 const HEADING_RE = /^ {0,3}(#{1,6})\s+(.*\S)/;
-const FENCE_RE = /^(`{3,}|~{3,})/;
+// Same 0-3 space rule as headings: 4 spaces is an indented code block, and
+// treating its backticks as a fence would swallow every heading after it.
+const FENCE_RE = /^ {0,3}(`{3,}|~{3,})/;
 
 export function parseOutline(content: string): OutlineHeading[] {
   const headings: OutlineHeading[] = [];
@@ -28,7 +30,7 @@ export function parseOutline(content: string): OutlineHeading[] {
   let offset = 0;
 
   for (const line of content.split("\n")) {
-    const marker = FENCE_RE.exec(line.trimStart())?.[1];
+    const marker = FENCE_RE.exec(line)?.[1];
     if (marker) {
       // A fence only closes on its own marker, at least as long — so a ~~~
       // sample inside a ``` block doesn't end it early.

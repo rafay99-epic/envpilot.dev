@@ -832,10 +832,18 @@ export const emptyProjectTrash = action({
     // Documentation, last and in one call. A doc owns no Vault object and no
     // blob, so there is no external delete to retry per row and nothing that
     // can half-succeed — the per-row skip accounting above does not apply.
-    const { purged: purgedDocs } = await ctx.runMutation(
-      internal.features.docs.gc.purgeProjectDocs,
-      { projectId: args.projectId }
-    );
+    // Loop rather than fire-and-forget: this is an action, so each call is
+    // its own transaction and the total below is the real one. A background
+    // continuation would audit only the first batch and report done.
+    let purgedDocs = 0;
+    for (let round = 0; round < 200; round++) {
+      const result: { purged: number; hadMore: boolean } =
+        await ctx.runMutation(internal.features.docs.gc.purgeProjectDocs, {
+          projectId: args.projectId,
+        });
+      purgedDocs += result.purged;
+      if (!result.hadMore) break;
+    }
 
     await ctx.runMutation(internal.features.vault.gc.recordTrashEmptied, {
       projectId: args.projectId,
