@@ -1,6 +1,3 @@
-// Shared between the landing FAQ section (client) and the FAQPage JSON-LD
-// schema in app/page.tsx (server) — the visible copy and the structured data
-// must never drift apart.
 export const FAQ_ITEMS = [
   {
     question: "Where do my secrets actually live?",

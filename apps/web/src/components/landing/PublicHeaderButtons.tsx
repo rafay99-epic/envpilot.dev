@@ -3,18 +3,10 @@
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 
-/**
- * Auth-aware header buttons for public pages.
- *
- * When signed in: shows a single "dashboard" button.
- * When signed out: shows "sign-in" (text link) + "get-started" (styled button).
- * While loading: renders nothing to avoid layout flash.
- */
 export function PublicHeaderButtons() {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    // Reserve space to prevent layout shift
     return <div className="w-[100px]" />;
   }
 
