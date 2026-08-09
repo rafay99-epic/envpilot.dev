@@ -19,6 +19,24 @@ export const metadata: Metadata = {
   },
 };
 
+// Declares the Blog entity the individual posts point `isPartOf` at.
+const blogSchema = {
+  "@context": "https://schema.org",
+  "@type": "Blog",
+  "@id": `${SITE_URLS.blog}/#blog`,
+  name: "Envpilot Blog",
+  description:
+    "Engineering, security, and building-in-public from the Envpilot team.",
+  url: SITE_URLS.blog,
+  inLanguage: "en",
+  publisher: {
+    "@type": "Organization",
+    "@id": `${SITE_URLS.www}/#organization`,
+    name: "Envpilot",
+    url: SITE_URLS.www,
+  },
+};
+
 export default function BlogPage() {
   const posts = getAllPosts();
 
@@ -27,6 +45,10 @@ export default function BlogPage() {
 
   return (
     <BlogShell>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogSchema) }}
+      />
       {/* ── Compact hero ───────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-zinc-800/60">
         <div className="mx-auto max-w-5xl px-4 pt-20 pb-12 sm:px-6">

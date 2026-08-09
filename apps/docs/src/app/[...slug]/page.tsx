@@ -83,6 +83,48 @@ export default async function DocPage({ params }: PageProps) {
   const doc = getDocBySlug(slug);
   if (!doc) notFound();
 
+  // Sections have no index route, so the trail is docs home → this page.
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": `${SITE_URLS.docs}/${slug}#article`,
+        headline: doc.title,
+        description: doc.description,
+        articleSection: doc.section,
+        url: `${SITE_URLS.docs}/${slug}`,
+        inLanguage: "en",
+        isPartOf: { "@id": `${SITE_URLS.docs}/#website` },
+        publisher: {
+          "@type": "Organization",
+          "@id": `${SITE_URLS.www}/#organization`,
+          name: "Envpilot",
+          url: SITE_URLS.www,
+        },
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${SITE_URLS.docs}/#website`,
+        name: "Envpilot Docs",
+        url: SITE_URLS.docs,
+        publisher: { "@id": `${SITE_URLS.www}/#organization` },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Docs",
+            item: SITE_URLS.docs,
+          },
+          { "@type": "ListItem", position: 2, name: doc.title },
+        ],
+      },
+    ],
+  };
+
   const allDocs = getAllDocs();
   const sections = getNavigation();
 
@@ -96,6 +138,10 @@ export default async function DocPage({ params }: PageProps) {
 
   return (
     <DocsShell>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <div className="relative overflow-hidden">
         {/* Deliberately no ambient backdrop here: docs are a reading
             surface — glow/grid/noise layers behind body text hurt
