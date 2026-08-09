@@ -1541,4 +1541,31 @@ Available on Pro.`,
 - Buttons you cannot use no longer appear, and the trash lists only pages you can actually restore
 - Owners now hold every capability by construction, so a capability shipped after an organization was created can no longer leave its owner locked out`,
   },
+  // ============================================================
+  // Owner capabilities and documentation limit fixes (2026-08-09)
+  // ============================================================
+  {
+    title: "Owners Hold Every Capability, By Construction",
+    version: "v1.57.1",
+    type: "fix",
+    publishedAt: ts("2026-08-09T21:00:00Z"),
+    content: `A round of fixes to the role system and to how documentation page limits are counted.
+
+### Owners Can No Longer Fall Behind Their Own Organization
+- The owner's capability set is now derived from the capability catalog rather than listed by hand, so a capability shipped in a new release reaches the owner automatically
+- Owner capabilities resolve from code, not from the stored role row — an organization created before a capability existed no longer has to wait for a re-seed to use it
+- Both the permission checks and the admin role matrix read the same resolved set, so what the matrix shows is what the platform enforces
+
+### Documentation Deletion Follows Publication
+- You can always revise your own page and trash your own draft
+- Once a page is published it belongs to the team, so deleting it requires the delete capability no matter who wrote it — an author can no longer unilaterally remove a page their teammates already rely on
+
+### Page Limits Cost Nothing on Unlimited Plans
+- Page counts are now evaluated lazily, so an organization with unlimited pages never runs the count behind a limit that can never apply
+- Counting stops at the cap instead of reading one project past it, and reports the exact number at the ceiling
+
+### Free-Tier Availability Actually Reaches Existing Organizations
+- Tier defaults only ever get inserted, never overwritten, so the move of documentation onto the free plan would not have reached organizations created earlier
+- A scoped migration now applies the three documentation values to existing plans, leaving every other tier setting untouched`,
+  },
 ];
