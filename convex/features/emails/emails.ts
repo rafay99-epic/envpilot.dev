@@ -749,3 +749,196 @@ export const sendVariableRequestReviewedEmail = internalAction({
     return sendEmail(args.to, subject, html, text);
   },
 });
+
+/**
+ * "X shared a documentation page with you" — the internal audience.
+ *
+ * Carries a deep link and no token: the recipient is an authenticated member
+ * and the grant lives in the database, not in the URL.
+ */
+export const sendDocSharedEmail = internalAction({
+  args: {
+    recipients: v.array(v.object({ email: v.string(), name: v.string() })),
+    docTitle: v.string(),
+    /** Set for a MODULE share — how many published pages it covers. */
+    pageCount: v.optional(v.number()),
+    projectName: v.string(),
+    sharedByName: v.string(),
+    note: v.optional(v.string()),
+    expiresAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    if (args.recipients.length === 0) return;
+
+    const appUrl = getEmailConfig()?.appUrl || "https://www.envpilot.dev";
+    const link = `${appUrl}/dashboard/docs/shared`;
+    const expires = new Date(args.expiresAt).toUTCString();
+
+    const safeTitle = escapeHtml(args.docTitle);
+    const safeProject = escapeHtml(args.projectName);
+    const safeSharer = escapeHtml(args.sharedByName);
+
+    // A module share is ONE message covering N pages — never one per page.
+    const isModule = args.pageCount !== undefined;
+    const pages =
+      args.pageCount === 1 ? "1 page" : `${args.pageCount ?? 0} pages`;
+
+    const subject = isModule
+      ? `${args.sharedByName} shared the "${args.docTitle}" documentation with you`
+      : `${args.sharedByName} shared "${args.docTitle}" with you`;
+
+    const rows = [
+      iconRow(args.projectName.charAt(0).toUpperCase()),
+      headingRow(
+        isModule
+          ? "A documentation module was shared with you"
+          : "A documentation page was shared with you"
+      ),
+      paragraphRow(
+        isModule
+          ? `<strong>${safeSharer}</strong> shared the <strong>${safeTitle}</strong> module from <strong>${safeProject}</strong> with you — ${pages} today, and anything published into it later.`
+          : `<strong>${safeSharer}</strong> shared <strong>${safeTitle}</strong> from <strong>${safeProject}</strong> with you.`
+      ),
+    ];
+    if (args.note) {
+      rows.push(
+        paragraphRow(
+          `“${escapeHtml(args.note)}”`,
+          "font-size: 14px; line-height: 1.5; color: #a1a1aa; font-style: italic;"
+        )
+      );
+    }
+    rows.push(
+      buttonRow(link, isModule ? "Read the documentation" : "Read the page"),
+      paragraphRow(
+        `Access expires on ${escapeHtml(expires)}.`,
+        "font-size: 13px; line-height: 1.5; color: #71717a;"
+      ),
+      footerRow(
+        `You received this because a teammate shared documentation with you. It gives you access to what they shared and nothing else.<br><br>Link not working? Copy this:<br><a href="${link}" style="color: #22c55e; word-break: break-all;">${link}</a>`
+      )
+    );
+
+    const html = emailWrapper(
+      "Documentation shared with you",
+      rows.join(""),
+      `${args.sharedByName} shared ${args.docTitle} from ${args.projectName} with you.`
+    );
+
+    const text = `${args.sharedByName} shared ${isModule ? `the "${args.docTitle}" module (${pages})` : `"${args.docTitle}"`} from ${args.projectName} with you.${
+      args.note ? `\n\n"${args.note}"` : ""
+    }\n\nRead it: ${link}\n\nAccess expires on ${expires}.`;
+
+    for (const recipient of args.recipients) {
+      await sendEmail(recipient.email, subject, html, text).catch((err) =>
+        console.error("emails.sendDocSharedEmail.sendFailed", {
+          docTitle: args.docTitle,
+          recipient: recipient.email,
+          error: String(err),
+        })
+      );
+    }
+  },
+});
+
+/**
+ * A public preview link, mailed to someone outside the organization.
+ *
+ * The passphrase is NEVER in this email. Mailing both factors down the same
+ * channel would make the second one decorative — the sender passes it on
+ * separately, and the copy says so.
+ */
+export const sendDocLinkEmail = internalAction({
+  args: {
+    to: v.string(),
+    token: v.string(),
+    docTitle: v.string(),
+    /** Set for a MODULE link — how many published pages it covers. */
+    pageCount: v.optional(v.number()),
+    projectName: v.string(),
+    sharedByName: v.string(),
+    note: v.optional(v.string()),
+    hasPassphrase: v.boolean(),
+    expiresAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    // Built here rather than passed in: one place owns the shape of a public
+    // documentation URL, and it is the same place that owns every other link
+    // this module sends.
+    const appUrl = getEmailConfig()?.appUrl || "https://www.envpilot.dev";
+    const url = `${appUrl}/d/${args.token}`;
+
+    const expires = new Date(args.expiresAt).toUTCString();
+    const safeTitle = escapeHtml(args.docTitle);
+    const safeProject = escapeHtml(args.projectName);
+    const safeSharer = escapeHtml(args.sharedByName);
+    const safeUrl = escapeHtml(url);
+
+    // One link, one message — whether it opens a page or a whole module.
+    const isModule = args.pageCount !== undefined;
+    const pages =
+      args.pageCount === 1 ? "1 page" : `${args.pageCount ?? 0} pages`;
+
+    const subject = isModule
+      ? `${args.sharedByName} shared documentation with you: ${args.docTitle}`
+      : `${args.sharedByName} shared a document with you: ${args.docTitle}`;
+
+    const rows = [
+      iconRow(args.projectName.charAt(0).toUpperCase()),
+      headingRow(
+        isModule
+          ? "Documentation was shared with you"
+          : "A document was shared with you"
+      ),
+      paragraphRow(
+        isModule
+          ? `<strong>${safeSharer}</strong> shared the <strong>${safeTitle}</strong> documentation from <strong>${safeProject}</strong> with you — ${pages}.`
+          : `<strong>${safeSharer}</strong> shared <strong>${safeTitle}</strong> from <strong>${safeProject}</strong> with you.`
+      ),
+    ];
+    if (args.note) {
+      rows.push(
+        paragraphRow(
+          `“${escapeHtml(args.note)}”`,
+          "font-size: 14px; line-height: 1.5; color: #a1a1aa; font-style: italic;"
+        )
+      );
+    }
+    rows.push(
+      buttonRow(url, isModule ? "Open the documentation" : "Open the document")
+    );
+    if (args.hasPassphrase) {
+      rows.push(
+        paragraphRow(
+          "This link is passphrase protected. The sender will give you the passphrase separately — it is deliberately not in this email.",
+          "font-size: 13px; line-height: 1.5; color: #fbbf24;"
+        )
+      );
+    }
+    rows.push(
+      paragraphRow(
+        `The link stops working on ${escapeHtml(expires)}.`,
+        "font-size: 13px; line-height: 1.5; color: #71717a;"
+      ),
+      footerRow(
+        `You received this because someone shared a document with you.<br><br>Link not working? Copy this:<br><a href="${safeUrl}" style="color: #22c55e; word-break: break-all;">${safeUrl}</a>`
+      )
+    );
+
+    const html = emailWrapper(
+      "A document was shared with you",
+      rows.join(""),
+      `${args.sharedByName} shared ${args.docTitle} with you.`
+    );
+
+    const text = `${args.sharedByName} shared ${isModule ? `the "${args.docTitle}" module (${pages})` : `"${args.docTitle}"`} from ${args.projectName} with you.${
+      args.note ? `\n\n"${args.note}"` : ""
+    }\n\nOpen it: ${url}${
+      args.hasPassphrase
+        ? "\n\nThis link is passphrase protected. The sender will give you the passphrase separately."
+        : ""
+    }\n\nThe link stops working on ${expires}.`;
+
+    return sendEmail(args.to, subject, html, text);
+  },
+});

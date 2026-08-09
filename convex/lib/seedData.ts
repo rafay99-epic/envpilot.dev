@@ -371,6 +371,39 @@ export const SEED_FEATURES = [
     resettable: false,
     sortOrder: 2,
   },
+  // Handing a page to a teammate costs one email per user action — no cron,
+  // no recurring work — so it needs no companion limit; the docShareCreate
+  // rate limit is what bounds abuse.
+  {
+    key: "doc_sharing",
+    displayName: "Documentation Sharing",
+    valueType: "boolean" as const,
+    category: "Collaboration",
+    defaultValue: "true",
+    resettable: false,
+    sortOrder: 3,
+  },
+  // A public link is infrastructure served to the anonymous internet for as
+  // long as it lives, so this one takes the full dual gate: boolean for
+  // availability, numeric for how many links may be live at once.
+  {
+    key: "doc_public_links",
+    displayName: "Public Documentation Links",
+    valueType: "boolean" as const,
+    category: "Collaboration",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 4,
+  },
+  {
+    key: "max_active_doc_links",
+    displayName: "Max Active Public Documentation Links",
+    valueType: "numeric" as const,
+    category: "Collaboration",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 5,
+  },
 ];
 
 // ─── Role registry seeds ──────────────────────────────────────────────────────

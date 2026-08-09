@@ -99,6 +99,37 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 10,
   },
 
+  // Documentation shares: 30 per hour per org, burst 10. A share sends an
+  // email, so the bound is on outbound volume, not storage. Handing one page
+  // to a five-person team in one action is a legitimate burst.
+  docShareCreate: {
+    kind: "token bucket",
+    rate: 30,
+    period: 3_600_000,
+    capacity: 10,
+  },
+
+  // Passphrase attempts on a public documentation link: 10 per hour per
+  // TOKEN. Keyed on the token rather than the client IP on purpose — the
+  // Convex mutation is publicly callable, so any caller-supplied key would
+  // let an attacker mint a fresh bucket per guess. Per-token also means one
+  // attacker cannot lock every other reader out of unrelated links.
+  docShareUnlock: {
+    kind: "fixed window",
+    rate: 10,
+    period: 3_600_000,
+  },
+
+  // Successful reads of a public documentation link: 60 per hour per token.
+  // Each one writes an audit row, so an unbounded read is an unbounded write.
+  // Well above real reading (open, refresh, re-open) and far below flooding.
+  docShareView: {
+    kind: "token bucket",
+    rate: 60,
+    period: 3_600_000,
+    capacity: 20,
+  },
+
   // CLI device code generation: 5 per minute per device
   cliAuthInitiate: {
     kind: "token bucket",

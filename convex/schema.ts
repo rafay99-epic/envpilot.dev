@@ -711,6 +711,102 @@ export default defineSchema({
       filterFields: ["projectId", "status"],
     }),
 
+  // Hands ONE published page to ONE reader. Two audiences, one table, one
+  // gate chain (features/docs/shareGuards.ts).
+  //
+  // A share is a grant to a PERSON, never to a machine identity: the MCP and
+  // REST read paths must never consult this table, or a per-user grant would
+  // silently widen what an org-scoped API key can read.
+  //
+  // Every gate is re-checked on READ, not trusted from create time. Status is
+  // a fast path; unpublishing, trashing, expiry, losing membership and a tier
+  // downgrade all have to kill a live link, and only a read-time check does.
+  docShares: defineTable({
+    projectId: v.id("projects"),
+    organizationId: v.id("organizations"),
+    createdBy: v.id("users"),
+
+    audience: v.union(v.literal("member"), v.literal("external")),
+
+    // WHAT is shared. Absent ⇒ "page" (rows created before module sharing
+    // existed) — normalize on read, the sharedSecrets.resourceType pattern.
+    //
+    // A module share is a subscription, not a snapshot: it names a module and
+    // the published pages in it are resolved at READ time, so a page
+    // published into the module later is covered without re-sharing, and one
+    // unpublished drops out on its own. That is the whole reason it exists —
+    // otherwise it is just N page shares and N emails.
+    scope: v.optional(v.union(v.literal("page"), v.literal("module"))),
+
+    // Set when scope is "page". Optional because a module share names no
+    // single page.
+    docId: v.optional(v.id("docs")),
+    // Set when scope is "module". Matches `docs.module` within `projectId`.
+    module: v.optional(v.string()),
+
+    // audience "member": a named person inside the organization. Resolved
+    // server-side from org membership — the client never picks a user id.
+    recipientUserId: v.optional(v.id("users")),
+
+    // audience "external": the token IS the credential (dshr_ + 64 hex).
+    token: v.optional(v.string()),
+    // scrypt(passphrase, salt). The passphrase itself is never stored, never
+    // logged, and never mailed alongside the link.
+    passphraseHash: v.optional(v.string()),
+    passphraseSalt: v.optional(v.string()),
+    // Who the link was mailed to, for the audit trail only — it does NOT gate
+    // the read. Anyone holding the URL can open it.
+    recipientEmail: v.optional(v.string()),
+
+    /** One line from the sender, shown to the reader. */
+    note: v.optional(v.string()),
+
+    status: v.union(
+      v.literal("active"),
+      v.literal("expired"),
+      v.literal("revoked")
+    ),
+    // Mandatory on BOTH audiences. There is no permanent share.
+    expiresAt: v.number(),
+    viewCount: v.number(),
+    lastViewedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    revokedAt: v.optional(v.number()),
+    revokedBy: v.optional(v.id("users")),
+  })
+    // O(log n) public read — the only lookup an anonymous request performs.
+    .index("by_token", ["token"])
+    // Status is part of every per-page read's key, never a post-read filter:
+    // ordered by creation alone, a `take` would return a page's REVOKED
+    // history first, so a page shared often enough would report no active
+    // shares and its live links could not be revoked from the UI.
+    //
+    // The bare `docId` prefix of this index also serves the purge cascade,
+    // which wants every row for a page regardless of status — hence no
+    // separate `by_doc`.
+    .index("by_doc_status", ["docId", "status"])
+    // Upsert key: re-sharing a page to the same person refreshes the grant
+    // instead of stacking a second row (and a second email). Status is in the
+    // key for the same reason as above — the lookup wants the ACTIVE grant,
+    // and a pair with a long revoke history would otherwise be a scan.
+    .index("by_doc_recipient_status", ["docId", "recipientUserId", "status"])
+    .index("by_recipient_status", ["recipientUserId", "status"])
+    // Bounds the active-link count behind max_active_doc_links. Audience is
+    // in the key because that count is about PUBLIC links only — without it
+    // the read walks every active member share in the organization too, and
+    // member shares have no cap to bound them.
+    .index("by_org_audience_status", ["organizationId", "audience", "status"])
+    // Bounds the hourly expiry sweep to rows that can actually expire.
+    .index("by_status_and_expires", ["status", "expiresAt"])
+    // Every share in a project, for the project's Shared tab — which lists
+    // page and module shares together and must not read the whole org.
+    .index("by_project_status", ["projectId", "status"])
+    // Module shares covering one module. Every documentation page view asks
+    // "is a module share serving this page too?", so that question has to be
+    // an exact range — without the module in the key it is a scan of the
+    // project's entire share history on every page open.
+    .index("by_project_module_status", ["projectId", "module", "status"]),
+
   // ==========================================
   // PROJECT ACCESS (for extension linking)
   // ==========================================
@@ -1200,7 +1296,13 @@ export default defineSchema({
       v.literal("doc.updated"),
       v.literal("doc.published"),
       v.literal("doc.deleted"),
-      v.literal("doc.restored")
+      v.literal("doc.restored"),
+      // Documentation sharing. `doc.share_viewed` is attributed to the share
+      // CREATOR: an external reader has no user row, and userId is required.
+      // The viewer's context travels in `details`, matching share.viewed.
+      v.literal("doc.shared"),
+      v.literal("doc.share_revoked"),
+      v.literal("doc.share_viewed")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),

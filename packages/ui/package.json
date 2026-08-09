@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/ui",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Shared marketing, docs, and app-chrome UI components for Envpilot",
   "private": true,
   "license": "UNLICENSED",
@@ -8,8 +8,13 @@
   "homepage": "https://www.envpilot.dev",
   "exports": {
     ".": "./src/index.ts",
+    "./docs": "./src/docs/index.ts",
     "./styles.css": "./src/styles.css"
   },
+  "//sideEffects": "Components and helpers only — no import-time side effects. Declared so a bundler may drop unused exports instead of pulling the marketing bundle (framer-motion et al) into any chunk that touches this package.",
+  "sideEffects": [
+    "*.css"
+  ],
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"

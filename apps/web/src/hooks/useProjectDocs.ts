@@ -88,6 +88,11 @@ export interface DocAccess {
   canCreate: boolean;
   canPublish: boolean;
   canDelete: boolean;
+  /** Role capability AND tier, already combined by the backend. */
+  canShare: boolean;
+  canShareExternal: boolean;
+  /** Role holds it, plan does not — show the upgrade, not an empty gap. */
+  externalUpgradeRequired: boolean;
   atProjectLimit: boolean;
   atOrgLimit: boolean;
   projectCount: number;
@@ -143,4 +148,127 @@ export function groupDocsByModule<T extends DocSummary>(
   return Array.from(byModule.entries())
     .map(([module, entries]) => ({ module, docs: entries }))
     .sort((a, b) => a.module.localeCompare(b.module));
+}
+
+// ─── Sharing ─────────────────────────────────────────────────────────────
+//
+// Two audiences, one table. Member shares are Convex mutations (the recipient
+// is authenticated); public links go through /api/doc-shares because minting
+// a token and deriving a scrypt hash both need Node crypto.
+
+export type DocShareScope = "page" | "module";
+
+export interface ProjectDocShare {
+  _id: Id<"docShares">;
+  scope: DocShareScope;
+  audience: "member" | "external";
+  status: "active" | "expired" | "revoked";
+  /** Module name, or the page title. What was actually shared. */
+  target: string;
+  docSlug?: string;
+  recipientName: string;
+  token?: string;
+  hasPassphrase: boolean;
+  viewCount: number;
+  lastViewedAt?: number;
+  expiresAt: number;
+  createdAt: number;
+  createdByName: string;
+  canRevoke: boolean;
+}
+
+export interface DocShareSummary {
+  _id: Id<"docShares">;
+  audience: "member" | "external";
+  scope: DocShareScope;
+  /** Module name, or the page title. */
+  target: string;
+  recipientName: string;
+  token?: string;
+  hasPassphrase: boolean;
+  note?: string;
+  viewCount: number;
+  lastViewedAt?: number;
+  expiresAt: number;
+  isExpired: boolean;
+  createdAt: number;
+  createdByName: string;
+  canRevoke: boolean;
+}
+
+export interface SharedWithMeEntry {
+  _id: Id<"docShares">;
+  scope: DocShareScope;
+  title: string;
+  module: string;
+  /** 1 for a page share; the module's live page count for a module share. */
+  pageCount: number;
+  excerpt?: string;
+  projectName: string;
+  note?: string;
+  expiresAt: number;
+  sharedAt: number;
+  sharedByName: string;
+}
+
+/** Everyone a page is currently shared with. */
+export function useDocShares(docId: Id<"docs"> | undefined) {
+  return useQuery(
+    convexApi.features.docs.shares.listForDoc,
+    docId ? { docId } : "skip"
+  ) as DocShareSummary[] | undefined;
+}
+
+/**
+ * Whether anything is shared with the caller. Deliberately separate from
+ * `useSharedWithMe`: the nav asks this on every dashboard page and only needs
+ * a yes/no, so it must not pay for resolving every share.
+ */
+export function useHasSharedWithMe() {
+  return useQuery(convexApi.features.docs.shares.hasSharedWithMe, {}) as
+    | boolean
+    | undefined;
+}
+
+/** Pages other people handed to the signed-in reader. */
+export function useSharedWithMe() {
+  return useQuery(convexApi.features.docs.shares.listSharedWithMe, {}) as
+    | SharedWithMeEntry[]
+    | undefined;
+}
+
+/**
+ * One shared page, or a shared module's index when `docSlug` is omitted.
+ * A reactive query: it writes nothing, so the visit is recorded separately
+ * by `useMarkShareViewed`.
+ */
+export function useSharedDoc(
+  shareId: Id<"docShares"> | undefined,
+  docSlug?: string
+) {
+  return useQuery(
+    convexApi.features.docs.shares.readSharedByRecipient,
+    shareId ? { shareId, docSlug } : "skip"
+  );
+}
+
+/** Every documentation share in a project — the docs half of Shared. */
+export function useProjectDocShares(projectId: Id<"projects"> | undefined) {
+  return useQuery(
+    convexApi.features.docs.shares.listForProject,
+    projectId ? { projectId } : "skip"
+  ) as ProjectDocShare[] | undefined;
+}
+
+export function useShareDocWithMembers() {
+  return useMutation(convexApi.features.docs.shares.shareWithMembers);
+}
+
+export function useRevokeDocShare() {
+  return useMutation(convexApi.features.docs.shares.revokeShare);
+}
+
+/** Fired once when a shared page opens — never from the render path. */
+export function useMarkShareViewed() {
+  return useMutation(convexApi.features.docs.shares.markShareViewed);
 }

@@ -464,3 +464,47 @@ export async function countOrgDocs(
   }
   return count;
 }
+
+/**
+ * Live public documentation links in an organization — the count behind
+ * `max_active_doc_links`.
+ *
+ * Two things make this exact rather than approximate. The index range is
+ * status-scoped, so revoked and expired rows are never read. And rows whose
+ * TTL has elapsed are excluded in memory: the expiry cron runs hourly, so an
+ * "active" row can be dead for up to an hour, and counting it would block a
+ * new link against a slot nothing occupies. `countActiveShares` carries the
+ * same correction for the same reason.
+ *
+ * The read is bounded by `MAX_ACTIVE_DOC_LINK_SCAN`, not by the tier limit:
+ * `take(limit + 1)` would be wrong because a taken row may be one of the
+ * past-TTL ones this function exists to exclude. The range is scoped to
+ * external AND active, so member shares (which have no cap) never enter it,
+ * and the only way to approach the ceiling is an organization that was
+ * unlimited and has since been capped — where reporting "at least the
+ * ceiling" is the correct answer anyway.
+ */
+/**
+ * Ceiling on the active-link scan. Only reachable by an organization that
+ * minted links while unlimited and was then given a finite cap; at that point
+ * every finite cap is already exceeded, so stopping here cannot change the
+ * decision — it only stops the read from growing without bound.
+ */
+const MAX_ACTIVE_DOC_LINK_SCAN = 500;
+
+export async function countActiveDocLinks(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">
+): Promise<number> {
+  const now = Date.now();
+  const rows = await db
+    .query("docShares")
+    .withIndex("by_org_audience_status", (q) =>
+      q
+        .eq("organizationId", organizationId)
+        .eq("audience", "external")
+        .eq("status", "active")
+    )
+    .take(MAX_ACTIVE_DOC_LINK_SCAN);
+  return rows.filter((row) => row.expiresAt > now).length;
+}

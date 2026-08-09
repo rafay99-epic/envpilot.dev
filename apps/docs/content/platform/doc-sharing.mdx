@@ -1,0 +1,185 @@
+---
+title: Sharing documentation
+description: Hand one published documentation page to a named teammate, or mint an expiring public preview link — with a gate chain that is re-checked on every single read.
+icon: users
+---
+
+# Sharing documentation
+
+Anyone assigned to a project already reads every published page in it, so
+sharing only means something in two cases: reaching an organization member who
+is **not** on the project, and reaching someone who is not on Envpilot at all.
+
+Both are grants to a **person or a URL**, never to a machine. Both are scoped
+to exactly what you chose to share — one page, or one module — and never to the
+project around it: not its other modules, and nothing about its variables,
+files or accounts.
+
+<Callout type="info" title="Only published pages are ever shared">
+  A draft has never been through human review, and publication is the single
+  gate the whole documentation feature rests on. A share that could carry a
+  draft would be a way around it — so the drawer refuses to share a draft page,
+  and a module share serves only the published pages inside it.
+</Callout>
+
+## Sharing with teammates
+
+From a published page, open **Share** and pick organization members. Set how
+long the access lasts (24 hours, 7 days, or 30 days) and, optionally, a one-line
+note explaining why you sent it.
+
+Each recipient gets an email, and the page appears under **Shared with me** in
+their dashboard sidebar. That entry only appears once something has actually
+been shared with them, so it is not a permanently empty inbox for the rest of
+the team. If a recipient turns out to have normal project access anyway, they
+are sent to the real page instead of the stripped-down reader.
+
+Re-sharing a page to someone who already holds it **extends their access**
+rather than creating a second grant — no duplicate row in your shared-with list
+and no second email for access they already have.
+
+| Property   | Value                                                             |
+| ---------- | ----------------------------------------------------------------- |
+| Capability | `project.docs.share`                                              |
+| Roles      | Owner, Project Manager, Team Lead, Developer, Editor — not Viewer |
+| Tier key   | `doc_sharing` — available on Free and Pro                         |
+| Expiry     | 24 hours, 7 days, or 30 days                                      |
+| Note       | Up to 280 characters                                              |
+| Recipients | Up to 20 per action                                               |
+
+## Sharing a whole module
+
+Handing over twenty pages one at a time means twenty shares and twenty emails
+to the same person. The **Whole module** option in the share drawer replaces
+all of that with one share and one message, on either audience.
+
+A module share is a **subscription, not a snapshot**. It names the module; the
+pages inside it are resolved every time the recipient opens it. A page
+published into the module next week is covered without anyone re-sharing, and
+a page returned to draft disappears from the recipient's index on its own.
+
+<Callout
+  type="warning"
+  title="A module share covers pages that do not exist yet"
+>
+  Because the page list is resolved at read time, anything published into that
+  module later becomes readable by everyone the module is already shared with —
+  including holders of a public link. Share a page rather than a module when the
+  recipient should only ever see what exists today.
+</Callout>
+
+Recipients get an index of the module and read pages from there. A module with
+no published pages cannot be shared at all — the drawer refuses rather than
+handing over an empty index.
+
+| Property   | Value                                                                                                  |
+| ---------- | ------------------------------------------------------------------------------------------------------ |
+| Capability | Same as the audience: `project.docs.share` internally, `project.docs.share.external` for a public link |
+| Emails     | One per recipient, naming the module and its page count                                                |
+| Pages      | Up to 200 per module share                                                                             |
+| Link cap   | A module link counts as **one** against `max_active_doc_links`                                         |
+
+Both scopes appear together on the project's **Shared** tab, alongside shared
+variables, with the same status filters.
+
+## Public preview links
+
+The **Public link** tab mints a URL at `/d/<token>`, where the token is `dshr_`
+followed by 64 hex characters of randomness. Anyone holding the URL can read
+that one page until it expires or is revoked; no account is required.
+
+Expiry is **mandatory** and capped at **30 days**. There is no permanent link.
+
+You may add a **passphrase** (8–200 characters). It is hashed with scrypt
+server-side, and every read verifies it inside Convex — there is no "already
+unlocked" flag a caller could assert on a direct call. A verified reader gets a
+short-lived cookie carrying the hash, which Convex re-checks anyway.
+
+<Callout type="warning" title="The passphrase is never in the email">
+  Envpilot deliberately does not include it in the notification. A link and its
+  passphrase in the same inbox is one credential, not two — pass it on through a
+  different channel.
+</Callout>
+
+A shared page carries a `noindex` robots meta tag, and the API responses behind
+it carry `X-Robots-Tag: noindex, nofollow, noarchive`. The link is already
+unguessable; the point of both is that one crawler reaching one link would
+otherwise publish the page permanently.
+
+| Property   | Value                                                                               |
+| ---------- | ----------------------------------------------------------------------------------- |
+| Capability | `project.docs.share.external`                                                       |
+| Roles      | Owner and Project Manager only                                                      |
+| Tier keys  | `doc_public_links` (Pro only), `max_active_doc_links` (0 on Free, unlimited on Pro) |
+| Expiry     | 24 hours, 7 days or 30 days in the dashboard; 1 hour to 30 days over the API        |
+| Passphrase | Optional, 8–200 characters, scrypt-hashed                                           |
+
+## What kills a share
+
+Every one of these is re-checked on **every read**, not just when the share was
+created — nothing here trusts create-time state:
+
+- the expiry passing
+- a manual revoke
+- the page being unpublished
+- the page being moved to trash
+- the recipient leaving, or being suspended from, the organization
+- documentation being switched off for the organization
+- for a public link, the organization dropping to a tier without the feature
+
+Unpublishing or trashing a page additionally revokes every live share pointing
+at it on the spot, rather than leaving dead links for readers to discover. An
+hourly job marks past-expiry rows `expired`, but that is bookkeeping for the
+shared-with list and the active-link count — a row it has not reached yet is
+already dead to readers.
+
+The sender may always revoke their own share; revoking someone else's needs
+`project.docs.delete`.
+
+<Callout type="info" title="Every failure looks the same">
+  A revoked link, an expired one, one whose page was unpublished, one whose
+  organization downgraded, and a token that never existed all produce the same
+  answer. Naming which one you hit tells a prober what they found.
+</Callout>
+
+## Shares are never granted to a machine
+
+The MCP tools (`envpilot_search_docs`, `envpilot_get_doc`) and the REST API do
+not consult the share table at all. An agent reads documentation because its
+API key is scoped to the project, never because a human shared a page with
+someone. Widening a share to a machine identity is not something you can
+configure — the code path does not exist.
+
+## Auditing and notifications
+
+| Audit action        | When                                |
+| ------------------- | ----------------------------------- |
+| `doc.shared`        | A share is created, either audience |
+| `doc.share_revoked` | A share is revoked                  |
+| `doc.share_viewed`  | A shared page is read               |
+
+Every share also carries a view count and a last-viewed timestamp, visible in
+the page's shared-with list. View rows are attributed to the share's **creator**
+— that row answers "who used the link I created", and an anonymous external
+reader has no user row to attribute to; their IP and user agent travel on the
+audit row instead.
+
+`doc.shared` fires the `docs` event group, so Slack and Discord webhooks pick it
+up alongside `doc.published`. See [Notifications](/integrations/notifications).
+
+## Limits
+
+- **30 share actions per hour** per organization, burst 10. Every share sends
+  mail, so the bound is on outbound volume — handing one page to a five-person
+  team in one action is a legitimate burst.
+- **10 passphrase attempts per hour** per IP. Only a wrong guess costs a token;
+  asking for the salt, or a first visit with no attempt, costs nothing.
+- **`max_active_doc_links`** caps how many public links may be live at once —
+  0 on Free, unlimited on Pro. Revoking or expiring one frees its slot.
+
+## See also
+
+- [Diagrams in documentation](/platform/doc-diagrams) — they render on shared pages too
+- [Roles & permissions](/platform/rbac) — the capability model both gates use
+- [Plans & limits](/limits/plans) — the documentation tier matrix
+- [Secret sharing links](/platform/sharing) — the equivalent for a single secret value

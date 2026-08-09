@@ -8,6 +8,7 @@ import { internal } from "../../_generated/api";
 import { internalMutation } from "../../_generated/server";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import { deleteBody } from "./content";
+import { deleteSharesForDoc } from "./shareGuards";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -40,6 +41,9 @@ export const purgeExpiredDocs = internalMutation({
       // unreachable but harmless, whereas a doc row whose body vanished
       // would render as an empty page.
       await deleteBody(ctx, doc._id);
+      // Share rows point at a doc id. Leaving them behind would strand a row
+      // whose target no longer exists in every list that reads them.
+      await deleteSharesForDoc(ctx, doc._id);
       await ctx.db.delete(doc._id);
       purged++;
     }
@@ -74,6 +78,7 @@ export const purgeProjectDocs = internalMutation({
     let purged = 0;
     for (const doc of trashed) {
       await deleteBody(ctx, doc._id);
+      await deleteSharesForDoc(ctx, doc._id);
       await ctx.db.delete(doc._id);
       purged++;
     }

@@ -1,9 +1,79 @@
 "use client";
 
 import { useDeferredValue, useMemo } from "react";
+import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { CodeBlock } from "@envpilot/ui/docs";
 import { remarkSourceLines } from "@/lib/editor/source-lines";
+
+// Mermaid is ~500KB and most pages have no diagram, so it loads only when a
+// ```mermaid fence actually renders. The MDX apps reach the same component
+// through remarkMermaid; react-markdown has no MDX phase, so the `pre`
+// override below is this pipeline's equivalent.
+const MermaidChart = dynamic(
+  // The `/docs` entry point, not the package root: the root barrel also
+  // re-exports the marketing components (framer-motion, particle canvas),
+  // which would land in this lazily-loaded chunk and undo the saving.
+  () => import("@envpilot/ui/docs").then((m) => m.MermaidChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="my-6 h-24 animate-pulse rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40" />
+    ),
+  }
+);
+
+/**
+ * Minimal structural view of the hast nodes react-markdown passes to a
+ * component override. Declared here rather than imported from `hast` for the
+ * same reason remark-mermaid.ts walks the tree by hand: those types are not a
+ * direct dependency of this app.
+ */
+type HastNode = {
+  type: string;
+  tagName?: string;
+  value?: string;
+  properties?: { className?: unknown };
+  children?: HastNode[];
+};
+
+/** The `language-x` suffix on a fence, if it declared one. */
+function fenceLanguage(code: HastNode): string | undefined {
+  const classes = code.properties?.className;
+  const list = Array.isArray(classes)
+    ? classes
+    : typeof classes === "string"
+      ? [classes]
+      : [];
+  for (const entry of list) {
+    if (typeof entry === "string" && entry.startsWith("language-")) {
+      return entry.slice("language-".length);
+    }
+  }
+  return undefined;
+}
+
+/** The `code` child of any fenced block, mermaid or otherwise. */
+function fenceCode(node: unknown): HastNode | undefined {
+  const first = (node as HastNode | undefined)?.children?.[0];
+  if (first?.type !== "element" || first.tagName !== "code") return undefined;
+  return first;
+}
+
+/** The `code` child of a ```mermaid fence; undefined for every other fence. */
+function mermaidFence(node: unknown): HastNode | undefined {
+  const code = fenceCode(node);
+  return code && fenceLanguage(code) === "mermaid" ? code : undefined;
+}
+
+/** Fence body, rebuilt from its text children. */
+function fenceText(code: HastNode): string {
+  return (code.children ?? [])
+    .map((child) => (child.type === "text" ? (child.value ?? "") : ""))
+    .join("")
+    .replace(/\n$/, "");
+}
 
 /**
  * Renders a doc body. Loaded via `next/dynamic` — the remark chain is a few
@@ -111,14 +181,35 @@ export function DocMarkdown({ body }: { body: string }) {
               {children}
             </code>
           ),
-          pre: ({ node, children, ...props }) => (
-            <pre
-              className="mb-4 overflow-x-auto rounded-lg border border-zinc-200 bg-zinc-50 p-4 [&>code]:block [&>code]:rounded-none [&>code]:border-0 [&>code]:bg-transparent [&>code]:px-0 [&>code]:py-0 [&>code]:text-xs [&>code]:leading-relaxed [&>code]:text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900/60 dark:[&>code]:bg-transparent dark:[&>code]:text-zinc-200"
-              {...props}
-            >
-              {children}
-            </pre>
-          ),
+          // A ```mermaid fence renders as a diagram; every other fence stays a
+          // code block. The override sits on `pre` rather than `code` because
+          // a diagram is a <div> and a <div> inside <pre> is invalid nesting.
+          pre: ({ node, children, ...props }) => {
+            const fence = mermaidFence(node);
+            if (fence) {
+              // `...props` carries the data-source-line stamp, which remark
+              // puts on the `pre`. The wrapper has to keep it or split sync
+              // and double-click-to-edit go dead on diagrams.
+              return (
+                <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>
+                  <MermaidChart chart={fenceText(fence)} />
+                </div>
+              );
+            }
+            // The SAME terminal frame the blog and the docs site use, so a
+            // code block in a project doc gets the copy button and the
+            // language label instead of a second, plainer treatment.
+            const code = fenceCode(node);
+            return (
+              <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>
+                <CodeBlock language={code ? fenceLanguage(code) : undefined}>
+                  <pre className="overflow-x-auto bg-zinc-950 p-4 [&>code]:block [&>code]:rounded-none [&>code]:border-0 [&>code]:bg-transparent [&>code]:px-0 [&>code]:py-0 [&>code]:text-xs [&>code]:leading-relaxed [&>code]:text-zinc-200">
+                    {children}
+                  </pre>
+                </CodeBlock>
+              </div>
+            );
+          },
           table: ({ node, children, ...props }) => (
             <div className="mb-4 overflow-x-auto">
               <table className="w-full border-collapse text-sm" {...props}>

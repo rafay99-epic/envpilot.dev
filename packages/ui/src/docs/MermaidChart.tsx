@@ -1,30 +1,49 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import mermaid from "mermaid";
 
 let counter = 0;
 let initialized = false;
 
 /**
+ * Parser bounds. A doc body is capped at 256KB and a body of `graph TD` edges
+ * is perfectly legal markdown — without these, one page hangs the reader's
+ * tab. Exceeding a bound throws inside mermaid, which lands in the same
+ * fallback as a syntax error: the source, rendered as text.
+ */
+const MAX_TEXT_SIZE = 50_000;
+const MAX_EDGES = 500;
+
+/**
  * Renders one mermaid diagram from its source text.
  *
- * Authors write standard ```mermaid fenced code blocks in MDX; the shared
- * remarkMermaid plugin (./remark-mermaid.ts) rewrites those fences into
- * <MermaidChart chart="..."> nodes at the remark phase. The chart text
- * travels as a plain string attribute, which is the only shape that
- * the only shape that survives the pipeline.
+ * Two authoring paths reach this component. In MDX (blog, docs) the shared
+ * remarkMermaid plugin (./remark-mermaid.ts) rewrites ```mermaid fences into
+ * <MermaidChart chart="..."> nodes at the remark phase. In the dashboard's
+ * react-markdown reader there is no MDX, so `pre` is overridden and calls
+ * this directly. Either way the chart text travels as a plain string.
+ *
+ * securityLevel "strict" is load-bearing, not hygiene: doc bodies are written
+ * by teammates AND by coding agents over MCP. Looser levels let a diagram
+ * carry HTML in node labels and `click` callbacks, which is stored XSS in the
+ * next reader's authenticated session.
  */
 export function MermaidChart({ chart }: { chart: string | undefined }) {
-  const ref = useRef<HTMLDivElement>(null);
+  // The SVG lives in state rather than being written into a ref: the ref
+  // approach cannot recover from a failed render (the target div is unmounted
+  // while the fallback shows, so a later success has nowhere to write), which
+  // strands every diagram the editor's live preview sees mid-keystroke.
+  const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (!chart) {
+    if (!chart || chart.trim().length === 0) {
       setFailed(true);
       return;
     }
     let cancelled = false;
+
     if (!initialized) {
       // initialize() sets GLOBAL config — once per page, not per render.
       // useMaxWidth:false keeps diagrams at their natural size instead of
@@ -33,22 +52,34 @@ export function MermaidChart({ chart }: { chart: string | undefined }) {
       mermaid.initialize({
         startOnLoad: false,
         theme: "dark",
+        securityLevel: "strict",
+        maxTextSize: MAX_TEXT_SIZE,
+        maxEdges: MAX_EDGES,
         flowchart: { useMaxWidth: false },
         sequence: { useMaxWidth: false },
       });
       initialized = true;
     }
+
     // Fresh id per render call — StrictMode double-invokes effects, and
     // mermaid.render leaves artifacts behind a reused id.
     const id = `mermaid-${++counter}`;
     mermaid
       .render(id, chart)
-      .then(({ svg }) => {
-        if (!cancelled && ref.current) ref.current.innerHTML = svg;
+      .then(({ svg: rendered }) => {
+        if (cancelled) return;
+        setSvg(rendered);
+        setFailed(false);
       })
       .catch((error: unknown) => {
         console.error("mermaid render failed", error);
-        if (!cancelled) setFailed(true);
+        // A throw leaves mermaid's offscreen measurement node behind. The
+        // editor's live preview fails on nearly every keystroke of an
+        // unfinished diagram, so without this the body accumulates orphans.
+        document.getElementById(`d${id}`)?.remove();
+        if (cancelled) return;
+        setSvg(null);
+        setFailed(true);
       });
     return () => {
       cancelled = true;
@@ -65,8 +96,10 @@ export function MermaidChart({ chart }: { chart: string | undefined }) {
 
   return (
     <div
-      ref={ref}
       className="my-6 flex justify-center overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/40 p-4"
+      // mermaid owns this markup and, at securityLevel "strict", sanitizes it
+      // before returning. Nothing from the doc body reaches here unfiltered.
+      dangerouslySetInnerHTML={svg === null ? undefined : { __html: svg }}
     />
   );
 }

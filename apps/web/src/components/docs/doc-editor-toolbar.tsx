@@ -84,6 +84,13 @@ const INSERT_GROUPS: { heading: string; items: [string, Command][] }[] = [
     items: [
       ["Code block", { kind: "insert", text: "\n```\n\n```\n" }],
       [
+        "Diagram",
+        {
+          kind: "insert",
+          text: "\n```mermaid\nflowchart TD\n  A[Start] --> B[End]\n```\n",
+        },
+      ],
+      [
         "Table",
         {
           kind: "insert",

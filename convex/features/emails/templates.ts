@@ -113,7 +113,18 @@ export function paragraphRow(
 </tr>`;
 }
 
-export function buttonRow(href: string, label: string): string {
+/**
+ * Call-to-action button.
+ *
+ * The href is escaped HERE rather than at each call site: it is the one
+ * attribute in these templates that regularly carries a value assembled from
+ * stored data, and an unescaped `"` in it closes the attribute and lets the
+ * rest become markup — in a message sent from the organization's own sending
+ * domain. Escaping `&` to `&amp;` is correct inside an attribute; browsers
+ * decode it before navigating, so query strings are unaffected.
+ */
+export function buttonRow(rawHref: string, label: string): string {
+  const href = escapeHtml(rawHref);
   return `<tr>
   <td style="padding: 4px 40px 30px 40px; text-align: center;">
     <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto;">

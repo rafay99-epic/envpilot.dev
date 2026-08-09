@@ -54,6 +54,8 @@ export const SECTIONS: DocSection[] = [
       "secret-files",
       "shared-accounts",
       "sharing",
+      "doc-diagrams",
+      "doc-sharing",
       "rbac",
       "requests",
       "rotation",

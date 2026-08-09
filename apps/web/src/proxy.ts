@@ -64,6 +64,15 @@ export default authkitMiddleware({
       "/s/(.*)",
       "/api/shares/shr_(.*)/verify-email",
       "/api/shares/shr_(.*)/verify-otp",
+      // Public documentation preview pages. The token IS the credential, so
+      // an outside reader has no session and a WorkOS redirect would hand
+      // them a sign-in page instead of the document.
+      "/d/(.*)",
+      // Read + passphrase unlock only. The `dshr_` prefix is load-bearing:
+      // creating a link and revoking one are addressed by docId / shareId
+      // (Convex ids, which never carry this prefix), so they stay behind the
+      // session check where they belong.
+      "/api/doc-shares/dshr_(.*)",
     ],
   },
 });

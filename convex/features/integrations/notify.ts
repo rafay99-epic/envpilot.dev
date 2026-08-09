@@ -49,6 +49,9 @@ const NOTIFY_GROUP: Record<string, WebhookEventGroup> = {
   // them would be noise, and a draft is precisely the thing nobody else is
   // supposed to know about yet.
   "doc.published": "docs",
+  // Sharing is a distribution event the team should see, especially the
+  // external kind. Views are audit-only: a channel message per read is noise.
+  "doc.shared": "docs",
 };
 
 export function isNotifiableAction(action: string): boolean {

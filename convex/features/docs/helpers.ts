@@ -34,6 +34,10 @@ export type DocAccess = {
   canPublish: boolean;
   /** May trash or restore a page. `project.docs.delete`. */
   canDelete: boolean;
+  /** May hand a published page to a teammate. `project.docs.share`. */
+  canShare: boolean;
+  /** May mint a public preview link. `project.docs.share.external`. */
+  canShareExternal: boolean;
 };
 
 /**
@@ -82,6 +86,8 @@ export async function requireDocAccess(
     canEditAny: hasCapability(profile, "project.docs.update"),
     canPublish: hasCapability(profile, "project.docs.publish"),
     canDelete: hasCapability(profile, "project.docs.delete"),
+    canShare: hasCapability(profile, "project.docs.share"),
+    canShareExternal: hasCapability(profile, "project.docs.share.external"),
   };
 }
 

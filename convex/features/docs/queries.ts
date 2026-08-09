@@ -74,11 +74,27 @@ export const access = query({
       (limit) => countOrgDocs(ctx.db, orgId, limit)
     );
 
+    // Both sharing gates resolve here so the drawer can hide a tab rather
+    // than offer an action whose mutation will refuse it.
+    const sharingEnabled = (
+      await checkBooleanFeature(ctx.db, orgId, "doc_sharing")
+    ).allowed;
+    const publicLinksEnabled = (
+      await checkBooleanFeature(ctx.db, orgId, "doc_public_links")
+    ).allowed;
+
     return {
       enabled,
       canCreate: enabled && docAccess.canCreate,
       canPublish: docAccess.canPublish,
       canDelete: docAccess.canDelete,
+      canShare: sharingEnabled && docAccess.canShare,
+      canShareExternal: publicLinksEnabled && docAccess.canShareExternal,
+      // Capability yes, plan no. Distinguished from a plain `false` so the
+      // drawer can explain the upgrade rather than silently hiding a feature
+      // the user's role genuinely holds.
+      externalUpgradeRequired:
+        docAccess.canShareExternal && !publicLinksEnabled,
       atProjectLimit: !perProject.allowed,
       atOrgLimit: !perOrg.allowed,
       projectCount: perProject.current,
