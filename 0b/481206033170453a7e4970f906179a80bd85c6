@@ -1,0 +1,29 @@
+apps/docs/src/app/[...slug]/page.tsx
+  s_1a8450bd5f3823::t_4a9ec77a18c9f8 141-144
+  s_1a8450bd5f3823::t_aac2f29be3e613 86-127
+apps/web/src/app/layout.tsx
+  s_1a8450bd5f3823::t_a1b7c17d5d60eb 68
+  s_1a8450bd5f3823::t_e8b1fa97f43161 107-112,114
+  s_1a8450bd5f3823::t_5b5874c481d626 113
+apps/blog/src/app/[slug]/page.tsx
+  s_1a8450bd5f3823::t_113b77ea9c2952 86-98,101-146
+apps/blog/src/app/page.tsx
+  s_1a8450bd5f3823::t_d5888fdb1954c6 22-39
+  s_1a8450bd5f3823::t_30e1ea3dbd7f78 48-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "0b481206033170453a7e4970f906179a80bd85c6",
+  "prompts": {},
+  "sessions": {
+    "s_1a8450bd5f3823": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "67fbd989-6f24-47b7-a5df-1153b6d8ac79",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
