@@ -65,7 +65,7 @@ export const metadata: Metadata = {
       },
     ],
     site: "@envpilot",
-    creator: "@envpilot",
+    creator: "@abdul_rafay99",
   },
   // Apple iMessage & Safari
   appleWebApp: {
@@ -104,6 +104,14 @@ const structuredData = {
       url: baseUrl,
       logo: `${baseUrl}/icon.png`,
       email: "hello@envpilot.dev",
+      // Ties this entity to the profiles that carry our off-site authority —
+      // without it Google treats each listing as an unrelated site.
+      sameAs: [
+        "https://github.com/rafay99-epic/envpilot.dev",
+        "https://www.npmjs.com/package/@envpilot/cli",
+        "https://marketplace.visualstudio.com/items?itemName=envpilot.envpilot",
+        "https://x.com/abdul_rafay99",
+      ],
     },
     {
       "@type": "WebSite",

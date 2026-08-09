@@ -83,27 +83,67 @@ export default async function BlogPostPage({ params }: PageProps) {
   const post = getPostBySlug(slug);
   if (!post) notFound();
 
+  // Team-authored posts resolve to the org entity; a named human gets a
+  // Person node, linked to their profile only when we actually know it.
+  const author =
+    post.author.name === "Envpilot Team"
+      ? { "@id": `${SITE_URLS.www}/#organization` }
+      : {
+          "@type": "Person",
+          name: post.author.name,
+          ...(post.author.name === "Abdul Rafay" && {
+            url: "https://x.com/abdul_rafay99",
+          }),
+        };
+
   const blogPostingSchema = {
     "@context": "https://schema.org",
-    "@type": "BlogPosting",
-    headline: post.title,
-    description: post.description,
-    datePublished: post.date,
-    author: {
-      "@type": "Person",
-      name: post.author.name,
-    },
-    publisher: {
-      "@type": "Organization",
-      "@id": `${SITE_URLS.www}/#organization`,
-      name: "Envpilot",
-    },
-    url: `${SITE_URLS.blog}/${slug}`,
-    mainEntityOfPage: {
-      "@type": "WebPage",
-      "@id": `${SITE_URLS.blog}/${slug}`,
-    },
-    keywords: post.keywords.join(", "),
+    "@graph": [
+      {
+        "@type": "BlogPosting",
+        "@id": `${SITE_URLS.blog}/${slug}#post`,
+        headline: post.title,
+        description: post.description,
+        datePublished: post.date,
+        author,
+        publisher: {
+          "@type": "Organization",
+          "@id": `${SITE_URLS.www}/#organization`,
+          name: "Envpilot",
+          url: SITE_URLS.www,
+        },
+        url: `${SITE_URLS.blog}/${slug}`,
+        image: post.coverImage
+          ? `${SITE_URLS.blog}${post.coverImage}`
+          : `${SITE_URLS.blog}/og-image.jpg`,
+        inLanguage: "en",
+        isPartOf: { "@id": `${SITE_URLS.blog}/#blog` },
+        mainEntityOfPage: {
+          "@type": "WebPage",
+          "@id": `${SITE_URLS.blog}/${slug}`,
+        },
+        keywords: post.keywords.join(", "),
+      },
+      {
+        "@type": "Blog",
+        "@id": `${SITE_URLS.blog}/#blog`,
+        name: "Envpilot Blog",
+        url: SITE_URLS.blog,
+        publisher: { "@id": `${SITE_URLS.www}/#organization` },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Blog",
+            item: SITE_URLS.blog,
+          },
+          { "@type": "ListItem", position: 2, name: post.title },
+        ],
+      },
+    ],
   };
 
   return (
