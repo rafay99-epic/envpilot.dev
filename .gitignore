@@ -65,3 +65,5 @@ apps/web/tests/e2e/.auth/
 
 # Editor settings
 .vscode/
+
+.firecrawl/
