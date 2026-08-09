@@ -6,32 +6,7 @@ import { api } from "@convex/_generated/api";
 import { Check } from "lucide-react";
 import type { PricingData } from "@/components/pricing/PricingContent";
 import { TerminalCommand, terminal } from "@/components/marketing";
-
-function generateFeatureLines(
-  features: Array<{
-    key: string;
-    displayName: string;
-    valueType: string;
-    value: boolean | number | null;
-  }>
-): string[] {
-  const lines: string[] = [];
-  for (const f of features) {
-    if (f.valueType === "numeric") {
-      if (f.value === null)
-        lines.push(
-          `Unlimited ${f.displayName.toLowerCase().replace(/^max\s*/i, "")}`
-        );
-      else if (typeof f.value === "number")
-        lines.push(
-          `${f.value} ${f.displayName.toLowerCase().replace(/^max\s*/i, "")}`
-        );
-    } else if (f.valueType === "boolean" && f.value === true) {
-      lines.push(f.displayName);
-    }
-  }
-  return lines.slice(0, 8);
-}
+import { generateFeatureLines } from "@/lib/pricing";
 
 function PricingCards({
   pricingData: serverPricingData,
@@ -50,7 +25,8 @@ function PricingCards({
   );
   const pricingData =
     serverPricingData ?? (clientPricingData as PricingData | undefined);
-  const paymentsEnabled = serverPaymentsEnabled ?? clientPaymentsEnabled;
+  const paymentsEnabled =
+    serverPaymentsEnabled ?? clientPaymentsEnabled ?? false;
 
   if (!pricingData) {
     return (

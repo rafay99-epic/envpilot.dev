@@ -130,10 +130,8 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
-        {/* Plain <script>, not next/script: `beforeInteractive` renders a
-            client-side <script> that React 19.2 rejects with a console error.
-            A parse-time inline script gives the same "runs before hydration"
-            guarantee with none of the machinery. */}
+        {/* Plain <script>, never next/script: `beforeInteractive` emits a
+            client-rendered <script> that React 19.2 rejects. */}
         <script
           dangerouslySetInnerHTML={{
             __html: "globalThis.CONFIG = globalThis.CONFIG || {};",

@@ -29,13 +29,16 @@ export function TerminalTabs({
   const [active, setActive] = useState(0);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const baseId = useId();
-  const current = items[active];
+
+  const last = items.length - 1;
+  const index = last < 0 ? 0 : Math.min(active, last);
+  const current = items[index];
 
   const onKeyDown = (e: KeyboardEvent) => {
-    const last = items.length - 1;
+    if (last < 0) return;
     let next: number | null = null;
-    if (e.key === "ArrowRight") next = active === last ? 0 : active + 1;
-    else if (e.key === "ArrowLeft") next = active === 0 ? last : active - 1;
+    if (e.key === "ArrowRight") next = index === last ? 0 : index + 1;
+    else if (e.key === "ArrowLeft") next = index === 0 ? last : index - 1;
     else if (e.key === "Home") next = 0;
     else if (e.key === "End") next = last;
     if (next === null) return;
@@ -43,6 +46,8 @@ export function TerminalTabs({
     setActive(next);
     tabRefs.current[next]?.focus();
   };
+
+  if (!current) return null;
 
   return (
     <div className={className}>
@@ -53,7 +58,7 @@ export function TerminalTabs({
         className={`flex flex-wrap gap-x-6 gap-y-2 border-b ${terminal.line} pb-px`}
       >
         {items.map((item, i) => {
-          const selected = i === active;
+          const selected = i === index;
 
           return (
             <button

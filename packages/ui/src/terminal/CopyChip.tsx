@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { terminal } from "./tokens";
 
@@ -14,12 +14,20 @@ export function CopyChip({
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+    };
+  }, []);
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
+      if (resetTimer.current) clearTimeout(resetTimer.current);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      resetTimer.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
     }
