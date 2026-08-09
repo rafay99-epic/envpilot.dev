@@ -16,7 +16,7 @@ import {
 } from "../../lib/authz";
 import {
   checkBooleanFeature,
-  checkNumericLimit,
+  checkCountedLimit,
   countOrgDocs,
   countProjectDocs,
 } from "../featureRegistry/gates";
@@ -136,17 +136,21 @@ export function canPublishDoc(access: DocAccess): boolean {
   return access.canPublish;
 }
 
-/** Deleting your own draft still needs the delete capability: trashing a page
- *  removes it from everyone, so it is not covered by authorship alone. */
+/**
+ * Trashing and restoring. Your own DRAFT follows your create right — an
+ * unpublished page nobody else can see is still yours to throw away, and
+ * without that branch the trash would list drafts their author could never
+ * restore. The moment a page is published it belongs to the team, so
+ * removing it needs the delete capability no matter who wrote it.
+ */
 export function canDeleteDoc(
   doc: Doc<"docs">,
   userId: Id<"users">,
   access: DocAccess
 ): boolean {
-  // Same shape as canEditDoc: your own page follows your create right,
-  // anyone else's needs the delete capability. Without the author branch the
-  // trash list would show a draft its author could never restore.
-  if (doc.authorId === userId) return access.canCreate;
+  if (doc.status === "draft" && doc.authorId === userId) {
+    return access.canCreate;
+  }
   return access.canDelete;
 }
 
@@ -183,11 +187,11 @@ export async function requireDocCapacity(
   project: Doc<"projects">,
   projectId: Id<"projects">
 ): Promise<void> {
-  const perProject = await checkNumericLimit(
+  const perProject = await checkCountedLimit(
     ctx.db,
     project.organizationId,
     "max_docs_per_project",
-    await countProjectDocs(ctx.db, projectId, MAX_DOC_ROWS)
+    (limit) => countProjectDocs(ctx.db, projectId, limit)
   );
   if (!perProject.allowed) {
     throw new ConvexError(
@@ -195,11 +199,11 @@ export async function requireDocCapacity(
     );
   }
 
-  const perOrg = await checkNumericLimit(
+  const perOrg = await checkCountedLimit(
     ctx.db,
     project.organizationId,
     "max_docs_per_org",
-    await countOrgDocs(ctx.db, project.organizationId, MAX_DOC_ROWS)
+    (limit) => countOrgDocs(ctx.db, project.organizationId, limit)
   );
   if (!perOrg.allowed) {
     throw new ConvexError(

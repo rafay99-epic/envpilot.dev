@@ -34,6 +34,15 @@ export const listMigrations = query({
         runOnce: false,
       },
       {
+        name: "resync-doc-tier-features",
+        description:
+          "FORCE-SETS the three documentation tier overrides (project_docs, max_docs_per_project, max_docs_per_org) to their code values on every tier. seed-tier-features only INSERTS, so the free-tier flip from gated to available never reaches an organization whose row was seeded when docs were Pro-only. Run once after the deploy that ships documentation on Free. Overwrites deliberate admin edits to these three keys — nothing else.",
+        category: "Feature & Tier System",
+        priority: 2,
+        destructive: false,
+        runOnce: true,
+      },
+      {
         name: "seed-tier-definitions",
         description:
           "Seeds or updates default 'free' and 'pro' tier definitions (upsert). Safe to run multiple times — updates existing tiers with latest pricing and display fields.",
@@ -177,6 +186,94 @@ export const run = internalMutation({
   args: { name: v.string() },
   handler: async (ctx, args) => runMigrationByName(ctx, args.name),
 });
+
+/**
+ * Per-tier feature overrides. Module scope so `seed-tier-features` (insert
+ * only, admin edits survive) and `resync-doc-tier-features` (force-set, the
+ * one-off availability flip) can never drift apart.
+ */
+const TIER_CONFIGS: Record<string, Record<string, string>> = {
+  free: {
+    max_projects: "3",
+    max_variables_per_project: "50",
+    max_organizations: "1",
+    max_team_members: "3",
+    max_invitations: "5",
+    variable_version_history: "false",
+    bulk_import: "false",
+    bulk_delete: "true",
+    bulk_export: "false",
+    variable_tags: "true",
+    api_access: "true",
+    extension_access: "true",
+    cli_access: "true",
+    vscode_unsync_customization: "false",
+    granular_permissions: "true",
+    audit_log_retention_days: "7",
+    sso_enabled: "false",
+    public_api: "false",
+    mcp_server: "false",
+    team_notifications: "false",
+    team_notifications_limit: "0",
+    secret_rotation: "false",
+    secret_rotation_limit: "7",
+    secret_sharing: "false",
+    security_hold: "false",
+    max_active_shares: "0",
+    shared_accounts: "true",
+    shared_accounts_limit: "5",
+    secret_files: "true",
+    secret_files_limit: "3",
+    secret_files_max_bytes: "262144",
+    keyboard_shortcuts_custom: "true",
+    custom_branding: "false",
+    analytics_retention_days: "7",
+    priority_support: "false",
+    project_docs: "true",
+    max_docs_per_project: "10",
+    max_docs_per_org: "25",
+  },
+  pro: {
+    max_projects: "null",
+    max_variables_per_project: "null",
+    max_organizations: "null",
+    max_team_members: "null",
+    max_invitations: "null",
+    variable_version_history: "true",
+    bulk_import: "true",
+    bulk_delete: "true",
+    bulk_export: "true",
+    variable_tags: "true",
+    api_access: "true",
+    extension_access: "true",
+    cli_access: "true",
+    vscode_unsync_customization: "true",
+    granular_permissions: "true",
+    audit_log_retention_days: "365",
+    sso_enabled: "false",
+    public_api: "true",
+    mcp_server: "true",
+    team_notifications: "true",
+    team_notifications_limit: "10",
+    secret_rotation: "true",
+    secret_rotation_limit: "null",
+    secret_sharing: "true",
+    security_hold: "true",
+    max_active_shares: "null",
+    shared_accounts: "true",
+    shared_accounts_limit: "null",
+    secret_files: "true",
+    secret_files_limit: "null",
+    secret_files_max_bytes: "8388608",
+    keyboard_shortcuts_custom: "true",
+    custom_branding: "true",
+    analytics_retention_days: "30",
+    priority_support: "true",
+    project_docs: "true",
+    max_docs_per_project: "null",
+    max_docs_per_org: "null",
+  },
+};
 
 async function runMigrationByName(ctx: MutationCtx, name: string) {
   // Keeps the original `args.name` references below working untouched.
@@ -526,89 +623,59 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
     };
   }
 
-  if (args.name === "seed-tier-features") {
-    const tierConfigs: Record<string, Record<string, string>> = {
-      free: {
-        max_projects: "3",
-        max_variables_per_project: "50",
-        max_organizations: "1",
-        max_team_members: "3",
-        max_invitations: "5",
-        variable_version_history: "false",
-        bulk_import: "false",
-        bulk_delete: "true",
-        bulk_export: "false",
-        variable_tags: "true",
-        api_access: "true",
-        extension_access: "true",
-        cli_access: "true",
-        vscode_unsync_customization: "false",
-        granular_permissions: "true",
-        audit_log_retention_days: "7",
-        sso_enabled: "false",
-        public_api: "false",
-        mcp_server: "false",
-        team_notifications: "false",
-        team_notifications_limit: "0",
-        secret_rotation: "false",
-        secret_rotation_limit: "7",
-        secret_sharing: "false",
-        security_hold: "false",
-        max_active_shares: "0",
-        shared_accounts: "true",
-        shared_accounts_limit: "5",
-        secret_files: "true",
-        secret_files_limit: "3",
-        secret_files_max_bytes: "262144",
-        keyboard_shortcuts_custom: "true",
-        custom_branding: "false",
-        analytics_retention_days: "7",
-        priority_support: "false",
-        project_docs: "true",
-        max_docs_per_project: "10",
-        max_docs_per_org: "25",
-      },
-      pro: {
-        max_projects: "null",
-        max_variables_per_project: "null",
-        max_organizations: "null",
-        max_team_members: "null",
-        max_invitations: "null",
-        variable_version_history: "true",
-        bulk_import: "true",
-        bulk_delete: "true",
-        bulk_export: "true",
-        variable_tags: "true",
-        api_access: "true",
-        extension_access: "true",
-        cli_access: "true",
-        vscode_unsync_customization: "true",
-        granular_permissions: "true",
-        audit_log_retention_days: "365",
-        sso_enabled: "false",
-        public_api: "true",
-        mcp_server: "true",
-        team_notifications: "true",
-        team_notifications_limit: "10",
-        secret_rotation: "true",
-        secret_rotation_limit: "null",
-        secret_sharing: "true",
-        security_hold: "true",
-        max_active_shares: "null",
-        shared_accounts: "true",
-        shared_accounts_limit: "null",
-        secret_files: "true",
-        secret_files_limit: "null",
-        secret_files_max_bytes: "8388608",
-        keyboard_shortcuts_custom: "true",
-        custom_branding: "true",
-        analytics_retention_days: "30",
-        priority_support: "true",
-        project_docs: "true",
-        max_docs_per_project: "null",
-        max_docs_per_org: "null",
-      },
+  if (args.name === "resync-doc-tier-features") {
+    const DOC_KEYS = [
+      "project_docs",
+      "max_docs_per_project",
+      "max_docs_per_org",
+    ];
+    let updated = 0;
+    let created = 0;
+    let unchanged = 0;
+    const now = Date.now();
+
+    for (const [tierName, features] of Object.entries(TIER_CONFIGS)) {
+      for (const key of DOC_KEYS) {
+        const value = features[key];
+        if (value === undefined) continue;
+
+        const existing = await ctx.db
+          .query("tierFeatures")
+          .withIndex("by_tier_and_feature", (q: any) =>
+            q.eq("tierName", tierName).eq("featureKey", key)
+          )
+          .first();
+
+        if (!existing) {
+          await ctx.db.insert("tierFeatures", {
+            tierName,
+            featureKey: key,
+            value,
+            updatedAt: now,
+          });
+          created++;
+          continue;
+        }
+        if (existing.value === value) {
+          unchanged++;
+          continue;
+        }
+        await ctx.db.patch(existing._id, { value, updatedAt: now });
+        updated++;
+      }
+    }
+
+    return {
+      success: true,
+      total: Object.keys(TIER_CONFIGS).length * DOC_KEYS.length,
+      migrated: created,
+      updated,
+      skipped: unchanged,
     };
+  }
+
+  if (args.name === "seed-tier-features") {
+    const tierConfigs = TIER_CONFIGS;
 
     let created = 0;
     let skipped = 0;

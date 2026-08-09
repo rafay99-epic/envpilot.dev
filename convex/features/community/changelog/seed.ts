@@ -1537,7 +1537,8 @@ Available on Pro.`,
 ### Roles Now Govern Documentation
 - Four new capabilities — draft a page, edit anyone's page, publish, and delete anyone's page — replace the blanket write access every member previously held
 - Publishing is its own capability: Editors and above hold it, Developers can draft but never publish, and Viewers hold none of the four
-- Your own draft follows your create right, so an author can always edit and trash their own page
-- Buttons you cannot use no longer appear, and the trash lists only pages you can actually restore`,
+- You can always revise your own page and trash your own draft; once a page is published, deleting it needs the delete capability no matter who wrote it
+- Buttons you cannot use no longer appear, and the trash lists only pages you can actually restore
+- Owners now hold every capability by construction, so a capability shipped after an organization was created can no longer leave its owner locked out`,
   },
 ];

@@ -339,13 +339,11 @@ export const SEED_FEATURES = [
     resettable: false,
     sortOrder: 4,
   },
-  // Passive stored content — no cron, no email, no per-resource background
-  // work — so a boolean gate with no companion numeric limit, the same class
-  // as variable_version_history.
   // Available on every tier — documentation is how a project explains itself,
   // and gating it entirely would make the free tier worse at onboarding, the
-  // exact job it exists to demonstrate. The free tier is bounded by COUNT
-  // instead, below.
+  // exact job it exists to demonstrate. Bounded by COUNT instead: pages cost
+  // storage and search-index space per row, so the two limits below cap the
+  // free tier rather than the boolean shutting it off.
   {
     key: "project_docs",
     displayName: "Project Documentation",

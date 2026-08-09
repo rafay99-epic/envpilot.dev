@@ -40,47 +40,22 @@ function caps(keys: CapabilityKey[]): CapabilityMap {
   return map;
 }
 
-/** Everything — the owner holds every capability, always. */
-const ALL_CAPABILITY_KEYS: CapabilityKey[] = [
-  "org.manage",
-  "org.billing",
-  "org.members.invite",
-  "org.members.remove",
-  "org.members.change_role",
-  "org.sessions",
-  "org.projects.create",
-  "org.projects.delete",
-  "org.rollback",
-  "org.clients.link",
-  "org.tags.create",
-  "org.tags.manage",
-  "org.api_keys",
-  "org.audit.view",
-  "org.community.represent",
-  "project.read",
-  "project.update",
-  "project.variables.create",
-  "project.variables.update",
-  "project.variables.delete",
-  "project.accounts.create",
-  "project.accounts.update",
-  "project.accounts.delete",
-  "project.files.create",
-  "project.files.update",
-  "project.files.delete",
-  "project.docs.create",
-  "project.docs.update",
-  "project.docs.publish",
-  "project.docs.delete",
-  "project.secrets.reveal",
-  "project.requests.review",
-  "project.permissions.manage",
-  "project.members.manage",
-  "project.share",
-  "project.templates.manage",
-  "notify.variable_changes",
-  // NOT: project.requests.submit (owners create directly), access.* modifiers
+/**
+ * The owner holds every capability, by construction. Derived from the
+ * catalog rather than listed by hand: a capability shipped without being
+ * added here would have silently left the owner unable to use their own
+ * organization until someone noticed.
+ */
+const OWNER_EXCLUDED: CapabilityKey[] = [
+  // Owners create directly; they never file a request with themselves.
+  "project.requests.submit",
 ];
+
+const ALL_CAPABILITY_KEYS: CapabilityKey[] = CAPABILITY_KEYS.filter(
+  // access.* are scope MODIFIERS, not grants — an owner that carried
+  // access.env_scoped would be narrowing itself.
+  (key) => !key.startsWith("access.") && !OWNER_EXCLUDED.includes(key)
+);
 
 export const SYSTEM_PROFILES: Record<string, RoleProfile> = {
   owner: {
@@ -250,6 +225,19 @@ export const SEEDED_CUSTOM_PROFILES: Record<string, RoleProfile> = {
 };
 
 /** True when the profile grants the capability. Missing = false (fail closed). */
+/**
+ * Owner capabilities always come from code, never from the stored row.
+ * The seed force-syncs owner, but between a deploy that adds a capability
+ * and the seed that lands it the stored map is short by exactly the new
+ * key — and that gap is an owner locked out of a feature they paid for.
+ */
+export function resolveCapabilities(
+  slug: string,
+  stored: CapabilityMap
+): CapabilityMap {
+  return slug === "owner" ? SYSTEM_PROFILES.owner.capabilities : stored;
+}
+
 export function hasCapability(
   profile: Pick<RoleProfile, "capabilities">,
   key: CapabilityKey

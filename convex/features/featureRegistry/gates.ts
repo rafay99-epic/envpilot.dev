@@ -451,7 +451,7 @@ export async function countOrgDocs(
 
   let count = 0;
   for (const project of projects) {
-    if (limit !== undefined && count > limit) break;
+    if (limit !== undefined && count >= limit) break;
     const query = db
       .query("docs")
       .withIndex("by_project_deleted", (q) =>

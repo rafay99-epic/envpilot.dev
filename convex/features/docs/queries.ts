@@ -8,7 +8,7 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import {
   checkBooleanFeature,
-  checkNumericLimit,
+  checkCountedLimit,
   countOrgDocs,
   countProjectDocs,
 } from "../featureRegistry/gates";
@@ -59,17 +59,19 @@ export const access = query({
     const enabled = (await checkBooleanFeature(ctx.db, orgId, "project_docs"))
       .allowed;
 
-    const perProject = await checkNumericLimit(
+    // Counted lazily: an unlimited tier never renders the banner, so it must
+    // not pay for an org-wide fan-out on every reactive re-run.
+    const perProject = await checkCountedLimit(
       ctx.db,
       orgId,
       "max_docs_per_project",
-      await countProjectDocs(ctx.db, args.projectId, MAX_DOC_ROWS)
+      (limit) => countProjectDocs(ctx.db, args.projectId, limit)
     );
-    const perOrg = await checkNumericLimit(
+    const perOrg = await checkCountedLimit(
       ctx.db,
       orgId,
       "max_docs_per_org",
-      await countOrgDocs(ctx.db, orgId, MAX_DOC_ROWS)
+      (limit) => countOrgDocs(ctx.db, orgId, limit)
     );
 
     return {

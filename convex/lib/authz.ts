@@ -12,6 +12,7 @@ import {
   SEEDED_CUSTOM_PROFILES,
   UNKNOWN_ROLE_PROFILE,
   hasCapability,
+  resolveCapabilities,
 } from "./roleProfiles";
 import type { OrgAction, ProjectAction } from "./capabilities";
 
@@ -134,7 +135,10 @@ export async function getRoleProfile(
       color: row.color,
       level: row.level,
       isSystem: row.isSystem,
-      capabilities: row.capabilities as RoleProfile["capabilities"],
+      capabilities: resolveCapabilities(
+        row.slug,
+        row.capabilities as RoleProfile["capabilities"]
+      ),
     };
   }
   if (row && !row.isActive) {

@@ -19,6 +19,7 @@ import {
   expandActions,
   hasCapability,
   mergeSystemRoleCapabilities,
+  resolveCapabilities,
 } from "@convex/lib/roleProfiles";
 import {
   CAPABILITY_KEYS,
@@ -259,6 +260,37 @@ describe("seeded custom roles (editor / viewer)", () => {
       "org.clients.link",
       "project.read",
     ]);
+  });
+});
+
+describe("owner holds everything by construction", () => {
+  const OWNER_EXCEPTIONS = ["project.requests.submit"];
+
+  it("carries every catalog capability except the documented exceptions", () => {
+    const missing = CAPABILITY_KEYS.filter(
+      (key) =>
+        !key.startsWith("access.") &&
+        !OWNER_EXCEPTIONS.includes(key) &&
+        !hasCapability(SYSTEM_PROFILES.owner, key)
+    );
+    // A new capability that forgets the owner is the failure this pins: the
+    // owner is derived from the catalog, so this can only break on purpose.
+    expect(missing).toEqual([]);
+  });
+
+  it("never carries a scope modifier", () => {
+    for (const key of CAPABILITY_KEYS.filter((k) => k.startsWith("access."))) {
+      expect(hasCapability(SYSTEM_PROFILES.owner, key)).toBe(false);
+    }
+  });
+
+  it("resolves owner capabilities from code, not from a stale stored row", () => {
+    // A row seeded before a capability shipped. The resolver must ignore it.
+    const stale = { "org.manage": true } as const;
+    const resolved = resolveCapabilities("owner", stale);
+    expect(resolved["project.docs.publish"]).toBe(true);
+    // Every other role still answers with exactly what was stored.
+    expect(resolveCapabilities("developer", stale)).toBe(stale);
   });
 });
 
