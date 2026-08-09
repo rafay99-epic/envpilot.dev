@@ -69,6 +69,13 @@ pages only** — a draft is not merely hidden from search, it cannot be fetched
 by id either. That gate is what stops a page one agent wrote from reaching
 another agent's context before a person has read it.
 
+### Page count is capped by plan
+
+`envpilot_create_doc` fails once the project or the organization is at its
+page limit — 10 per project and 25 per organization on Free, unlimited on Pro.
+The caps are the same numbers the dashboard enforces, so an agent cannot use
+the MCP surface to walk around them. See [Plans & Limits](/limits/plans).
+
 ### Pages name variables, never values
 
 A page may reference `API_BASE_URL`; it never contains the value. Resolving it

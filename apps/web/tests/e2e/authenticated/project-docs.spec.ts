@@ -127,6 +127,25 @@ test.describe.serial("Project documentation", () => {
     ).toEqual([]);
   });
 
+  test("an unlimited plan shows no page-count ceiling", async ({ page }) => {
+    // The caps are numeric registry values, so "unlimited" is a null the UI
+    // has to read as unlimited rather than as zero — which would hide New
+    // Page on a Pro org and block the whole feature.
+    await page.goto(`/dashboard/projects/${projectSlug}/docs`, {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page.getByTestId("doc-new")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("doc-limit-banner")).toHaveCount(0);
+
+    await page.goto(`/dashboard/projects/${projectSlug}/docs/new`, {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page.getByTestId("doc-title-input")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("doc-new-blocked")).toHaveCount(0);
+  });
+
   test("mint a docs-scoped API key", async ({ page }) => {
     test.setTimeout(120_000);
     test.skip(!projectSlug, "no project from the first test");

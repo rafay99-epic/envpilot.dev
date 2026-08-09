@@ -19,6 +19,7 @@ import {
   expandActions,
   hasCapability,
   mergeSystemRoleCapabilities,
+  resolveCapabilities,
 } from "@convex/lib/roleProfiles";
 import {
   CAPABILITY_KEYS,
@@ -259,6 +260,76 @@ describe("seeded custom roles (editor / viewer)", () => {
       "org.clients.link",
       "project.read",
     ]);
+  });
+});
+
+describe("owner holds everything by construction", () => {
+  const OWNER_EXCEPTIONS = ["project.requests.submit"];
+
+  it("carries every catalog capability except the documented exceptions", () => {
+    const missing = CAPABILITY_KEYS.filter(
+      (key) =>
+        !key.startsWith("access.") &&
+        !OWNER_EXCEPTIONS.includes(key) &&
+        !hasCapability(SYSTEM_PROFILES.owner, key)
+    );
+    // A new capability that forgets the owner is the failure this pins: the
+    // owner is derived from the catalog, so this can only break on purpose.
+    expect(missing).toEqual([]);
+  });
+
+  it("never carries a scope modifier", () => {
+    for (const key of CAPABILITY_KEYS.filter((k) => k.startsWith("access."))) {
+      expect(hasCapability(SYSTEM_PROFILES.owner, key)).toBe(false);
+    }
+  });
+
+  it("resolves owner capabilities from code, not from a stale stored row", () => {
+    // A row seeded before a capability shipped. The resolver must ignore it.
+    const stale = { "org.manage": true } as const;
+    const resolved = resolveCapabilities("owner", stale);
+    expect(resolved["project.docs.publish"]).toBe(true);
+    // Every other role still answers with exactly what was stored.
+    expect(resolveCapabilities("developer", stale)).toBe(stale);
+  });
+});
+
+describe("documentation capabilities", () => {
+  const DOC_MATRIX: Record<string, [boolean, boolean, boolean, boolean]> = {
+    // [create, update-anyone's, publish, delete-anyone's]
+    owner: [true, true, true, true],
+    project_manager: [true, true, true, true],
+    team_lead: [true, true, true, true],
+    editor: [true, true, true, false],
+    developer: [true, false, false, false],
+    viewer: [false, false, false, false],
+  };
+
+  const profileFor = (slug: string) =>
+    SYSTEM_PROFILES[slug as keyof typeof SYSTEM_PROFILES] ??
+    SEEDED_CUSTOM_PROFILES[slug as keyof typeof SEEDED_CUSTOM_PROFILES];
+
+  for (const [slug, [create, update, publish, remove]] of Object.entries(
+    DOC_MATRIX
+  )) {
+    it(`${slug} holds the expected doc capabilities`, () => {
+      const profile = profileFor(slug);
+      expect(hasCapability(profile, "project.docs.create")).toBe(create);
+      expect(hasCapability(profile, "project.docs.update")).toBe(update);
+      expect(hasCapability(profile, "project.docs.publish")).toBe(publish);
+      expect(hasCapability(profile, "project.docs.delete")).toBe(remove);
+    });
+  }
+
+  // Publishing is the human gate that makes a draft readable over MCP, so a
+  // role that cannot publish must never acquire it by accident.
+  it("a role without publish cannot reach it through another doc capability", () => {
+    expect(
+      hasCapability(SYSTEM_PROFILES.developer, "project.docs.create")
+    ).toBe(true);
+    expect(
+      hasCapability(SYSTEM_PROFILES.developer, "project.docs.publish")
+    ).toBe(false);
   });
 });
 

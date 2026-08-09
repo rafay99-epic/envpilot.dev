@@ -6,10 +6,17 @@ import { v, ConvexError } from "convex/values";
 import { query } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
-import { checkBooleanFeature } from "../featureRegistry/gates";
+import {
+  checkBooleanFeature,
+  checkCountedLimit,
+  countOrgDocs,
+  countProjectDocs,
+} from "../featureRegistry/gates";
 import { listForUserCore } from "../projects/helpers";
 import { readBody } from "./content";
 import {
+  canDeleteDoc,
+  canEditDoc,
   canSeeDoc,
   MAX_DOC_ROWS,
   requireDocAccess,
@@ -36,6 +43,51 @@ function toSummary(doc: Doc<"docs">) {
     publishedAt: doc.publishedAt,
   };
 }
+
+/**
+ * What the caller may do with this project's docs, plus how much room is
+ * left. The UI reads this to hide actions a role cannot perform and to
+ * explain a full tier BEFORE the user writes a page and loses it on save.
+ */
+export const access = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const docAccess = await requireDocAccess(ctx, actor._id, args.projectId);
+    const orgId = docAccess.project.organizationId;
+
+    const enabled = (await checkBooleanFeature(ctx.db, orgId, "project_docs"))
+      .allowed;
+
+    // Counted lazily: an unlimited tier never renders the banner, so it must
+    // not pay for an org-wide fan-out on every reactive re-run.
+    const perProject = await checkCountedLimit(
+      ctx.db,
+      orgId,
+      "max_docs_per_project",
+      (limit) => countProjectDocs(ctx.db, args.projectId, limit)
+    );
+    const perOrg = await checkCountedLimit(
+      ctx.db,
+      orgId,
+      "max_docs_per_org",
+      (limit) => countOrgDocs(ctx.db, orgId, limit)
+    );
+
+    return {
+      enabled,
+      canCreate: enabled && docAccess.canCreate,
+      canPublish: docAccess.canPublish,
+      canDelete: docAccess.canDelete,
+      atProjectLimit: !perProject.allowed,
+      atOrgLimit: !perOrg.allowed,
+      projectCount: perProject.current,
+      projectLimit: perProject.limit,
+      orgCount: perOrg.current,
+      orgLimit: perOrg.limit,
+    };
+  },
+});
 
 /** Docs the caller may see, newest first. Drafts filter per-row: "published
  *  plus my own" is not expressible as one index range. */
@@ -93,7 +145,11 @@ export const getBySlug = query({
       ...toSummary(doc),
       body: await readBody(ctx, doc._id),
       authorName: author?.name ?? author?.email ?? "Unknown",
-      canEdit: doc.authorId === actor._id || access.canManage,
+      // Split so the UI can show exactly the actions the role allows,
+      // instead of one flag standing in for three different capabilities.
+      canEdit: canEditDoc(doc, actor._id, access),
+      canPublish: access.canPublish,
+      canDelete: canDeleteDoc(doc, actor._id, access),
     };
   },
 });
@@ -206,7 +262,7 @@ export const listTrashed = query({
       .take(MAX_DOC_ROWS);
 
     return rows
-      .filter((doc) => doc.authorId === actor._id || access.canManage)
+      .filter((doc) => canDeleteDoc(doc, actor._id, access))
       .map((doc) => ({ ...toSummary(doc), deletedAt: doc.deletedAt }));
   },
 });

@@ -12,9 +12,12 @@ import { createBody, setContentStatus, writeBody } from "./content";
 import { normalizePrUrl, scanDocBody, slugifyTitle } from "./guards";
 import { templateFor } from "./templates";
 import {
+  canDeleteDoc,
   canEditDoc,
+  canPublishDoc,
   requireDocAccess,
   requireDocsFeature,
+  requireDocCapacity,
   uniqueSlug,
 } from "./helpers";
 
@@ -50,6 +53,12 @@ export const create = mutation({
     const actor = await requireAuthedUser(ctx);
     const access = await requireDocAccess(ctx, actor._id, args.projectId);
     await requireDocsFeature(ctx, access.project.organizationId);
+    if (!access.canCreate) {
+      throw new ConvexError(
+        "Your role cannot create documentation pages in this project"
+      );
+    }
+    await requireDocCapacity(ctx, access.project, args.projectId);
 
     assertTitle(args.title);
     assertModule(args.module);
@@ -197,8 +206,8 @@ export const publish = mutation({
     }
     const access = await requireDocAccess(ctx, actor._id, doc.projectId);
     await requireDocsFeature(ctx, access.project.organizationId);
-    if (!canEditDoc(doc, actor._id, access)) {
-      throw new ConvexError("You do not have permission to publish this page");
+    if (!canPublishDoc(access)) {
+      throw new ConvexError("Your role cannot publish documentation pages");
     }
     if (doc.status === "published") return { slug: doc.slug };
 
@@ -236,8 +245,8 @@ export const unpublish = mutation({
     }
     const access = await requireDocAccess(ctx, actor._id, doc.projectId);
     await requireDocsFeature(ctx, access.project.organizationId);
-    if (!canEditDoc(doc, actor._id, access)) {
-      throw new ConvexError("You do not have permission to edit this page");
+    if (!canPublishDoc(access)) {
+      throw new ConvexError("Your role cannot change a page's published state");
     }
     if (doc.status === "draft") return { slug: doc.slug };
 
@@ -272,8 +281,8 @@ export const remove = mutation({
     }
     const access = await requireDocAccess(ctx, actor._id, doc.projectId);
     await requireDocsFeature(ctx, access.project.organizationId);
-    if (!canEditDoc(doc, actor._id, access)) {
-      throw new ConvexError("You do not have permission to delete this page");
+    if (!canDeleteDoc(doc, actor._id, access)) {
+      throw new ConvexError("Your role cannot delete documentation pages");
     }
 
     await ctx.db.patch(doc._id, {
@@ -304,9 +313,11 @@ export const restore = mutation({
     }
     const access = await requireDocAccess(ctx, actor._id, doc.projectId);
     await requireDocsFeature(ctx, access.project.organizationId);
-    if (!canEditDoc(doc, actor._id, access)) {
-      throw new ConvexError("You do not have permission to restore this page");
+    if (!canDeleteDoc(doc, actor._id, access)) {
+      throw new ConvexError("Your role cannot restore documentation pages");
     }
+    // Restoring re-occupies a slot, so it is bounded like a create.
+    await requireDocCapacity(ctx, access.project, doc.projectId);
 
     // The slug may have been taken while this row sat in the trash.
     const slug = await uniqueSlug(ctx, doc.projectId, doc.slug, doc._id);

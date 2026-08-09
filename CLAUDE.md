@@ -77,6 +77,38 @@ The seed functions use an **upsert pattern** — running them multiple times is 
 
 All enforcement is automatically **bypassed when the Tier Enforcement admin toggle is OFF** (pre-alpha mode). The resolver returns `true` for booleans and `null` (unlimited) for numerics when enforcement is disabled.
 
+#### Numeric limits: count lazily, count ACTIVE rows (CRITICAL)
+
+Two mistakes recur in count-based limits, both silent:
+
+1. **Use `checkCountedLimit`, not `checkNumericLimit`, on request paths.** It
+   takes a `countFn(limit)` closure and short-circuits when the tier resolves
+   to `null`, so an unlimited org never pays for the scan. `checkNumericLimit`
+   takes an already-evaluated number — every Pro request runs the full count
+   for a limit that will never bind. Reactive queries make this per-keystroke.
+2. **Count through a `by_*_deleted` index with `deletedAt: undefined`.** Never
+   `.take()` over `by_project` and filter in memory: trashed rows sort at the
+   FRONT of that range, so a project with three deleted rows and three live
+   ones reports zero against a limit of three. `countActiveFiles` in
+   `gates.ts` is the reference shape — bound each project's read with
+   `take(limit - count + 1)` and `break` once `count >= limit`.
+
+Enforce the limit on **every** path that occupies a slot: create, restore
+from trash, and the MCP/API create surface. An agent must never be able to
+route around a cap the dashboard enforces.
+
+#### Flipping an existing tier value needs a resync migration
+
+`seed-tier-features` **only inserts** — it skips any `tierFeatures` row that
+already exists, so admin edits survive. That means changing a value in
+`TIER_CONFIGS` (e.g. free-tier availability from `"false"` to `"true"`) is a
+**no-op for every deployment that has already been seeded**. Ship a
+force-setting migration scoped to the changed keys alongside the flip (see
+`resync-doc-tier-features`), and run it once from the admin panel after the
+deploy. Do NOT add a force-setting migration to the deploy loop in
+`deploy-convex.yml` — it would clobber deliberate admin edits on every
+release.
+
 #### Dual-Gate Pattern: Boolean + Usage Limit
 
 When a feature incurs **compute or infrastructure cost** (crons, emails, external API calls), it must have **two** registry entries:
@@ -338,13 +370,36 @@ Browser/CLI/Extension → Next.js API Routes → Convex (database) + WorkOS Vaul
   consumed via `transpilePackages` — no build step.
 - `packages/github-action/` — the Envpilot GitHub Action (`@envpilot/github-action`, private in this repo). Pulls variables from `/api/v1/secrets` with a service token and exports them to `$GITHUB_ENV` / a dotenv file. CRITICAL INVARIANT in `src/main.ts`: `core.setSecret(value)` runs BEFORE any export so values are masked in workflow logs; keys/values are never printed. Own MIT LICENSE (public distribution) unlike the proprietary monorepo.
 
-### Roles & Permissions
+### Roles & Permissions — the capability registry (CRITICAL)
 
-Three-tier RBAC defined in `apps/web/src/lib/auth.ts`:
+Authorization is a **capability registry**, not a role enum. Never compare
+role slugs in feature code; resolve the profile and ask it.
 
-- **Admin** — Full access including variable rollback and permission management
-- **Team Lead** — Manage projects/variables, grant/revoke per-variable access
-- **Member** — Read-only projects; variable access requires explicit per-variable permissions
+- **Catalog**: `convex/lib/capabilities.ts` — `CAPABILITIES` is the complete
+  vocabulary. Every key corresponds to enforcement that exists in code, so
+  adding one is a code change (review, test, deploy).
+- **Profiles**: `convex/lib/roleProfiles.ts` — `SYSTEM_PROFILES` (owner,
+  project_manager, team_lead, developer) and `SEEDED_CUSTOM_PROFILES`
+  (editor, viewer). Seeded into `roleRegistry` by `seed-role-registry`.
+- **Resolve + check**: `getRoleProfile(ctx, role)` then
+  `hasCapability(profile, "key")` (both re-exported from `convex/lib/authz.ts`).
+- **Roles are data, capabilities are code.** A new ROLE is a registry row. A
+  new CAPABILITY is a code change plus a seed run.
+
+**Every gatable resource gets its own capabilities.** Variables, accounts,
+files and docs each carry `project.<resource>.create|update|delete` (docs also
+`publish`). A feature that reuses another resource's capability — or grants
+blanket write to every member — has bypassed the role system, which is a
+review-blocking defect. Wire the frontend to the same flags the backend
+checks so a user never sees a button whose mutation will refuse them.
+
+**The owner holds every capability, by construction.** `ALL_CAPABILITY_KEYS`
+is DERIVED from `CAPABILITY_KEYS` (minus `access.*` scope modifiers and
+`project.requests.submit`) — never hand-list it, or a newly shipped capability
+silently locks the owner out of their own organization. `resolveCapabilities`
+returns code truth for the owner slug regardless of what the stored
+`roleRegistry` row says, so a deploy that lands before its seed cannot leave
+the owner short a key. Both are pinned by `role-parity.test.ts`.
 
 ### Variables: per-environment key uniqueness (CRITICAL domain rule)
 

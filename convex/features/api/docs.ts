@@ -25,7 +25,7 @@ import { createBody } from "../docs/content";
 import { readBody } from "../docs/content";
 import { normalizePrUrl, scanDocBody, slugifyTitle } from "../docs/guards";
 import { templateFor } from "../docs/templates";
-import { uniqueSlug } from "../docs/helpers";
+import { requireDocCapacity, uniqueSlug } from "../docs/helpers";
 import {
   hashToken,
   assertKeyFormat,
@@ -526,6 +526,10 @@ export const _createDocDraft = internalMutation({
     ) {
       throw new ConvexError("Project not found");
     }
+
+    // Same ceilings as the dashboard. An agent must not be able to walk
+    // around a tier limit just because it came in through the MCP surface.
+    await requireDocCapacity(ctx, project, args.projectId);
 
     const title = args.title.trim();
     if (title.length === 0 || title.length > 200) {

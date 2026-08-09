@@ -8,7 +8,12 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { FeatureGate } from "@/components/tier/FeatureGate";
-import { useProjectBySlug, useProjectDocs, useCreateDoc } from "@/hooks";
+import {
+  useProjectBySlug,
+  useProjectDocs,
+  useCreateDoc,
+  useDocAccess,
+} from "@/hooks";
 import { sanitizeConvexError } from "@/lib/error-messages";
 import type { DocType } from "@/hooks";
 
@@ -35,6 +40,7 @@ export default function NewDocPage({ params }: NewDocPageProps) {
   const projectId = project?._id as Id<"projects"> | undefined;
 
   const existingDocs = useProjectDocs(projectId);
+  const access = useDocAccess(projectId);
   const createDoc = useCreateDoc();
 
   const [title, setTitle] = useState("");
@@ -50,8 +56,23 @@ export default function NewDocPage({ params }: NewDocPageProps) {
     new Set((existingDocs ?? []).map((doc) => doc.module))
   ).sort();
 
+  // Blocked reasons come from the same source the mutation checks, so the
+  // form refuses before the user writes a page it would reject on save.
+  const blocked = access
+    ? !access.canCreate
+      ? "Your role cannot create documentation pages in this project."
+      : access.atProjectLimit
+        ? `This project holds ${access.projectCount} of ${access.projectLimit} pages. Delete a page or upgrade for unlimited pages.`
+        : access.atOrgLimit
+          ? `Your organization holds ${access.orgCount} of ${access.orgLimit} pages. Delete a page or upgrade for unlimited pages.`
+          : null
+    : null;
+
   const canSubmit =
-    title.trim().length > 0 && moduleName.trim().length > 0 && !isSaving;
+    title.trim().length > 0 &&
+    moduleName.trim().length > 0 &&
+    !isSaving &&
+    !blocked;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,6 +124,15 @@ export default function NewDocPage({ params }: NewDocPageProps) {
             New page
           </h1>
         </div>
+
+        {blocked && (
+          <p
+            data-testid="doc-new-blocked"
+            className="border-l-2 border-amber-500/60 py-1 pl-3 text-xs text-amber-700 dark:text-amber-400"
+          >
+            {blocked}
+          </p>
+        )}
 
         {error && (
           <p className="border-l-2 border-red-500/60 py-1 pl-3 text-xs text-red-700 dark:text-red-400">

@@ -42,6 +42,8 @@ export interface DocDetail extends DocSummary {
   body: string;
   authorName: string;
   canEdit: boolean;
+  canPublish: boolean;
+  canDelete: boolean;
 }
 
 /**
@@ -79,6 +81,28 @@ export function useProjectDoc(
     convexApi.features.docs.queries.getBySlug,
     projectId && slug ? { projectId, slug } : "skip"
   ) as DocDetail | undefined;
+}
+
+export interface DocAccess {
+  enabled: boolean;
+  canCreate: boolean;
+  canPublish: boolean;
+  canDelete: boolean;
+  atProjectLimit: boolean;
+  atOrgLimit: boolean;
+  projectCount: number;
+  projectLimit: number | null;
+  orgCount: number;
+  orgLimit: number | null;
+}
+
+/** Role capabilities and remaining tier capacity, so the UI can hide an
+ *  action instead of letting the user find out at save time. */
+export function useDocAccess(projectId: Id<"projects"> | undefined) {
+  return useQuery(
+    convexApi.features.docs.queries.access,
+    projectId ? { projectId } : "skip"
+  ) as DocAccess | undefined;
 }
 
 export function useCreateDoc() {

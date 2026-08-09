@@ -256,7 +256,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                 </p>
               </div>
 
-              {doc.canEdit && (
+              {(doc.canEdit || doc.canPublish || doc.canDelete) && (
                 <div className="flex shrink-0 items-center gap-2">
                   {isEditing ? (
                     <>
@@ -280,47 +280,52 @@ export default function DocDetailPage({ params }: DocPageProps) {
                     </>
                   ) : (
                     <>
-                      <button
-                        type="button"
-                        data-testid="doc-delete"
-                        onClick={() => setConfirmDelete(true)}
-                        title="Move to trash"
-                        aria-label="Move to trash"
-                        className="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="doc-edit"
-                        onClick={beginEdit}
-                        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
-                      >
-                        <Pencil className="h-4 w-4" />
-                        Edit
-                      </button>
-                      {doc.status === "draft" ? (
+                      {doc.canDelete && (
                         <button
                           type="button"
-                          data-testid="doc-publish"
-                          onClick={handlePublish}
-                          disabled={isBusy}
-                          className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-900 transition-colors hover:bg-white disabled:opacity-50"
+                          data-testid="doc-delete"
+                          onClick={() => setConfirmDelete(true)}
+                          title="Move to trash"
+                          aria-label="Move to trash"
+                          className="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
                         >
-                          <Send className="h-3.5 w-3.5" />
-                          Publish
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          data-testid="doc-unpublish"
-                          onClick={handleUnpublish}
-                          disabled={isBusy}
-                          className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-400 transition-colors hover:text-zinc-100 disabled:opacity-50"
-                        >
-                          Return to draft
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       )}
+                      {doc.canEdit && (
+                        <button
+                          type="button"
+                          data-testid="doc-edit"
+                          onClick={beginEdit}
+                          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Edit
+                        </button>
+                      )}
+                      {doc.canPublish &&
+                        (doc.status === "draft" ? (
+                          <button
+                            type="button"
+                            data-testid="doc-publish"
+                            onClick={handlePublish}
+                            disabled={isBusy}
+                            className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-900 transition-colors hover:bg-white disabled:opacity-50"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            Publish
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            data-testid="doc-unpublish"
+                            onClick={handleUnpublish}
+                            disabled={isBusy}
+                            className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-400 transition-colors hover:text-zinc-100 disabled:opacity-50"
+                          >
+                            Return to draft
+                          </button>
+                        ))}
                     </>
                   )}
                 </div>

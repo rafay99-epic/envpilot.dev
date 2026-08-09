@@ -2,6 +2,7 @@ import { v, ConvexError } from "convex/values";
 import { query, mutation } from "../../_generated/server";
 import { requireAdmin } from "./auth";
 import { CAPABILITIES, CAPABILITY_KEYS } from "../../lib/capabilities";
+import { resolveCapabilities } from "../../lib/roleProfiles";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_]{1,30}$/;
 // Legacy values normalizeOrgRole rewrites BEFORE registry lookup (admin →
@@ -56,6 +57,9 @@ export const listRoles = query({
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((role) => ({
         ...role,
+        // Owner reads from code, so the matrix never shows a capability the
+        // owner actually holds as missing just because the seed has not run.
+        capabilities: resolveCapabilities(role.slug, role.capabilities),
         memberCount: memberCounts[role.slug] ?? 0,
         pendingInvitationCount: pendingInviteCounts[role.slug] ?? 0,
       }));
