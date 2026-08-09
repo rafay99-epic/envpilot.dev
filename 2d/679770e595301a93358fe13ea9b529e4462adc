@@ -1,0 +1,52 @@
+convex/features/docs/helpers.ts
+  s_ef310eae7bd2d7::t_97368454f5bfea 19,139-145,151-153,190,194,202,206
+convex/features/admin/migrations.ts
+  s_ef310eae7bd2d7::t_d26a4ce6de7338 671-672
+  s_ef310eae7bd2d7::t_05ec29b04115cd 678
+  s_ef310eae7bd2d7::t_568a1cf625446a 196-275
+  s_ef310eae7bd2d7::t_5f6aa34382f826 37-44,626-670,673
+  s_ef310eae7bd2d7::t_c45101a1d7e8ee 190-195,276-277
+  s_ef310eae7bd2d7::t_88853ae70d2ee2 36,675-677
+CLAUDE.md
+  s_ef310eae7bd2d7::t_840e53aa853380 80-111,373-402
+convex/features/admin/roles.ts
+  s_ef310eae7bd2d7::t_f58a99743616e6 5
+  s_ef310eae7bd2d7::t_f8bf1d87f63ff4 60-62
+convex/features/featureRegistry/gates.ts
+  s_ef310eae7bd2d7::t_3aa4adbafb6d27 454
+apps/docs/content/platform/rbac.mdx
+  s_ef310eae7bd2d7::t_dbc2858d284ce9 55-57
+convex/features/docs/queries.ts
+  s_ef310eae7bd2d7::t_3aa4adbafb6d27 11,62-64,68,70,74
+convex/lib/seedData.ts
+  s_ef310eae7bd2d7::t_3aa4adbafb6d27 344-346
+convex/lib/roleProfiles.ts
+  s_ef310eae7bd2d7::t_7a60651f7c1c23 43-51,54-59,228-240
+apps/web/src/lib/__tests__/role-parity.test.ts
+  s_ef310eae7bd2d7::t_277e2b5f394463 22,266-294
+  s_ef310eae7bd2d7::t_65f090f8da3d67 295-296
+apps/web/src/lib/__tests__/doc-permissions.test.ts
+  s_ef310eae7bd2d7::t_60c6ab479a9f48 1-5,7-106
+  s_ef310eae7bd2d7::t_21553a5d4358de 6,107-108
+convex/lib/authz.ts
+  s_ef310eae7bd2d7::t_f8bf1d87f63ff4 15
+  s_ef310eae7bd2d7::t_a8ed128e528e66 138-141
+convex/features/community/changelog/seed.ts
+  s_ef310eae7bd2d7::t_0e27941eb174e4 1540-1542
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "2d679770e595301a93358fe13ea9b529e4462adc",
+  "prompts": {},
+  "sessions": {
+    "s_ef310eae7bd2d7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4d6e2b4a-adf8-4bc0-9a7d-1d8ad19fb4bb",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
