@@ -207,6 +207,20 @@ export const CAPABILITIES = {
     description: "Move pages to trash and restore them",
     risk: "medium",
   },
+  "project.docs.share": {
+    label: "Share documentation with teammates",
+    category: "Documentation",
+    description:
+      "Hand a published page to a named organization member, including one who is not assigned to the project. Grants read of that one page — never the project",
+    risk: "medium",
+  },
+  "project.docs.share.external": {
+    label: "Share documentation outside the organization",
+    category: "Documentation",
+    description:
+      "Mint a public preview link for a published page, readable by anyone holding the URL until it expires or is revoked",
+    risk: "high",
+  },
   /**
    * DISPLAY capability, enforced at the client — deliberately, not by
    * omission.

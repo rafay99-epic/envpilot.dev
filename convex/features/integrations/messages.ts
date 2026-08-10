@@ -52,6 +52,7 @@ const ACTION_TITLES: Record<string, { glyph: string; title: string }> = {
     title: "Extension session revoked",
   },
   "doc.published": { glyph: "✓", title: "Documentation published" },
+  "doc.shared": { glyph: "→", title: "Documentation shared" },
 };
 
 function escapeSlack(value: string): string {
@@ -181,6 +182,15 @@ function subject(
     const title = firstString(details, ["title"]);
     const moduleName = firstString(details, ["module"]);
     return title && moduleName ? `${moduleName} → ${title}` : title;
+  }
+  if (action === "doc.shared") {
+    const title = firstString(details, ["title"]);
+    const audience = firstString(details, ["audience"]);
+    // Names the page and whether it left the organization. Recipient
+    // identities stay out of the channel — the audit log has them.
+    return title && audience === "external"
+      ? `${title} (public link)`
+      : (title ?? undefined);
   }
   return undefined;
 }

@@ -111,6 +111,10 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "doc.published": "info",
   "doc.deleted": "warning",
   "doc.restored": "info",
+  "doc.shared": "info",
+  "doc.share_revoked": "info",
+  // A page leaving the organization is the event worth finding later.
+  "doc.share_viewed": "warning",
 };
 
 // Resource type mapping for different action types
@@ -229,6 +233,9 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "doc.published": "doc",
   "doc.deleted": "doc",
   "doc.restored": "doc",
+  "doc.shared": "doc",
+  "doc.share_revoked": "doc",
+  "doc.share_viewed": "doc",
 };
 
 export interface AuditLogInput {

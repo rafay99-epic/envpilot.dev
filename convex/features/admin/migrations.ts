@@ -232,6 +232,9 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
     project_docs: "true",
     max_docs_per_project: "10",
     max_docs_per_org: "25",
+    doc_sharing: "true",
+    doc_public_links: "false",
+    max_active_doc_links: "0",
   },
   pro: {
     max_projects: "null",
@@ -272,6 +275,9 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
     project_docs: "true",
     max_docs_per_project: "null",
     max_docs_per_org: "null",
+    doc_sharing: "true",
+    doc_public_links: "true",
+    max_active_doc_links: "null",
   },
 };
 

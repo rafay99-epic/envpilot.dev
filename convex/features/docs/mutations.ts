@@ -11,6 +11,7 @@ import { createAuditLog } from "../../lib/audit";
 import { createBody, setContentStatus, writeBody } from "./content";
 import { normalizePrUrl, scanDocBody, slugifyTitle } from "./guards";
 import { templateFor } from "./templates";
+import { revokeSharesForDoc } from "./shareGuards";
 import {
   canDeleteDoc,
   canEditDoc,
@@ -167,9 +168,19 @@ export const update = mutation({
       patch.publishedAt = undefined;
       patch.publishedBy = undefined;
     }
-    patch.updatedAt = Date.now();
+    const now = Date.now();
+    patch.updatedAt = now;
     await ctx.db.patch(doc._id, patch);
-    if (unpublished) await setContentStatus(ctx, doc._id, "draft");
+
+    // Editing a published page returns it to draft, and that has to take its
+    // shares with it exactly as an explicit unpublish does. Without this the
+    // grants stayed active on a draft and came back the moment the page was
+    // republished — a share nobody re-authorized.
+    let sharesRevoked = 0;
+    if (unpublished) {
+      await setContentStatus(ctx, doc._id, "draft");
+      sharesRevoked = await revokeSharesForDoc(ctx, doc._id, actor._id, now);
+    }
 
     await createAuditLog(ctx, {
       organizationId: access.project.organizationId,
@@ -180,6 +191,7 @@ export const update = mutation({
         title: (patch.title as string) ?? doc.title,
         slug: (patch.slug as string) ?? doc.slug,
         returnedToDraft: unpublished,
+        sharesRevoked,
       },
     });
 
@@ -250,20 +262,31 @@ export const unpublish = mutation({
     }
     if (doc.status === "draft") return { slug: doc.slug };
 
+    const now = Date.now();
     await ctx.db.patch(doc._id, {
       status: "draft",
       publishedAt: undefined,
       publishedBy: undefined,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
     await setContentStatus(ctx, doc._id, "draft");
+
+    // Returning a page to draft has to take its shares with it. The gate
+    // chain would refuse them anyway, but a revoked row stops advertising
+    // itself as live access in the sender's list and the recipient's inbox.
+    const revoked = await revokeSharesForDoc(ctx, doc._id, actor._id, now);
 
     await createAuditLog(ctx, {
       organizationId: access.project.organizationId,
       projectId: doc.projectId,
       userId: actor._id,
       action: "doc.updated",
-      details: { title: doc.title, slug: doc.slug, returnedToDraft: true },
+      details: {
+        title: doc.title,
+        slug: doc.slug,
+        returnedToDraft: true,
+        sharesRevoked: revoked,
+      },
     });
 
     return { slug: doc.slug };
@@ -285,17 +308,22 @@ export const remove = mutation({
       throw new ConvexError("Your role cannot delete documentation pages");
     }
 
+    const now = Date.now();
     await ctx.db.patch(doc._id, {
-      deletedAt: Date.now(),
-      updatedAt: Date.now(),
+      deletedAt: now,
+      updatedAt: now,
     });
+
+    // Same reason as unpublish: a trashed page must not leave live-looking
+    // grants behind, on either audience.
+    const revoked = await revokeSharesForDoc(ctx, doc._id, actor._id, now);
 
     await createAuditLog(ctx, {
       organizationId: access.project.organizationId,
       projectId: doc.projectId,
       userId: actor._id,
       action: "doc.deleted",
-      details: { title: doc.title, slug: doc.slug },
+      details: { title: doc.title, slug: doc.slug, sharesRevoked: revoked },
     });
 
     return { ok: true };

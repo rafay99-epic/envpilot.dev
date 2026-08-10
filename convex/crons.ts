@@ -72,6 +72,15 @@ crons.interval(
   internal.features.sharing.cleanup.cleanupExpiredOtps
 );
 
+// Flip past-TTL documentation shares to "expired" every hour. Bookkeeping
+// only — the read gate already refuses them, and the active-link count
+// excludes them, so the cadence is not load-bearing.
+crons.interval(
+  "cleanup expired documentation shares",
+  { hours: 1 },
+  internal.features.docs.shareCleanup.cleanupExpiredDocShares
+);
+
 // Auto-publish scheduled changelog entries hourly. A marketing changelog
 // entry going live up to ~55 minutes after its scheduledFor timestamp has
 // no user-facing consequence — publishedAt is still set to the original

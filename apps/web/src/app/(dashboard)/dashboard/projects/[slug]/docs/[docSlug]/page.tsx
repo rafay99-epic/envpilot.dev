@@ -4,14 +4,27 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { ArrowLeft, GitPullRequest, Pencil, Send, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  GitPullRequest,
+  Pencil,
+  Send,
+  Share2,
+  Trash2,
+} from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { ConfirmDialog } from "@/components/ui";
 import { FeatureGate } from "@/components/tier/FeatureGate";
-import { DocEditor, DocStatusPill } from "@/components/docs";
 import {
+  DocEditor,
+  DocSharesList,
+  DocShareDrawer,
+  DocStatusPill,
+} from "@/components/docs";
+import {
+  useDocAccess,
   useProjectBySlug,
   useProjectDoc,
   useUpdateDoc,
@@ -64,6 +77,18 @@ export default function DocDetailPage({ params }: DocPageProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+
+  // Capability + tier, resolved by the backend. `canShare` covers the team
+  // tab; the public-link tab has its own capability and is hidden without it.
+  const docAccess = useDocAccess(projectId);
+
+  // Either capability opens the drawer — a role may hold only the external
+  // one — and so does the plan-blocked case, which the drawer itself explains.
+  const canOpenShare =
+    docAccess?.canShare === true ||
+    docAccess?.canShareExternal === true ||
+    docAccess?.externalUpgradeRequired === true;
 
   // Seed the editor when a different page loads. Guarded on docSlug rather
   // than the doc object so a live update from another tab cannot overwrite
@@ -73,6 +98,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
     setWarnings([]);
     setError(null);
     setNotice(null);
+    setShareOpen(false);
   }, [docSlug]);
 
   const beginEdit = () => {
@@ -256,7 +282,10 @@ export default function DocDetailPage({ params }: DocPageProps) {
                 </p>
               </div>
 
-              {(doc.canEdit || doc.canPublish || doc.canDelete) && (
+              {(doc.canEdit ||
+                doc.canPublish ||
+                doc.canDelete ||
+                canOpenShare) && (
                 <div className="flex shrink-0 items-center gap-2">
                   {isEditing ? (
                     <>
@@ -280,6 +309,19 @@ export default function DocDetailPage({ params }: DocPageProps) {
                     </>
                   ) : (
                     <>
+                      {canOpenShare && doc.status === "published" && (
+                        <button
+                          type="button"
+                          data-testid="doc-share"
+                          onClick={() => setShareOpen(true)}
+                          title="Share this page"
+                          aria-label="Share this page"
+                          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+                        >
+                          <Share2 className="h-4 w-4" />
+                          Share
+                        </button>
+                      )}
                       {doc.canDelete && (
                         <button
                           type="button"
@@ -363,8 +405,14 @@ export default function DocDetailPage({ params }: DocPageProps) {
                 />
               </div>
             ) : (
-              <div data-testid="doc-body" className="max-w-[76ch]">
-                <DocMarkdown body={doc.body} />
+              <div className="max-w-[76ch]">
+                <div data-testid="doc-body">
+                  <DocMarkdown body={doc.body} />
+                </div>
+                {/* Outside the body wrapper: it is chrome about the page, not
+                    part of it, and its icons would otherwise count as page
+                    content to anything inspecting the rendered markdown. */}
+                <DocSharesList docId={doc._id} />
               </div>
             )}
 
@@ -383,6 +431,18 @@ export default function DocDetailPage({ params }: DocPageProps) {
           </>
         )}
       </div>
+
+      {doc && (
+        <DocShareDrawer
+          isOpen={shareOpen}
+          onClose={() => setShareOpen(false)}
+          docId={doc._id}
+          docTitle={doc.title}
+          docModule={doc.module}
+          projectId={projectId!}
+          isPublished={doc.status === "published"}
+        />
+      )}
 
       <ConfirmDialog
         isOpen={confirmDelete}

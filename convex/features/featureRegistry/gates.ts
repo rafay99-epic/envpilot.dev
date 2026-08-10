@@ -464,3 +464,48 @@ export async function countOrgDocs(
   }
   return count;
 }
+
+/**
+ * Live public documentation links in an organization — the count behind
+ * `max_active_doc_links`.
+ *
+ * Two things make this exact rather than approximate. The index range is
+ * status-scoped, so revoked and expired rows are never read. And rows whose
+ * TTL has elapsed are excluded in memory: the expiry cron runs hourly, so an
+ * "active" row can be dead for up to an hour, and counting it would block a
+ * new link against a slot nothing occupies. `countActiveShares` carries the
+ * same correction for the same reason.
+ *
+ * Bounded by the caller's own limit, and exact: the index range covers
+ * external + active + not-yet-expired, so nothing needs filtering after the
+ * read and nothing can be missed behind rows that would have been filtered
+ * out. Member shares (which have no cap) never enter the range.
+ */
+/**
+ * Ceiling on the active-link scan. Only reachable by an organization that
+ * minted links while unlimited and was then given a finite cap; at that point
+ * every finite cap is already exceeded, so stopping here cannot change the
+ * decision — it only stops the read from growing without bound.
+ */
+export async function countActiveDocLinks(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">,
+  limit: number
+): Promise<number> {
+  // Every condition is in the index range — organization, audience, status
+  // and a lower bound on expiry — so the rows read are exactly the live
+  // public links and nothing else. That is what makes `limit + 1` a complete
+  // answer: one more than the cap is all it takes to prove the cap is
+  // exceeded, and no amount of expired or revoked history can crowd them out.
+  const rows = await db
+    .query("docShares")
+    .withIndex("by_org_audience_status", (q) =>
+      q
+        .eq("organizationId", organizationId)
+        .eq("audience", "external")
+        .eq("status", "active")
+        .gt("expiresAt", Date.now())
+    )
+    .take(limit + 1);
+  return rows.length;
+}

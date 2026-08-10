@@ -15,6 +15,7 @@ import {
   Share2,
   Users,
   Inbox,
+  FileText,
   GitPullRequest,
   ClipboardList,
   BarChart3,
@@ -34,6 +35,7 @@ import {
   useConvexUser,
   useProjectBySlug,
   usePendingRequestCount,
+  useHasSharedWithMe,
 } from "@/hooks";
 
 interface NavItem {
@@ -139,6 +141,11 @@ export function DashboardNav() {
     ? `/organizations/${organization.slug}/members`
     : "/dashboard/team";
 
+  // Only surfaced once something has actually been shared with this reader.
+  // An always-visible empty inbox is noise for the majority who never receive
+  // one, and the notification email deep-links straight to the page anyway.
+  const hasSharedDocs = useHasSharedWithMe() === true;
+
   // Org-level nav items
   const orgNavItems: NavItem[] = [
     {
@@ -158,6 +165,15 @@ export function DashboardNav() {
             href: "/dashboard/requests",
             label: "Requests",
             icon: <Inbox className="h-4 w-4" />,
+          },
+        ]
+      : []),
+    ...(hasSharedDocs
+      ? [
+          {
+            href: "/dashboard/docs/shared",
+            label: "Shared with me",
+            icon: <FileText className="h-4 w-4" />,
           },
         ]
       : []),

@@ -30,11 +30,22 @@ export const BORDER = "#27272a"; // zinc-800
 // Inline monospace token (e.g. a variable name) styled for the dark theme.
 export const CODE_STYLE = `background:${CHROME_BG}; border:1px solid ${BORDER}; padding:2px 7px; border-radius:5px; color:#4ade80; font-family:${FONT_MONO}; font-size:13px;`;
 
+/**
+ * Outer shell for every transactional email.
+ *
+ * `title` and `preheader` are escaped HERE rather than at each call site.
+ * They are the two slots that regularly carry stored, user-supplied text — a
+ * document title, a display name — and unlike `body` they are not assembled
+ * from already-escaped row helpers, so an unescaped one is injected markup in
+ * a message sent from the organization's own domain.
+ */
 export function emailWrapper(
-  title: string,
+  rawTitle: string,
   body: string,
-  preheader = ""
+  rawPreheader = ""
 ): string {
+  const title = escapeHtml(rawTitle);
+  const preheader = escapeHtml(rawPreheader);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -113,7 +124,18 @@ export function paragraphRow(
 </tr>`;
 }
 
-export function buttonRow(href: string, label: string): string {
+/**
+ * Call-to-action button.
+ *
+ * The href is escaped HERE rather than at each call site: it is the one
+ * attribute in these templates that regularly carries a value assembled from
+ * stored data, and an unescaped `"` in it closes the attribute and lets the
+ * rest become markup — in a message sent from the organization's own sending
+ * domain. Escaping `&` to `&amp;` is correct inside an attribute; browsers
+ * decode it before navigating, so query strings are unaffected.
+ */
+export function buttonRow(rawHref: string, label: string): string {
+  const href = escapeHtml(rawHref);
   return `<tr>
   <td style="padding: 4px 40px 30px 40px; text-align: center;">
     <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto;">

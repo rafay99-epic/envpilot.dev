@@ -77,28 +77,47 @@ export function DrawerPanel({
     [safeClose]
   );
 
+  // The keydown listener re-binds whenever its handler identity changes.
+  // Cheap and idempotent — nothing here touches focus.
   useEffect(() => {
-    if (isOpen) {
-      document.addEventListener("keydown", handleKeydown);
-      document.body.style.overflow = "hidden";
-      // Initial focus into the dialog; restore to the trigger on close.
-      const previouslyFocused = document.activeElement as HTMLElement | null;
-      const frame = requestAnimationFrame(() => {
-        const target = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
-        (target ?? panelRef.current)?.focus();
-      });
-      return () => {
-        cancelAnimationFrame(frame);
-        document.removeEventListener("keydown", handleKeydown);
-        document.body.style.overflow = "unset";
-        previouslyFocused?.focus();
-      };
-    }
-    return () => {
-      document.removeEventListener("keydown", handleKeydown);
-      document.body.style.overflow = "unset";
-    };
+    if (!isOpen) return;
+    document.addEventListener("keydown", handleKeydown);
+    return () => document.removeEventListener("keydown", handleKeydown);
   }, [isOpen, handleKeydown]);
+
+  /**
+   * Focus and scroll lock, keyed on `isOpen` ALONE — deliberately.
+   *
+   * These two concerns used to share one effect with the keydown binding, so
+   * the effect re-ran whenever the handler identity changed, which is
+   * whenever the caller passes a fresh `onClose`. Its cleanup restores focus
+   * to whatever was focused before the drawer opened, so a drawer that holds
+   * its own form state stole focus out of the field on EVERY keystroke: type
+   * a few characters, focus jumps to the first focusable in the panel, the
+   * rest of the input is dropped on the floor.
+   *
+   * Drawers whose inputs live in a child component never re-rendered this
+   * one, which is why the bug stayed hidden. Splitting the effects fixes it
+   * for every caller rather than asking each of them to memoize `onClose`.
+   */
+  useEffect(() => {
+    // A closed drawer leaves body overflow ALONE. Pages mount several of
+    // these at once, so resetting here means the one that mounts closed
+    // unlocks scrolling behind the one that is open. The cleanup below is
+    // what restores it, and only the drawer that locked it runs that.
+    if (!isOpen) return;
+    document.body.style.overflow = "hidden";
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const frame = requestAnimationFrame(() => {
+      const target = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
+      (target ?? panelRef.current)?.focus();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      document.body.style.overflow = "unset";
+      previouslyFocused?.focus();
+    };
+  }, [isOpen]);
 
   return (
     <AnimatePresence>

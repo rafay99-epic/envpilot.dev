@@ -1,6 +1,7 @@
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
 import { MAX_PROJECT_FILES } from "./fileLimits";
+import { MAX_SHARE_RECIPIENTS } from "../features/docs/shareGuards";
 
 /**
  * Rate limiter configuration for Envpilot backend.
@@ -97,6 +98,40 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     rate: 30,
     period: 3_600_000,
     capacity: 10,
+  },
+
+  // Documentation shares: 60 emails per hour per org. Charged per RECIPIENT,
+  // because the cost being bounded is outbound mail rather than rows.
+  //
+  // capacity must be at least MAX_SHARE_RECIPIENTS or the advertised
+  // 20-recipient action could never succeed — one batch consumes 20 tokens,
+  // and a bucket that never holds 20 rejects it every time.
+  docShareCreate: {
+    kind: "token bucket",
+    rate: 60,
+    period: 3_600_000,
+    capacity: MAX_SHARE_RECIPIENTS,
+  },
+
+  // Passphrase attempts on a public documentation link: 10 per hour per
+  // TOKEN. Keyed on the token rather than the client IP on purpose — the
+  // Convex mutation is publicly callable, so any caller-supplied key would
+  // let an attacker mint a fresh bucket per guess. Per-token also means one
+  // attacker cannot lock every other reader out of unrelated links.
+  docShareUnlock: {
+    kind: "fixed window",
+    rate: 10,
+    period: 3_600_000,
+  },
+
+  // Successful reads of a public documentation link: 60 per hour per token.
+  // Each one writes an audit row, so an unbounded read is an unbounded write.
+  // Well above real reading (open, refresh, re-open) and far below flooding.
+  docShareView: {
+    kind: "token bucket",
+    rate: 60,
+    period: 3_600_000,
+    capacity: 20,
   },
 
   // CLI device code generation: 5 per minute per device
