@@ -300,7 +300,7 @@ export function SharedDocReader({
   const { doc, moduleName } = payload;
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-5xl px-6 py-12">
       {/* Only a page reached THROUGH a module index has somewhere to go back
           to; a single-page link has no sibling to offer. */}
       {docSlug && (

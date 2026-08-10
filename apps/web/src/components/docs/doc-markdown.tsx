@@ -128,9 +128,12 @@ export function DocMarkdown({ body }: { body: string }) {
               {children}
             </h4>
           ),
+          // Prose keeps a reading measure of its own so the container can be
+          // wide enough for tables, code and diagrams without stretching
+          // sentences past what is comfortable to read.
           p: ({ node, children, ...props }) => (
             <p
-              className="mb-4 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300"
+              className="mb-4 max-w-[72ch] text-sm leading-relaxed text-zinc-700 dark:text-zinc-300"
               {...props}
             >
               {children}
@@ -138,7 +141,7 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           ul: ({ node, children, ...props }) => (
             <ul
-              className="mb-4 list-disc space-y-1 pl-6 text-sm text-zinc-700 dark:text-zinc-300"
+              className="mb-4 max-w-[72ch] list-disc space-y-1 pl-6 text-sm text-zinc-700 dark:text-zinc-300"
               {...props}
             >
               {children}
@@ -146,7 +149,7 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           ol: ({ node, children, ...props }) => (
             <ol
-              className="mb-4 list-decimal space-y-1 pl-6 text-sm text-zinc-700 dark:text-zinc-300"
+              className="mb-4 max-w-[72ch] list-decimal space-y-1 pl-6 text-sm text-zinc-700 dark:text-zinc-300"
               {...props}
             >
               {children}
@@ -210,16 +213,38 @@ export function DocMarkdown({ body }: { body: string }) {
               </div>
             );
           },
+          // `w-max min-w-full`, not `w-full`: a cell holding a long path or
+          // code chip used to squeeze every other column down to one word per
+          // line. Columns now take their natural width and the frame scrolls.
           table: ({ node, children, ...props }) => (
-            <div className="mb-4 overflow-x-auto">
-              <table className="w-full border-collapse text-sm" {...props}>
+            <div className="mb-6 overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+              <table
+                className="w-max min-w-full border-collapse text-sm"
+                {...props}
+              >
                 {children}
               </table>
             </div>
           ),
+          thead: ({ node, children, ...props }) => (
+            <thead
+              className="border-b border-zinc-200 bg-zinc-100/70 dark:border-zinc-800 dark:bg-zinc-900/60"
+              {...props}
+            >
+              {children}
+            </thead>
+          ),
+          tr: ({ node, children, ...props }) => (
+            <tr
+              className="border-b border-zinc-200 last:border-b-0 dark:border-zinc-800/60"
+              {...props}
+            >
+              {children}
+            </tr>
+          ),
           th: ({ node, children, ...props }) => (
             <th
-              className="border-b border-zinc-300 px-3 py-2 text-left text-xs font-semibold text-zinc-600 uppercase dark:border-zinc-700 dark:text-zinc-400"
+              className="px-4 py-2.5 text-left text-xs font-semibold whitespace-nowrap text-zinc-600 uppercase dark:text-zinc-400"
               {...props}
             >
               {children}
@@ -227,7 +252,7 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           td: ({ node, children, ...props }) => (
             <td
-              className="border-b border-zinc-200 px-3 py-2 text-zinc-700 dark:border-zinc-800 dark:text-zinc-300"
+              className="px-4 py-2.5 align-top leading-relaxed text-zinc-700 dark:text-zinc-300"
               {...props}
             >
               {children}
@@ -235,7 +260,7 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           blockquote: ({ node, children, ...props }) => (
             <blockquote
-              className="mb-4 border-l-2 border-green-500/40 pl-4 text-sm text-zinc-600 italic dark:text-zinc-400"
+              className="mb-4 max-w-[72ch] border-l-2 border-green-500/40 pl-4 text-sm text-zinc-600 italic dark:text-zinc-400"
               {...props}
             >
               {children}

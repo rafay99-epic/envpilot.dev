@@ -203,7 +203,7 @@ export default function SharedDocReaderPage({
         </p>
       )}
 
-      <div data-testid="shared-doc-body" className="max-w-[76ch]">
+      <div data-testid="shared-doc-body" className="max-w-5xl">
         <DocMarkdown body={doc.body} />
       </div>
     </div>
