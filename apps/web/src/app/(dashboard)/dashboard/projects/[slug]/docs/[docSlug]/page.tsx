@@ -405,7 +405,10 @@ export default function DocDetailPage({ params }: DocPageProps) {
                 />
               </div>
             ) : (
-              <div className="max-w-[76ch]">
+              // Wider than the prose measure on purpose — DocMarkdown caps
+              // paragraphs at 72ch, so the extra room goes to tables, code
+              // blocks and diagrams instead of to line length.
+              <div className="max-w-5xl">
                 <div data-testid="doc-body">
                   <DocMarkdown body={doc.body} />
                 </div>
