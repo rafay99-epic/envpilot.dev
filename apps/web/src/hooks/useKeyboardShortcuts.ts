@@ -98,6 +98,24 @@ const DEAD_SEQUENCE: HotkeySequence = [
 ] as unknown as HotkeySequence;
 const DEAD_HOTKEY = "F24" as Hotkey;
 
+/**
+ * Both registrations are unconditional — rules of hooks — so whichever shape
+ * a binding is NOT gets a placeholder. `enabled: false` does not prevent the
+ * placeholder from being registered: the library only consults `enabled` when
+ * dispatching an event, so every single-key shortcut registered the same dead
+ * sequence and the manager warned about the collision on each one, on every
+ * mount.
+ *
+ * "allow" rather than a unique placeholder per shortcut: the collision is
+ * real and intended. `Unidentified` and `F24` are keys no keyboard emits and
+ * the registrations are disabled anyway, so several handlers sharing them can
+ * never fire. Making the sentinel unique would only hide the warning.
+ */
+const DEAD_REGISTRATION = {
+  enabled: false,
+  conflictBehavior: "allow",
+} as const;
+
 function useShortcut(
   shortcutId: string,
   callback: (e: KeyboardEvent) => void,
@@ -106,22 +124,21 @@ function useShortcut(
 ) {
   const keys = customBindings[shortcutId] ?? SHORTCUTS[shortcutId].keys;
   const binding = parseBinding(keys);
+  const isSequence = binding.type === "sequence";
 
   useHotkeySequence(
-    binding.type === "sequence"
-      ? (binding.keys as unknown as HotkeySequence)
-      : DEAD_SEQUENCE,
+    isSequence ? (binding.keys as unknown as HotkeySequence) : DEAD_SEQUENCE,
     callback,
-    { enabled: isEnabled && binding.type === "sequence" }
+    isSequence ? { enabled: isEnabled } : DEAD_REGISTRATION
   );
 
   useHotkey(
-    binding.type === "single" ? (binding.hotkey as Hotkey) : DEAD_HOTKEY,
+    isSequence ? DEAD_HOTKEY : (binding.hotkey as Hotkey),
     (e) => {
       e.preventDefault();
       callback(e);
     },
-    { enabled: isEnabled && binding.type === "single" }
+    isSequence ? DEAD_REGISTRATION : { enabled: isEnabled }
   );
 }
 
