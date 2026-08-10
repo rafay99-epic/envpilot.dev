@@ -1,6 +1,7 @@
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
 import { MAX_PROJECT_FILES } from "./fileLimits";
+import { MAX_SHARE_RECIPIENTS } from "../features/docs/shareGuards";
 
 /**
  * Rate limiter configuration for Envpilot backend.
@@ -99,14 +100,17 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 10,
   },
 
-  // Documentation shares: 30 per hour per org, burst 10. A share sends an
-  // email, so the bound is on outbound volume, not storage. Handing one page
-  // to a five-person team in one action is a legitimate burst.
+  // Documentation shares: 60 emails per hour per org. Charged per RECIPIENT,
+  // because the cost being bounded is outbound mail rather than rows.
+  //
+  // capacity must be at least MAX_SHARE_RECIPIENTS or the advertised
+  // 20-recipient action could never succeed — one batch consumes 20 tokens,
+  // and a bucket that never holds 20 rejects it every time.
   docShareCreate: {
     kind: "token bucket",
-    rate: 30,
+    rate: 60,
     period: 3_600_000,
-    capacity: 10,
+    capacity: MAX_SHARE_RECIPIENTS,
   },
 
   // Passphrase attempts on a public documentation link: 10 per hour per

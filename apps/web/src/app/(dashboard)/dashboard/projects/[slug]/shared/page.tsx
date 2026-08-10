@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, use } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, use } from "react";
 import Link from "next/link";
 import type { Id } from "@convex/_generated/dataModel";
 import { useQuery as useConvexQuery } from "convex/react";
@@ -410,6 +410,13 @@ function DocShareCard({
   onRevokeClick,
 }: DocShareCardProps) {
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   // The share URL is built here, never taken from the server: `token` is
   // withheld from roles that may not share externally, so its presence is
@@ -417,7 +424,8 @@ function DocShareCard({
   const copyLink = async (token: string) => {
     await navigator.clipboard.writeText(`${window.location.origin}/d/${token}`);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   return (

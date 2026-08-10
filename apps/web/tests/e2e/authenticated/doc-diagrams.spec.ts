@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { hasE2ECredentials, SKIP_REASON } from "../env";
+import { hasE2ECredentials, SKIP_REASON, STORAGE_STATE_PATH } from "../env";
 import { getWorkerProjectSlug, trackClientErrors } from "./support";
 
 /**
@@ -23,6 +23,7 @@ import { getWorkerProjectSlug, trackClientErrors } from "./support";
 
 test.skip(!hasE2ECredentials, SKIP_REASON);
 
+const APP_ORIGIN = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const STAMP = Date.now();
 const MODULE_NAME = `E2E Diagrams ${STAMP}`;
 const TITLE = `E2E Diagram Page ${STAMP}`;
@@ -151,7 +152,14 @@ test.describe.serial("Documentation diagrams", () => {
     // Reruns stay green: the page is trashed, not left to collide with the
     // next stamp's module listing.
     if (!docSlug || !projectSlug) return;
-    const page = await browser.newPage();
+    // `browser.newPage()` builds a context from scratch: no storage state and
+    // no baseURL, so the dashboard bounced to sign-in and nothing was ever
+    // deleted. The saved session has to be handed over explicitly.
+    const context = await browser.newContext({
+      storageState: STORAGE_STATE_PATH,
+      baseURL: APP_ORIGIN,
+    });
+    const page = await context.newPage();
     try {
       await page.goto(`/dashboard/projects/${projectSlug}/docs/${docSlug}`, {
         waitUntil: "domcontentloaded",
@@ -164,7 +172,7 @@ test.describe.serial("Documentation diagrams", () => {
     } catch {
       // Cleanup is best-effort — a failure here must not fail the suite.
     } finally {
-      await page.close();
+      await context.close();
     }
   });
 });

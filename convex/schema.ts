@@ -676,6 +676,16 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_project_and_status", ["projectId", "status"])
     .index("by_project_and_module", ["projectId", "module"])
+    // A module share reads exactly the pages it serves. Without deletedAt and
+    // status in the key, a `take` over (project, module) fills up with drafts
+    // and trashed rows first, so a large module silently serves a partial —
+    // or empty — index while reading more rows than it needs.
+    .index("by_project_module_live", [
+      "projectId",
+      "module",
+      "deletedAt",
+      "status",
+    ])
     // O(log n) slug resolution for the page route. Without it every page view
     // scans the project's whole doc list.
     .index("by_project_and_slug", ["projectId", "slug"])
@@ -795,7 +805,15 @@ export default defineSchema({
     // in the key because that count is about PUBLIC links only — without it
     // the read walks every active member share in the organization too, and
     // member shares have no cap to bound them.
-    .index("by_org_audience_status", ["organizationId", "audience", "status"])
+    // expiresAt last so the count behind max_active_doc_links can range on it:
+    // past-TTL rows are excluded by the INDEX rather than read and filtered,
+    // which makes `take(limit + 1)` an exact answer instead of a sample.
+    .index("by_org_audience_status", [
+      "organizationId",
+      "audience",
+      "status",
+      "expiresAt",
+    ])
     // Bounds the hourly expiry sweep to rows that can actually expire.
     .index("by_status_and_expires", ["status", "expiresAt"])
     // Every share in a project, for the project's Shared tab — which lists

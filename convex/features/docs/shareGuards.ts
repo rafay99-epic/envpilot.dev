@@ -58,6 +58,31 @@ export type ResolvedModuleShare = {
 /** Ceiling on the pages one module share will serve. */
 export const MAX_MODULE_PAGES = 200;
 
+/**
+ * The published, non-deleted pages of one module.
+ *
+ * Both conditions sit in the index key, so `take` returns real pages rather
+ * than whatever happened to sort first. Callers that need to know the module
+ * is oversized ask for `MAX_MODULE_PAGES + 1` and check the length.
+ */
+export async function listLiveModulePages(
+  ctx: QueryCtx | MutationCtx,
+  projectId: Id<"projects">,
+  moduleName: string,
+  limit: number = MAX_MODULE_PAGES
+): Promise<Doc<"docs">[]> {
+  return ctx.db
+    .query("docs")
+    .withIndex("by_project_module_live", (q) =>
+      q
+        .eq("projectId", projectId)
+        .eq("module", moduleName)
+        .eq("deletedAt", undefined)
+        .eq("status", "published")
+    )
+    .take(limit);
+}
+
 /** Validates a caller-supplied TTL and returns the absolute expiry. */
 export function resolveExpiry(ttlMs: number, now: number): number {
   if (!Number.isFinite(ttlMs) || ttlMs < MIN_SHARE_TTL_MS) {
@@ -249,16 +274,12 @@ export async function resolveModuleShare(
   if (!base) return null;
   if (shareScope(base.share) !== "module" || !base.share.module) return null;
 
-  const rows = await ctx.db
-    .query("docs")
-    .withIndex("by_project_and_module", (q) =>
-      q.eq("projectId", base.share.projectId).eq("module", base.share.module!)
-    )
-    .take(MAX_MODULE_PAGES);
-
-  const docs = rows
-    .filter((doc) => doc.deletedAt === undefined && doc.status === "published")
-    .sort((a, b) => a.title.localeCompare(b.title));
+  // Live and published are IN the index range, not filtered after the read:
+  // filtering afterwards let a module's drafts and trashed pages fill the cap
+  // and push real pages out of the index a reader was supposed to get.
+  const docs = (
+    await listLiveModulePages(ctx, base.share.projectId, base.share.module)
+  ).sort((a, b) => a.title.localeCompare(b.title));
 
   return {
     share: base.share,
@@ -297,15 +318,68 @@ export async function revokeSharesForDoc(
   revokedBy: Id<"users">,
   now: number
 ): Promise<number> {
-  const active = await activeSharesForDoc(ctx, docId);
-  for (const share of active) {
-    await ctx.db.patch(share._id, {
-      status: "revoked",
-      revokedAt: now,
-      revokedBy,
-    });
+  // Drains until the range is empty rather than stopping at one page. A
+  // ceiling here would leave live grants on an unpublished page — and they
+  // would come back the moment it was republished. Each round patches rows
+  // OUT of the (doc, active) range it reads, so this terminates; the write
+  // ceiling in `assertShareCapacity` keeps the row count small in the first
+  // place, so in practice it is one round.
+  let revoked = 0;
+  for (;;) {
+    const active = await activeSharesForDoc(ctx, docId);
+    if (active.length === 0) return revoked;
+    for (const share of active) {
+      await ctx.db.patch(share._id, {
+        status: "revoked",
+        revokedAt: now,
+        revokedBy,
+      });
+      revoked++;
+    }
   }
-  return active.length;
+}
+
+/**
+ * Refuse a new share once a page already carries the maximum.
+ *
+ * The read surfaces bound themselves at `MAX_SHARES_PER_DOC`, so without a
+ * matching WRITE ceiling a busy page's later grants would be invisible in the
+ * sender's list and unrevokable through it. Enforcing the cap here is what
+ * makes the bounded reads complete rather than truncated.
+ */
+export async function assertShareCapacity(
+  ctx: MutationCtx,
+  docId: Id<"docs">
+): Promise<void> {
+  const existing = await ctx.db
+    .query("docShares")
+    .withIndex("by_doc_status", (q) =>
+      q.eq("docId", docId).eq("status", "active")
+    )
+    .take(MAX_SHARES_PER_DOC);
+  if (existing.length >= MAX_SHARES_PER_DOC) {
+    throw new ConvexError(
+      `This page already has ${MAX_SHARES_PER_DOC} active shares. Revoke one before adding another.`
+    );
+  }
+}
+
+/** Same reasoning, per RECIPIENT: "Shared with me" is bounded the same way. */
+export async function assertRecipientCapacity(
+  ctx: MutationCtx,
+  recipientUserId: Id<"users">
+): Promise<void> {
+  const existing = await ctx.db
+    .query("docShares")
+    .withIndex("by_recipient_status", (q) =>
+      q.eq("recipientUserId", recipientUserId).eq("status", "active")
+    )
+    .take(MAX_SHARES_PER_RECIPIENT);
+  if (existing.length >= MAX_SHARES_PER_RECIPIENT) {
+    throw new ConvexError(
+      "That person already holds the maximum number of active documentation shares."
+    );
+  }
 }
 
 /**
@@ -320,24 +394,23 @@ export async function deleteSharesForDoc(
   ctx: MutationCtx,
   docId: Id<"docs">
 ): Promise<number> {
-  let deleted = 0;
-  // Rounds rather than one take. The bound is generous enough that no real
-  // page reaches it; a page that somehow did would leave rows behind, so the
-  // count is returned for the caller to log.
+  // Drains until the range is empty. Stopping at a round count would leave
+  // share rows pointing at a doc id that no longer exists, and nothing would
+  // ever come back for them.
   //
   // `by_doc_status` queried on its `docId` prefix only — this wants every row
   // for the page, live or dead, and a prefix range gives exactly that without
   // a second index to maintain on every write.
-  for (let round = 0; round < 5; round++) {
+  let deleted = 0;
+  for (;;) {
     const rows = await ctx.db
       .query("docShares")
       .withIndex("by_doc_status", (q) => q.eq("docId", docId))
       .take(MAX_SHARES_PER_DOC);
+    if (rows.length === 0) return deleted;
     for (const row of rows) {
       await ctx.db.delete(row._id);
       deleted++;
     }
-    if (rows.length < MAX_SHARES_PER_DOC) break;
   }
-  return deleted;
 }

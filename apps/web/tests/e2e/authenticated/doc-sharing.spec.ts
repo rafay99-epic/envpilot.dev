@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { hasE2ECredentials, SKIP_REASON } from "../env";
+import { hasE2ECredentials, SKIP_REASON, STORAGE_STATE_PATH } from "../env";
 import { getWorkerProjectSlug, trackClientErrors } from "./support";
 
 /**
@@ -263,21 +263,29 @@ test.describe.serial("Documentation sharing", () => {
 
   test("revoking kills a live link", async ({ page, browser }) => {
     test.setTimeout(120_000);
-    test.skip(!plainToken, "no public link from the earlier test");
+    test.skip(
+      !plainToken || !lockedToken,
+      "no public links from the earlier tests"
+    );
 
     await page.goto(`/dashboard/projects/${projectSlug}/docs/${docSlug}`, {
       waitUntil: "domcontentloaded",
     });
 
-    // The shares list renders under the page body; revoke the first entry.
-    const revoke = page
-      .getByRole("button", { name: /^revoke access/i })
-      .first();
-    await expect(revoke).toBeVisible({ timeout: 20_000 });
+    // Target the row for `plainToken` specifically — revoking whichever entry
+    // happens to sort first proves nothing about the token this test then
+    // reads. Both public rows read "Anyone with the link"; only the
+    // passphrase one carries the lock, so the row without it is this token's.
+    const plainRow = page
+      .locator("li")
+      .filter({ hasText: /anyone with the link/i })
+      .filter({ hasNot: page.locator('[aria-label="Passphrase protected"]') });
+    await expect(plainRow).toHaveCount(1, { timeout: 20_000 });
+
     const before = await page
       .getByRole("button", { name: /^revoke access/i })
       .count();
-    await revoke.click();
+    await plainRow.getByRole("button", { name: /^revoke access/i }).click();
     await expect(
       page.getByRole("button", { name: /^revoke access/i })
     ).toHaveCount(before - 1, { timeout: 20_000 });
@@ -287,8 +295,6 @@ test.describe.serial("Documentation sharing", () => {
       baseURL: APP_ORIGIN,
     });
     try {
-      // One of the two links is now dead; whichever it was, a revoked token
-      // answers exactly like a token that never existed.
       const dead = await anon.request.get(`/api/doc-shares/${plainToken}`, {
         failOnStatusCode: false,
       });
@@ -296,9 +302,18 @@ test.describe.serial("Documentation sharing", () => {
         `/api/doc-shares/dshr_${"0".repeat(64)}`,
         { failOnStatusCode: false }
       );
-      if (dead.status() === 404) {
-        expect(await dead.text()).toBe(await missing.text());
-      }
+      // A revoked token answers exactly like one that never existed.
+      expect(dead.status()).toBe(404);
+      expect(await dead.text()).toBe(await missing.text());
+
+      // And the OTHER link is untouched — 401 (locked, awaiting a passphrase)
+      // rather than 404. This is what makes the row targeting above a fact
+      // instead of an assumption: revoking the wrong one fails here.
+      const survivor = await anon.request.get(
+        `/api/doc-shares/${lockedToken}`,
+        { failOnStatusCode: false }
+      );
+      expect(survivor.status()).toBe(401);
     } finally {
       await anon.close();
     }
@@ -454,7 +469,14 @@ test.describe.serial("Documentation sharing", () => {
 
   test.afterAll(async ({ browser }) => {
     if (!docSlug || !projectSlug) return;
-    const page = await browser.newPage();
+    // `browser.newPage()` builds a context from scratch: no storage state and
+    // no baseURL, so the dashboard bounced to sign-in and nothing was ever
+    // deleted. The saved session has to be handed over explicitly.
+    const context = await browser.newContext({
+      storageState: STORAGE_STATE_PATH,
+      baseURL: APP_ORIGIN,
+    });
+    const page = await context.newPage();
     try {
       await page.goto(`/dashboard/projects/${projectSlug}/docs/${docSlug}`, {
         waitUntil: "domcontentloaded",
@@ -467,7 +489,7 @@ test.describe.serial("Documentation sharing", () => {
     } catch {
       // Best-effort cleanup; never fail the suite on it.
     } finally {
-      await page.close();
+      await context.close();
     }
   });
 });

@@ -101,10 +101,11 @@ export function DrawerPanel({
    * for every caller rather than asking each of them to memoize `onClose`.
    */
   useEffect(() => {
-    if (!isOpen) {
-      document.body.style.overflow = "unset";
-      return;
-    }
+    // A closed drawer leaves body overflow ALONE. Pages mount several of
+    // these at once, so resetting here means the one that mounts closed
+    // unlocks scrolling behind the one that is open. The cleanup below is
+    // what restores it, and only the drawer that locked it runs that.
+    if (!isOpen) return;
     document.body.style.overflow = "hidden";
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const frame = requestAnimationFrame(() => {

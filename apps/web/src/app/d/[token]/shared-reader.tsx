@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import {
   AlertTriangle,
   ArrowLeft,
+  Clock,
   FileText,
   Loader2,
   Lock,
@@ -54,7 +55,7 @@ type Payload =
   | { kind: "page"; moduleName?: string; doc: SharedDoc }
   | { kind: "module"; module: SharedModule };
 
-type Step = "loading" | "locked" | "ready" | "unavailable";
+type Step = "loading" | "locked" | "ready" | "unavailable" | "rate_limited";
 
 function expiryLine(expiresAt: number): string {
   return new Date(expiresAt).toLocaleDateString(undefined, {
@@ -93,6 +94,12 @@ export function SharedDocReader({
       });
       if (response.status === 401) {
         setStep("locked");
+        return;
+      }
+      // Kept apart from the uniform failure screen: the link is still valid,
+      // it is only the view bucket that is empty, and it refills.
+      if (response.status === 429) {
+        setStep("rate_limited");
         return;
       }
       if (!response.ok) {
@@ -161,6 +168,25 @@ export function SharedDocReader({
           <p className="text-sm text-zinc-400">
             It may have expired, been revoked, or the page may have been taken
             down. Ask whoever sent it for a fresh link.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (step === "rate_limited") {
+    return (
+      <main className="mx-auto max-w-md px-6 py-24">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-8 text-center">
+          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-amber-500/10">
+            <Clock className="h-5 w-5 text-amber-400" />
+          </div>
+          <h1 className="mb-2 text-lg font-semibold text-zinc-100">
+            Too many requests
+          </h1>
+          <p className="text-sm text-zinc-400">
+            This link has been opened too many times in a short period. Wait a
+            few minutes and reload — it has not expired or been revoked.
           </p>
         </div>
       </main>

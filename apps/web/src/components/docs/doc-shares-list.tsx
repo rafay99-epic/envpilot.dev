@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Globe, Lock, Trash2, Users } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
 import { useDocShares, useRevokeDocShare } from "@/hooks";
@@ -19,13 +19,21 @@ export function DocSharesList({ docId }: { docId: Id<"docs"> }) {
   const [busyId, setBusyId] = useState<Id<"docShares"> | null>(null);
   const [copiedId, setCopiedId] = useState<Id<"docShares"> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   if (shares === undefined || shares.length === 0) return null;
 
   const copy = async (shareId: Id<"docShares">, token: string) => {
     await navigator.clipboard.writeText(`${window.location.origin}/d/${token}`);
     setCopiedId(shareId);
-    setTimeout(() => setCopiedId(null), 2000);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopiedId(null), 2000);
   };
 
   const onRevoke = async (shareId: Id<"docShares">) => {

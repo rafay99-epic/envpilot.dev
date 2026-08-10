@@ -67,6 +67,16 @@ export async function POST(request: Request) {
     }
     const data = validation.data;
 
+    // BEFORE the share row exists: a misconfigured deployment that fails here
+    // afterwards has already minted a live link (and emailed it) that the
+    // creator never sees, so every retry adds another.
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!baseUrl) {
+      throw new Error(
+        "NEXT_PUBLIC_APP_URL is not configured. Cannot generate share URL."
+      );
+    }
+
     const token = newShareToken();
     let passphraseSalt: string | undefined;
     let passphraseHash: string | undefined;
@@ -94,12 +104,6 @@ export async function POST(request: Request) {
       }
     );
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-    if (!baseUrl) {
-      throw new Error(
-        "NEXT_PUBLIC_APP_URL is not configured. Cannot generate share URL."
-      );
-    }
     const url = `${baseUrl}/d/${token}`;
 
     // The recipient email is scheduled inside the mutation — best-effort by

@@ -25,7 +25,14 @@ function getEmailConfig() {
 
   const rawFrom = process.env.FROM_EMAIL || "noreply@invite.envpilot.dev";
   const from = rawFrom.includes("<") ? rawFrom : `Envpilot <${rawFrom}>`;
-  const appUrl = process.env.APP_URL || "http://localhost:3000";
+  // NEXT_PUBLIC_APP_URL is the variable the setup docs and .env.example
+  // actually tell deployers to set; APP_URL is the older name. Preferring
+  // whichever is present, and only then falling back, stops a correctly
+  // configured deployment from mailing localhost links to real recipients.
+  const appUrl =
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "http://localhost:3000";
 
   return { resend: new Resend(apiKey), from, appUrl };
 }

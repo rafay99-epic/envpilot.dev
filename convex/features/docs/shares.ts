@@ -35,6 +35,9 @@ import {
 import { readBody } from "./content";
 import { requireDocAccess, requireDocsFeature } from "./helpers";
 import {
+  assertRecipientCapacity,
+  assertShareCapacity,
+  listLiveModulePages,
   MAX_MODULE_PAGES,
   MAX_SHARE_RECIPIENTS,
   MAX_SHARES_PER_DOC,
@@ -154,15 +157,20 @@ async function loadShareTarget(
   const access = await requireDocAccess(ctx, actorId, args.projectId);
   await requireDocsFeature(ctx, access.project.organizationId);
 
-  const rows = await ctx.db
-    .query("docs")
-    .withIndex("by_project_and_module", (q) =>
-      q.eq("projectId", args.projectId!).eq("module", moduleName)
-    )
-    .take(MAX_MODULE_PAGES);
-  const published = rows.filter(
-    (doc) => doc.deletedAt === undefined && doc.status === "published"
+  // One past the ceiling, so an oversize module is REFUSED rather than shared
+  // as a silent partial. Published and live are in the index key, so this
+  // reads real pages instead of filling up with drafts.
+  const published = await listLiveModulePages(
+    ctx,
+    args.projectId,
+    moduleName,
+    MAX_MODULE_PAGES + 1
   );
+  if (published.length > MAX_MODULE_PAGES) {
+    throw new ConvexError(
+      `"${moduleName}" has more than ${MAX_MODULE_PAGES} published pages, which is more than one share can carry. Split the module or share individual pages.`
+    );
+  }
   if (published.length === 0) {
     throw new ConvexError(
       `"${moduleName}" has no published pages yet. Publish at least one before sharing the module.`
@@ -177,6 +185,38 @@ async function loadShareTarget(
     access,
     projectId: args.projectId,
   };
+}
+
+/**
+ * Refuse a share once the target already carries the maximum.
+ *
+ * Both list surfaces read at most `MAX_SHARES_PER_DOC` rows, and a module
+ * share shows up in the list of every page in that module, so the module
+ * needs the same ceiling as a page — otherwise the reads that bound
+ * themselves would start hiding live grants nobody could then revoke.
+ */
+async function assertTargetCapacity(
+  ctx: MutationCtx,
+  target: ShareTarget
+): Promise<void> {
+  if (target.docId) {
+    await assertShareCapacity(ctx, target.docId);
+    return;
+  }
+  const existing = await ctx.db
+    .query("docShares")
+    .withIndex("by_project_module_status", (q) =>
+      q
+        .eq("projectId", target.projectId)
+        .eq("module", target.module)
+        .eq("status", "active")
+    )
+    .take(MAX_SHARES_PER_DOC);
+  if (existing.length >= MAX_SHARES_PER_DOC) {
+    throw new ConvexError(
+      `"${target.module}" already has ${MAX_SHARES_PER_DOC} active shares. Revoke one before adding another.`
+    );
+  }
 }
 
 /** Shape returned to a reader who reached a page through a share. */
@@ -355,6 +395,9 @@ export const shareWithMembers = mutation({
         continue;
       }
 
+      await assertTargetCapacity(ctx, target);
+      await assertRecipientCapacity(ctx, recipientUserId);
+
       await ctx.db.insert("docShares", {
         scope: target.scope,
         docId: target.docId,
@@ -472,7 +515,7 @@ export const createPublicLink = mutation({
       ctx.db,
       organizationId,
       "max_active_doc_links",
-      () => countActiveDocLinks(ctx.db, organizationId)
+      (limit) => countActiveDocLinks(ctx.db, organizationId, limit)
     );
     if (!linkLimit.allowed) {
       throw new ConvexError(
@@ -511,6 +554,8 @@ export const createPublicLink = mutation({
       key: organizationId,
       throws: true,
     });
+
+    await assertTargetCapacity(ctx, target);
 
     const shareId = await ctx.db.insert("docShares", {
       scope: target.scope,
@@ -634,7 +679,12 @@ export const markShareViewed = mutation({
     if (!share || share.recipientUserId !== actor._id) return { ok: false };
 
     const now = Date.now();
-    const resolved = await resolveShare(ctx, share, now);
+    // Both scopes, or a module share would never record a view and its
+    // counter and audit trail would read as "never opened".
+    const resolved =
+      shareScope(share) === "module"
+        ? await resolveModuleShare(ctx, share, now)
+        : await resolveShare(ctx, share, now);
     if (!resolved) return { ok: false };
 
     await ctx.db.patch(share._id, {
@@ -650,7 +700,9 @@ export const markShareViewed = mutation({
       userId: share.createdBy,
       action: "doc.share_viewed",
       details: {
-        title: resolved.doc.title,
+        scope: shareScope(share),
+        title:
+          "doc" in resolved ? resolved.doc.title : (share.module ?? "module"),
         audience: "member",
         viewedByEmail: actor.email,
       },
@@ -739,6 +791,18 @@ export const readSharedByToken = mutation({
       }
     }
 
+    // A slug that is not in this module is resolved BEFORE anything is
+    // counted: a wrong URL is not a view, and letting it through would let
+    // anyone with the token inflate the counter and burn the view bucket by
+    // requesting pages that do not exist.
+    const requestedPage =
+      resolvedModule && args.docSlug
+        ? resolvedModule.docs.find((doc) => doc.slug === args.docSlug)
+        : undefined;
+    if (resolvedModule && args.docSlug && !requestedPage) {
+      return { status: "unavailable" as const };
+    }
+
     // A successful read writes an audit row and patches a counter, so it is
     // bounded too. Generous enough that ordinary reading and refreshing never
     // notices; low enough that one leaked token cannot fill an org's audit
@@ -766,9 +830,15 @@ export const readSharedByToken = mutation({
         title: resolvedModule ? resolvedModule.module : resolved!.doc.title,
         audience: "external",
         recipientEmail: live.share.recipientEmail,
+        // Reported, NOT trusted: this mutation is publicly callable, so a
+        // direct caller picks these values freely. Kept because they are
+        // useful when the request really did come through the API route, and
+        // named so nobody reads them as verified request metadata. They stay
+        // out of the audit row's own ipAddress/userAgent columns for the same
+        // reason.
+        reportedIpAddress: args.ipAddress,
+        reportedUserAgent: args.userAgent,
       },
-      ipAddress: args.ipAddress,
-      userAgent: args.userAgent,
       involvesSensitiveData: true,
     });
 
@@ -792,8 +862,7 @@ export const readSharedByToken = mutation({
       // A page WITHIN the module. Matched against the resolved list, so a
       // slug from another module — or a draft in this one — is simply not
       // found rather than being fetched and then checked.
-      const page = resolvedModule.docs.find((doc) => doc.slug === args.docSlug);
-      if (!page) return { status: "unavailable" as const };
+      const page = requestedPage!;
       return {
         status: "ok" as const,
         kind: "page" as const,
@@ -856,22 +925,24 @@ export const verifyPassphrase = mutation({
       return { ok: false as const, salt: undefined };
     }
 
+    // The salt probe consumes a token too, and that is the point: the API
+    // route fetches the salt immediately before running scrypt, so charging
+    // only for the comparison afterwards let a flood spend the server's whole
+    // libuv pool on key derivations that the ten-attempt quota then rejected.
+    // Charging first puts the limiter in front of the expensive work.
+    await rateLimiter.limit(ctx, "docShareUnlock", {
+      key: args.token,
+      throws: true,
+    });
+
     if (args.passphraseHash === undefined) {
-      // Asking for the salt is not an attempt, so it consumes nothing.
       return { ok: false as const, salt: resolved.share.passphraseSalt };
     }
 
     if (
       !timingSafeEqualHex(args.passphraseHash, resolved.share.passphraseHash)
     ) {
-      // Keyed on the token. There is deliberately no ipAddress argument on
-      // this mutation: it is publicly callable, so an IP the caller supplies
-      // is an attacker-chosen bucket, and a fresh one per guess would make
-      // the limit meaningless.
-      await rateLimiter.limit(ctx, "docShareUnlock", {
-        key: args.token,
-        throws: true,
-      });
+      // Already charged above — one attempt, one token.
       return { ok: false as const, salt: resolved.share.passphraseSalt };
     }
 

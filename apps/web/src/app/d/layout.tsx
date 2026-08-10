@@ -17,7 +17,15 @@ export const metadata: Metadata = {
   // page itself is the only place the title belongs.
   title: "Shared document",
   description: "A document shared with you through Envpilot.",
-  robots: { index: false, follow: false, nocache: true },
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    // Explicit, because Next.js DEEP-merges metadata down the tree and the
+    // root layout sets `googleBot: { index: true, follow: true }` — without
+    // this override the one crawler that matters keeps its permission.
+    googleBot: { index: false, follow: false, noimageindex: true },
+  },
   openGraph: {
     title: "Shared document",
     description: "A document shared with you through Envpilot.",

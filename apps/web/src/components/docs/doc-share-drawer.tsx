@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -92,6 +92,13 @@ export function DocShareDrawer({
   const [recipientEmail, setRecipientEmail] = useState("");
   const [linkUrl, setLinkUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   const canShareExternal = access?.canShareExternal === true;
   // The tab appears for anyone whose ROLE can share externally. Whether the
@@ -212,7 +219,7 @@ export function DocShareDrawer({
       setPassphrase("");
       setNotice(
         recipientEmail.trim()
-          ? "Link created and emailed. The passphrase, if any, was not included — send it separately."
+          ? "Link created. Delivery to that address is queued, not confirmed — copy the link as a fallback. The passphrase, if any, is never emailed; send it separately."
           : "Link created."
       );
     } catch {
@@ -226,7 +233,8 @@ export function DocShareDrawer({
     if (!linkUrl) return;
     await navigator.clipboard.writeText(linkUrl);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -453,11 +461,11 @@ export function DocShareDrawer({
                   {usePassphrase && (
                     <>
                       <input
-                        type="text"
+                        type="password"
                         value={passphrase}
                         onChange={(event) => setPassphrase(event.target.value)}
                         placeholder={`At least ${MIN_PASSPHRASE_LENGTH} characters`}
-                        autoComplete="off"
+                        autoComplete="new-password"
                         className={`${FIELD} mt-2`}
                       />
                       <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">

@@ -83,6 +83,13 @@ export default function DocDetailPage({ params }: DocPageProps) {
   // tab; the public-link tab has its own capability and is hidden without it.
   const docAccess = useDocAccess(projectId);
 
+  // Either capability opens the drawer — a role may hold only the external
+  // one — and so does the plan-blocked case, which the drawer itself explains.
+  const canOpenShare =
+    docAccess?.canShare === true ||
+    docAccess?.canShareExternal === true ||
+    docAccess?.externalUpgradeRequired === true;
+
   // Seed the editor when a different page loads. Guarded on docSlug rather
   // than the doc object so a live update from another tab cannot overwrite
   // what the user is currently typing.
@@ -278,7 +285,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
               {(doc.canEdit ||
                 doc.canPublish ||
                 doc.canDelete ||
-                docAccess?.canShare) && (
+                canOpenShare) && (
                 <div className="flex shrink-0 items-center gap-2">
                   {isEditing ? (
                     <>
@@ -302,7 +309,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                     </>
                   ) : (
                     <>
-                      {docAccess?.canShare && doc.status === "published" && (
+                      {canOpenShare && doc.status === "published" && (
                         <button
                           type="button"
                           data-testid="doc-share"
@@ -405,7 +412,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                 {/* Outside the body wrapper: it is chrome about the page, not
                     part of it, and its icons would otherwise count as page
                     content to anything inspecting the rendered markdown. */}
-                {docAccess?.canShare && <DocSharesList docId={doc._id} />}
+                <DocSharesList docId={doc._id} />
               </div>
             )}
 

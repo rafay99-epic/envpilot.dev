@@ -168,9 +168,19 @@ export const update = mutation({
       patch.publishedAt = undefined;
       patch.publishedBy = undefined;
     }
-    patch.updatedAt = Date.now();
+    const now = Date.now();
+    patch.updatedAt = now;
     await ctx.db.patch(doc._id, patch);
-    if (unpublished) await setContentStatus(ctx, doc._id, "draft");
+
+    // Editing a published page returns it to draft, and that has to take its
+    // shares with it exactly as an explicit unpublish does. Without this the
+    // grants stayed active on a draft and came back the moment the page was
+    // republished — a share nobody re-authorized.
+    let sharesRevoked = 0;
+    if (unpublished) {
+      await setContentStatus(ctx, doc._id, "draft");
+      sharesRevoked = await revokeSharesForDoc(ctx, doc._id, actor._id, now);
+    }
 
     await createAuditLog(ctx, {
       organizationId: access.project.organizationId,
@@ -181,6 +191,7 @@ export const update = mutation({
         title: (patch.title as string) ?? doc.title,
         slug: (patch.slug as string) ?? doc.slug,
         returnedToDraft: unpublished,
+        sharesRevoked,
       },
     });
 
