@@ -1,0 +1,77 @@
+apps/web/src/app/d/layout.tsx
+  s_b0cccafa256aa6::t_ba4bd8f597425d 20-28
+apps/web/src/app/robots.ts
+  s_b0cccafa256aa6::t_66c317fed42d8e 21
+apps/web/tests/e2e/authenticated/doc-diagrams.spec.ts
+  s_b0cccafa256aa6::t_b9b938fa09799b 3
+  s_b0cccafa256aa6::t_35170d99adbee4 26
+  s_b0cccafa256aa6::t_572c0361bd1eaa 155-162
+  s_b0cccafa256aa6::t_10d75722171878 175
+convex/features/docs/shares.ts
+  s_b0cccafa256aa6::t_f5519074878298 399-400,682-687,703-705,794-805,833-840,865,928-937,945
+  s_b0cccafa256aa6::t_85cff922baab08 190-221,398,558
+  s_b0cccafa256aa6::t_6be92a4e4ea609 38-40,160-167,169-173,518
+  s_b0cccafa256aa6::t_50a19208870c35 559
+convex/features/docs/mutations.ts
+  s_b0cccafa256aa6::t_85cff922baab08 171-172,174-183,194
+apps/web/src/components/ui/drawer-panel.tsx
+  s_b0cccafa256aa6::t_78fc8aeb27194d 104-108
+apps/web/src/app/d/[token]/shared-reader.tsx
+  s_b0cccafa256aa6::t_c0d1e89b476b0e 177-195
+  s_b0cccafa256aa6::t_73fb86b2f57f21 99-104
+  s_b0cccafa256aa6::t_740961fcb98ea9 58
+  s_b0cccafa256aa6::t_059830bbbecb3e 9
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/shared/page.tsx
+  s_b0cccafa256aa6::t_99bccbfbd7fa85 3
+  s_b0cccafa256aa6::t_28953a26c1877d 413-419,427-428
+apps/web/src/components/docs/doc-share-drawer.tsx
+  s_b0cccafa256aa6::t_eef3aa90fe6ab2 236-237
+  s_b0cccafa256aa6::t_4e86103044ced9 3
+  s_b0cccafa256aa6::t_713bb32dfa5b26 464,468
+  s_b0cccafa256aa6::t_bb76fd54c8f3e3 95-101
+  s_b0cccafa256aa6::t_cae08406ad5669 222
+convex/features/docs/shareGuards.ts
+  s_b0cccafa256aa6::t_5a4eddcf536d66 61-85,277-282,321-381,397-399,404-405,410
+convex/features/emails/templates.ts
+  s_b0cccafa256aa6::t_f5519074878298 33-41,43,45,47-48
+apps/web/tests/e2e/authenticated/doc-sharing.spec.ts
+  s_b0cccafa256aa6::t_a1333a1b4f3794 266-269
+  s_b0cccafa256aa6::t_9364f460d1d36a 492
+  s_b0cccafa256aa6::t_f9695e8142b9cb 275-284,288,305-316
+  s_b0cccafa256aa6::t_868149158793ce 472-479
+  s_b0cccafa256aa6::t_6e140c2c4043fc 3
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/docs/[docSlug]/page.tsx
+  s_b0cccafa256aa6::t_a8a878162f1ecc 415
+  s_b0cccafa256aa6::t_9ebe8871f36aaf 312
+  s_b0cccafa256aa6::t_024662bf3dd0f2 86-92
+  s_b0cccafa256aa6::t_6043c45e84a284 288
+apps/web/src/app/api/doc-shares/route.ts
+  s_b0cccafa256aa6::t_bbbc4ad3988a8f 70-79
+apps/web/src/components/docs/doc-shares-list.tsx
+  s_b0cccafa256aa6::t_f8added411f623 22-28,35-36
+  s_b0cccafa256aa6::t_bd6868877f0be1 3
+convex/features/emails/emails.ts
+  s_b0cccafa256aa6::t_79aa18cfb22564 28-35
+convex/features/featureRegistry/gates.ts
+  s_b0cccafa256aa6::t_9339c0da2702d8 479-482,492-493,495-499,507,509-510
+convex/lib/rateLimits.ts
+  s_b0cccafa256aa6::t_af590ce1dae4db 4,103-108,111,113
+convex/schema.ts
+  s_b0cccafa256aa6::t_886444031dc163 679-688,808-816
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "a169c215dcc83554877e67f24ae52b4b1756ff59",
+  "prompts": {},
+  "sessions": {
+    "s_b0cccafa256aa6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4046fb67-1dbb-422f-a5ae-325e1a01e7bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
