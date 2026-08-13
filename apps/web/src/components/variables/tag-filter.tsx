@@ -22,17 +22,15 @@ export function TagFilter({
 
   return (
     <>
-      <span className="mx-2 text-zinc-300 dark:text-zinc-600">|</span>
-      <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-        Tags:
-      </label>
+      <span className="mx-2 text-ink-faint">|</span>
+      <label className="text-sm font-medium text-ink-muted">Tags:</label>
       <div className="flex flex-wrap gap-1.5">
         <button
           onClick={onClearAll}
           className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
             !hasSelection
-              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-              : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              ? "bg-accent-soft text-accent ring-1 ring-accent-line"
+              : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
           }`}
         >
           All
@@ -49,10 +47,20 @@ export function TagFilter({
               aria-pressed={isSelected}
               className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 isSelected
-                  ? "text-white"
-                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  ? ""
+                  : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
               }`}
-              style={isSelected ? { backgroundColor: safeColor } : undefined}
+              // Selected tags carry the tag's own colour as a soft tint, the
+              // same treatment TagBadge and the tag selector already use.
+              style={
+                isSelected
+                  ? {
+                      backgroundColor: `${safeColor}15`,
+                      boxShadow: `inset 0 0 0 1px ${safeColor}40`,
+                      color: safeColor,
+                    }
+                  : undefined
+              }
             >
               <Tag className="h-3 w-3" />
               {tag.name}

@@ -93,20 +93,18 @@ export function ExportDialog({
           />
         ) : (
           <>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="text-sm text-ink-muted">
               Export environment variables from{" "}
-              <span className="font-medium text-zinc-700 dark:text-zinc-200">
-                {projectName}
-              </span>{" "}
-              in your preferred format.
+              <span className="font-medium text-ink">{projectName}</span> in
+              your preferred format.
             </p>
 
             {notice && (
               <div
                 className={`rounded-lg px-4 py-3 text-sm ${
                   notice.startsWith("Error")
-                    ? "border border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-400"
-                    : "border border-green-200 bg-green-50 text-green-700 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400"
+                    ? "border border-danger-line bg-danger-soft text-danger"
+                    : "border border-accent-line bg-accent-soft text-accent"
                 }`}
               >
                 {notice}
@@ -114,13 +112,13 @@ export function ExportDialog({
             )}
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <label className="mb-1.5 block text-sm font-medium text-ink-muted">
                 Format
               </label>
               <select
                 value={format}
                 onChange={(e) => setFormat(e.target.value as FormatType)}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 transition-colors focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                className="w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
               >
                 {ALL_FORMATS.map((f) => (
                   <option key={f} value={f}>
@@ -131,13 +129,13 @@ export function ExportDialog({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <label className="mb-1.5 block text-sm font-medium text-ink-muted">
                 Environment
               </label>
               <select
                 value={environment}
                 onChange={(e) => setEnvironment(e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 transition-colors focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                className="w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
               >
                 <option value="all">All Environments</option>
                 <option value="development">Development</option>
@@ -149,14 +147,14 @@ export function ExportDialog({
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleClose}
-                className="flex-1 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className="flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors border-line-strong text-ink-muted hover:bg-surface-hover"
               >
                 Cancel
               </button>
               <button
                 onClick={handleExport}
                 disabled={isExporting}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
               >
                 {isExporting ? (
                   <>

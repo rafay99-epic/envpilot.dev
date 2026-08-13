@@ -75,8 +75,8 @@ export function TerminalTabs({
               onClick={() => setActive(i)}
               className={`-mb-px border-b-2 pb-3 ${terminal.mono} text-[13px] transition-colors ${
                 selected
-                  ? "border-green-400 text-green-400"
-                  : "border-transparent text-zinc-500 hover:text-zinc-200"
+                  ? "border-accent-line text-accent"
+                  : "border-transparent text-ink-subtle hover:text-ink"
               }`}
             >
               {item.label}

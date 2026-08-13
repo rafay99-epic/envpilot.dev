@@ -60,17 +60,17 @@ export function UsageMeter({
   };
 
   const getBarColor = () => {
-    if (isUnlimited) return "bg-green-500";
-    if (isAtLimit) return "bg-red-500";
-    if (isNearLimit) return "bg-amber-500";
-    return "bg-green-500";
+    if (isUnlimited) return "bg-accent";
+    if (isAtLimit) return "bg-danger";
+    if (isNearLimit) return "bg-warning";
+    return "bg-accent";
   };
 
   const getTextColor = () => {
-    if (isUnlimited) return "text-green-400";
-    if (isAtLimit) return "text-red-400";
-    if (isNearLimit) return "text-amber-400";
-    return "text-zinc-300";
+    if (isUnlimited) return "text-accent";
+    if (isAtLimit) return "text-danger";
+    if (isNearLimit) return "text-warning";
+    return "text-ink-muted";
   };
 
   return (
@@ -79,7 +79,7 @@ export function UsageMeter({
         <div
           className={`flex justify-between items-center mb-1 ${sizeClasses[size].text}`}
         >
-          <span className="font-medium text-zinc-300">{label}</span>
+          <span className="font-medium text-ink-muted">{label}</span>
           <span className={getTextColor()}>
             {isUnlimited ? (
               <span className="flex items-center gap-1">
@@ -93,7 +93,7 @@ export function UsageMeter({
         </div>
       )}
       <div
-        className={`w-full bg-zinc-700 rounded-full overflow-hidden ${sizeClasses[size].container}`}
+        className={`w-full bg-surface-hover rounded-full overflow-hidden ${sizeClasses[size].container}`}
       >
         <div
           className={`h-full rounded-full transition-all duration-300 ${getBarColor()}`}

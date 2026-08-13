@@ -36,12 +36,12 @@ export function KebabMenu({ items, className }: KebabMenuProps) {
           e.stopPropagation();
           setOpen(!open);
         }}
-        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+        className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
       >
         <MoreVertical className="h-4 w-4" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+        <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-md border border-line bg-surface py-1 shadow-xl">
           {items.map((item, i) => (
             <button
               key={i}
@@ -53,8 +53,8 @@ export function KebabMenu({ items, className }: KebabMenuProps) {
               className={cn(
                 "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
                 item.variant === "danger"
-                  ? "text-red-400 hover:bg-red-500/10"
-                  : "text-zinc-300 hover:bg-zinc-800"
+                  ? "text-danger hover:bg-danger-soft"
+                  : "text-ink-muted hover:bg-surface-hover"
               )}
             >
               {item.icon && <span className="flex-shrink-0">{item.icon}</span>}

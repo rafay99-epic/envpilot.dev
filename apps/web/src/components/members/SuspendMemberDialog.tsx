@@ -97,17 +97,17 @@ export function SuspendMemberDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
-      <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+      <div className="w-full max-w-lg rounded-xl p-6 shadow-xl bg-surface">
         <FeatureGate
           organizationId={organizationId as Id<"organizations">}
           featureKey="security_hold"
           featureName="Security Hold"
           fallbackVariant="card"
         >
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          <h2 className="text-lg font-semibold text-ink">
             Suspend access for {targetName}
           </h2>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-sm text-ink-muted">
             Freezes all of their access to this organization — web, CLI,
             extension, and API — and signs them out everywhere. Synced .env
             files on their devices are deleted. Their role, projects, and
@@ -115,7 +115,7 @@ export function SuspendMemberDialog({
             were.
           </p>
 
-          <label className="mt-4 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label className="mt-4 block text-sm font-medium text-ink-muted">
             Reason (kept in the audit log, never shown to the member)
             <textarea
               value={reason}
@@ -123,16 +123,16 @@ export function SuspendMemberDialog({
               maxLength={500}
               rows={2}
               placeholder="e.g. Laptop reported compromised"
-              className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm border-line bg-surface-raised text-ink"
             />
           </label>
 
           {credentials && credentials.length > 0 && (
             <div className="mt-4">
-              <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <p className="text-sm font-medium text-ink-muted">
                 Credentials they created — revoke too?
               </p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs text-ink-muted">
                 These may be stored on their devices, but may also power shared
                 CI pipelines. Revoking is optional and audited.
               </p>
@@ -140,17 +140,15 @@ export function SuspendMemberDialog({
                 {credentials.map((cred) => (
                   <label
                     key={cred.id}
-                    className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                    className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm border-line"
                   >
                     <input
                       type="checkbox"
                       checked={selectedCreds.has(cred.id)}
                       onChange={() => toggleCred(cred.id)}
                     />
-                    <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                      {cred.name}
-                    </span>
-                    <span className="ml-auto text-xs text-zinc-500">
+                    <span className="font-medium text-ink">{cred.name}</span>
+                    <span className="ml-auto text-xs text-ink-subtle">
                       {cred.type === "api_key" ? "API key" : "CI/CD token"}
                     </span>
                   </label>
@@ -163,14 +161,14 @@ export function SuspendMemberDialog({
             <button
               onClick={onClose}
               disabled={submitting}
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="rounded-lg border px-4 py-2 text-sm font-medium border-line text-ink-muted hover:bg-surface-hover"
             >
               Cancel
             </button>
             <button
               onClick={handleSuspend}
               disabled={submitting}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              className="rounded-lg bg-danger px-4 py-2 text-sm font-medium text-white hover:bg-danger disabled:opacity-50"
             >
               {submitting ? "Suspending…" : "Suspend access"}
             </button>
@@ -179,7 +177,7 @@ export function SuspendMemberDialog({
         {/* Escape hatch when the FeatureGate fallback replaces the content */}
         <button
           onClick={onClose}
-          className="mt-4 block w-full text-center text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+          className="mt-4 block w-full text-center text-xs text-ink-subtle hover:text-ink-muted"
         >
           Close
         </button>

@@ -19,10 +19,10 @@ interface FileListItemProps {
 /** Same environment palette the variables and accounts rows use. */
 function envBadgeClasses(env: string): string {
   return env === "production"
-    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+    ? "bg-danger-soft text-danger"
     : env === "staging"
-      ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-      : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+      ? "bg-warning-soft text-warning"
+      : "bg-accent-soft text-accent";
 }
 
 export function FileListItem({
@@ -51,13 +51,13 @@ export function FileListItem({
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              <span className="text-sm font-semibold text-ink">
                 {file.name}
               </span>
               {/* The destination path is the feature — mono, like the
                   account row treats its URL. */}
               <span
-                className="max-w-full truncate font-mono text-xs text-zinc-500 sm:max-w-[280px] dark:text-zinc-400"
+                className="max-w-full truncate font-mono text-xs sm:max-w-[280px] text-ink-muted"
                 title={file.path}
               >
                 {file.path}
@@ -65,8 +65,8 @@ export function FileListItem({
               <span
                 className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                   isWritable
-                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                    : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                    ? "bg-warning-soft text-warning"
+                    : "bg-info-soft text-info"
                 }`}
               >
                 {file.access}
@@ -74,7 +74,7 @@ export function FileListItem({
             </div>
 
             {file.description && (
-              <p className="mt-1 truncate text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="mt-1 truncate text-sm text-ink-muted">
                 {file.description}
               </p>
             )}
@@ -90,10 +90,10 @@ export function FileListItem({
                   </span>
                 ))}
               </div>
-              <span className="font-mono text-xs text-zinc-400 dark:text-zinc-500">
+              <span className="font-mono text-xs text-ink-subtle">
                 {formatBytes(file.size)} · {file.mode}
               </span>
-              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+              <span className="text-xs text-ink-subtle">
                 Updated {formatDate(file.updatedAt)}
               </span>
             </div>
@@ -106,7 +106,7 @@ export function FileListItem({
             disabled={isDownloading}
             aria-label={`Download ${file.name}`}
             title="Download (audited)"
-            className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+            className="rounded-lg p-2 text-ink-muted disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
           >
             {isDownloading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -121,7 +121,7 @@ export function FileListItem({
                 onClick={onReplace}
                 aria-label={`Replace ${file.name}`}
                 title="Replace contents"
-                className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               >
                 <Upload className="h-4 w-4" />
               </button>
@@ -129,7 +129,7 @@ export function FileListItem({
                 onClick={onEdit}
                 aria-label={`Edit ${file.name}`}
                 title="Edit details"
-                className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               >
                 <Pencil className="h-4 w-4" />
               </button>
@@ -141,7 +141,7 @@ export function FileListItem({
               onClick={onManagePermissions}
               aria-label={`Manage access for ${file.name}`}
               title="Manage access"
-              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
             >
               <Users className="h-4 w-4" />
             </button>
@@ -152,7 +152,7 @@ export function FileListItem({
               onClick={onDelete}
               aria-label={`Delete ${file.name}`}
               title="Move to trash"
-              className="rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+              className="rounded-lg p-2 text-ink-muted hover:bg-danger-soft hover:text-danger"
             >
               <Trash2 className="h-4 w-4" />
             </button>

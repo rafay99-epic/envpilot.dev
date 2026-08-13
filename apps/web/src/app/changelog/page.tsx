@@ -36,7 +36,7 @@ export default async function ChangelogPage() {
         eyebrow="changelog"
         title={
           <>
-            What&apos;s new in <span className="text-green-400">Envpilot</span>
+            What&apos;s new in <span className="text-accent">Envpilot</span>
           </>
         }
         description="All the latest updates, improvements, and fixes. Follow along as we build."

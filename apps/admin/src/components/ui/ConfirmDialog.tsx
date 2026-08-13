@@ -5,22 +5,22 @@ import { cn } from "@/lib/utils";
 
 const VARIANT_STYLES = {
   danger: {
-    icon: <Trash2 className="h-5 w-5 text-red-400" />,
-    iconBg: "bg-red-500/10 border-red-500/20",
+    icon: <Trash2 className="h-5 w-5 text-danger" />,
+    iconBg: "bg-danger-soft border-danger-line",
     confirmBtn:
-      "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20",
+      "border-danger-line bg-danger-soft text-danger hover:bg-danger-soft",
   },
   warning: {
-    icon: <AlertTriangle className="h-5 w-5 text-amber-400" />,
-    iconBg: "bg-amber-500/10 border-amber-500/20",
+    icon: <AlertTriangle className="h-5 w-5 text-warning" />,
+    iconBg: "bg-warning-soft border-warning-line",
     confirmBtn:
-      "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20",
+      "border-warning-line bg-warning-soft text-warning hover:bg-warning-soft",
   },
   default: {
-    icon: <Info className="h-5 w-5 text-blue-400" />,
-    iconBg: "bg-blue-500/10 border-blue-500/20",
+    icon: <Info className="h-5 w-5 text-info" />,
+    iconBg: "bg-info-soft border-info-line",
     confirmBtn:
-      "border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20",
+      "border-accent-line bg-accent-soft text-accent hover:bg-accent-soft",
   },
 };
 
@@ -65,7 +65,7 @@ export function ConfirmDialog() {
         if (e.target === overlayRef.current) close();
       }}
     >
-      <div className="w-full max-w-md animate-in fade-in zoom-in-95 rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-2xl">
+      <div className="w-full max-w-md animate-in fade-in zoom-in-95 rounded-lg border border-line bg-surface/90 shadow-2xl">
         <div className="p-6">
           {/* Icon + Title */}
           <div className="flex items-start gap-4">
@@ -78,8 +78,8 @@ export function ConfirmDialog() {
               {styles.icon}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="text-base font-semibold text-zinc-100">{title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
+              <h3 className="text-base font-semibold text-ink">{title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
                 {message}
               </p>
             </div>
@@ -87,10 +87,10 @@ export function ConfirmDialog() {
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 border-t border-zinc-700/50 px-6 py-4">
+        <div className="flex justify-end gap-2 border-t border-line px-6 py-4">
           <button
             onClick={() => onCancel?.()}
-            className="rounded-lg border border-zinc-700 bg-transparent px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+            className="rounded-lg border border-line bg-transparent px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink-muted"
           >
             {cancelLabel}
           </button>

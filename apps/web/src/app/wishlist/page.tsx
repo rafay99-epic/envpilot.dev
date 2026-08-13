@@ -33,24 +33,32 @@ const statusConfig: Record<
   string,
   { label: string; color: string; dot: string }
 > = {
-  submitted: { label: "submitted", color: "text-zinc-400", dot: "bg-zinc-400" },
+  submitted: {
+    label: "submitted",
+    color: "text-ink-muted",
+    dot: "bg-surface-hover",
+  },
   under_review: {
     label: "under-review",
-    color: "text-amber-400",
-    dot: "bg-amber-400",
+    color: "text-warning",
+    dot: "bg-warning",
   },
-  planned: { label: "planned", color: "text-zinc-300", dot: "bg-zinc-400" },
+  planned: {
+    label: "planned",
+    color: "text-ink-muted",
+    dot: "bg-surface-hover",
+  },
   in_progress: {
     label: "in-progress",
-    color: "text-amber-400",
-    dot: "bg-amber-400",
+    color: "text-warning",
+    dot: "bg-warning",
   },
   completed: {
     label: "completed",
-    color: "text-green-400",
-    dot: "bg-green-400",
+    color: "text-accent",
+    dot: "bg-accent",
   },
-  declined: { label: "declined", color: "text-red-400", dot: "bg-red-400" },
+  declined: { label: "declined", color: "text-danger", dot: "bg-danger" },
 };
 
 interface FeatureRequestType {
@@ -136,7 +144,7 @@ export default function WishlistPage() {
         eyebrow="wishlist"
         title={
           <>
-            Help shape <span className="text-green-400">the roadmap</span>
+            Help shape <span className="text-accent">the roadmap</span>
           </>
         }
         description="Vote on what we build next, or submit your own ideas. Every vote shapes the product."
@@ -145,7 +153,7 @@ export default function WishlistPage() {
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => setShowSubmitForm(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 font-mono text-xs font-semibold text-zinc-950 shadow-[0_0_24px_-6px_rgba(34,197,94,0.6)] transition-all hover:bg-green-400"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-mono text-xs font-semibold text-ink-inverse shadow-[0_0_24px_-6px_rgba(34,197,94,0.6)] transition-all hover:bg-accent"
           >
             <Plus className="h-3.5 w-3.5" />
             submit-feature
@@ -176,7 +184,7 @@ export default function WishlistPage() {
             <>
               {/* Filters */}
               <div className="mb-10 flex flex-wrap items-center gap-3">
-                <span className="font-mono text-xs text-zinc-600">
+                <span className="font-mono text-xs text-ink-faint">
                   --status
                 </span>
                 <div className="flex flex-wrap gap-2">
@@ -195,8 +203,8 @@ export default function WishlistPage() {
                       onClick={() => setStatusFilter(status)}
                       className={`rounded-lg border px-2.5 py-1 font-mono text-xs transition-all ${
                         statusFilter === status
-                          ? "border-green-500/40 bg-green-500/10 text-green-400 shadow-[0_0_16px_-4px_rgba(34,197,94,0.4)]"
-                          : "border-zinc-800 text-zinc-500 hover:border-green-500/30 hover:text-zinc-300"
+                          ? "border-accent-line bg-accent-soft text-accent shadow-[0_0_16px_-4px_rgba(34,197,94,0.4)]"
+                          : "border-line text-ink-subtle hover:border-accent-line hover:text-ink-muted"
                       }`}
                     >
                       {status === "all" ? "*" : status.replace("_", "-")}
@@ -206,13 +214,13 @@ export default function WishlistPage() {
 
                 {categories && categories.length > 0 && (
                   <>
-                    <span className="font-mono text-xs text-zinc-600">
+                    <span className="font-mono text-xs text-ink-faint">
                       --category
                     </span>
                     <select
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1 font-mono text-xs text-zinc-200 focus:border-green-500/40 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                      className="rounded-lg border border-line bg-surface/60 px-2.5 py-1 font-mono text-xs text-ink focus:border-accent-line focus:outline-none focus:ring-2 focus:ring-accent-line"
                     >
                       <option value="all">all</option>
                       {categories.map((cat: string) => (
@@ -263,15 +271,15 @@ export default function WishlistPage() {
       {/* Email Prompt Dialog */}
       {showEmailPrompt && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-xl bg-gradient-to-b from-green-500/50 via-zinc-700/40 to-zinc-800/40 p-px shadow-[0_0_60px_-12px_rgba(34,197,94,0.35)]">
-            <div className="overflow-hidden rounded-[11px] bg-zinc-950 font-mono">
-              <div className="border-b border-zinc-800 px-5 py-4">
-                <h3 className="font-sans text-sm font-bold tracking-tight text-zinc-100">
+          <div className="mx-4 w-full max-w-sm rounded-xl bg-gradient-to-b from-accent-line via-line to-line p-px shadow-[0_0_60px_-12px_rgba(34,197,94,0.35)]">
+            <div className="overflow-hidden rounded-[11px] bg-canvas font-mono">
+              <div className="border-b border-line px-5 py-4">
+                <h3 className="font-sans text-sm font-bold tracking-tight text-ink">
                   Enter your email to vote
                 </h3>
               </div>
               <form onSubmit={handleEmailSubmit} className="px-5 py-4">
-                <p className="mb-3 text-xs text-zinc-400">
+                <p className="mb-3 text-xs text-ink-muted">
                   Your email is used to track your votes and prevent duplicates.
                 </p>
                 <input
@@ -281,7 +289,7 @@ export default function WishlistPage() {
                   placeholder="you@example.com"
                   required
                   autoFocus
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:border-green-500/40 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                  className="w-full rounded-lg border border-line bg-surface/60 px-3 py-2 text-sm text-ink placeholder-ink-faint focus:border-accent-line focus:outline-none focus:ring-2 focus:ring-accent-line"
                 />
                 <div className="mt-4 flex justify-end gap-2">
                   <button
@@ -291,13 +299,13 @@ export default function WishlistPage() {
                       setPendingVoteId(null);
                       setEmailInput("");
                     }}
-                    className="rounded-lg border border-zinc-800 px-4 py-1.5 text-xs text-zinc-400 transition-colors hover:border-green-500/30 hover:text-zinc-300"
+                    className="rounded-lg border border-line px-4 py-1.5 text-xs text-ink-muted transition-colors hover:border-accent-line hover:text-ink-muted"
                   >
                     cancel
                   </button>
                   <button
                     type="submit"
-                    className="rounded-lg bg-green-500 px-4 py-1.5 text-xs font-semibold text-zinc-950 shadow-[0_0_20px_-6px_rgba(34,197,94,0.6)] transition-colors hover:bg-green-400"
+                    className="rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-ink-inverse shadow-[0_0_20px_-6px_rgba(34,197,94,0.6)] transition-colors hover:bg-accent"
                   >
                     vote
                   </button>
@@ -311,7 +319,7 @@ export default function WishlistPage() {
       {/* Toast */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-[100]">
-          <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-zinc-950 px-4 py-3 font-mono text-xs text-red-400 shadow-[0_0_30px_-8px_rgba(248,113,113,0.4)]">
+          <div className="flex items-center gap-2 rounded-lg border border-danger-line bg-canvas px-4 py-3 font-mono text-xs text-danger shadow-[0_0_30px_-8px_rgba(248,113,113,0.4)]">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>{toastMessage}</span>
             <button
@@ -341,8 +349,8 @@ function TabButton({
       onClick={onClick}
       className={`rounded-lg border px-4 py-2 font-mono text-xs transition-all ${
         active
-          ? "border-green-500/40 bg-green-500/10 text-green-400 shadow-[0_0_16px_-4px_rgba(34,197,94,0.4)]"
-          : "border-zinc-800 text-zinc-500 hover:border-green-500/30 hover:text-zinc-300"
+          ? "border-accent-line bg-accent-soft text-accent shadow-[0_0_16px_-4px_rgba(34,197,94,0.4)]"
+          : "border-line text-ink-subtle hover:border-accent-line hover:text-ink-muted"
       }`}
     >
       {children}
@@ -354,15 +362,12 @@ function LoadingSkeleton({ rows }: { rows: number }) {
   return (
     <div className="space-y-3">
       {Array.from({ length: rows }).map((_, i) => (
-        <div
-          key={i}
-          className="flex gap-4 rounded-xl border border-zinc-800/80 p-5"
-        >
-          <div className="h-14 w-14 shrink-0 animate-pulse rounded-lg bg-zinc-900/40" />
+        <div key={i} className="flex gap-4 rounded-xl border border-line p-5">
+          <div className="h-14 w-14 shrink-0 animate-pulse rounded-lg bg-surface/40" />
           <div className="flex-1 space-y-3 py-1">
-            <div className="h-4 w-1/3 animate-pulse rounded bg-zinc-900/40" />
-            <div className="h-3 w-2/3 animate-pulse rounded bg-zinc-900/40" />
-            <div className="h-3 w-1/4 animate-pulse rounded bg-zinc-900/40" />
+            <div className="h-4 w-1/3 animate-pulse rounded bg-surface/40" />
+            <div className="h-3 w-2/3 animate-pulse rounded bg-surface/40" />
+            <div className="h-3 w-1/4 animate-pulse rounded bg-surface/40" />
           </div>
         </div>
       ))}
@@ -388,8 +393,8 @@ function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
           aria-pressed={hasVoted}
           className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-lg border font-mono transition-all ${
             hasVoted
-              ? "border-green-500/60 bg-green-500/15 text-green-400 shadow-[0_0_20px_-4px_rgba(34,197,94,0.5)]"
-              : "border-zinc-800 bg-zinc-950/40 text-zinc-500 hover:border-green-500/40 hover:text-green-400"
+              ? "border-accent-line bg-accent-soft text-accent shadow-[0_0_20px_-4px_rgba(34,197,94,0.5)]"
+              : "border-line bg-canvas/40 text-ink-subtle hover:border-accent-line hover:text-accent"
           }`}
         >
           <ChevronUp className="h-4 w-4" />
@@ -399,7 +404,7 @@ function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
         {/* Content */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-sans text-sm font-bold tracking-tight text-zinc-100">
+            <h3 className="font-sans text-sm font-bold tracking-tight text-ink">
               {feature.title}
             </h3>
             <span
@@ -409,15 +414,15 @@ function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
               {status.label}
             </span>
             {feature.category && (
-              <span className="rounded-full border border-zinc-800 bg-zinc-950/60 px-2 py-0.5 font-mono text-[10px] text-zinc-500">
+              <span className="rounded-full border border-line bg-canvas/60 px-2 py-0.5 font-mono text-[10px] text-ink-subtle">
                 {feature.category}
               </span>
             )}
           </div>
-          <p className="mt-1.5 line-clamp-2 font-mono text-xs leading-relaxed text-zinc-500">
+          <p className="mt-1.5 line-clamp-2 font-mono text-xs leading-relaxed text-ink-subtle">
             {feature.description}
           </p>
-          <p className="mt-2 font-mono text-[10px] text-zinc-600">
+          <p className="mt-2 font-mono text-[10px] text-ink-faint">
             {new Date(feature.createdAt).toLocaleDateString("en-US", {
               year: "numeric",
               month: "short",
@@ -432,16 +437,16 @@ function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
 
 function EmptyState({ onSubmit }: { onSubmit: () => void }) {
   return (
-    <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/40 p-12 text-center">
-      <p className="font-mono text-sm text-zinc-500">
-        <span className="text-green-500">❯</span> envpilot wishlist --list
+    <div className="rounded-xl border border-dashed border-line bg-surface/40 p-12 text-center">
+      <p className="font-mono text-sm text-ink-subtle">
+        <span className="text-accent">❯</span> envpilot wishlist --list
       </p>
-      <p className="mt-2 font-mono text-xs text-zinc-600">
+      <p className="mt-2 font-mono text-xs text-ink-faint">
         No feature requests yet. Be the first.
       </p>
       <button
         onClick={onSubmit}
-        className="mt-6 inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 font-mono text-xs font-semibold text-zinc-950 shadow-[0_0_24px_-6px_rgba(34,197,94,0.6)] transition-all hover:bg-green-400"
+        className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-mono text-xs font-semibold text-ink-inverse shadow-[0_0_24px_-6px_rgba(34,197,94,0.6)] transition-all hover:bg-accent"
       >
         <Plus className="h-3.5 w-3.5" />
         submit-feature
@@ -486,9 +491,9 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
       <div className="grid gap-6 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="space-y-3">
-            <div className="h-8 animate-pulse rounded-lg bg-zinc-900/40" />
-            <div className="h-24 animate-pulse rounded-xl bg-zinc-900/40" />
-            <div className="h-24 animate-pulse rounded-xl bg-zinc-900/40" />
+            <div className="h-8 animate-pulse rounded-lg bg-surface/40" />
+            <div className="h-24 animate-pulse rounded-xl bg-surface/40" />
+            <div className="h-24 animate-pulse rounded-xl bg-surface/40" />
           </div>
         ))}
       </div>
@@ -500,25 +505,25 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
   const columns = [
     {
       title: "planned",
-      dot: "bg-zinc-400",
-      color: "text-zinc-300",
-      borderColor: "border-zinc-800",
+      dot: "bg-surface-hover",
+      color: "text-ink-muted",
+      borderColor: "border-line",
       items: planned,
       showDate: false,
     },
     {
       title: "in-progress",
-      dot: "bg-amber-400",
-      color: "text-amber-400",
-      borderColor: "border-amber-500/20",
+      dot: "bg-warning",
+      color: "text-warning",
+      borderColor: "border-warning-line",
       items: inProgress,
       showDate: false,
     },
     {
       title: "completed",
-      dot: "bg-green-400",
-      color: "text-green-400",
-      borderColor: "border-green-500/20",
+      dot: "bg-accent",
+      color: "text-accent",
+      borderColor: "border-accent-line",
       items: completed,
       showDate: true,
     },
@@ -537,10 +542,10 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
         return (
           <StaggerItem
             key={col.title}
-            className={`rounded-xl border ${col.borderColor} bg-zinc-900/20 p-4`}
+            className={`rounded-xl border ${col.borderColor} bg-surface/20 p-4`}
           >
             {/* Column header */}
-            <div className="mb-4 flex items-center gap-2 border-b border-zinc-800 pb-3">
+            <div className="mb-4 flex items-center gap-2 border-b border-line pb-3">
               <span
                 className={`h-2 w-2 rounded-full ${col.dot} ${
                   col.title === "in-progress" ? "animate-pulse" : ""
@@ -551,7 +556,7 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
               >
                 {col.title}
               </h3>
-              <span className="ml-auto rounded-full border border-zinc-800 bg-zinc-950/60 px-2 py-0.5 font-mono text-[10px] text-zinc-500">
+              <span className="ml-auto rounded-full border border-line bg-canvas/60 px-2 py-0.5 font-mono text-[10px] text-ink-subtle">
                 {col.items.length}
               </span>
             </div>
@@ -559,7 +564,7 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
             {/* Cards */}
             <div className="space-y-3">
               {col.items.length === 0 ? (
-                <p className="py-6 text-center font-mono text-xs text-zinc-700">
+                <p className="py-6 text-center font-mono text-xs text-ink-faint">
                   # empty
                 </p>
               ) : (
@@ -567,15 +572,15 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
                   {visibleItems.map((feature) => (
                     <div
                       key={feature._id}
-                      className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 transition-colors hover:border-green-500/30"
+                      className="rounded-xl border border-line bg-surface/40 p-4 transition-colors hover:border-accent-line"
                     >
-                      <h4 className="font-sans text-xs font-bold tracking-tight text-zinc-200">
+                      <h4 className="font-sans text-xs font-bold tracking-tight text-ink">
                         {feature.title}
                       </h4>
-                      <p className="mt-1.5 line-clamp-2 font-mono text-[11px] leading-relaxed text-zinc-500">
+                      <p className="mt-1.5 line-clamp-2 font-mono text-[11px] leading-relaxed text-ink-subtle">
                         {feature.description}
                       </p>
-                      <div className="mt-3 flex items-center justify-between font-mono text-[10px] text-zinc-600">
+                      <div className="mt-3 flex items-center justify-between font-mono text-[10px] text-ink-faint">
                         <span className="flex items-center gap-1">
                           <ChevronUp className="h-3 w-3" />
                           {feature.voteCount}
@@ -605,7 +610,7 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
                           [col.title]: !isExpanded,
                         }))
                       }
-                      className={`flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed ${col.borderColor} py-2.5 font-mono text-[11px] font-medium ${col.color} transition-colors hover:bg-zinc-900/50`}
+                      className={`flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed ${col.borderColor} py-2.5 font-mono text-[11px] font-medium ${col.color} transition-colors hover:bg-surface-hover/50`}
                     >
                       {isExpanded ? (
                         <>
@@ -644,7 +649,7 @@ interface SubmitFeatureModalProps {
 }
 
 const INPUT_CLASSES =
-  "mt-1.5 block w-full rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 font-mono text-xs text-zinc-200 placeholder-zinc-600 focus:border-green-500/40 focus:outline-none focus:ring-2 focus:ring-green-500/20";
+  "mt-1.5 block w-full rounded-lg border border-line bg-surface/60 px-3 py-2 font-mono text-xs text-ink placeholder-ink-faint focus:border-accent-line focus:outline-none focus:ring-2 focus:ring-accent-line";
 
 function SubmitFeatureModal({
   onClose,
@@ -717,13 +722,13 @@ function SubmitFeatureModal({
         bodyClassName="max-h-[80vh] overflow-y-auto"
       >
         <div className="flex items-start justify-between">
-          <p className="font-mono text-xs text-zinc-500">
-            <span className="text-green-500">❯</span> envpilot feature --new
+          <p className="font-mono text-xs text-ink-subtle">
+            <span className="text-accent">❯</span> envpilot feature --new
           </p>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-300"
+            className="rounded p-0.5 text-ink-subtle transition-colors hover:text-ink-muted"
           >
             <X className="h-4 w-4" />
           </button>
@@ -731,13 +736,13 @@ function SubmitFeatureModal({
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           {error && (
-            <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 font-mono text-xs text-red-400">
+            <div className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 font-mono text-xs text-danger">
               error: {error}
             </div>
           )}
 
           <div>
-            <label className="block font-mono text-xs text-zinc-400">
+            <label className="block font-mono text-xs text-ink-muted">
               title *
             </label>
             <input
@@ -750,7 +755,7 @@ function SubmitFeatureModal({
           </div>
 
           <div>
-            <label className="block font-mono text-xs text-zinc-400">
+            <label className="block font-mono text-xs text-ink-muted">
               description *
             </label>
             <textarea
@@ -764,7 +769,7 @@ function SubmitFeatureModal({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block font-mono text-xs text-zinc-400">
+              <label className="block font-mono text-xs text-ink-muted">
                 email *
               </label>
               <input
@@ -776,7 +781,7 @@ function SubmitFeatureModal({
               />
             </div>
             <div>
-              <label className="block font-mono text-xs text-zinc-400">
+              <label className="block font-mono text-xs text-ink-muted">
                 name
               </label>
               <input
@@ -790,7 +795,7 @@ function SubmitFeatureModal({
           </div>
 
           <div>
-            <label className="block font-mono text-xs text-zinc-400">
+            <label className="block font-mono text-xs text-ink-muted">
               category
             </label>
             <input
@@ -806,14 +811,14 @@ function SubmitFeatureModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-zinc-800 px-4 py-2 font-mono text-xs text-zinc-500 transition-colors hover:border-green-500/30 hover:text-zinc-300"
+              className="rounded-lg border border-line px-4 py-2 font-mono text-xs text-ink-subtle transition-colors hover:border-accent-line hover:text-ink-muted"
             >
               cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-lg bg-green-500 px-4 py-2 font-mono text-xs font-semibold text-zinc-950 shadow-[0_0_20px_-6px_rgba(34,197,94,0.6)] transition-all hover:bg-green-400 disabled:opacity-50"
+              className="rounded-lg bg-accent px-4 py-2 font-mono text-xs font-semibold text-ink-inverse shadow-[0_0_20px_-6px_rgba(34,197,94,0.6)] transition-all hover:bg-accent disabled:opacity-50"
             >
               {isSubmitting ? "submitting..." : "submit"}
             </button>

@@ -1,24 +1,51 @@
 import Link from "next/link";
 
+const panel = "rounded-panel bg-surface ring-1 ring-line shadow-panel";
+
 export function TerminalWindow({
   title,
+  meta,
+  cmd,
+  action,
   children,
   className = "",
 }: {
   title: string;
+  meta?: string;
+  cmd?: string;
+  action?: { label: string; href: string };
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <div
-      className={`flex flex-col overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-xl ${className}`}
-    >
-      <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
-        <div className="h-3 w-3 rounded-full bg-[#ef5350]/80" />
-        <div className="h-3 w-3 rounded-full bg-[#fbbf24]/80" />
-        <div className="h-3 w-3 rounded-full bg-[#22c55e]/80" />
-        <span className="ml-2 text-xs text-zinc-500">{title}</span>
+    <div className={`flex flex-col overflow-hidden ${panel} ${className}`}>
+      <div className="flex items-center gap-3 border-b border-line bg-white/[0.02] px-4 py-2">
+        <span className="truncate font-mono text-[11.5px] text-ink-muted">
+          {title}
+        </span>
+        {meta && (
+          <span className="ml-auto hidden shrink-0 font-mono text-[11px] text-ink-faint sm:block">
+            {meta}
+          </span>
+        )}
       </div>
+
+      {cmd && (
+        <div className="flex items-center justify-between border-b border-line px-5 py-2.5">
+          <span className="truncate font-mono text-xs text-ink-subtle">
+            <span className="text-accent">$</span> {cmd}
+          </span>
+          {action && (
+            <Link
+              href={action.href}
+              className="shrink-0 text-xs text-ink-subtle transition-colors hover:text-accent"
+            >
+              {action.label}
+            </Link>
+          )}
+        </div>
+      )}
+
       <div className="flex-1">{children}</div>
     </div>
   );
@@ -31,13 +58,7 @@ export function TerminalCard({
   children: React.ReactNode;
   className?: string;
 }) {
-  return (
-    <div
-      className={`rounded-lg border border-zinc-700/50 bg-zinc-900/90 p-6 ${className}`}
-    >
-      {children}
-    </div>
-  );
+  return <div className={`${panel} p-6 ${className}`}>{children}</div>;
 }
 
 export function TerminalInput({
@@ -46,7 +67,7 @@ export function TerminalInput({
 }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30 ${className}`}
+      className={`w-full rounded-panel border border-line bg-surface-raised px-3 py-2 text-sm text-ink placeholder-ink-subtle transition-colors focus:border-accent-line focus:ring-1 focus:ring-accent-line focus:outline-none ${className}`}
       {...props}
     />
   );
@@ -59,7 +80,7 @@ export function TerminalSelect({
 }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30 ${className}`}
+      className={`rounded-panel border border-line bg-surface-raised px-3 py-2 text-sm text-ink transition-colors focus:border-accent-line focus:ring-1 focus:ring-accent-line focus:outline-none ${className}`}
       {...props}
     >
       {children}
@@ -69,13 +90,16 @@ export function TerminalSelect({
 
 type ButtonVariant = "primary" | "secondary" | "danger";
 
+// Hover must differ from the resting fill, or nothing moves on pointer-over.
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary:
-    "border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20",
+  primary: "border-accent-line bg-accent-soft text-accent hover:bg-accent-line",
   secondary:
-    "border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300",
-  danger: "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20",
+    "border-line text-ink-muted hover:border-line-strong hover:bg-surface-hover hover:text-ink",
+  danger: "border-danger-line bg-danger-soft text-danger hover:bg-danger-line",
 };
+
+const buttonBase =
+  "inline-flex items-center gap-2 rounded-panel border px-4 py-2 text-sm font-medium transition-colors";
 
 export function TerminalButton({
   variant = "primary",
@@ -87,7 +111,7 @@ export function TerminalButton({
 }) {
   return (
     <button
-      className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${buttonVariants[variant]} ${className}`}
+      className={`${buttonBase} ${buttonVariants[variant]} ${className}`}
       {...props}
     >
       {children}
@@ -112,7 +136,7 @@ export function TerminalButtonLink({
     <Link
       href={href}
       data-testid={dataTestId}
-      className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${buttonVariants[variant]} ${className}`}
+      className={`${buttonBase} ${buttonVariants[variant]} ${className}`}
     >
       {children}
     </Link>
@@ -129,12 +153,12 @@ export function TerminalBadge({
   className?: string;
 }) {
   const colors = {
-    green: "bg-green-500/10 text-green-400 border-green-500/20",
-    amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    red: "bg-red-500/10 text-red-400 border-red-500/20",
-    zinc: "bg-zinc-800 text-zinc-400 border-zinc-700",
-    blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    purple: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    green: "bg-accent-soft text-accent border-accent-line",
+    amber: "bg-warning-soft text-warning border-warning-line",
+    red: "bg-danger-soft text-danger border-danger-line",
+    zinc: "bg-surface-raised text-ink-muted border-line",
+    blue: "bg-info-soft text-info border-info-line",
+    purple: "bg-premium-soft text-premium border-premium-line",
   };
 
   return (
@@ -157,10 +181,10 @@ export function TerminalEmptyState({
 }) {
   return (
     <div className="px-5 py-10 text-center">
-      <p className="font-mono text-sm text-zinc-500">
-        <span className="text-green-400">$</span> {command}
+      <p className="font-mono text-sm text-ink-subtle">
+        <span className="text-accent">$</span> {command}
       </p>
-      <p className="mt-2 text-sm text-zinc-400">{message}</p>
+      <p className="mt-2 text-sm text-ink-muted">{message}</p>
       {action && (
         <div className="mt-4">
           {action.href ? (
@@ -187,10 +211,10 @@ export function TerminalLoading({ fullPage = false }: { fullPage?: boolean }) {
           : "flex items-center justify-center py-8"
       }
     >
-      <span className="font-mono text-sm text-green-400">
-        <span className="text-zinc-500">$</span> loading
+      <span className="font-mono text-sm text-accent">
+        <span className="text-ink-subtle">$</span> loading
         <span
-          className="inline-block w-2 bg-green-400"
+          className="inline-block w-2 bg-accent"
           style={{ animation: "blink 1s step-end infinite" }}
         >
           &nbsp;

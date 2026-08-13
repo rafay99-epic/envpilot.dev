@@ -53,7 +53,7 @@ export function AuditExportDialog({
       <div className="space-y-5">
         {/* Date Range */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-zinc-300">
+          <label className="mb-2 block text-sm font-medium text-ink-muted">
             Date Range
           </label>
           <div className="flex flex-wrap gap-2">
@@ -63,8 +63,8 @@ export function AuditExportDialog({
                 onClick={() => setSelectedPreset(i)}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                   selectedPreset === i
-                    ? "bg-green-500/10 text-green-400 border border-green-500/30"
-                    : "border border-zinc-700/50 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+                    ? "bg-accent-soft text-accent border border-accent-line"
+                    : "border border-line text-ink-subtle hover:border-line-strong hover:text-ink-muted"
                 }`}
               >
                 {preset.label}
@@ -75,7 +75,7 @@ export function AuditExportDialog({
 
         {/* Format */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-zinc-300">
+          <label className="mb-2 block text-sm font-medium text-ink-muted">
             Format
           </label>
           <div className="flex gap-2">
@@ -83,8 +83,8 @@ export function AuditExportDialog({
               onClick={() => setFormat("csv")}
               className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
                 format === "csv"
-                  ? "border-green-500/30 bg-green-500/10 text-green-400"
-                  : "border-zinc-700/50 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+                  ? "border-accent-line bg-accent-soft text-accent"
+                  : "border-line text-ink-subtle hover:border-line-strong hover:text-ink-muted"
               }`}
             >
               CSV
@@ -96,8 +96,8 @@ export function AuditExportDialog({
               onClick={() => setFormat("json")}
               className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
                 format === "json"
-                  ? "border-green-500/30 bg-green-500/10 text-green-400"
-                  : "border-zinc-700/50 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+                  ? "border-accent-line bg-accent-soft text-accent"
+                  : "border-line text-ink-subtle hover:border-line-strong hover:text-ink-muted"
               }`}
             >
               JSON
@@ -109,17 +109,17 @@ export function AuditExportDialog({
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-3 border-t border-zinc-800 pt-4">
+        <div className="flex justify-end gap-3 border-t border-line pt-4">
           <button
             onClick={onClose}
-            className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+            className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
           >
             Cancel
           </button>
           <button
             onClick={handleExport}
             disabled={isExporting}
-            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent disabled:opacity-50"
           >
             {isExporting ? "Exporting..." : "Export"}
           </button>

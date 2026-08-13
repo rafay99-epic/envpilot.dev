@@ -55,7 +55,7 @@ function OrganizationsPage() {
       header: "Created",
       sortable: true,
       render: (row) => (
-        <span className="text-zinc-400">
+        <span className="text-ink-muted">
           {formatDate(row._creationTime as number)}
         </span>
       ),
@@ -64,9 +64,7 @@ function OrganizationsPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
-        Organizations
-      </h1>
+      <h1 className="mb-6 text-2xl font-semibold text-ink">Organizations</h1>
       <div className="mb-4">
         <SearchInput
           value={search}
@@ -76,7 +74,7 @@ function OrganizationsPage() {
         />
       </div>
       {organizations && (
-        <p className="mb-3 text-xs text-zinc-500">
+        <p className="mb-3 text-xs text-ink-subtle">
           {search.trim()
             ? `${filteredOrgs?.length ?? 0} of ${(organizations as Record<string, unknown>[]).length} organizations match`
             : `${(organizations as Record<string, unknown>[]).length} organizations`}

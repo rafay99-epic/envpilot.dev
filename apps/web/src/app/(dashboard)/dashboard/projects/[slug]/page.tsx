@@ -563,9 +563,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   if (!project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
+        <div className="rounded-full p-3 bg-danger-soft">
           <svg
-            className="h-6 w-6 text-red-600 dark:text-red-400"
+            className="h-6 w-6 text-danger"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -578,14 +578,14 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             />
           </svg>
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="mt-4 text-lg font-semibold text-ink">
           {projectError instanceof Error
             ? projectError.message
             : "Project not found"}
         </h2>
         <Link
           href="/dashboard/projects"
-          className="mt-6 text-sm font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300"
+          className="mt-6 text-sm font-medium text-ink-inverse hover:text-ink-muted"
         >
           Back to Projects
         </Link>
@@ -612,7 +612,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           <>
             <Link
               href={`/dashboard/projects/${project.slug}/diff`}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
             >
               <svg
                 className="h-4 w-4"
@@ -636,7 +636,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             </Link>
             <Link
               href={`/dashboard/projects/${project.slug}/members`}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
             >
               <svg
                 className="h-4 w-4"
@@ -656,7 +656,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             {canSeeTrash && (
               <Link
                 href={`/dashboard/projects/${project.slug}/trash`}
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
               >
                 <svg
                   className="h-4 w-4"
@@ -679,19 +679,19 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       />
 
       {notice && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/40 dark:bg-green-900/20">
-          <p className="text-sm text-green-700 dark:text-green-400">{notice}</p>
+        <div className="rounded-lg border p-4 border-accent-line bg-accent-soft">
+          <p className="text-sm text-accent">{notice}</p>
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-900/20">
-          <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+        <div className="rounded-lg border p-4 border-danger-line bg-danger-soft">
+          <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
       <div className="flex flex-wrap items-center gap-4">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <label className="text-sm font-medium text-ink-muted">
           Environment:
         </label>
         <div className="flex gap-2">
@@ -699,8 +699,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             onClick={() => setSelectedEnvironment("all")}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               selectedEnvironment === "all"
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                ? "bg-accent-soft text-accent ring-1 ring-accent-line"
+                : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
             }`}
           >
             All
@@ -711,8 +711,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               onClick={() => setSelectedEnvironment(env)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                 selectedEnvironment === env
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  ? "bg-accent-soft text-accent ring-1 ring-accent-line"
+                  : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
               }`}
             >
               {env}
@@ -737,7 +737,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
       <div className="relative">
         <svg
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500"
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -762,7 +762,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         />
         {isSearchLoading ? (
           <svg
-            className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-zinc-500"
+            className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-ink-subtle"
             fill="none"
             viewBox="0 0 24 24"
           >
@@ -785,7 +785,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             type="button"
             onClick={() => setSearchTerm("")}
             aria-label="Clear search"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 transition-colors hover:text-zinc-300"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle transition-colors hover:text-ink-muted"
           >
             <svg
               className="h-4 w-4"
@@ -804,13 +804,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         ) : null}
       </div>
 
-      <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+      <div className="rounded-xl border border-line bg-surface">
+        <div className="flex items-center justify-between border-b px-6 py-4 border-line">
           <div>
-            <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-              Environment Variables
-            </h2>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <h2 className="font-semibold text-ink">Environment Variables</h2>
+            <p className="mt-1 text-sm text-ink-muted">
               {filteredVariables.length}
               {isSearching ? " result" : " variable"}
               {filteredVariables.length !== 1 ? "s" : ""}
@@ -819,7 +817,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                 : selectedEnvironment !== "all" && ` in ${selectedEnvironment}`}
             </p>
             {isSearching && searchData?.truncated && (
-              <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+              <p className="mt-1 text-xs text-warning">
                 Showing the first 100 matches — narrow your search to see more.
               </p>
             )}
@@ -828,7 +826,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             {/* Export Button */}
             <button
               onClick={() => setShowExportDrawer(true)}
-              className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
             >
               <svg
                 className="h-4 w-4"
@@ -850,7 +848,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             {canCreateVariable && (
               <button
                 onClick={() => setShowImportDrawer(true)}
-                className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
               >
                 <svg
                   className="h-4 w-4"
@@ -873,7 +871,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             {(canCreateVariable || canRequestVariable) && (
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                className="flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium transition-colors text-ink-inverse hover:bg-ink-muted"
               >
                 <svg
                   className="h-4 w-4"
@@ -897,14 +895,14 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           </div>
         </div>
 
-        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <div className="divide-y divide-line">
           {showListLoading ? (
             <TerminalLoading />
           ) : filteredVariables.length === 0 ? (
             <div className="px-6 py-12 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-raised">
                 <svg
-                  className="h-6 w-6 text-zinc-400"
+                  className="h-6 w-6 text-ink-muted"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -917,10 +915,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                   />
                 </svg>
               </div>
-              <h3 className="mt-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              <h3 className="mt-4 text-sm font-semibold text-ink">
                 {isSearching ? "No matching variables" : "No variables yet"}
               </h3>
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="mt-1 text-sm text-ink-muted">
                 {isSearching
                   ? `No variables match "${trimmedSearch}". Try a different term.`
                   : canCreateVariable
@@ -930,7 +928,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             </div>
           ) : (
             <>
-              <AnimatedList className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <AnimatedList className="divide-y divide-line">
                 {filteredVariables.map((variable) => (
                   <VariableListItem
                     key={variable._id}
@@ -965,11 +963,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               {!isSearching &&
                 (variablesStatus === "CanLoadMore" ||
                   variablesStatus === "LoadingMore") && (
-                  <div className="flex justify-center border-t border-zinc-200 px-6 py-4 dark:border-zinc-800">
+                  <div className="flex justify-center border-t px-6 py-4 border-line">
                     <button
                       onClick={() => loadMoreVariables(50)}
                       disabled={variablesStatus === "LoadingMore"}
-                      className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
                     >
                       {variablesStatus === "LoadingMore"
                         ? "Loading..."
@@ -1065,27 +1063,27 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           fallbackVariant="inline"
         >
           <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
-            <div className="flex items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-900 px-5 py-3 shadow-2xl">
-              <span className="text-sm font-medium text-zinc-300">
+            <div className="flex items-center gap-3 rounded-xl border border-line bg-surface px-5 py-3 shadow-2xl">
+              <span className="text-sm font-medium text-ink-muted">
                 {selectedIds.size} variable{selectedIds.size !== 1 ? "s" : ""}{" "}
                 selected
               </span>
               <button
                 onClick={() => selectAll(filteredVariables.map((v) => v._id))}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
               >
                 Select All
               </button>
               <button
                 onClick={clearSelection}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
               >
                 Clear
               </button>
               <button
                 onClick={() => setShowBulkDeleteConfirm(true)}
                 disabled={isBulkDeleting}
-                className="rounded-lg bg-red-600 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                className="rounded-lg bg-danger px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-danger disabled:opacity-50"
               >
                 Delete Selected
               </button>

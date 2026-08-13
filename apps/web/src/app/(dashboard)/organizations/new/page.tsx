@@ -78,7 +78,7 @@ export default function NewOrganizationPage() {
       <div>
         <Link
           href="/organizations"
-          className="inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          className="inline-flex items-center gap-1 text-sm text-ink-faint hover:text-ink"
         >
           <svg
             className="h-4 w-4"
@@ -95,10 +95,10 @@ export default function NewOrganizationPage() {
           </svg>
           Back to Organizations
         </Link>
-        <h1 className="mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+        <h1 className="mt-4 text-2xl font-bold text-ink">
           Create Organization
         </h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-ink-muted">
           Create a new organization to collaborate with your team.
         </p>
       </div>
@@ -114,17 +114,17 @@ export default function NewOrganizationPage() {
         )}
 
         {error && !tierLimitHit && (
-          <div className="rounded-lg border border-red-800/50 bg-red-900/20 p-4">
-            <p className="text-sm text-red-400">{error}</p>
+          <div className="rounded-lg border border-danger-line bg-danger-soft p-4">
+            <p className="text-sm text-danger">{error}</p>
           </div>
         )}
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="rounded-xl border p-6 border-line bg-surface">
           <div className="space-y-6">
             <div>
               <label
                 htmlFor="name"
-                className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+                className="block text-sm font-medium text-ink"
               >
                 Organization Name
               </label>
@@ -136,21 +136,19 @@ export default function NewOrganizationPage() {
                 placeholder="Acme Inc."
                 required
                 maxLength={100}
-                className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                className="mt-2 block w-full rounded-lg border px-4 py-2.5 focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder:text-ink-subtle"
               />
             </div>
 
             <div>
               <label
                 htmlFor="slug"
-                className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+                className="block text-sm font-medium text-ink"
               >
                 URL Slug
               </label>
               <div className="mt-2 flex items-center">
-                <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                  envpilot.dev/
-                </span>
+                <span className="text-sm text-ink-muted">envpilot.dev/</span>
                 <input
                   type="text"
                   id="slug"
@@ -160,10 +158,10 @@ export default function NewOrganizationPage() {
                   required
                   maxLength={50}
                   pattern="^[a-z0-9-]+$"
-                  className="ml-1 block flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                  className="ml-1 block flex-1 rounded-lg border px-4 py-2.5 focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder:text-ink-subtle"
                 />
               </div>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 text-xs text-ink-muted">
                 Only lowercase letters, numbers, and hyphens.
               </p>
             </div>
@@ -171,10 +169,10 @@ export default function NewOrganizationPage() {
             <div>
               <label
                 htmlFor="description"
-                className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+                className="block text-sm font-medium text-ink"
               >
                 Description{" "}
-                <span className="font-normal text-zinc-500">(optional)</span>
+                <span className="font-normal text-ink-subtle">(optional)</span>
               </label>
               <textarea
                 id="description"
@@ -183,7 +181,7 @@ export default function NewOrganizationPage() {
                 placeholder="A brief description of your organization..."
                 rows={3}
                 maxLength={500}
-                className="mt-2 block w-full resize-none rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                className="mt-2 block w-full resize-none rounded-lg border px-4 py-2.5 focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder:text-ink-subtle"
               />
             </div>
           </div>
@@ -192,18 +190,18 @@ export default function NewOrganizationPage() {
         <div className="flex items-center justify-end gap-3">
           <Link
             href="/organizations"
-            className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors border-line text-ink-muted hover:bg-surface-hover"
           >
             Cancel
           </Link>
           <button
             type="submit"
             disabled={isSubmitting || !name || !slug}
-            className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
           >
             {isSubmitting ? (
               <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent dark:border-zinc-900 dark:border-t-transparent" />
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
                 Creating...
               </>
             ) : (

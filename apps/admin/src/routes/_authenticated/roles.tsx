@@ -302,7 +302,7 @@ function RolesPage() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-100">Roles</h1>
+        <h1 className="text-2xl font-semibold text-ink">Roles</h1>
         <Button size="sm" onClick={openCreate}>
           <Plus className="h-3.5 w-3.5" />
           Create Role
@@ -331,10 +331,10 @@ function RolesPage() {
                         className="h-3 w-3 rounded-full"
                         style={{
                           backgroundColor: colorHex(role.color),
-                          boxShadow: `0 0 0 2px var(--color-zinc-900), 0 0 0 3px ${colorHex(role.color)}`,
+                          boxShadow: `0 0 0 2px var(--color-surface), 0 0 0 3px ${colorHex(role.color)}`,
                         }}
                       />
-                      <h3 className="font-semibold text-zinc-100">
+                      <h3 className="font-semibold text-ink">
                         {role.displayName}
                       </h3>
                       <Badge variant={role.isSystem ? "purple" : "default"}>
@@ -370,8 +370,8 @@ function RolesPage() {
                         disabled={role.isSystem || togglingId === role._id}
                         className={
                           role.isActive
-                            ? "hover:text-amber-400"
-                            : "hover:text-emerald-400"
+                            ? "hover:text-warning"
+                            : "hover:text-accent"
                         }
                         aria-label={
                           role.isSystem
@@ -398,13 +398,15 @@ function RolesPage() {
                   </div>
 
                   {role.description && (
-                    <p className="mb-3 text-xs text-zinc-400">
+                    <p className="mb-3 text-xs text-ink-muted">
                       {role.description}
                     </p>
                   )}
 
-                  <div className="flex items-center gap-4 text-xs text-zinc-400">
-                    <span className="font-mono text-zinc-500">{role.slug}</span>
+                  <div className="flex items-center gap-4 text-xs text-ink-muted">
+                    <span className="font-mono text-ink-subtle">
+                      {role.slug}
+                    </span>
                     <span className="flex items-center gap-1" title="Level">
                       <Layers className="h-3 w-3" />
                       {role.level}
@@ -434,10 +436,10 @@ function RolesPage() {
           SECTION 2: ROLE x CAPABILITY MATRIX
           ========================================== */}
       <div className="mb-8" data-wide>
-        <h2 className="mb-1 text-lg font-semibold text-zinc-100">
+        <h2 className="mb-1 text-lg font-semibold text-ink">
           Capability Matrix
         </h2>
-        <p className="mb-4 text-xs text-zinc-500">
+        <p className="mb-4 text-xs text-ink-subtle">
           Toggles save immediately for every role except Owner (always locked,
           always holds everything). System-role edits survive deploys — new code
           defaults only fill in capabilities you haven&apos;t touched.
@@ -450,20 +452,20 @@ function RolesPage() {
               (capabilitiesByCategory[cap.category] ??= []).push(cap);
             }
             return (
-              <div className="overflow-x-auto rounded-lg border border-zinc-700/50">
+              <div className="overflow-x-auto rounded-lg border border-line">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="sticky top-0 z-10 border-b border-zinc-800/50 bg-zinc-900/95 backdrop-blur-sm">
-                      <th className="px-4 py-3 font-mono text-[0.68rem] font-medium uppercase tracking-wider text-zinc-500">
+                    <tr className="sticky top-0 z-10 border-b border-line bg-surface/95 backdrop-blur-sm">
+                      <th className="px-4 py-3 font-mono text-[0.68rem] font-medium uppercase tracking-wider text-ink-subtle">
                         Capability
                       </th>
-                      <th className="px-4 py-3 font-mono text-[0.68rem] font-medium uppercase tracking-wider text-zinc-500">
+                      <th className="px-4 py-3 font-mono text-[0.68rem] font-medium uppercase tracking-wider text-ink-subtle">
                         Risk
                       </th>
                       {matrixRoles.map((role) => (
                         <th
                           key={role._id}
-                          className="px-4 py-3 text-center font-mono text-[0.68rem] font-medium uppercase tracking-wider text-zinc-500"
+                          className="px-4 py-3 text-center font-mono text-[0.68rem] font-medium uppercase tracking-wider text-ink-subtle"
                         >
                           <div className="flex items-center justify-center gap-1.5">
                             <div
@@ -473,7 +475,7 @@ function RolesPage() {
                             {role.displayName}
                             {role.slug === "owner" && (
                               <Lock
-                                className="h-3 w-3 text-zinc-500"
+                                className="h-3 w-3 text-ink-subtle"
                                 aria-label="Locked (owner always holds everything)"
                               />
                             )}
@@ -482,7 +484,7 @@ function RolesPage() {
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/50">
+                  <tbody className="divide-y divide-line">
                     {Object.entries(capabilitiesByCategory).map(
                       ([category, caps]) => (
                         <RoleCategoryGroup
@@ -522,7 +524,7 @@ function RolesPage() {
         <div className="flex h-full flex-col">
           <div className="flex-1 space-y-5">
             <fieldset className="space-y-4">
-              <legend className="mb-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+              <legend className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-subtle">
                 Identity
               </legend>
 
@@ -539,12 +541,12 @@ function RolesPage() {
                   <div className="mb-1.5 flex items-center gap-1.5">
                     <label
                       htmlFor="role-slug"
-                      className="flex items-center gap-1.5 text-sm font-medium text-zinc-300"
+                      className="flex items-center gap-1.5 text-sm font-medium text-ink-muted"
                     >
                       <Tag className="h-3.5 w-3.5" />
                       Slug
                     </label>
-                    <span className="text-[10px] text-zinc-500">
+                    <span className="text-[10px] text-ink-subtle">
                       (auto-generated, immutable after creation)
                     </span>
                   </div>
@@ -567,13 +569,13 @@ function RolesPage() {
               />
             </fieldset>
 
-            <hr className="border-zinc-800/60" />
+            <hr className="border-line" />
 
             <fieldset>
-              <legend className="mb-3 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+              <legend className="mb-3 text-[11px] font-medium uppercase tracking-wider text-ink-subtle">
                 Appearance
               </legend>
-              <label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-zinc-300">
+              <label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-ink-muted">
                 <Palette className="h-3.5 w-3.5" />
                 Color
               </label>
@@ -589,7 +591,7 @@ function RolesPage() {
                     className={`h-7 w-7 rounded-full border-2 transition-all ${
                       form.color === preset.token
                         ? "scale-110 border-white shadow-lg"
-                        : "border-zinc-700 hover:scale-105 hover:border-zinc-400"
+                        : "border-line hover:scale-105 hover:border-line-strong"
                     }`}
                     style={{ backgroundColor: preset.hex }}
                   />
@@ -597,10 +599,10 @@ function RolesPage() {
               </div>
             </fieldset>
 
-            <hr className="border-zinc-800/60" />
+            <hr className="border-line" />
 
             <fieldset className="space-y-4">
-              <legend className="mb-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+              <legend className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-subtle">
                 Hierarchy
               </legend>
 
@@ -608,7 +610,7 @@ function RolesPage() {
                 <div>
                   <label
                     htmlFor="role-level"
-                    className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-zinc-300"
+                    className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-ink-muted"
                   >
                     <Layers className="h-3.5 w-3.5" />
                     Level
@@ -625,12 +627,12 @@ function RolesPage() {
                       )
                     }
                   />
-                  <p className="mt-1 text-[10px] text-zinc-500">
+                  <p className="mt-1 text-[10px] text-ink-subtle">
                     Higher = more authority. Invite/role-change rules compare
                     levels.
                   </p>
                   {levelClash && !editingRole?.isSystem && (
-                    <p className="mt-1 text-xs text-amber-400">
+                    <p className="mt-1 text-xs text-warning">
                       Same level as &quot;{levelClash.displayName}&quot; —
                       allowed, but hierarchy comparisons treat them as peers.
                     </p>
@@ -671,10 +673,10 @@ function RolesPage() {
               )}
             </fieldset>
 
-            {formError && <p className="text-xs text-red-400">{formError}</p>}
+            {formError && <p className="text-xs text-danger">{formError}</p>}
           </div>
 
-          <div className="mt-6 flex items-center justify-end gap-2 border-t border-zinc-800 pt-4">
+          <div className="mt-6 flex items-center justify-end gap-2 border-t border-line pt-4">
             <Button
               variant="ghost"
               onClick={() => setDrawerMode(null)}
@@ -715,21 +717,23 @@ function RoleCategoryGroup({
 }) {
   return (
     <>
-      <tr className="bg-zinc-900/60">
+      <tr className="bg-surface/60">
         <td
           colSpan={2 + roles.length}
-          className="px-4 py-2 font-mono text-[0.68rem] font-semibold uppercase tracking-wider text-zinc-400"
+          className="px-4 py-2 font-mono text-[0.68rem] font-semibold uppercase tracking-wider text-ink-muted"
         >
           {category}
         </td>
       </tr>
       {caps.map((cap) => (
-        <tr key={cap.key} className="transition-colors hover:bg-green-500/5">
+        <tr key={cap.key} className="transition-colors hover:bg-accent-soft">
           <td className="px-4 py-2">
-            <div className="text-xs text-zinc-300" title={cap.description}>
+            <div className="text-xs text-ink-muted" title={cap.description}>
               {cap.label}
             </div>
-            <div className="font-mono text-[10px] text-zinc-500">{cap.key}</div>
+            <div className="font-mono text-[10px] text-ink-subtle">
+              {cap.key}
+            </div>
           </td>
           <td className="px-4 py-2">
             <Badge variant={RISK_VARIANT[cap.risk] ?? "default"}>
@@ -743,9 +747,9 @@ function RoleCategoryGroup({
               <td key={role._id} className="px-4 py-2 text-center">
                 {role.slug === "owner" ? (
                   granted ? (
-                    <Check className="mx-auto h-3.5 w-3.5 text-green-500/70" />
+                    <Check className="mx-auto h-3.5 w-3.5 text-accent/70" />
                   ) : (
-                    <span className="text-zinc-600">&mdash;</span>
+                    <span className="text-ink-faint">&mdash;</span>
                   )
                 ) : (
                   <input
@@ -755,7 +759,7 @@ function RoleCategoryGroup({
                     onChange={(e) => onToggle(role, cap.key, e.target.checked)}
                     aria-label={`${role.displayName}: ${cap.label}`}
                     title={`${role.displayName}: ${cap.label}`}
-                    className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-green-500 focus:ring-green-500/50 disabled:opacity-50"
+                    className="h-4 w-4 rounded border-line-strong bg-surface-raised text-accent focus:ring-accent-line disabled:opacity-50"
                   />
                 )}
               </td>

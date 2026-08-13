@@ -16,7 +16,7 @@ function isTimestamp(value: unknown): value is number {
 export function CellValue({ value, fieldKey }: CellValueProps) {
   // Null / undefined
   if (value === null || value === undefined) {
-    return <span className="text-zinc-600">—</span>;
+    return <span className="text-ink-faint">—</span>;
   }
 
   // Boolean
@@ -37,7 +37,7 @@ export function CellValue({ value, fieldKey }: CellValueProps) {
       fieldKey === "expiresAt")
   ) {
     return (
-      <span className="text-zinc-400" title={formatDateTime(value as number)}>
+      <span className="text-ink-muted" title={formatDateTime(value as number)}>
         {timeAgo(value as number)}
       </span>
     );
@@ -48,7 +48,7 @@ export function CellValue({ value, fieldKey }: CellValueProps) {
     const str = String(value);
     return (
       <span
-        className="max-w-[120px] truncate font-mono text-xs text-zinc-500"
+        className="max-w-[120px] truncate font-mono text-xs text-ink-subtle"
         title={str}
       >
         {str.length > 16 ? `${str.slice(0, 8)}...${str.slice(-4)}` : str}
@@ -59,7 +59,7 @@ export function CellValue({ value, fieldKey }: CellValueProps) {
   // Array
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      return <span className="text-zinc-600">[]</span>;
+      return <span className="text-ink-faint">[]</span>;
     }
     // If it's an array of strings, show as comma-separated badges
     if (value.every((v) => typeof v === "string") && value.length <= 3) {
@@ -79,7 +79,7 @@ export function CellValue({ value, fieldKey }: CellValueProps) {
   // Object
   if (typeof value === "object") {
     return (
-      <span className="text-zinc-500" title={JSON.stringify(value, null, 2)}>
+      <span className="text-ink-subtle" title={JSON.stringify(value, null, 2)}>
         {"{...}"}
       </span>
     );

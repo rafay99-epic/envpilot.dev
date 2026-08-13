@@ -42,6 +42,7 @@ import {
   Upload,
 } from "lucide-react";
 import { createLogger } from "@/lib/logger";
+import { PageHeader } from "@envpilot/ui";
 
 const log = createLogger("app/dashboard/variables");
 
@@ -281,10 +282,10 @@ export default function VariablesPage() {
   if (!organization) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="font-mono text-sm text-zinc-500">
-          <span className="text-green-400">$</span> envpilot variable list
+        <p className="font-mono text-sm text-ink-subtle">
+          <span className="text-accent">$</span> envpilot variable list
         </p>
-        <p className="mt-2 text-sm text-zinc-400">
+        <p className="mt-2 text-sm text-ink-muted">
           Select or create an organization to manage variables.
         </p>
         <TerminalButtonLink href="/organizations" className="mt-6">
@@ -298,14 +299,11 @@ export default function VariablesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-zinc-100">
-            Environment Variables
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Manage your encrypted secrets and configuration
-          </p>
-        </div>
+        <PageHeader
+          cmd="envpilot variable list"
+          title="Environment Variables"
+          description="Manage your encrypted secrets and configuration"
+        />
         <div className="flex items-center gap-2">
           {selectedProject !== "all" && (
             <TerminalButton onClick={() => setShowExportDialog(true)}>
@@ -330,20 +328,20 @@ export default function VariablesPage() {
 
       {/* Notices */}
       {notice && (
-        <div className="rounded-lg border border-green-700/50 bg-green-900/20 px-4 py-3">
-          <p className="text-sm text-green-400">{notice}</p>
+        <div className="rounded-lg border border-accent-line bg-accent-soft px-4 py-3">
+          <p className="text-sm text-accent">{notice}</p>
         </div>
       )}
       {error && (
-        <div className="rounded-lg border border-red-700/50 bg-red-900/20 px-4 py-3">
-          <p className="text-sm text-red-400">{error}</p>
+        <div className="rounded-lg border border-danger-line bg-danger-soft px-4 py-3">
+          <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
           <TerminalInput
             type="text"
             placeholder="Search variables..."
@@ -414,22 +412,22 @@ export default function VariablesPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-zinc-700/50">
-                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-green-500/70">
+                <tr className="border-b border-line">
+                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-accent/70">
                     Key
                   </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-green-500/70">
+                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-accent/70">
                     Environments
                   </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-green-500/70">
+                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-accent/70">
                     Updated
                   </th>
-                  <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-green-500/70">
+                  <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-accent/70">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/50">
+              <tbody className="divide-y divide-line">
                 {filteredVariables.map((variable, i) => (
                   <VariableRow
                     key={variable._id}
@@ -467,7 +465,7 @@ export default function VariablesPage() {
           </div>
           {(variablesStatus === "CanLoadMore" ||
             variablesStatus === "LoadingMore") && (
-            <div className="flex justify-center border-t border-zinc-800/50 px-5 py-4">
+            <div className="flex justify-center border-t border-line px-5 py-4">
               <TerminalButton
                 variant="secondary"
                 onClick={() => loadMore(PAGE_SIZE)}
@@ -587,26 +585,26 @@ function VariableRow({
   return (
     <>
       <tr
-        className="animate-row-in transition-colors hover:bg-green-500/5"
+        className="animate-row-in transition-colors hover:bg-accent-soft"
         style={{ animationDelay: `${index * 40}ms` }}
       >
         <td className="whitespace-nowrap px-5 py-3">
           <div className="flex items-center gap-2">
             {variable.isSensitive && (
-              <Lock className="h-3.5 w-3.5 text-amber-500" />
+              <Lock className="h-3.5 w-3.5 text-warning" />
             )}
-            <code className="font-mono text-sm text-amber-400">
+            <code className="font-mono text-sm text-warning">
               {variable.key}
             </code>
           </div>
           {variable.description && (
-            <p className="mt-0.5 text-xs text-zinc-600">
+            <p className="mt-0.5 text-xs text-ink-faint">
               {variable.description}
             </p>
           )}
           {isValueVisible && revealedValue && (
-            <div className="mt-1 rounded bg-zinc-800 px-2 py-1">
-              <code className="break-all font-mono text-xs text-green-400">
+            <div className="mt-1 rounded bg-surface-raised px-2 py-1">
+              <code className="break-all font-mono text-xs text-accent">
                 {revealedValue}
               </code>
             </div>
@@ -629,7 +627,7 @@ function VariableRow({
               variable.rotationFrequencyDays > 0 &&
               variable.rotationStatus !== "expiring_soon" &&
               variable.rotationStatus !== "expired" && (
-                <span className="inline-flex items-center gap-1 text-xs text-zinc-500">
+                <span className="inline-flex items-center gap-1 text-xs text-ink-subtle">
                   <RotateCcw className="h-3 w-3" />
                   {variable.rotationFrequencyDays}d
                 </span>
@@ -639,7 +637,7 @@ function VariableRow({
             ))}
           </div>
         </td>
-        <td className="whitespace-nowrap px-5 py-3 text-sm text-zinc-500">
+        <td className="whitespace-nowrap px-5 py-3 text-sm text-ink-subtle">
           {new Date(variable.updatedAt).toLocaleDateString()}
         </td>
         <td className="whitespace-nowrap px-5 py-3 text-right">
@@ -647,7 +645,7 @@ function VariableRow({
             <button
               onClick={handleToggleReveal}
               disabled={isRevealing}
-              className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400 disabled:opacity-50"
+              className="rounded-lg p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-accent disabled:opacity-50"
               title={
                 isValueVisible && revealedValue ? "Hide value" : "Reveal value"
               }
@@ -663,11 +661,11 @@ function VariableRow({
             <button
               onClick={handleCopy}
               disabled={!revealedValue}
-              className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400 disabled:opacity-30"
+              className="rounded-lg p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-accent disabled:opacity-30"
               title={copied ? "Copied!" : "Copy key=value"}
             >
               {copied ? (
-                <Check className="h-4 w-4 text-green-400" />
+                <Check className="h-4 w-4 text-accent" />
               ) : (
                 <Copy className="h-4 w-4" />
               )}
@@ -675,7 +673,7 @@ function VariableRow({
             {onEdit && (
               <button
                 onClick={onEdit}
-                className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400"
+                className="rounded-lg p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-accent"
                 title="Edit variable"
               >
                 <Pencil className="h-4 w-4" />
@@ -684,7 +682,7 @@ function VariableRow({
             {onDelete && (
               <button
                 onClick={onDelete}
-                className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
+                className="rounded-lg p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-danger"
                 title="Delete variable"
               >
                 <Trash2 className="h-4 w-4" />

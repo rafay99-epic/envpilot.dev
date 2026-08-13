@@ -24,7 +24,7 @@ export function AuthErrorPage({
   onRetry,
 }: AuthErrorPageProps) {
   return (
-    <div className="dark flex min-h-screen items-center justify-center bg-[#0f172a] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       {/* Subtle grid background */}
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.03]"
@@ -40,24 +40,24 @@ export function AuthErrorPage({
         className="relative z-10 w-full max-w-md shadow-2xl"
       >
         <div className="p-8 font-mono text-sm">
-          <p className="text-red-400">ERROR: {title} [exit code 1]</p>
-          <p className="mt-2 text-zinc-400">{message}</p>
+          <p className="text-danger">ERROR: {title} [exit code 1]</p>
+          <p className="mt-2 text-ink-muted">{message}</p>
 
           {/* Raw error text is dev-only: production server errors must stay
               redacted (digest below is the user-facing correlation ID). */}
           {process.env.NODE_ENV === "development" && error?.message && (
             <details className="mt-3">
-              <summary className="cursor-pointer text-xs text-zinc-600 hover:text-zinc-500">
+              <summary className="cursor-pointer text-xs text-ink-faint hover:text-ink-subtle">
                 Error details (dev only)
               </summary>
-              <p className="mt-2 whitespace-pre-wrap break-all text-xs text-zinc-600">
+              <p className="mt-2 whitespace-pre-wrap break-all text-xs text-ink-faint">
                 {error.message}
               </p>
             </details>
           )}
 
           {error?.digest && (
-            <p className="mt-3 text-xs text-zinc-600">
+            <p className="mt-3 text-xs text-ink-faint">
               Error ID: {error.digest}
             </p>
           )}
@@ -76,13 +76,13 @@ export function AuthErrorPage({
             </TerminalButtonLink>
           </div>
 
-          <div className="mt-6 rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
-            <p className="text-xs font-medium text-zinc-300">Need help?</p>
-            <p className="mt-1 text-xs text-zinc-500">
+          <div className="mt-6 rounded-lg border border-line bg-surface-raised/50 p-4">
+            <p className="text-xs font-medium text-ink-muted">Need help?</p>
+            <p className="mt-1 text-xs text-ink-subtle">
               Contact our support team at{" "}
               <a
                 href="mailto:support@envpilot.dev"
-                className="text-green-400 underline underline-offset-2 hover:text-green-300"
+                className="text-accent underline underline-offset-2 hover:text-accent"
               >
                 support@envpilot.dev
               </a>

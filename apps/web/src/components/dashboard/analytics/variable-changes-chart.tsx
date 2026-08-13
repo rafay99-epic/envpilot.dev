@@ -14,15 +14,15 @@ import { TerminalWindow } from "@/components/dashboard/terminal-ui";
 const chartConfig = {
   created: {
     label: "Created",
-    color: "hsl(var(--chart-1))",
+    color: "var(--color-chart-1)",
   },
   updated: {
     label: "Updated",
-    color: "hsl(var(--chart-3))",
+    color: "var(--color-chart-3)",
   },
   deleted: {
     label: "Deleted",
-    color: "hsl(var(--chart-5))",
+    color: "var(--color-chart-5)",
   },
 } satisfies ChartConfig;
 
@@ -38,15 +38,15 @@ interface VariableChangesChartProps {
 export function VariableChangesChart({ data }: VariableChangesChartProps) {
   return (
     <TerminalWindow title="variable-changes">
-      <div className="border-b border-zinc-700/50 px-5 py-2.5">
-        <span className="font-mono text-xs text-zinc-500">
-          <span className="text-green-400">$</span> envpilot analytics
+      <div className="border-b border-line px-5 py-2.5">
+        <span className="font-mono text-xs text-ink-subtle">
+          <span className="text-accent">$</span> envpilot analytics
           --variable-changes
         </span>
       </div>
       <div className="p-5">
         {data.length === 0 ? (
-          <p className="text-center text-xs text-zinc-600 font-mono py-8">
+          <p className="text-center text-xs text-ink-faint font-mono py-8">
             No variable change data
           </p>
         ) : (
@@ -62,7 +62,7 @@ export function VariableChangesChart({ data }: VariableChangesChartProps) {
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="#27272a"
+                stroke="var(--color-line-strong)"
                 horizontal={false}
               />
               <XAxis
@@ -93,19 +93,19 @@ export function VariableChangesChart({ data }: VariableChangesChartProps) {
               <Bar
                 dataKey="created"
                 stackId="a"
-                fill="hsl(var(--chart-1))"
+                fill="var(--color-chart-1)"
                 radius={[0, 0, 0, 0]}
               />
               <Bar
                 dataKey="updated"
                 stackId="a"
-                fill="hsl(var(--chart-3))"
+                fill="var(--color-chart-3)"
                 radius={[0, 0, 0, 0]}
               />
               <Bar
                 dataKey="deleted"
                 stackId="a"
-                fill="hsl(var(--chart-5))"
+                fill="var(--color-chart-5)"
                 radius={[0, 4, 4, 0]}
               />
             </BarChart>

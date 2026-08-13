@@ -19,8 +19,8 @@ export function PaginationControls({
   }
 
   return (
-    <div className="flex items-center justify-between border-t border-zinc-800 px-1 py-3">
-      <p className="text-xs text-zinc-500">
+    <div className="flex items-center justify-between border-t border-line px-1 py-3">
+      <p className="text-xs text-ink-subtle">
         {loadedCount} rows loaded
         {status === "Exhausted" && " (all loaded)"}
       </p>
@@ -33,7 +33,7 @@ export function PaginationControls({
         >
           {status === "LoadingMore" ? (
             <>
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-600 border-t-emerald-500" />
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-line-strong border-t-accent-line" />
               Loading...
             </>
           ) : (

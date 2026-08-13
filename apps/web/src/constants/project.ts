@@ -63,15 +63,15 @@ export const ENVIRONMENTS = ["development", "staging", "production"] as const;
  */
 export function envToggleClasses(env: Environment, selected: boolean): string {
   if (!selected) {
-    return "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700";
+    return "bg-surface-raised text-ink-muted hover:bg-surface-hover";
   }
   switch (env) {
     case "production":
-      return "bg-red-100 text-red-700 ring-1 ring-red-300 dark:bg-red-900/30 dark:text-red-400 dark:ring-red-700";
+      return "ring-1 bg-danger-soft text-danger ring-danger-line";
     case "staging":
-      return "bg-yellow-100 text-yellow-700 ring-1 ring-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:ring-yellow-700";
+      return "ring-1 bg-warning-soft text-warning ring-warning-line";
     default:
-      return "bg-green-100 text-green-700 ring-1 ring-green-300 dark:bg-green-900/30 dark:text-green-400 dark:ring-green-700";
+      return "ring-1 bg-accent-soft text-accent ring-accent-line";
   }
 }
 

@@ -23,13 +23,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   // hard navigation (see auth-error-boundary.spec.ts rapid-navigation test).
   return (
     <AuthErrorBoundary context="dashboard-shell">
-      <div className="dark flex min-h-screen bg-[#0f172a] text-zinc-100">
+      <div className="flex min-h-screen bg-canvas text-ink">
         {/* Subtle grid background */}
         <div
-          className="pointer-events-none fixed inset-0 opacity-[0.03]"
+          className="pointer-events-none fixed inset-0 opacity-[0.02]"
           style={{
             backgroundImage:
-              "linear-gradient(rgba(34,197,94,1) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,1) 1px, transparent 1px)",
+              "linear-gradient(var(--color-accent) 1px, transparent 1px), linear-gradient(90deg, var(--color-accent) 1px, transparent 1px)",
             backgroundSize: "40px 40px",
           }}
         />

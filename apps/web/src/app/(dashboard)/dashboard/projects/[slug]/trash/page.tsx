@@ -210,7 +210,7 @@ export default function TrashPage({ params }: TrashPageProps) {
   if (project === null) {
     return (
       <div className="mx-auto max-w-4xl">
-        <p className="text-sm text-zinc-500">Project not found.</p>
+        <p className="text-sm text-ink-subtle">Project not found.</p>
       </div>
     );
   }
@@ -221,7 +221,7 @@ export default function TrashPage({ params }: TrashPageProps) {
       <div>
         <Link
           href={`/dashboard/projects/${slug}`}
-          className="inline-flex items-center gap-1.5 text-sm text-zinc-500 transition-colors hover:text-zinc-700 dark:hover:text-zinc-300"
+          className="inline-flex items-center gap-1.5 text-sm text-ink-subtle transition-colors hover:text-ink-muted"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to {project?.name ?? "project"}
@@ -237,7 +237,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                   type="button"
                   onClick={() => setConfirmOpen(true)}
                   disabled={emptying}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400"
+                  className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-danger-line bg-danger-soft px-4 py-2 text-sm font-medium transition-colors hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-50 text-danger"
                 >
                   {emptying ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -254,23 +254,21 @@ export default function TrashPage({ params }: TrashPageProps) {
 
       {/* Body */}
       {loading ? (
-        <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="rounded-xl border p-6 border-line bg-surface">
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
-                className="h-12 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800"
+                className="h-12 animate-pulse rounded-lg bg-surface-raised"
               />
             ))}
           </div>
         </div>
       ) : totalCount === 0 ? (
-        <div className="rounded-xl border border-dashed border-zinc-300 bg-white px-6 py-16 text-center dark:border-zinc-700 dark:bg-zinc-900">
-          <Trash2 className="mx-auto h-10 w-10 text-zinc-300 dark:text-zinc-600" />
-          <h2 className="mt-4 font-semibold text-zinc-900 dark:text-zinc-100">
-            Trash is empty
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <div className="rounded-xl border border-dashed px-6 py-16 text-center border-line bg-surface">
+          <Trash2 className="mx-auto h-10 w-10 text-ink-faint" />
+          <h2 className="mt-4 font-semibold text-ink">Trash is empty</h2>
+          <p className="mt-1 text-sm text-ink-muted">
             Deleted variables and shared accounts will appear here for{" "}
             {RETENTION_DAYS} days before being permanently destroyed.
           </p>
@@ -278,33 +276,31 @@ export default function TrashPage({ params }: TrashPageProps) {
       ) : (
         <div className="space-y-6">
           {deletedVariables && deletedVariables.length > 0 && (
-            <section className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-              <div className="flex items-center gap-2 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-                <KeyRound className="h-4 w-4 text-zinc-400" />
-                <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  Variables
-                </h2>
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            <section className="rounded-xl border border-line bg-surface">
+              <div className="flex items-center gap-2 border-b px-6 py-4 border-line">
+                <KeyRound className="h-4 w-4 text-ink-muted" />
+                <h2 className="font-semibold text-ink">Variables</h2>
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
                   {deletedVariables.length}
                 </span>
               </div>
-              <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <div className="divide-y divide-line">
                 {deletedVariables.map((variable) => (
                   <div
                     key={variable._id}
                     className="flex items-center justify-between gap-4 px-6 py-3"
                   >
                     <div className="min-w-0 flex-1 opacity-60">
-                      <code className="font-mono text-sm font-semibold text-zinc-500 line-through dark:text-zinc-400">
+                      <code className="font-mono text-sm font-semibold line-through text-ink-muted">
                         {variable.key}
                       </code>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                      <p className="mt-1 text-xs text-ink-subtle">
                         Deleted {pluralDays(daysAgo(variable.deletedAt))} ago
                         {" — "}
                         <span
                           className={
                             daysLeft(variable.deletedAt) <= 1
-                              ? "font-medium text-red-500"
+                              ? "font-medium text-danger"
                               : ""
                           }
                         >
@@ -318,7 +314,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                         handleRestoreVariable(variable._id, variable.key)
                       }
                       disabled={restoringId === variable._id || emptying}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
                     >
                       {restoringId === variable._id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -334,33 +330,31 @@ export default function TrashPage({ params }: TrashPageProps) {
           )}
 
           {deletedAccounts && deletedAccounts.length > 0 && (
-            <section className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-              <div className="flex items-center gap-2 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-                <UserRound className="h-4 w-4 text-zinc-400" />
-                <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  Shared accounts
-                </h2>
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            <section className="rounded-xl border border-line bg-surface">
+              <div className="flex items-center gap-2 border-b px-6 py-4 border-line">
+                <UserRound className="h-4 w-4 text-ink-muted" />
+                <h2 className="font-semibold text-ink">Shared accounts</h2>
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
                   {deletedAccounts.length}
                 </span>
               </div>
-              <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <div className="divide-y divide-line">
                 {deletedAccounts.map((account) => (
                   <div
                     key={account._id}
                     className="flex items-center justify-between gap-4 px-6 py-3"
                   >
                     <div className="min-w-0 flex-1 opacity-60">
-                      <span className="text-sm font-semibold text-zinc-500 line-through dark:text-zinc-400">
+                      <span className="text-sm font-semibold line-through text-ink-muted">
                         {account.name}
                       </span>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                      <p className="mt-1 text-xs text-ink-subtle">
                         Deleted {pluralDays(daysAgo(account.deletedAt))} ago
                         {" — "}
                         <span
                           className={
                             daysLeft(account.deletedAt) <= 1
-                              ? "font-medium text-red-500"
+                              ? "font-medium text-danger"
                               : ""
                           }
                         >
@@ -374,7 +368,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                         handleRestoreAccount(account._id, account.name)
                       }
                       disabled={restoringId === account._id || emptying}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
                     >
                       {restoringId === account._id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -390,36 +384,34 @@ export default function TrashPage({ params }: TrashPageProps) {
           )}
 
           {deletedFiles && deletedFiles.length > 0 && (
-            <section className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-              <div className="flex items-center gap-2 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-                <FileKey className="h-4 w-4 text-zinc-400" />
-                <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  Secret files
-                </h2>
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            <section className="rounded-xl border border-line bg-surface">
+              <div className="flex items-center gap-2 border-b px-6 py-4 border-line">
+                <FileKey className="h-4 w-4 text-ink-muted" />
+                <h2 className="font-semibold text-ink">Secret files</h2>
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
                   {deletedFiles.length}
                 </span>
               </div>
-              <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <div className="divide-y divide-line">
                 {deletedFiles.map((file) => (
                   <div
                     key={file._id}
                     className="flex items-center justify-between gap-4 px-6 py-3"
                   >
                     <div className="min-w-0 flex-1 opacity-60">
-                      <span className="text-sm font-semibold text-zinc-500 line-through dark:text-zinc-400">
+                      <span className="text-sm font-semibold line-through text-ink-muted">
                         {file.name}
                       </span>
-                      <p className="truncate font-mono text-xs text-zinc-500 dark:text-zinc-500">
+                      <p className="truncate font-mono text-xs text-ink-subtle">
                         {file.path}
                       </p>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                      <p className="mt-1 text-xs text-ink-subtle">
                         Deleted {pluralDays(daysAgo(file.deletedAt))} ago
                         {" — "}
                         <span
                           className={
                             daysLeft(file.deletedAt) <= 1
-                              ? "font-medium text-red-500"
+                              ? "font-medium text-danger"
                               : ""
                           }
                         >
@@ -431,7 +423,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                       type="button"
                       onClick={() => handleRestoreFile(file._id, file.name)}
                       disabled={restoringId === file._id || emptying}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
                     >
                       {restoringId === file._id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -447,37 +439,35 @@ export default function TrashPage({ params }: TrashPageProps) {
           )}
 
           {deletedDocs && deletedDocs.length > 0 && (
-            <section className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-              <div className="flex items-center gap-2 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-                <BookText className="h-4 w-4 text-zinc-400" />
-                <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  Documentation
-                </h2>
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            <section className="rounded-xl border border-line bg-surface">
+              <div className="flex items-center gap-2 border-b px-6 py-4 border-line">
+                <BookText className="h-4 w-4 text-ink-muted" />
+                <h2 className="font-semibold text-ink">Documentation</h2>
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
                   {deletedDocs.length}
                 </span>
               </div>
-              <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <div className="divide-y divide-line">
                 {deletedDocs.map((doc) => (
                   <div
                     key={doc._id}
                     className="flex items-center justify-between gap-4 px-6 py-3"
                   >
                     <div className="min-w-0 flex-1 opacity-60">
-                      <span className="text-sm font-semibold text-zinc-500 line-through dark:text-zinc-400">
+                      <span className="text-sm font-semibold line-through text-ink-muted">
                         {doc.title}
                       </span>
-                      <p className="truncate font-mono text-xs text-zinc-500 dark:text-zinc-500">
+                      <p className="truncate font-mono text-xs text-ink-subtle">
                         {doc.module}
                       </p>
                       {doc.deletedAt !== undefined && (
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                        <p className="mt-1 text-xs text-ink-subtle">
                           Deleted {pluralDays(daysAgo(doc.deletedAt))} ago
                           {" — "}
                           <span
                             className={
                               daysLeft(doc.deletedAt) <= 1
-                                ? "font-medium text-red-500"
+                                ? "font-medium text-danger"
                                 : ""
                             }
                           >
@@ -490,7 +480,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                       type="button"
                       onClick={() => handleRestoreDoc(doc._id, doc.title)}
                       disabled={restoringId === doc._id || emptying}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
                     >
                       {restoringId === doc._id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />

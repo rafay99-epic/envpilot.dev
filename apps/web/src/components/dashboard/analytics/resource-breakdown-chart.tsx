@@ -12,11 +12,11 @@ import {
 import { TerminalWindow } from "@/components/dashboard/terminal-ui";
 
 const RESOURCE_COLORS: Record<string, string> = {
-  variable: "hsl(var(--chart-1))",
-  project: "hsl(var(--chart-2))",
-  permission: "hsl(var(--chart-3))",
-  organization: "hsl(var(--chart-4))",
-  security: "hsl(var(--chart-5))",
+  variable: "var(--color-chart-1)",
+  project: "var(--color-chart-2)",
+  permission: "var(--color-chart-3)",
+  organization: "var(--color-chart-4)",
+  security: "var(--color-chart-5)",
   access_token: "hsl(217, 70%, 50%)",
   invitation: "hsl(180, 60%, 45%)",
   billing: "hsl(330, 65%, 55%)",
@@ -60,15 +60,14 @@ export function ResourceBreakdownChart({
 
   return (
     <TerminalWindow title="resource-breakdown">
-      <div className="border-b border-zinc-700/50 px-5 py-2.5">
-        <span className="font-mono text-xs text-zinc-500">
-          <span className="text-green-400">$</span> envpilot analytics
-          --resources
+      <div className="border-b border-line px-5 py-2.5">
+        <span className="font-mono text-xs text-ink-subtle">
+          <span className="text-accent">$</span> envpilot analytics --resources
         </span>
       </div>
       <div className="p-5">
         {data.length === 0 ? (
-          <p className="text-center text-xs text-zinc-600 font-mono py-8">
+          <p className="text-center text-xs text-ink-faint font-mono py-8">
             No resource data
           </p>
         ) : (
@@ -84,7 +83,7 @@ export function ResourceBreakdownChart({
                 innerRadius={60}
                 outerRadius={95}
                 strokeWidth={2}
-                stroke="#0f172a"
+                stroke="var(--color-canvas)"
               >
                 {data.map((entry) => (
                   <Cell key={entry.type} fill={entry.fill} />

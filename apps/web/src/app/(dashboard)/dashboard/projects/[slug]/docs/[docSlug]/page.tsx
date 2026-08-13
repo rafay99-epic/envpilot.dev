@@ -185,11 +185,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
 
   if (isLoadingProject) return <TerminalLoading fullPage />;
   if (!project) {
-    return (
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Project not found.
-      </p>
-    );
+    return <p className="text-sm text-ink-muted">Project not found.</p>;
   }
 
   return (
@@ -216,7 +212,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
         {/* Header rows share the writing column's grid while editing. */}
         <Link
           href={`/dashboard/projects/${slug}/docs`}
-          className={`inline-flex shrink-0 items-center gap-1.5 text-sm text-zinc-500 transition-colors hover:text-zinc-100 ${
+          className={`inline-flex shrink-0 items-center gap-1.5 text-sm text-ink-subtle transition-colors hover:text-ink ${
             isEditing ? "mx-auto w-full max-w-[920px] px-4" : ""
           }`}
         >
@@ -246,12 +242,12 @@ export default function DocDetailPage({ params }: DocPageProps) {
                       data-testid="doc-title-edit"
                       aria-label="Page title"
                       placeholder="Page title"
-                      className="min-w-0 flex-1 border-0 bg-transparent p-0 text-2xl font-bold text-zinc-900 outline-none placeholder:text-zinc-600 dark:text-zinc-100"
+                      className="min-w-0 flex-1 border-0 bg-transparent p-0 text-2xl font-bold text-ink-inverse outline-none placeholder:text-ink"
                     />
                   ) : (
                     <h1
                       data-testid="doc-title"
-                      className="min-w-0 truncate text-2xl font-bold text-zinc-900 dark:text-zinc-100"
+                      className="min-w-0 truncate text-2xl font-bold text-ink"
                     >
                       {doc.title}
                     </h1>
@@ -259,8 +255,8 @@ export default function DocDetailPage({ params }: DocPageProps) {
                   <DocStatusPill status={doc.status} />
                 </div>
 
-                <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500">
-                  <span className="text-zinc-400">{doc.module}</span>
+                <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-ink-subtle">
+                  <span className="text-ink-muted">{doc.module}</span>
                   <span aria-hidden>·</span>
                   <span>{doc.authorName}</span>
                   <span aria-hidden>·</span>
@@ -272,7 +268,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                         href={doc.prUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-green-500 hover:underline"
+                        className="inline-flex items-center gap-1 text-accent hover:underline"
                       >
                         <GitPullRequest className="h-3 w-3" />
                         Pull request
@@ -293,7 +289,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                         type="button"
                         onClick={() => setIsEditing(false)}
                         disabled={isBusy}
-                        className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-400 transition-colors hover:text-zinc-100 disabled:opacity-50"
+                        className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
                       >
                         Cancel
                       </button>
@@ -302,7 +298,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                         data-testid="doc-save"
                         onClick={handleSave}
                         disabled={isBusy}
-                        className="rounded-lg bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-900 transition-colors hover:bg-white disabled:opacity-50"
+                        className="rounded-lg bg-ink px-4 py-1.5 text-sm font-medium text-ink-inverse transition-colors hover:bg-ink-muted disabled:opacity-50"
                       >
                         {isBusy ? "Saving…" : "Save"}
                       </button>
@@ -316,7 +312,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                           onClick={() => setShareOpen(true)}
                           title="Share this page"
                           aria-label="Share this page"
-                          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+                          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
                         >
                           <Share2 className="h-4 w-4" />
                           Share
@@ -329,7 +325,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                           onClick={() => setConfirmDelete(true)}
                           title="Move to trash"
                           aria-label="Move to trash"
-                          className="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                          className="rounded-lg p-2 text-ink-subtle transition-colors hover:bg-danger-soft hover:text-danger"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -339,7 +335,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                           type="button"
                           data-testid="doc-edit"
                           onClick={beginEdit}
-                          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+                          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
                         >
                           <Pencil className="h-4 w-4" />
                           Edit
@@ -352,7 +348,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                             data-testid="doc-publish"
                             onClick={handlePublish}
                             disabled={isBusy}
-                            className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-900 transition-colors hover:bg-white disabled:opacity-50"
+                            className="flex items-center gap-1.5 rounded-lg bg-ink px-4 py-1.5 text-sm font-medium text-ink-inverse transition-colors hover:bg-ink-muted disabled:opacity-50"
                           >
                             <Send className="h-3.5 w-3.5" />
                             Publish
@@ -363,7 +359,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                             data-testid="doc-unpublish"
                             onClick={handleUnpublish}
                             disabled={isBusy}
-                            className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-400 transition-colors hover:text-zinc-100 disabled:opacity-50"
+                            className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
                           >
                             Return to draft
                           </button>
@@ -376,19 +372,19 @@ export default function DocDetailPage({ params }: DocPageProps) {
 
             {/* What publishing actually changes. */}
             {doc.status === "draft" && !isEditing && (
-              <p className="shrink-0 text-xs text-zinc-500">
+              <p className="shrink-0 text-xs text-ink-subtle">
                 Not visible to your team, and no agent can read it over MCP
                 until it is published.
               </p>
             )}
 
             {notice && (
-              <p className="border-l-2 border-green-500/60 py-1 pl-3 text-xs text-green-700 dark:text-green-400">
+              <p className="border-l-2 border-accent-line py-1 pl-3 text-xs text-accent">
                 {notice}
               </p>
             )}
             {error && (
-              <p className="border-l-2 border-red-500/60 py-1 pl-3 text-xs text-red-700 dark:text-red-400">
+              <p className="border-l-2 border-danger-line py-1 pl-3 text-xs text-danger">
                 {error}
               </p>
             )}
@@ -420,12 +416,9 @@ export default function DocDetailPage({ params }: DocPageProps) {
             )}
 
             {warnings.length > 0 && !isEditing && (
-              <div className="space-y-1 border-l-2 border-amber-500/60 py-1 pl-3">
+              <div className="space-y-1 border-l-2 border-warning-line py-1 pl-3">
                 {warnings.map((warning) => (
-                  <p
-                    key={warning}
-                    className="text-xs text-amber-700 dark:text-amber-300"
-                  >
+                  <p key={warning} className="text-xs text-warning">
                     {warning}
                   </p>
                 ))}

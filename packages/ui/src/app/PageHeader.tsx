@@ -8,6 +8,8 @@ export interface PageHeaderProps {
   title: string;
   description?: ReactNode;
   actions?: ReactNode;
+  /** Mono `❯ cmd` line above the title, e.g. "envpilot usage". */
+  cmd?: string;
 }
 
 /**
@@ -24,21 +26,30 @@ export function PageHeader({
   title,
   description,
   actions,
+  cmd,
 }: PageHeaderProps) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
+        {cmd ? (
+          <p className="mb-2 truncate font-mono text-[13px] leading-snug text-ink-muted">
+            <span aria-hidden className="mr-2.5 text-accent">
+              ❯
+            </span>
+            {cmd}
+          </p>
+        ) : null}
         <div className="flex items-center gap-2.5">
           {leading ??
             (Icon ? (
-              <Icon className="h-5 w-5 shrink-0 text-green-500/70" />
+              <Icon className="h-5 w-5 shrink-0 text-accent/70" />
             ) : null)}
-          <h1 className="truncate text-2xl leading-none font-bold text-zinc-100">
+          <h1 className="truncate text-2xl leading-none font-bold text-ink">
             {title}
           </h1>
         </div>
         {description ? (
-          <p className="mt-2 max-w-2xl text-sm text-zinc-400">{description}</p>
+          <p className="mt-2 max-w-2xl text-sm text-ink-muted">{description}</p>
         ) : null}
       </div>
       {actions ? (

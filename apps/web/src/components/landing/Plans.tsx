@@ -65,12 +65,12 @@ function PricingCards({
           >
             <div className="flex items-center justify-between">
               <span
-                className={`${terminal.mono} text-[11px] tracking-[0.16em] text-green-400 uppercase`}
+                className={`${terminal.mono} text-[11px] tracking-[0.16em] text-accent uppercase`}
               >
                 {tier.name}
               </span>
               {tier.badge && (
-                <span className={`${terminal.mono} text-[11px] text-zinc-600`}>
+                <span className={`${terminal.mono} text-[11px] text-ink-faint`}>
                   {tier.badge}
                 </span>
               )}
@@ -78,12 +78,12 @@ function PricingCards({
             <div className="mt-5 flex items-baseline gap-2">
               <span
                 className={`font-sans text-5xl font-semibold tracking-[-0.035em] ${
-                  isComingSoon ? "text-zinc-500" : "text-zinc-100"
+                  isComingSoon ? "text-ink-subtle" : "text-ink"
                 }`}
               >
                 ${price}
               </span>
-              <span className={`${terminal.mono} text-[12px] text-zinc-600`}>
+              <span className={`${terminal.mono} text-[12px] text-ink-faint`}>
                 /mo · per org, not per seat
               </span>
             </div>
@@ -92,13 +92,13 @@ function PricingCards({
                 <p
                   key={item}
                   className={`flex items-start gap-2.5 font-sans text-[15px] ${
-                    isComingSoon ? "text-zinc-500" : "text-zinc-400"
+                    isComingSoon ? "text-ink-subtle" : "text-ink-muted"
                   }`}
                 >
                   <Check
                     aria-hidden
                     className={`mt-1 h-3.5 w-3.5 shrink-0 ${
-                      isComingSoon ? "text-zinc-700" : "text-green-500"
+                      isComingSoon ? "text-ink-faint" : "text-accent"
                     }`}
                   />
                   {item}
@@ -107,7 +107,7 @@ function PricingCards({
             </div>
             <div className="mt-8 flex-1" />
             {isComingSoon ? (
-              <span className="block cursor-not-allowed rounded-md px-5 py-3 text-center font-sans text-[15px] text-zinc-500 ring-1 ring-white/[0.08]">
+              <span className="block cursor-not-allowed rounded-md px-5 py-3 text-center font-sans text-[15px] text-ink-subtle ring-1 ring-white/[0.08]">
                 {cta}
               </span>
             ) : (
@@ -115,8 +115,8 @@ function PricingCards({
                 href={ctaHref}
                 className={`block rounded-md px-5 py-3 text-center font-sans text-[15px] font-semibold transition-colors ${
                   isDefault
-                    ? "bg-green-500 text-[#08090A] hover:bg-green-400"
-                    : "text-zinc-200 ring-1 ring-white/[0.08] hover:ring-white/25"
+                    ? "bg-accent text-chrome hover:bg-accent"
+                    : "text-ink ring-1 ring-white/[0.08] hover:ring-white/25"
                 }`}
               >
                 {cta}
@@ -149,7 +149,7 @@ export function Plans({
         />
         <Link
           href="/pricing"
-          className={`mt-6 inline-block ${terminal.mono} text-[13px] text-zinc-500 transition-colors hover:text-green-400`}
+          className={`mt-6 inline-block ${terminal.mono} text-[13px] text-ink-subtle transition-colors hover:text-accent`}
         >
           → compare every feature
         </Link>

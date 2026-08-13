@@ -231,12 +231,10 @@ function FeatureRequestsPage() {
     <div data-wide>
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-100">
-          Feature Requests
-        </h1>
+        <h1 className="text-2xl font-semibold text-ink">Feature Requests</h1>
         <div className="flex items-center gap-2">
           {requests && (
-            <span className="mr-1 text-sm text-zinc-500">
+            <span className="mr-1 text-sm text-ink-subtle">
               {requests.length} total
             </span>
           )}
@@ -396,31 +394,31 @@ function FeatureRequestsPage() {
                 <DragOverlay dropAnimation={null}>
                   {activeItem ? (
                     <div
-                      className={`w-72 rotate-[1.5deg] rounded-lg border bg-zinc-900 p-3 shadow-lg transition-transform ${
+                      className={`w-72 rotate-[1.5deg] rounded-lg border bg-surface p-3 shadow-lg transition-transform ${
                         targetCol && targetCol.value !== activeItemCol?.value
                           ? `${targetCol.border} ${targetCol.glowShadow}`
-                          : "border-zinc-600 shadow-zinc-900/50"
+                          : "border-line-strong shadow-line"
                       }`}
                       style={{ willChange: "transform" }}
                     >
                       <div className="mb-2 flex items-start justify-between gap-2">
-                        <h4 className="text-xs font-semibold leading-snug text-zinc-100">
+                        <h4 className="text-xs font-semibold leading-snug text-ink">
                           {activeItem.title}
                         </h4>
-                        <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                        <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-muted" />
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="purple">
                           {activeItem.category ?? "general"}
                         </Badge>
-                        <span className="flex items-center gap-0.5 text-[10px] text-zinc-400">
+                        <span className="flex items-center gap-0.5 text-[10px] text-ink-muted">
                           <ThumbsUp className="h-2.5 w-2.5" />
                           {activeItem.voteCount ?? 0}
                         </span>
                       </div>
                       {targetCol &&
                         targetCol.value !== activeItemCol?.value && (
-                          <div className="mt-2.5 flex items-center gap-1.5 border-t border-zinc-800 pt-2">
+                          <div className="mt-2.5 flex items-center gap-1.5 border-t border-line pt-2">
                             <ArrowRight
                               className={`h-3 w-3 ${targetCol.dropText}`}
                             />
@@ -513,7 +511,7 @@ function DetailModal({
           </Badge>
         )}
         <Badge variant="purple">{req.category ?? "general"}</Badge>
-        <span className="flex items-center gap-1 text-xs text-zinc-500">
+        <span className="flex items-center gap-1 text-xs text-ink-subtle">
           <ThumbsUp className="h-3 w-3" />
           {req.voteCount ?? 0} votes
         </span>
@@ -525,17 +523,17 @@ function DetailModal({
           <div className="space-y-6">
             {/* Description */}
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
                 Description
               </h3>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-muted">
                 {req.description ?? "No description provided."}
               </p>
             </div>
 
             {/* Status — Move to */}
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
                 Move to
               </h3>
               <div className="flex flex-wrap gap-2">
@@ -560,7 +558,7 @@ function DetailModal({
 
             {/* Admin Notes */}
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
                 Admin Notes
               </h3>
               <Textarea
@@ -581,7 +579,7 @@ function DetailModal({
                   {savingNoteId === req._id ? "Saving..." : "Save Notes"}
                 </Button>
                 {hasUnsavedNotes && (
-                  <span className="text-[11px] text-amber-400/80">
+                  <span className="text-[11px] text-warning/80">
                     Unsaved changes
                   </span>
                 )}
@@ -592,22 +590,22 @@ function DetailModal({
           {/* Right sidebar */}
           <div className="space-y-5">
             <div>
-              <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+              <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
                 <User className="h-3 w-3" />
                 Submitter
               </h4>
-              <p className="text-sm text-zinc-300">
+              <p className="text-sm text-ink-muted">
                 {req.submitterName ?? "Anonymous"}
               </p>
               {req.submitterEmail && (
-                <p className="mt-0.5 text-xs text-zinc-500">
+                <p className="mt-0.5 text-xs text-ink-subtle">
                   {req.submitterEmail}
                 </p>
               )}
             </div>
 
             <div>
-              <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+              <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
                 <Tag className="h-3 w-3" />
                 Category
               </h4>
@@ -615,29 +613,29 @@ function DetailModal({
             </div>
 
             <div>
-              <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+              <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
                 <Calendar className="h-3 w-3" />
                 Created
               </h4>
-              <p className="text-sm text-zinc-400">
+              <p className="text-sm text-ink-muted">
                 {formatDate(req._creationTime)}
               </p>
             </div>
 
             <div>
-              <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+              <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
                 <ThumbsUp className="h-3 w-3" />
                 Votes
               </h4>
-              <p className="text-sm text-zinc-300">{req.voteCount ?? 0}</p>
+              <p className="text-sm text-ink-muted">{req.voteCount ?? 0}</p>
             </div>
 
             {/* ID */}
             <div>
-              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
                 ID
               </h4>
-              <p className="break-all font-mono text-[10px] text-zinc-600">
+              <p className="break-all font-mono text-[10px] text-ink-faint">
                 {req._id}
               </p>
             </div>
@@ -646,7 +644,7 @@ function DetailModal({
       </div>
 
       {/* Footer */}
-      <div className="mt-5 flex items-center justify-between border-t border-zinc-800/60 pt-4">
+      <div className="mt-5 flex items-center justify-between border-t border-line pt-4">
         <Button
           variant="destructive"
           size="sm"
@@ -694,20 +692,18 @@ function CreatorPanel({
   isSubmitting,
 }: CreatorPanelProps) {
   return (
-    <div className="mb-6 rounded-xl border border-emerald-500/20 bg-zinc-900/80 shadow-lg shadow-emerald-500/5">
+    <div className="mb-6 rounded-xl border border-accent-line bg-surface/80 shadow-lg shadow-accent-line">
       {/* Panel Header */}
-      <div className="flex items-center justify-between border-b border-zinc-800/60 px-5 py-3">
+      <div className="flex items-center justify-between border-b border-line px-5 py-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-emerald-400" />
-          <span className="text-sm font-semibold text-zinc-100">
-            New Feature
-          </span>
+          <Sparkles className="h-4 w-4 text-accent" />
+          <span className="text-sm font-semibold text-ink">New Feature</span>
           <Badge variant="success">Team</Badge>
         </div>
         <button
           onClick={onDiscard}
           aria-label="Discard new feature"
-          className="rounded-md p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+          className="rounded-md p-1 text-ink-subtle transition-colors hover:bg-surface-hover hover:text-ink-muted"
         >
           <X className="h-4 w-4" />
         </button>
@@ -768,14 +764,14 @@ function CreatorPanel({
               }))}
             />
 
-            <p className="text-[11px] leading-relaxed text-zinc-600">
+            <p className="text-[11px] leading-relaxed text-ink-faint">
               Team features are submitted as &quot;Envpilot Team&quot; and will
               appear on the public roadmap alongside community requests.
             </p>
           </div>
         </div>
 
-        <div className="mt-5 flex items-center justify-between border-t border-zinc-800/60 pt-4">
+        <div className="mt-5 flex items-center justify-between border-t border-line pt-4">
           <Button variant="outline" size="sm" onClick={onDiscard}>
             Discard
           </Button>
@@ -846,17 +842,17 @@ function KanbanColumn({
             showDrop
               ? `border border-dashed p-1.5 ${col.dropBorder} ${col.dropBg}`
               : isDragActive
-                ? "border border-dashed border-zinc-800/50 p-1.5"
+                ? "border border-dashed border-line p-1.5"
                 : "border border-transparent p-1.5"
           }`}
         >
           {items.length === 0 && !showDrop ? (
             <div
               className={`flex flex-1 items-center justify-center rounded-lg border border-dashed py-10 transition-colors duration-200 ${
-                isDragActive ? "border-zinc-700" : "border-zinc-800"
+                isDragActive ? "border-line" : "border-line"
               }`}
             >
-              <p className="text-[11px] text-zinc-600">No requests</p>
+              <p className="text-[11px] text-ink-faint">No requests</p>
             </div>
           ) : (
             <>
@@ -917,8 +913,8 @@ function DraggableCard({
       style={style}
       className={`group/card rounded-lg border transition-all duration-200 ${
         isDragging || isBeingDragged
-          ? "scale-[0.97] border-zinc-700/50 bg-zinc-900/30 opacity-30"
-          : "border-zinc-800 bg-zinc-900/60 shadow-sm shadow-zinc-950/30 hover:border-zinc-700 hover:shadow-md hover:shadow-zinc-950/20"
+          ? "scale-[0.97] border-line bg-surface/30 opacity-30"
+          : "border-line bg-surface/60 shadow-sm shadow-line hover:border-line hover:shadow-md hover:shadow-line"
       }`}
     >
       <div className="flex items-start gap-1.5 p-3">
@@ -926,7 +922,7 @@ function DraggableCard({
         <button
           {...attributes}
           {...listeners}
-          className="group/grip mt-0.5 shrink-0 cursor-grab touch-none rounded p-0.5 text-zinc-700 transition-all duration-150 hover:bg-zinc-800 hover:text-zinc-400 active:cursor-grabbing active:scale-95 active:text-zinc-300"
+          className="group/grip mt-0.5 shrink-0 cursor-grab touch-none rounded p-0.5 text-ink-faint transition-all duration-150 hover:bg-surface-hover hover:text-ink-muted active:cursor-grabbing active:scale-95 active:text-ink-muted"
           aria-label="Drag to reorder"
         >
           <GripVertical className="h-3.5 w-3.5 transition-transform duration-150 group-hover/grip:scale-110" />
@@ -936,7 +932,7 @@ function DraggableCard({
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex items-start justify-between gap-1">
             <h4
-              className="cursor-pointer text-xs font-semibold leading-snug text-zinc-200 transition-colors hover:text-zinc-50"
+              className="cursor-pointer text-xs font-semibold leading-snug text-ink transition-colors hover:text-ink"
               onClick={onOpenDetail}
             >
               {req.title}
@@ -944,14 +940,14 @@ function DraggableCard({
             <div className="flex shrink-0 items-center gap-0.5">
               <button
                 onClick={onOpenDetail}
-                className="rounded p-0.5 text-zinc-700 opacity-0 transition-all group-hover/card:opacity-100 hover:bg-zinc-800 hover:text-zinc-400"
+                className="rounded p-0.5 text-ink-faint opacity-0 transition-all group-hover/card:opacity-100 hover:bg-surface-hover hover:text-ink-muted"
                 aria-label="Open detail"
               >
                 <Maximize2 className="h-3 w-3" />
               </button>
               <button
                 onClick={() => handleDelete(req._id)}
-                className="rounded p-0.5 text-zinc-700 opacity-0 transition-all group-hover/card:opacity-100 hover:bg-red-500/10 hover:text-red-400"
+                className="rounded p-0.5 text-ink-faint opacity-0 transition-all group-hover/card:opacity-100 hover:bg-danger-soft hover:text-danger"
                 aria-label="Delete feature request"
               >
                 <Trash2 className="h-3 w-3" />
@@ -960,12 +956,12 @@ function DraggableCard({
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="purple">{req.category ?? "general"}</Badge>
-            <span className="flex items-center gap-0.5 text-[10px] text-zinc-500">
+            <span className="flex items-center gap-0.5 text-[10px] text-ink-subtle">
               <ThumbsUp className="h-2.5 w-2.5" />
               {req.voteCount ?? 0}
             </span>
           </div>
-          <div className="mt-2 flex items-center justify-between text-[10px] text-zinc-500">
+          <div className="mt-2 flex items-center justify-between text-[10px] text-ink-subtle">
             <span>
               {req.submitterName ?? req.submitterEmail ?? "Anonymous"}
             </span>

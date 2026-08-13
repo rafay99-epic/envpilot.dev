@@ -24,9 +24,9 @@ function LoginPage() {
   const pending = isLoading || (user && whoami === undefined);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+    <div className="flex min-h-screen items-center justify-center bg-canvas">
       <div className="w-full max-w-sm">
-        <p className="mb-3 text-center font-mono text-xs uppercase tracking-wider text-zinc-500">
+        <p className="mb-3 text-center font-mono text-xs uppercase tracking-wider text-ink-subtle">
           $ envpilot admin
         </p>
         <Card title="login">
@@ -34,10 +34,10 @@ function LoginPage() {
             <TerminalLoading label="authenticating" />
           ) : user && whoami && !whoami.isAdmin ? (
             <div className="space-y-4 text-center">
-              <p className="font-mono text-sm text-red-400">
+              <p className="font-mono text-sm text-danger">
                 ✗ {whoami.email ?? "This account"} is not an admin.
               </p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-ink-subtle">
                 If this email was just allowlisted, sign in to the main Envpilot
                 app once first — admin access needs an existing Envpilot
                 account.

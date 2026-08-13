@@ -39,14 +39,14 @@ export default function DocsHome() {
       <div className="mx-auto max-w-6xl px-4 pt-14 pb-24 sm:px-6 lg:px-8">
         <Reveal>
           <header>
-            <p className="flex items-center gap-2 font-mono text-[11px] tracking-widest text-green-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-400 [animation:pulse-glow_2.4s_ease-in-out_infinite]" />
+            <p className="flex items-center gap-2 font-mono text-[11px] tracking-widest text-accent">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent [animation:pulse-glow_2.4s_ease-in-out_infinite]" />
               {"// documentation"}
             </p>
-            <h1 className="mt-5 font-sans text-4xl font-bold tracking-tight text-zinc-100 md:text-5xl">
+            <h1 className="mt-5 font-sans text-4xl font-bold tracking-tight text-ink md:text-5xl">
               Envpilot docs
             </h1>
-            <p className="mt-4 max-w-2xl text-base leading-relaxed text-zinc-400">
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-muted">
               Five client surfaces over one enforcement core. Start with the
               quickstart, or jump straight to the surface you are wiring up —
               every page states what it does, how to use it, and exactly where
@@ -63,10 +63,10 @@ export default function DocsHome() {
             <Link key={entry.href} href={entry.href} className="block h-full">
               <GlowCard className="h-full">
                 <div className="flex h-full flex-col gap-2 p-5">
-                  <span className="font-sans text-base font-semibold text-zinc-100">
+                  <span className="font-sans text-base font-semibold text-ink">
                     {entry.label}
                   </span>
-                  <span className="text-sm leading-relaxed text-zinc-500">
+                  <span className="text-sm leading-relaxed text-ink-subtle">
                     {entry.blurb}
                   </span>
                 </div>
@@ -82,11 +82,11 @@ export default function DocsHome() {
             const Icon = DOC_ICONS[section.icon] ?? DOC_ICONS["file-text"];
             return (
               <section key={section.slug}>
-                <h2 className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-green-400">
+                <h2 className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-accent">
                   <Icon className="h-3.5 w-3.5" />
                   {section.label}
                 </h2>
-                <p className="mt-2 text-xs leading-relaxed text-zinc-600">
+                <p className="mt-2 text-xs leading-relaxed text-ink-faint">
                   {section.blurb}
                 </p>
                 <ul className="mt-3 space-y-1">
@@ -94,7 +94,7 @@ export default function DocsHome() {
                     <li key={item.slug}>
                       <Link
                         href={`/${item.slug}`}
-                        className="block rounded px-2 py-1 text-sm text-zinc-400 transition-colors hover:bg-zinc-900/60 hover:text-green-400"
+                        className="block rounded px-2 py-1 text-sm text-ink-muted transition-colors hover:bg-surface-hover/60 hover:text-accent"
                       >
                         {item.title}
                       </Link>

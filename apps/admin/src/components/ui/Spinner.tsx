@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 export function Spinner({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center justify-center py-8", className)}>
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-600 border-t-green-500" />
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-line-strong border-t-accent-line" />
     </div>
   );
 }
@@ -28,10 +28,10 @@ export function TerminalLoading({
           : "flex items-center justify-center py-8"
       }
     >
-      <span className="font-mono text-sm text-green-400">
-        <span className="text-zinc-500">$</span> {label}
+      <span className="font-mono text-sm text-accent">
+        <span className="text-ink-subtle">$</span> {label}
         <span
-          className="inline-block w-2 bg-green-400"
+          className="inline-block w-2 bg-accent"
           style={{ animation: "blink 1s step-end infinite" }}
         >
           &nbsp;

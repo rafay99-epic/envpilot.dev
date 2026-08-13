@@ -192,7 +192,7 @@ export function AccountFormDrawer({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+          <div className="rounded-lg p-3 text-sm bg-danger-soft text-danger">
             {error}
           </div>
         )}
@@ -201,9 +201,9 @@ export function AccountFormDrawer({
         <div>
           <label
             htmlFor="account-name"
-            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            className="block text-sm font-medium text-ink-muted"
           >
-            Name <span className="text-red-500">*</span>
+            Name <span className="text-danger">*</span>
           </label>
           <input
             id="account-name"
@@ -211,7 +211,7 @@ export function AccountFormDrawer({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Stripe Dashboard"
-            className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+            className="mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
           />
         </div>
 
@@ -219,9 +219,9 @@ export function AccountFormDrawer({
         <div>
           <label
             htmlFor="account-url"
-            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            className="block text-sm font-medium text-ink-muted"
           >
-            Website URL <span className="text-zinc-400">(optional)</span>
+            Website URL <span className="text-ink-muted">(optional)</span>
           </label>
           <input
             id="account-url"
@@ -229,7 +229,7 @@ export function AccountFormDrawer({
             value={websiteUrl}
             onChange={(e) => setWebsiteUrl(e.target.value)}
             placeholder="https://dashboard.stripe.com"
-            className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 font-mono text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+            className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
           />
         </div>
 
@@ -237,10 +237,10 @@ export function AccountFormDrawer({
         <div>
           <label
             htmlFor="account-username"
-            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            className="block text-sm font-medium text-ink-muted"
           >
             Username / Email{" "}
-            {!isEditing && <span className="text-red-500">*</span>}
+            {!isEditing && <span className="text-danger">*</span>}
           </label>
           <input
             id="account-username"
@@ -252,7 +252,7 @@ export function AccountFormDrawer({
             }}
             disabled={isPrefilling}
             placeholder={isPrefilling ? "Loading…" : "user@example.com"}
-            className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 font-mono text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500 dark:disabled:bg-zinc-900"
+            className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
           />
         </div>
 
@@ -260,9 +260,9 @@ export function AccountFormDrawer({
         <div>
           <label
             htmlFor="account-password"
-            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            className="block text-sm font-medium text-ink-muted"
           >
-            Password {!isEditing && <span className="text-red-500">*</span>}
+            Password {!isEditing && <span className="text-danger">*</span>}
           </label>
           <div className="relative mt-1">
             <input
@@ -275,12 +275,12 @@ export function AccountFormDrawer({
               }}
               disabled={isPrefilling}
               placeholder={isPrefilling ? "Loading…" : "••••••••"}
-              className="block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 pr-10 font-mono text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500 dark:disabled:bg-zinc-900"
+              className="block w-full rounded-lg border px-4 py-2 pr-10 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
             />
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-muted hover:text-ink-muted"
               tabIndex={-1}
             >
               {showPassword ? (
@@ -291,12 +291,12 @@ export function AccountFormDrawer({
             </button>
           </div>
           {isEditing && !prefillFailed && (
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 text-xs text-ink-muted">
               Editing either field rewrites the stored credentials.
             </p>
           )}
           {isEditing && prefillFailed && (
-            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            <p className="mt-1 text-xs text-warning">
               Could not load existing credentials. Enter both fields to replace
               them, or leave blank to keep the current values.
             </p>
@@ -307,9 +307,9 @@ export function AccountFormDrawer({
         <div>
           <label
             htmlFor="account-description"
-            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            className="block text-sm font-medium text-ink-muted"
           >
-            Description <span className="text-zinc-400">(optional)</span>
+            Description <span className="text-ink-muted">(optional)</span>
           </label>
           <textarea
             id="account-description"
@@ -317,14 +317,14 @@ export function AccountFormDrawer({
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What this account is used for…"
             rows={2}
-            className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+            className="mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
           />
         </div>
 
         {/* Environments */}
         <div>
-          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Environments <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium text-ink-muted">
+            Environments <span className="text-danger">*</span>
           </label>
           <div className="mt-2 flex flex-wrap gap-2">
             {ENVIRONMENTS.map((env) => (
@@ -349,14 +349,14 @@ export function AccountFormDrawer({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting || isPrefilling}
-            className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {isSubmitting

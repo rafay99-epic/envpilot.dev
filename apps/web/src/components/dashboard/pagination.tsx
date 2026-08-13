@@ -30,15 +30,15 @@ export function Pagination({
   const pages = getPageNumbers(currentPage, totalPages);
 
   return (
-    <div className="flex items-center justify-between border-t border-zinc-700/50 px-5 py-3">
-      <span className="font-mono text-xs text-zinc-500">
+    <div className="flex items-center justify-between border-t border-line px-5 py-3">
+      <span className="font-mono text-xs text-ink-subtle">
         showing {startIndex + 1}-{endIndex} of {totalItems}
       </span>
       <div className="flex items-center gap-1">
         <button
           onClick={onPrevPage}
           disabled={!hasPrevPage}
-          className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-green-400 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-500"
+          className="rounded-md p-1.5 text-ink-subtle transition-colors hover:bg-surface-hover hover:text-accent disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-subtle"
           aria-label="Previous page"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -47,7 +47,7 @@ export function Pagination({
           page === "..." ? (
             <span
               key={`ellipsis-${i}`}
-              className="px-1 font-mono text-xs text-zinc-600"
+              className="px-1 font-mono text-xs text-ink-faint"
             >
               ...
             </span>
@@ -57,8 +57,8 @@ export function Pagination({
               onClick={() => onGoToPage(page as number)}
               className={`min-w-7 rounded-md px-2 py-1 font-mono text-xs transition-colors ${
                 page === currentPage
-                  ? "bg-green-500/15 text-green-400 border border-green-500/30"
-                  : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+                  ? "bg-accent-soft text-accent border border-accent-line"
+                  : "text-ink-subtle hover:bg-surface-hover hover:text-ink-muted"
               }`}
             >
               {page}
@@ -68,7 +68,7 @@ export function Pagination({
         <button
           onClick={onNextPage}
           disabled={!hasNextPage}
-          className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-green-400 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-500"
+          className="rounded-md p-1.5 text-ink-subtle transition-colors hover:bg-surface-hover hover:text-accent disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-subtle"
           aria-label="Next page"
         >
           <ChevronRight className="h-4 w-4" />

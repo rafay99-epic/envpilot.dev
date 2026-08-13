@@ -225,7 +225,7 @@ export default function FAQPage() {
             answer?{" "}
             <Link
               href="/support"
-              className="text-green-400 underline-offset-4 hover:underline"
+              className="text-accent underline-offset-4 hover:underline"
             >
               Contact support
             </Link>

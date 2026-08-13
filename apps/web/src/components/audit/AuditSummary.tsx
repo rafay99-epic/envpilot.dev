@@ -20,10 +20,10 @@ interface AuditSummaryProps {
 }
 
 const severityLabels: Record<string, { label: string; color: string }> = {
-  info: { label: "Info", color: "bg-blue-500" },
-  warning: { label: "Warning", color: "bg-yellow-500" },
-  error: { label: "Error", color: "bg-red-500" },
-  critical: { label: "Critical", color: "bg-red-700" },
+  info: { label: "Info", color: "bg-info" },
+  warning: { label: "Warning", color: "bg-warning" },
+  error: { label: "Error", color: "bg-danger" },
+  critical: { label: "Critical", color: "bg-danger" },
 };
 
 const resourceTypeLabels: Record<string, string> = {
@@ -44,10 +44,10 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
         {[...Array(4)].map((_, i) => (
           <div
             key={i}
-            className="animate-pulse rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+            className="animate-pulse rounded-lg border p-4 border-line bg-surface"
           >
-            <div className="h-4 w-24 rounded bg-zinc-200 dark:bg-zinc-700" />
-            <div className="mt-2 h-8 w-16 rounded bg-zinc-200 dark:bg-zinc-700" />
+            <div className="h-4 w-24 rounded bg-surface-hover" />
+            <div className="mt-2 h-8 w-16 rounded bg-surface-hover" />
           </div>
         ))}
       </div>
@@ -78,8 +78,8 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
           />
         </svg>
       ),
-      color: "text-blue-600 dark:text-blue-400",
-      bgColor: "bg-blue-50 dark:bg-blue-900/20",
+      color: "text-info",
+      bgColor: "bg-info-soft",
     },
     {
       label: "Sensitive Access",
@@ -100,8 +100,8 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
           />
         </svg>
       ),
-      color: "text-amber-600 dark:text-amber-400",
-      bgColor: "bg-amber-50 dark:bg-amber-900/20",
+      color: "text-warning",
+      bgColor: "bg-warning-soft",
     },
     {
       label: "Security Events",
@@ -122,14 +122,9 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
           />
         </svg>
       ),
-      color:
-        summary.securityEventCount > 0
-          ? "text-red-600 dark:text-red-400"
-          : "text-green-600 dark:text-green-400",
+      color: summary.securityEventCount > 0 ? "text-danger" : "text-accent",
       bgColor:
-        summary.securityEventCount > 0
-          ? "bg-red-50 dark:bg-red-900/20"
-          : "bg-green-50 dark:bg-green-900/20",
+        summary.securityEventCount > 0 ? "bg-danger-soft" : "bg-accent-soft",
     },
     {
       label: "Active Users",
@@ -150,8 +145,8 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
           />
         </svg>
       ),
-      color: "text-purple-600 dark:text-purple-400",
-      bgColor: "bg-purple-50 dark:bg-purple-900/20",
+      color: "text-premium",
+      bgColor: "bg-premium-soft",
     },
   ];
 
@@ -162,7 +157,7 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
         {statCards.map((stat) => (
           <div
             key={stat.label}
-            className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+            className="rounded-lg border p-4 border-line bg-surface"
           >
             <div className="flex items-center gap-3">
               <div
@@ -171,15 +166,9 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
                 {stat.icon}
               </div>
               <div>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {stat.label}
-                </p>
-                <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-                  {stat.value}
-                </p>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                  {stat.subLabel}
-                </p>
+                <p className="text-sm text-ink-muted">{stat.label}</p>
+                <p className="text-2xl font-semibold text-ink">{stat.value}</p>
+                <p className="text-xs text-ink-subtle">{stat.subLabel}</p>
               </div>
             </div>
           </div>
@@ -189,8 +178,8 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
       {/* Breakdown Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {/* Severity Distribution */}
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+        <div className="rounded-lg border p-4 border-line bg-surface">
+          <h3 className="text-sm font-medium text-ink">
             Severity Distribution
           </h3>
           <div className="mt-4 space-y-3">
@@ -199,20 +188,16 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
                 ([severity, count]) => {
                   const config = severityLabels[severity] || {
                     label: severity,
-                    color: "bg-gray-500",
+                    color: "bg-surface-hover",
                   };
                   const percentage = (count / summary.totalEvents) * 100;
                   return (
                     <div key={severity}>
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-zinc-600 dark:text-zinc-400">
-                          {config.label}
-                        </span>
-                        <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                          {count}
-                        </span>
+                        <span className="text-ink-muted">{config.label}</span>
+                        <span className="font-medium text-ink">{count}</span>
                       </div>
-                      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-surface-raised">
                         <div
                           className={`h-full rounded-full ${config.color}`}
                           style={{ width: `${percentage}%` }}
@@ -223,7 +208,7 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
                 }
               )
             ) : (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm text-ink-muted">
                 No severity data available
               </p>
             )}
@@ -231,10 +216,8 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
         </div>
 
         {/* Resource Types */}
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-            Activity by Resource
-          </h3>
+        <div className="rounded-lg border p-4 border-line bg-surface">
+          <h3 className="text-sm font-medium text-ink">Activity by Resource</h3>
           <div className="mt-4 space-y-2">
             {Object.entries(summary.resourceTypeCounts).length > 0 ? (
               Object.entries(summary.resourceTypeCounts)
@@ -242,16 +225,16 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
                 .slice(0, 5)
                 .map(([type, count]) => (
                   <div key={type} className="flex items-center justify-between">
-                    <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                    <span className="text-sm text-ink-muted">
                       {resourceTypeLabels[type] || type}
                     </span>
-                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    <span className="text-sm font-medium text-ink">
                       {count}
                     </span>
                   </div>
                 ))
             ) : (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm text-ink-muted">
                 No resource data available
               </p>
             )}
@@ -259,34 +242,30 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
         </div>
 
         {/* Top Users */}
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-            Most Active Users
-          </h3>
+        <div className="rounded-lg border p-4 border-line bg-surface">
+          <h3 className="text-sm font-medium text-ink">Most Active Users</h3>
           <div className="mt-4 space-y-3">
             {summary.topActiveUsers.length > 0 ? (
               summary.topActiveUsers.map((user, index) => (
                 <div key={user.userId} className="flex items-center gap-3">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium bg-surface-raised text-ink-muted">
                     {index + 1}
                   </span>
                   <div className="flex-1 truncate">
-                    <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    <p className="truncate text-sm font-medium text-ink">
                       {user.name}
                     </p>
-                    <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className="truncate text-xs text-ink-muted">
                       {user.email}
                     </p>
                   </div>
-                  <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                  <span className="text-sm text-ink-muted">
                     {user.actionCount}
                   </span>
                 </div>
               ))
             ) : (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                No user activity data
-              </p>
+              <p className="text-sm text-ink-muted">No user activity data</p>
             )}
           </div>
         </div>

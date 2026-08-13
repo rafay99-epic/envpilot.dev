@@ -85,7 +85,7 @@ export default async function PricingPage() {
         eyebrow="pricing"
         title={
           <>
-            Simple, <span className="text-green-400">transparent</span> pricing
+            Simple, <span className="text-accent">transparent</span> pricing
           </>
         }
         description="Start free. Upgrade when you need more power. Every plan includes AES-256 encryption, role-based access control, and real-time sync across CLI, VS Code, and web dashboard."
@@ -110,8 +110,7 @@ export default async function PricingPage() {
             eyebrow="faq"
             title={
               <>
-                Frequently asked{" "}
-                <span className="text-green-400">questions</span>
+                Frequently asked <span className="text-accent">questions</span>
               </>
             }
             description="Everything you need to know before getting started."
@@ -119,14 +118,14 @@ export default async function PricingPage() {
           <Stagger className="mt-10 space-y-4">
             {FAQ_ITEMS.map(({ q, a }) => (
               <StaggerItem key={q}>
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 transition-colors duration-300 hover:border-green-500/30">
-                  <h3 className="flex items-start gap-2.5 font-sans text-sm font-bold tracking-tight text-zinc-100">
-                    <span aria-hidden className="font-mono text-green-400">
+                <div className="rounded-xl border border-line bg-surface/40 p-6 transition-colors duration-300 hover:border-accent-line">
+                  <h3 className="flex items-start gap-2.5 font-sans text-sm font-bold tracking-tight text-ink">
+                    <span aria-hidden className="font-mono text-accent">
                       ❯
                     </span>
                     {q}
                   </h3>
-                  <p className="mt-2.5 pl-6 font-mono text-xs leading-relaxed text-zinc-500">
+                  <p className="mt-2.5 pl-6 font-mono text-xs leading-relaxed text-ink-subtle">
                     {a}
                   </p>
                 </div>
@@ -145,8 +144,7 @@ export default async function PricingPage() {
             eyebrow="get started"
             title={
               <>
-                Ship secrets <span className="text-green-400">safely</span>{" "}
-                today
+                Ship secrets <span className="text-accent">safely</span> today
               </>
             }
             description="Get started in under 2 minutes. No credit card required."
@@ -156,13 +154,13 @@ export default async function PricingPage() {
           <Reveal className="mx-auto mt-10 max-w-xl" delay={0.1}>
             <TerminalFrame title="bash — get started" glow>
               <div className="text-left">
-                <p className="text-xs text-zinc-300">
-                  <span aria-hidden className="text-green-400">
+                <p className="text-xs text-ink-muted">
+                  <span aria-hidden className="text-accent">
                     ❯{" "}
                   </span>
-                  <span className="text-green-400">npx</span> @envpilot/cli init
+                  <span className="text-accent">npx</span> @envpilot/cli init
                 </p>
-                <p className="mt-2 text-[11px] text-zinc-600">
+                <p className="mt-2 text-[11px] text-ink-faint">
                   # encrypted vault, RBAC, and real-time sync in one command
                 </p>
               </div>
@@ -172,13 +170,13 @@ export default async function PricingPage() {
             <div className="flex flex-wrap items-center justify-center gap-4">
               <Link
                 href="/sign-up"
-                className="rounded-lg bg-green-500 px-6 py-3 font-mono text-xs font-semibold text-zinc-950 shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] transition-shadow hover:shadow-[0_0_55px_-8px_rgba(34,197,94,0.8)]"
+                className="rounded-lg bg-accent px-6 py-3 font-mono text-xs font-semibold text-ink-inverse shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] transition-shadow hover:shadow-[0_0_55px_-8px_rgba(34,197,94,0.8)]"
               >
                 Get Started Free
               </Link>
               <Link
                 href="/docs"
-                className="rounded-lg border border-zinc-800 px-6 py-3 font-mono text-xs text-zinc-400 transition-colors hover:border-green-500/30 hover:text-green-400"
+                className="rounded-lg border border-line px-6 py-3 font-mono text-xs text-ink-muted transition-colors hover:border-accent-line hover:text-accent"
               >
                 Read the docs
               </Link>

@@ -64,15 +64,15 @@ function formatFeatureValue(
 ): React.ReactNode {
   if (valueType === "boolean") {
     return value ? (
-      <Check className="mx-auto h-3.5 w-3.5 text-green-400" />
+      <Check className="mx-auto h-3.5 w-3.5 text-accent" />
     ) : (
-      <X className="mx-auto h-3.5 w-3.5 text-zinc-600" />
+      <X className="mx-auto h-3.5 w-3.5 text-ink-faint" />
     );
   }
   if (value === null) {
-    return <span className="font-medium text-green-400">Unlimited</span>;
+    return <span className="font-medium text-accent">Unlimited</span>;
   }
-  return <span className="text-zinc-300">{value.toLocaleString()}</span>;
+  return <span className="text-ink-muted">{value.toLocaleString()}</span>;
 }
 
 // ============================================================
@@ -95,35 +95,35 @@ function PricingCard({ tier }: { tier: Tier }) {
 
   const badgeColorClass =
     tier.badgeColor === "amber"
-      ? "border-amber-500/20 bg-amber-500/5 text-amber-400"
+      ? "border-warning-line bg-warning-soft text-warning"
       : tier.badgeColor === "green"
-        ? "border-green-500/20 bg-green-500/5 text-green-400"
-        : "border-zinc-700 bg-zinc-800/50 text-zinc-500";
+        ? "border-accent-line bg-accent-soft text-accent"
+        : "border-line bg-surface-raised/50 text-ink-subtle";
   const dotColorClass =
     tier.badgeColor === "amber"
-      ? "bg-amber-400"
+      ? "bg-warning"
       : tier.badgeColor === "green"
-        ? "bg-green-400"
-        : "bg-zinc-500";
+        ? "bg-accent"
+        : "bg-surface-hover";
 
   return (
     <div
       className={`relative w-full rounded-2xl p-px transition-shadow duration-300 ${
         emphasized
-          ? "bg-gradient-to-b from-green-500/50 via-zinc-700/40 to-zinc-800/40 shadow-[0_0_60px_-16px_rgba(34,197,94,0.35)]"
-          : "bg-zinc-800/60"
+          ? "bg-gradient-to-b from-accent-line via-line to-line shadow-[0_0_60px_-16px_rgba(34,197,94,0.35)]"
+          : "bg-surface-raised/60"
       }`}
     >
-      <div className="flex h-full flex-col rounded-[15px] bg-zinc-950/95 p-7">
+      <div className="flex h-full flex-col rounded-[15px] bg-canvas/95 p-7">
         {/* Tier name + badge */}
         <div className="flex items-center justify-between gap-3">
-          <span className="font-mono text-xs uppercase tracking-widest text-zinc-500">
+          <span className="font-mono text-xs uppercase tracking-widest text-ink-subtle">
             {tier.name}
           </span>
           <div className="flex items-center gap-2">
             {isComingSoon && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800/50 px-2.5 py-0.5 font-mono text-[10px] text-zinc-500">
-                <span className="h-1 w-1 rounded-full bg-zinc-500" />
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-raised/50 px-2.5 py-0.5 font-mono text-[10px] text-ink-subtle">
+                <span className="h-1 w-1 rounded-full bg-surface-hover" />
                 coming soon
               </span>
             )}
@@ -141,7 +141,7 @@ function PricingCard({ tier }: { tier: Tier }) {
         {/* Display name */}
         <h3
           className={`mt-4 font-sans text-lg font-bold tracking-tight ${
-            isComingSoon ? "text-zinc-400" : "text-zinc-100"
+            isComingSoon ? "text-ink-muted" : "text-ink"
           }`}
         >
           {tier.displayName}
@@ -151,18 +151,18 @@ function PricingCard({ tier }: { tier: Tier }) {
         <div className="mt-2 flex items-baseline gap-2">
           <span
             className={`font-sans text-5xl font-bold tracking-tight ${
-              isComingSoon ? "text-zinc-400" : "text-zinc-100"
+              isComingSoon ? "text-ink-muted" : "text-ink"
             }`}
           >
             ${price}
           </span>
-          <span className="font-mono text-xs text-zinc-600">
+          <span className="font-mono text-xs text-ink-faint">
             / month / organization
           </span>
         </div>
 
         {/* What's included */}
-        <p className="mt-7 font-mono text-[10px] uppercase tracking-widest text-zinc-600">
+        <p className="mt-7 font-mono text-[10px] uppercase tracking-widest text-ink-faint">
           {"// what's included"}
         </p>
         <div className="mt-3 space-y-2.5">
@@ -170,12 +170,12 @@ function PricingCard({ tier }: { tier: Tier }) {
             <p
               key={item}
               className={`flex items-start gap-2.5 font-mono text-xs ${
-                isComingSoon ? "text-zinc-600" : "text-zinc-400"
+                isComingSoon ? "text-ink-faint" : "text-ink-muted"
               }`}
             >
               <Check
                 className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
-                  isComingSoon ? "text-zinc-700" : "text-green-400"
+                  isComingSoon ? "text-ink-faint" : "text-accent"
                 }`}
               />
               {item}
@@ -187,7 +187,7 @@ function PricingCard({ tier }: { tier: Tier }) {
 
         {/* CTA */}
         {isComingSoon ? (
-          <span className="block cursor-not-allowed rounded-lg border border-zinc-800 px-5 py-3 text-center font-mono text-xs text-zinc-600">
+          <span className="block cursor-not-allowed rounded-lg border border-line px-5 py-3 text-center font-mono text-xs text-ink-faint">
             {cta}
           </span>
         ) : (
@@ -195,8 +195,8 @@ function PricingCard({ tier }: { tier: Tier }) {
             href={ctaHref}
             className={`block rounded-lg px-5 py-3 text-center font-mono text-xs font-semibold transition-all ${
               emphasized
-                ? "bg-green-500 text-zinc-950 shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] hover:shadow-[0_0_55px_-8px_rgba(34,197,94,0.8)]"
-                : "border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20"
+                ? "bg-accent text-ink-inverse shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] hover:shadow-[0_0_55px_-8px_rgba(34,197,94,0.8)]"
+                : "border border-accent-line bg-accent-soft text-accent hover:bg-accent-soft"
             }`}
           >
             {cta}
@@ -249,18 +249,18 @@ function ComparisonTable({
   const hiddenKeys = new Set(["sso_enabled"]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40 backdrop-blur-sm">
+    <div className="overflow-hidden rounded-xl border border-line bg-surface/40 backdrop-blur-sm">
       <div className="overflow-x-auto">
         <table className="w-full text-left font-mono text-xs">
           <thead>
-            <tr className="border-b border-zinc-800 bg-zinc-900/60">
-              <th className="w-1/3 px-5 py-4 font-medium uppercase tracking-widest text-zinc-500">
+            <tr className="border-b border-line bg-surface/60">
+              <th className="w-1/3 px-5 py-4 font-medium uppercase tracking-widest text-ink-subtle">
                 Feature
               </th>
               {tiers.map((tier) => (
                 <th
                   key={tier.name}
-                  className="px-4 py-4 text-center font-sans text-sm font-bold tracking-tight text-zinc-100"
+                  className="px-4 py-4 text-center font-sans text-sm font-bold tracking-tight text-ink"
                 >
                   {tier.displayName}
                 </th>
@@ -277,10 +277,10 @@ function ComparisonTable({
 
               return (
                 <Fragment key={category}>
-                  <tr className="border-b border-zinc-800/50 bg-green-500/[0.03]">
+                  <tr className="border-b border-line bg-accent/[0.03]">
                     <td
                       colSpan={tiers.length + 1}
-                      className="px-5 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-widest text-green-400"
+                      className="px-5 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-widest text-accent"
                     >
                       {`// ${category}`}
                     </td>
@@ -288,12 +288,12 @@ function ComparisonTable({
                   {visibleFeatures.map((feature) => (
                     <tr
                       key={feature.key}
-                      className="border-b border-zinc-800/50 transition-colors last:border-b-0 hover:bg-green-500/[0.04]"
+                      className="border-b border-line transition-colors last:border-b-0 hover:bg-accent/[0.04]"
                     >
-                      <td className="px-5 py-3 text-zinc-400">
+                      <td className="px-5 py-3 text-ink-muted">
                         {feature.displayName}
                         {feature.description && (
-                          <span className="mt-0.5 block text-[10px] text-zinc-600">
+                          <span className="mt-0.5 block text-[10px] text-ink-faint">
                             {feature.description}
                           </span>
                         )}
@@ -308,7 +308,7 @@ function ComparisonTable({
                               key={tier.name}
                               className="px-4 py-3 text-center"
                             >
-                              <Minus className="mx-auto h-3.5 w-3.5 text-zinc-700" />
+                              <Minus className="mx-auto h-3.5 w-3.5 text-ink-faint" />
                             </td>
                           );
                         }
@@ -362,7 +362,7 @@ export function PricingContent({
         {[0, 1].map((i) => (
           <div
             key={i}
-            className="h-96 animate-pulse rounded-2xl border border-zinc-800 bg-zinc-900/40"
+            className="h-96 animate-pulse rounded-2xl border border-line bg-surface/40"
           />
         ))}
       </div>
@@ -396,7 +396,7 @@ export function PricingContent({
           eyebrow="details"
           title={
             <>
-              Feature <span className="text-green-400">comparison</span>
+              Feature <span className="text-accent">comparison</span>
             </>
           }
           description="A detailed breakdown of what's included in each plan."

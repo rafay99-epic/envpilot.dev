@@ -114,7 +114,7 @@ function TicketsPage() {
 
   const columns: Column<TicketDoc>[] = [
     { key: "name", header: "Name" },
-    { key: "email", header: "Email", className: "text-zinc-400" },
+    { key: "email", header: "Email", className: "text-ink-muted" },
     {
       key: "category",
       header: "Category",
@@ -152,14 +152,14 @@ function TicketsPage() {
     {
       key: "_creationTime",
       header: "Date",
-      className: "text-zinc-400",
+      className: "text-ink-muted",
       render: (t) => formatDateTime(t._creationTime),
     },
   ];
 
   return (
     <div>
-      <h1 className="mb-6 font-mono text-2xl font-semibold text-zinc-100">
+      <h1 className="mb-6 font-mono text-2xl font-semibold text-ink">
         Support Tickets
       </h1>
 
@@ -186,7 +186,7 @@ function TicketsPage() {
             onChange={(e) => setCategoryFilter(e.target.value)}
           />
         </div>
-        <span className="font-mono text-xs uppercase tracking-wider text-zinc-500">
+        <span className="font-mono text-xs uppercase tracking-wider text-ink-subtle">
           {search.trim()
             ? `${filteredTickets?.length ?? 0} of ${tickets?.length ?? 0} tickets`
             : `${tickets?.length ?? 0} tickets`}
@@ -206,10 +206,10 @@ function TicketsPage() {
             onExpandedChange={setExpandedId}
             renderExpanded={(t) => (
               <div>
-                <p className="mb-1 font-mono text-xs uppercase tracking-wider text-zinc-500">
+                <p className="mb-1 font-mono text-xs uppercase tracking-wider text-ink-subtle">
                   Message
                 </p>
-                <p className="whitespace-pre-wrap text-sm text-zinc-300">
+                <p className="whitespace-pre-wrap text-sm text-ink-muted">
                   {t.message}
                 </p>
               </div>

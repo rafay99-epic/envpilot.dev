@@ -87,7 +87,7 @@ export function VariableListItem({
 
   return (
     <div
-      className={`px-6 py-4 ${isSelected ? "bg-green-500/5 border-l-2 border-green-500" : ""}`}
+      className={`px-6 py-4 ${isSelected ? "bg-accent-soft border-l-2 border-accent-line" : ""}`}
     >
       <div className="flex items-center justify-between">
         <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -103,23 +103,23 @@ export function VariableListItem({
           )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-3">
-              <code className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              <code className="font-mono text-sm font-semibold text-ink">
                 {variable.key}
               </code>
               {variable.isSensitive && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
                   Sensitive
                 </span>
               )}
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+              <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
                 v{variable.version}
               </span>
               {permissionLevel && (
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     permissionLevel === "write"
-                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                      : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                      ? "bg-warning-soft text-warning"
+                      : "bg-info-soft text-info"
                   }`}
                 >
                   {permissionLevel}
@@ -127,7 +127,7 @@ export function VariableListItem({
               )}
             </div>
             {variable.description && (
-              <p className="mt-1 truncate text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="mt-1 truncate text-sm text-ink-muted">
                 {variable.description}
               </p>
             )}
@@ -138,10 +138,10 @@ export function VariableListItem({
                     key={env}
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                       env === "production"
-                        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        ? "bg-danger-soft text-danger"
                         : env === "staging"
-                          ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                          : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          ? "bg-warning-soft text-warning"
+                          : "bg-accent-soft text-accent"
                     }`}
                   >
                     {env}
@@ -151,7 +151,7 @@ export function VariableListItem({
                   <TagBadge key={tag._id} name={tag.name} color={tag.color} />
                 ))}
               </div>
-              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+              <span className="text-xs text-ink-subtle">
                 Updated {formatDate(variable.updatedAt)}
               </span>
             </div>
@@ -163,7 +163,7 @@ export function VariableListItem({
             <button
               onClick={handleToggleReveal}
               disabled={isRevealing}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="rounded-lg p-2 text-ink-muted disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
               title={
                 isValueVisible && revealedValue ? "Hide value" : "Reveal value"
               }
@@ -180,11 +180,11 @@ export function VariableListItem({
           {revealedValue && (
             <button
               onClick={handleCopy}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title={copied ? "Copied!" : "Copy key=value"}
             >
               {copied ? (
-                <Check className="h-4 w-4 text-green-500" />
+                <Check className="h-4 w-4 text-accent" />
               ) : (
                 <Copy className="h-4 w-4" />
               )}
@@ -193,19 +193,19 @@ export function VariableListItem({
           {onShare && (
             <button
               onClick={onShare}
-              className="relative rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="relative rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title="Share via secure link"
             >
               <Share2 className="h-4 w-4" />
               {activeShareCount !== undefined && activeShareCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-green-500" />
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent" />
               )}
             </button>
           )}
           {onViewHistory && (
             <button
               onClick={onViewHistory}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title="View history"
             >
               <svg
@@ -226,7 +226,7 @@ export function VariableListItem({
           {canManagePermissions && onManagePermissions && (
             <button
               onClick={onManagePermissions}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title="Manage access permissions"
             >
               <svg
@@ -247,7 +247,7 @@ export function VariableListItem({
           {canEdit && onEdit && (
             <button
               onClick={onEdit}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title="Edit variable"
             >
               <svg
@@ -268,7 +268,7 @@ export function VariableListItem({
           {canDelete && onDelete && (
             <button
               onClick={onDelete}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+              className="rounded-lg p-2 text-ink-muted hover:bg-danger-soft hover:text-danger"
               title="Delete variable"
             >
               <svg
@@ -291,8 +291,8 @@ export function VariableListItem({
 
       {/* Revealed value display */}
       {isValueVisible && revealedValue && (
-        <div className="mt-2 rounded-lg bg-zinc-100 px-3 py-2 dark:bg-zinc-800">
-          <code className="break-all font-mono text-xs text-zinc-700 dark:text-zinc-300">
+        <div className="mt-2 rounded-lg px-3 py-2 bg-surface-raised">
+          <code className="break-all font-mono text-xs text-ink-muted">
             {revealedValue}
           </code>
         </div>

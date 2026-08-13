@@ -11,11 +11,11 @@ export interface TerminalScene {
 }
 
 const TONE_CLASSES: Record<OutputTone, string> = {
-  ok: "text-green-400",
-  out: "text-zinc-300",
-  dim: "text-zinc-600",
-  warn: "text-amber-400",
-  err: "text-red-400",
+  ok: "text-accent",
+  out: "text-ink-muted",
+  dim: "text-ink-faint",
+  warn: "text-warning",
+  err: "text-danger",
 };
 
 /**
@@ -79,12 +79,10 @@ export function TerminalPlayer({
   return (
     <div className={`text-[13px] sm:text-sm ${className}`}>
       <div className="flex items-center">
-        <span className="mr-2 shrink-0 text-green-500">❯</span>
-        <span className="text-zinc-200">
-          {scene.command.slice(0, charCount)}
-        </span>
+        <span className="mr-2 shrink-0 text-accent">❯</span>
+        <span className="text-ink">{scene.command.slice(0, charCount)}</span>
         <span
-          className="ml-0.5 inline-block h-4 w-[7px] bg-green-400"
+          className="ml-0.5 inline-block h-4 w-[7px] bg-accent"
           style={{ animation: "blink 1.1s step-end infinite" }}
         />
       </div>

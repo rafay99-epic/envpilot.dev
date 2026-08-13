@@ -167,7 +167,7 @@ export function RowEditDrawer({
       onBeforeClose={handleBeforeClose}
     >
       {/* View mode toggle */}
-      <div className="mb-5 flex rounded-md border border-zinc-700 p-0.5">
+      <div className="mb-5 flex rounded-md border border-line p-0.5">
         <button
           onClick={() =>
             viewMode === "json" ? switchToForm() : setViewMode("form")
@@ -175,8 +175,8 @@ export function RowEditDrawer({
           className={cn(
             "flex-1 rounded-[5px] px-3 py-1.5 text-sm font-medium transition-colors",
             viewMode === "form"
-              ? "bg-zinc-700 text-zinc-100"
-              : "text-zinc-400 hover:text-zinc-200"
+              ? "bg-surface-hover text-ink"
+              : "text-ink-muted hover:text-ink"
           )}
         >
           Form
@@ -188,8 +188,8 @@ export function RowEditDrawer({
           className={cn(
             "flex-1 rounded-[5px] px-3 py-1.5 text-sm font-medium transition-colors",
             viewMode === "json"
-              ? "bg-zinc-700 text-zinc-100"
-              : "text-zinc-400 hover:text-zinc-200"
+              ? "bg-surface-hover text-ink"
+              : "text-ink-muted hover:text-ink"
           )}
         >
           Raw JSON
@@ -198,7 +198,7 @@ export function RowEditDrawer({
 
       {/* Error display */}
       {error && (
-        <div className="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+        <div className="mb-4 rounded-md border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger">
           {error}
         </div>
       )}
@@ -213,10 +213,10 @@ export function RowEditDrawer({
 
               return (
                 <div key={key}>
-                  <label className="mb-1.5 flex items-center gap-2 text-xs font-medium text-zinc-400">
+                  <label className="mb-1.5 flex items-center gap-2 text-xs font-medium text-ink-muted">
                     {key}
                     {isReadOnly && (
-                      <span className="text-[10px] text-zinc-600">
+                      <span className="text-[10px] text-ink-faint">
                         read-only
                       </span>
                     )}
@@ -262,7 +262,9 @@ export function RowEditDrawer({
                     />
                   ) : value === null || value === undefined ? (
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-zinc-600 italic">null</span>
+                      <span className="text-sm text-ink-faint italic">
+                        null
+                      </span>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -304,12 +306,12 @@ export function RowEditDrawer({
         </div>
 
         {/* Danger zone */}
-        <div className="border-t border-zinc-800 pt-3">
+        <div className="border-t border-line pt-3">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleDelete}
-            className="w-full text-red-400 hover:bg-red-500/10 hover:text-red-300"
+            className="w-full text-danger hover:bg-danger-soft hover:text-danger"
           >
             <Trash2 className="h-3.5 w-3.5" />
             Delete this row
@@ -340,18 +342,18 @@ function ReadOnlyField({
       : str;
 
   return (
-    <div className="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-800/50 px-3 py-2">
-      <span className="flex-1 truncate font-mono text-xs text-zinc-500">
+    <div className="flex items-center gap-2 rounded-md border border-line bg-surface-raised/50 px-3 py-2">
+      <span className="flex-1 truncate font-mono text-xs text-ink-subtle">
         {displayValue}
       </span>
       <button
         onClick={() => onCopy(str, fieldKey)}
-        className="flex-shrink-0 text-zinc-500 hover:text-zinc-300"
+        className="flex-shrink-0 text-ink-subtle hover:text-ink-muted"
         aria-label={`Copy ${fieldKey}`}
         title="Copy"
       >
         {copied ? (
-          <Check className="h-3.5 w-3.5 text-green-400" />
+          <Check className="h-3.5 w-3.5 text-accent" />
         ) : (
           <Copy className="h-3.5 w-3.5" />
         )}
@@ -393,7 +395,7 @@ function TimestampField({
         value={dateStr}
         onChange={(e) => onChange(new Date(e.target.value).getTime())}
       />
-      <p className="text-xs text-zinc-600">{timeAgo(value)}</p>
+      <p className="text-xs text-ink-faint">{timeAgo(value)}</p>
     </div>
   );
 }
@@ -435,12 +437,12 @@ function ArrayField({
         {(value as string[]).map((item, i) => (
           <span
             key={i}
-            className="inline-flex items-center gap-1 rounded-full border border-zinc-700 bg-zinc-800 px-2.5 py-0.5 text-xs text-zinc-300"
+            className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-raised px-2.5 py-0.5 text-xs text-ink-muted"
           >
             {item}
             <button
               onClick={() => onChange(value.filter((_, idx) => idx !== i))}
-              className="ml-0.5 text-zinc-500 hover:text-red-400"
+              className="ml-0.5 text-ink-subtle hover:text-danger"
               aria-label={`Remove ${item}`}
             >
               ×
@@ -512,10 +514,10 @@ function ObjectField({
         rows={4}
         className={cn(
           "font-mono text-xs",
-          jsonError && "border-red-500/50 focus:border-red-500"
+          jsonError && "border-danger-line focus:border-danger-line"
         )}
       />
-      {jsonError && <p className="mt-1 text-xs text-red-400">{jsonError}</p>}
+      {jsonError && <p className="mt-1 text-xs text-danger">{jsonError}</p>}
     </div>
   );
 }

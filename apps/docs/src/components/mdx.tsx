@@ -4,23 +4,23 @@ import { Info, TriangleAlert, ShieldAlert, Lightbulb } from "lucide-react";
 const CALLOUT_STYLES = {
   info: {
     icon: Info,
-    wrapper: "border-blue-500/30 bg-blue-500/5",
-    label: "text-blue-400",
+    wrapper: "border-info-line bg-info-soft",
+    label: "text-info",
   },
   tip: {
     icon: Lightbulb,
-    wrapper: "border-green-500/30 bg-green-500/5",
-    label: "text-green-400",
+    wrapper: "border-accent-line bg-accent-soft",
+    label: "text-accent",
   },
   warning: {
     icon: TriangleAlert,
-    wrapper: "border-amber-500/30 bg-amber-500/5",
-    label: "text-amber-400",
+    wrapper: "border-warning-line bg-warning-soft",
+    label: "text-warning",
   },
   danger: {
     icon: ShieldAlert,
-    wrapper: "border-red-500/30 bg-red-500/5",
-    label: "text-red-400",
+    wrapper: "border-danger-line bg-danger-soft",
+    label: "text-danger",
   },
 } as const;
 
@@ -66,17 +66,17 @@ export function Callout({
  */
 export function Steps({ children }: { children: ReactNode }) {
   return (
-    <div className="my-6 border-l border-zinc-800 pl-6 [counter-reset:step] [&_h3]:relative [&_h3]:[counter-increment:step] before:[&_h3]:absolute before:[&_h3]:-left-[2.1rem] before:[&_h3]:flex before:[&_h3]:h-6 before:[&_h3]:w-6 before:[&_h3]:items-center before:[&_h3]:justify-center before:[&_h3]:rounded-full before:[&_h3]:border before:[&_h3]:border-green-500/30 before:[&_h3]:bg-zinc-950 before:[&_h3]:font-mono before:[&_h3]:text-[11px] before:[&_h3]:text-green-400 before:[&_h3]:content-[counter(step)]">
+    <div className="my-6 border-l border-line pl-6 [counter-reset:step] [&_h3]:relative [&_h3]:[counter-increment:step] before:[&_h3]:absolute before:[&_h3]:-left-[2.1rem] before:[&_h3]:flex before:[&_h3]:h-6 before:[&_h3]:w-6 before:[&_h3]:items-center before:[&_h3]:justify-center before:[&_h3]:rounded-full before:[&_h3]:border before:[&_h3]:border-accent-line before:[&_h3]:bg-canvas before:[&_h3]:font-mono before:[&_h3]:text-[11px] before:[&_h3]:text-accent before:[&_h3]:content-[counter(step)]">
       {children}
     </div>
   );
 }
 
 const METHOD_COLORS: Record<string, string> = {
-  GET: "border-green-500/30 bg-green-500/10 text-green-400",
-  POST: "border-blue-500/30 bg-blue-500/10 text-blue-400",
-  PATCH: "border-amber-500/30 bg-amber-500/10 text-amber-400",
-  DELETE: "border-red-500/30 bg-red-500/10 text-red-400",
+  GET: "border-accent-line bg-accent-soft text-accent",
+  POST: "border-info-line bg-info-soft text-info",
+  PATCH: "border-warning-line bg-warning-soft text-warning",
+  DELETE: "border-danger-line bg-danger-soft text-danger",
 };
 
 /**
@@ -96,20 +96,20 @@ export function Endpoint({
 }) {
   const color =
     METHOD_COLORS[method.toUpperCase()] ??
-    "border-zinc-700 bg-zinc-900 text-zinc-300";
+    "border-line bg-surface text-ink-muted";
 
   return (
-    <div className="my-6 flex flex-wrap items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+    <div className="my-6 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface/40 px-4 py-3">
       <span
         className={`rounded border px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wider ${color}`}
       >
         {method.toUpperCase()}
       </span>
-      <code className="font-mono text-sm text-zinc-200">{path}</code>
-      <span className="ml-auto flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-zinc-600">
+      <code className="font-mono text-sm text-ink">{path}</code>
+      <span className="ml-auto flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-ink-faint">
         <span>{auth}</span>
         {resource && (
-          <span className="rounded border border-zinc-800 px-1.5 py-0.5 text-zinc-400">
+          <span className="rounded border border-line px-1.5 py-0.5 text-ink-muted">
             {resource}
           </span>
         )}

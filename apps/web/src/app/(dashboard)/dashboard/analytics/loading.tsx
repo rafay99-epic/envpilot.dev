@@ -10,30 +10,30 @@ export default function AnalyticsLoading() {
       {/* Header skeleton */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="font-mono">
-          <div className="h-4 w-32 animate-pulse rounded bg-zinc-800/60" />
-          <div className="mt-2 h-6 w-24 animate-pulse rounded bg-zinc-800" />
+          <div className="h-4 w-32 animate-pulse rounded bg-surface-raised/60" />
+          <div className="mt-2 h-6 w-24 animate-pulse rounded bg-surface-raised" />
         </div>
-        <div className="flex gap-1 rounded-lg border border-zinc-700/50 bg-zinc-900/50 p-1">
-          <div className="h-8 w-12 animate-pulse rounded-md bg-zinc-800" />
-          <div className="h-8 w-12 animate-pulse rounded-md bg-zinc-800/60" />
-          <div className="h-8 w-12 animate-pulse rounded-md bg-zinc-800/60" />
+        <div className="flex gap-1 rounded-lg border border-line bg-surface/50 p-1">
+          <div className="h-8 w-12 animate-pulse rounded-md bg-surface-raised" />
+          <div className="h-8 w-12 animate-pulse rounded-md bg-surface-raised/60" />
+          <div className="h-8 w-12 animate-pulse rounded-md bg-surface-raised/60" />
         </div>
       </div>
 
       {/* Activity chart skeleton */}
-      <div className="overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90">
-        <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
-          <div className="h-3 w-3 rounded-full bg-zinc-700" />
-          <div className="h-3 w-3 rounded-full bg-zinc-700" />
-          <div className="h-3 w-3 rounded-full bg-zinc-700" />
-          <div className="ml-2 h-3 w-32 animate-pulse rounded bg-zinc-700" />
+      <div className="overflow-hidden rounded-lg border border-line bg-surface/90">
+        <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2.5">
+          <div className="h-3 w-3 rounded-full bg-surface-hover" />
+          <div className="h-3 w-3 rounded-full bg-surface-hover" />
+          <div className="h-3 w-3 rounded-full bg-surface-hover" />
+          <div className="ml-2 h-3 w-32 animate-pulse rounded bg-surface-hover" />
         </div>
         <div className="p-6">
           <div className="flex h-48 items-end gap-1">
             {BAR_HEIGHTS.map((h, i) => (
               <div
                 key={i}
-                className="flex-1 animate-pulse rounded-t bg-zinc-800/60"
+                className="flex-1 animate-pulse rounded-t bg-surface-raised/60"
                 style={{ height: `${h}%` }}
               />
             ))}
@@ -46,20 +46,20 @@ export default function AnalyticsLoading() {
         {[0, 1].map((i) => (
           <div
             key={i}
-            className="overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90"
+            className="overflow-hidden rounded-lg border border-line bg-surface/90"
           >
-            <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
-              <div className="h-3 w-3 rounded-full bg-zinc-700" />
-              <div className="h-3 w-3 rounded-full bg-zinc-700" />
-              <div className="h-3 w-3 rounded-full bg-zinc-700" />
-              <div className="ml-2 h-3 w-28 animate-pulse rounded bg-zinc-700" />
+            <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2.5">
+              <div className="h-3 w-3 rounded-full bg-surface-hover" />
+              <div className="h-3 w-3 rounded-full bg-surface-hover" />
+              <div className="h-3 w-3 rounded-full bg-surface-hover" />
+              <div className="ml-2 h-3 w-28 animate-pulse rounded bg-surface-hover" />
             </div>
             <div className="space-y-3 p-6">
               {Array.from({ length: 4 }).map((_, j) => (
                 <div key={j} className="flex items-center gap-3">
-                  <div className="h-3 w-20 animate-pulse rounded bg-zinc-800" />
+                  <div className="h-3 w-20 animate-pulse rounded bg-surface-raised" />
                   <div
-                    className="h-6 animate-pulse rounded bg-zinc-800/60"
+                    className="h-6 animate-pulse rounded bg-surface-raised/60"
                     style={{ width: `${70 - j * 15}%` }}
                   />
                 </div>
@@ -74,23 +74,23 @@ export default function AnalyticsLoading() {
         {[0, 1].map((i) => (
           <div
             key={i}
-            className="overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90"
+            className="overflow-hidden rounded-lg border border-line bg-surface/90"
           >
-            <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
-              <div className="h-3 w-3 rounded-full bg-zinc-700" />
-              <div className="h-3 w-3 rounded-full bg-zinc-700" />
-              <div className="h-3 w-3 rounded-full bg-zinc-700" />
-              <div className="ml-2 h-3 w-24 animate-pulse rounded bg-zinc-700" />
+            <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2.5">
+              <div className="h-3 w-3 rounded-full bg-surface-hover" />
+              <div className="h-3 w-3 rounded-full bg-surface-hover" />
+              <div className="h-3 w-3 rounded-full bg-surface-hover" />
+              <div className="ml-2 h-3 w-24 animate-pulse rounded bg-surface-hover" />
             </div>
             <div className="space-y-3 p-6">
               {Array.from({ length: 5 }).map((_, j) => (
                 <div key={j} className="flex items-center gap-3">
-                  <div className="h-8 w-8 animate-pulse rounded-full bg-zinc-800" />
+                  <div className="h-8 w-8 animate-pulse rounded-full bg-surface-raised" />
                   <div className="flex-1 space-y-1.5">
-                    <div className="h-3 w-24 animate-pulse rounded bg-zinc-800" />
-                    <div className="h-2 w-16 animate-pulse rounded bg-zinc-800/40" />
+                    <div className="h-3 w-24 animate-pulse rounded bg-surface-raised" />
+                    <div className="h-2 w-16 animate-pulse rounded bg-surface-raised/40" />
                   </div>
-                  <div className="h-3 w-8 animate-pulse rounded bg-zinc-800/60" />
+                  <div className="h-3 w-8 animate-pulse rounded bg-surface-raised/60" />
                 </div>
               ))}
             </div>
@@ -103,13 +103,13 @@ export default function AnalyticsLoading() {
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="rounded-lg border border-zinc-700/50 bg-zinc-900/90 p-6"
+            className="rounded-lg border border-line bg-surface/90 p-6"
           >
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 animate-pulse rounded-full bg-zinc-800" />
+              <div className="h-9 w-9 animate-pulse rounded-full bg-surface-raised" />
               <div className="space-y-1.5">
-                <div className="h-3 w-16 animate-pulse rounded bg-zinc-800/60" />
-                <div className="h-5 w-10 animate-pulse rounded bg-zinc-800" />
+                <div className="h-3 w-16 animate-pulse rounded bg-surface-raised/60" />
+                <div className="h-5 w-10 animate-pulse rounded bg-surface-raised" />
               </div>
             </div>
           </div>

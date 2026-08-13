@@ -12,12 +12,9 @@ interface ToastProps {
 }
 
 const variantClasses = {
-  error:
-    "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-400",
-  success:
-    "border-green-200 bg-green-50 text-green-700 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400",
-  warning:
-    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-400",
+  error: "border-danger-line bg-danger-soft text-danger",
+  success: "border-accent-line bg-accent-soft text-accent",
+  warning: "border-warning-line bg-warning-soft text-warning",
 };
 
 export function Toast({

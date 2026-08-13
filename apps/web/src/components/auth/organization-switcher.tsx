@@ -22,7 +22,7 @@ interface Organization {
 
 function ProBadge() {
   return (
-    <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+    <span className="flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-warning-soft text-warning">
       Pro
     </span>
   );
@@ -127,11 +127,11 @@ export function OrganizationSwitcher({
       <div
         className={`flex items-center gap-3 ${collapsed ? "justify-center px-0 py-2" : "px-3 py-2"}`}
       >
-        <div className="h-8 w-8 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-700" />
+        <div className="h-8 w-8 animate-pulse rounded-lg bg-surface-hover" />
         {!collapsed && (
           <div className="flex-1">
-            <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
-            <div className="mt-1 h-3 w-16 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+            <div className="h-4 w-24 animate-pulse rounded bg-surface-hover" />
+            <div className="mt-1 h-3 w-16 animate-pulse rounded bg-surface-hover" />
           </div>
         )}
       </div>
@@ -143,11 +143,11 @@ export function OrganizationSwitcher({
       <Link
         href="/organizations/new"
         title={collapsed ? "Create Organization" : undefined}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 ${collapsed ? "justify-center px-0" : ""}`}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors text-ink-muted hover:bg-surface-hover ${collapsed ? "justify-center px-0" : ""}`}
       >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-line-strong">
           <svg
-            className="h-4 w-4 text-zinc-400"
+            className="h-4 w-4 text-ink-muted"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -172,7 +172,7 @@ export function OrganizationSwitcher({
       <button
         onClick={() => setIsOpen(!isOpen)}
         title={collapsed ? currentOrg?.name : undefined}
-        className={`flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
+        className={`flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-surface-hover ${
           collapsed ? "justify-center px-0" : "justify-between gap-3 px-3"
         }`}
       >
@@ -188,19 +188,19 @@ export function OrganizationSwitcher({
               className="h-8 w-8 shrink-0 rounded-lg object-cover"
             />
           ) : (
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-200 dark:bg-zinc-700">
-              <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-hover">
+              <span className="text-sm font-semibold text-ink-muted">
                 {currentOrg?.name.charAt(0).toUpperCase()}
               </span>
             </div>
           )}
           {!collapsed && (
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              <p className="truncate text-sm font-medium text-ink">
                 {currentOrg?.name || "Select Organization"}
               </p>
               {currentOrg && (
-                <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="truncate text-xs text-ink-muted">
                   {formatRole(currentOrg.role)}
                 </p>
               )}
@@ -209,7 +209,7 @@ export function OrganizationSwitcher({
         </div>
         {!collapsed && (
           <svg
-            className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            className={`h-4 w-4 shrink-0 text-ink-muted transition-transform ${isOpen ? "rotate-180" : ""}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -227,7 +227,7 @@ export function OrganizationSwitcher({
       {/* Dropdown */}
       {isOpen && (
         <div
-          className={`absolute z-50 mt-1 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800 ${
+          className={`absolute z-50 mt-1 rounded-lg border py-1 shadow-lg border-line bg-surface-raised ${
             collapsed ? "left-full top-0 ml-2 w-64" : "left-0 right-0"
           }`}
         >
@@ -236,10 +236,8 @@ export function OrganizationSwitcher({
               <button
                 key={org._id}
                 onClick={() => handleSelectOrganization(org)}
-                className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-700 ${
-                  org._id === currentOrg?._id
-                    ? "bg-zinc-50 dark:bg-zinc-700/50"
-                    : ""
+                className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-surface-hover ${
+                  org._id === currentOrg?._id ? "bg-surface-hover/50" : ""
                 }`}
               >
                 {org.logoUrl ? (
@@ -251,26 +249,26 @@ export function OrganizationSwitcher({
                     className="h-8 w-8 flex-shrink-0 rounded-lg object-cover"
                   />
                 ) : (
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-200 dark:bg-zinc-600">
-                    <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-300">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-surface-hover">
+                    <span className="text-sm font-semibold text-ink-muted">
                       {org.name.charAt(0).toUpperCase()}
                     </span>
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    <p className="truncate text-sm font-medium text-ink">
                       {org.name}
                     </p>
                     {proOrgIds.has(org._id) && <ProBadge />}
                   </div>
-                  <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                  <p className="truncate text-xs text-ink-muted">
                     {formatRole(org.role)}
                   </p>
                 </div>
                 {org._id === currentOrg?._id && (
                   <svg
-                    className="h-4 w-4 flex-shrink-0 text-green-500"
+                    className="h-4 w-4 flex-shrink-0 text-accent"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -287,11 +285,11 @@ export function OrganizationSwitcher({
             ))}
           </div>
 
-          <div className="border-t border-zinc-200 dark:border-zinc-700">
+          <div className="border-t border-line">
             <Link
               href="/organizations"
               onClick={() => setIsOpen(false)}
-              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors text-ink-muted hover:bg-surface-hover"
             >
               <svg
                 className="h-4 w-4"
@@ -316,7 +314,7 @@ export function OrganizationSwitcher({
             <Link
               href="/organizations/new"
               onClick={() => setIsOpen(false)}
-              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors text-ink-muted hover:bg-surface-hover"
             >
               <svg
                 className="h-4 w-4"

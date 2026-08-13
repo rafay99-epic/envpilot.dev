@@ -101,24 +101,24 @@ const severityColors: Record<
   { bg: string; text: string; dot: string }
 > = {
   info: {
-    bg: "bg-blue-50 dark:bg-blue-900/20",
-    text: "text-blue-700 dark:text-blue-400",
-    dot: "bg-blue-500",
+    bg: "bg-info-soft",
+    text: "text-info",
+    dot: "bg-info",
   },
   warning: {
-    bg: "bg-yellow-50 dark:bg-yellow-900/20",
-    text: "text-yellow-700 dark:text-yellow-400",
-    dot: "bg-yellow-500",
+    bg: "bg-warning-soft",
+    text: "text-warning",
+    dot: "bg-warning",
   },
   error: {
-    bg: "bg-red-50 dark:bg-red-900/20",
-    text: "text-red-700 dark:text-red-400",
-    dot: "bg-red-500",
+    bg: "bg-danger-soft",
+    text: "text-danger",
+    dot: "bg-danger",
   },
   critical: {
-    bg: "bg-red-100 dark:bg-red-900/30",
-    text: "text-red-800 dark:text-red-300",
-    dot: "bg-red-600",
+    bg: "bg-danger-soft",
+    text: "text-danger",
+    dot: "bg-danger",
   },
 };
 
@@ -300,13 +300,13 @@ export function AuditLogList({
         {[...Array(5)].map((_, i) => (
           <div
             key={i}
-            className="animate-pulse rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+            className="animate-pulse rounded-lg border p-4 border-line bg-surface"
           >
             <div className="flex items-start gap-3">
-              <div className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-700" />
+              <div className="h-8 w-8 rounded-full bg-surface-hover" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 w-3/4 rounded bg-zinc-200 dark:bg-zinc-700" />
-                <div className="h-3 w-1/2 rounded bg-zinc-200 dark:bg-zinc-700" />
+                <div className="h-4 w-3/4 rounded bg-surface-hover" />
+                <div className="h-3 w-1/2 rounded bg-surface-hover" />
               </div>
             </div>
           </div>
@@ -317,9 +317,9 @@ export function AuditLogList({
 
   if (!logs || logs.length === 0) {
     return (
-      <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="rounded-lg border p-8 text-center border-line bg-surface">
         <svg
-          className="mx-auto h-12 w-12 text-zinc-400"
+          className="mx-auto h-12 w-12 text-ink-muted"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -331,9 +331,7 @@ export function AuditLogList({
             d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
           />
         </svg>
-        <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
-          {emptyMessage}
-        </p>
+        <p className="mt-4 text-sm text-ink-muted">{emptyMessage}</p>
       </div>
     );
   }
@@ -351,8 +349,8 @@ export function AuditLogList({
             key={log._id}
             className={`rounded-lg border p-4 transition-colors ${
               severity === "critical" || severity === "warning"
-                ? `${colors.bg} border-${severity === "critical" ? "red" : "yellow"}-200 dark:border-${severity === "critical" ? "red" : "yellow"}-800`
-                : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+                ? `${colors.bg} border-${severity === "critical" ? "red" : "yellow"}-200 border-${severity === "critical" ? "red" : "yellow"}-800`
+                : "border-line bg-surface"
             }`}
           >
             <div className="flex items-start gap-3">
@@ -363,11 +361,11 @@ export function AuditLogList({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                  <span className="font-medium text-ink">
                     {actionLabels[log.action] || log.action}
                   </span>
                   {log.involvesSensitiveData && (
-                    <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-danger-soft text-danger">
                       Sensitive
                     </span>
                   )}
@@ -382,7 +380,7 @@ export function AuditLogList({
                     </span>
                   )}
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500 dark:text-zinc-400">
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
                   <span>by {log.userName}</span>
                   <span>&middot;</span>
                   <span>
@@ -399,7 +397,7 @@ export function AuditLogList({
                 </div>
                 {log.parsedDetails &&
                   Object.keys(log.parsedDetails).length > 0 && (
-                    <div className="mt-2 rounded bg-zinc-50 p-2 text-xs font-mono text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                    <div className="mt-2 rounded p-2 text-xs font-mono bg-surface-raised text-ink-muted">
                       {Object.entries(log.parsedDetails)
                         .filter(
                           ([key]) =>
@@ -413,9 +411,7 @@ export function AuditLogList({
                         .slice(0, 3)
                         .map(([key, value]) => (
                           <div key={key} className="truncate">
-                            <span className="text-zinc-400 dark:text-zinc-500">
-                              {key}:
-                            </span>{" "}
+                            <span className="text-ink-subtle">{key}:</span>{" "}
                             {typeof value === "object"
                               ? JSON.stringify(value)
                               : String(value)}

@@ -88,7 +88,7 @@ export function MermaidChart({ chart }: { chart: string | undefined }) {
 
   if (failed) {
     return (
-      <pre className="my-6 overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-xs text-zinc-400">
+      <pre className="my-6 overflow-x-auto rounded-xl border border-line bg-surface/40 p-4 text-xs text-ink-muted">
         {chart ?? "Unknown diagram"}
       </pre>
     );
@@ -96,7 +96,7 @@ export function MermaidChart({ chart }: { chart: string | undefined }) {
 
   return (
     <div
-      className="my-6 flex justify-center overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/40 p-4"
+      className="my-6 flex justify-center overflow-x-auto rounded-xl border border-line bg-surface/40 p-4"
       // mermaid owns this markup and, at securityLevel "strict", sanitizes it
       // before returning. Nothing from the doc body reaches here unfiltered.
       dangerouslySetInnerHTML={svg === null ? undefined : { __html: svg }}

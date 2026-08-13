@@ -304,9 +304,7 @@ export function TierDefinitionsTab() {
   return (
     <section>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-zinc-100">
-          Tier Definitions
-        </h2>
+        <h2 className="text-lg font-semibold text-ink">Tier Definitions</h2>
         <div className="flex gap-2">
           {tierDefs && tierDefs.length === 0 && (
             <Button
@@ -347,10 +345,10 @@ export function TierDefinitionsTab() {
                         className="h-3 w-3 rounded-full"
                         style={{
                           backgroundColor: tier.color ?? "#71717a",
-                          boxShadow: `0 0 0 2px var(--color-zinc-900), 0 0 0 3px ${tier.color ?? "#71717a"}`,
+                          boxShadow: `0 0 0 2px var(--color-surface), 0 0 0 3px ${tier.color ?? "#71717a"}`,
                         }}
                       />
-                      <h3 className="font-semibold text-zinc-100">
+                      <h3 className="font-semibold text-ink">
                         {tier.displayName}
                       </h3>
                       <Badge
@@ -359,7 +357,7 @@ export function TierDefinitionsTab() {
                         {tier.name}
                       </Badge>
                       {tier.isDefault && (
-                        <span className="flex items-center gap-1 text-xs text-amber-400">
+                        <span className="flex items-center gap-1 text-xs text-warning">
                           <Star className="h-3 w-3" />
                           Default
                         </span>
@@ -369,7 +367,7 @@ export function TierDefinitionsTab() {
                       <button
                         onClick={() => openEdit(tier)}
                         aria-label={`Edit ${tier.displayName}`}
-                        className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                        className="rounded p-1.5 text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
                         title="Edit tier"
                       >
                         <Pencil className="h-3.5 w-3.5" />
@@ -378,7 +376,7 @@ export function TierDefinitionsTab() {
                         onClick={() => handleDelete(tier._id)}
                         disabled={!canDelete}
                         aria-label={`Delete ${tier.displayName}`}
-                        className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="rounded p-1.5 text-ink-muted transition-colors hover:bg-surface-hover hover:text-danger disabled:cursor-not-allowed disabled:opacity-30"
                         title={
                           tier.isDefault
                             ? "Cannot delete the default tier"
@@ -397,19 +395,19 @@ export function TierDefinitionsTab() {
                   </div>
 
                   {tier.description && (
-                    <p className="mb-3 text-xs text-zinc-400">
+                    <p className="mb-3 text-xs text-ink-muted">
                       {tier.description}
                     </p>
                   )}
 
-                  <div className="flex items-center gap-4 text-xs text-zinc-400">
+                  <div className="flex items-center gap-4 text-xs text-ink-muted">
                     <span className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
                       {userCount} user{userCount !== 1 ? "s" : ""}
                     </span>
                     {tier.polarProductId && (
                       <span
-                        className="flex items-center gap-1 text-zinc-500"
+                        className="flex items-center gap-1 text-ink-subtle"
                         title={tier.polarProductId}
                       >
                         <CreditCard className="h-3 w-3" />
@@ -438,8 +436,8 @@ export function TierDefinitionsTab() {
       >
         <div className="flex h-full flex-col">
           {/* Live preview card */}
-          <div className="mb-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+          <div className="mb-6 rounded-lg border border-line bg-surface/50 p-4">
+            <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-ink-subtle">
               Preview
             </p>
             <div className="flex items-center gap-3">
@@ -453,18 +451,20 @@ export function TierDefinitionsTab() {
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-zinc-100">
+                  <span className="text-sm font-semibold text-ink">
                     {form.displayName || "Tier Name"}
                   </span>
                   {form.isDefault && (
-                    <span className="flex items-center gap-0.5 text-[10px] text-amber-400">
+                    <span className="flex items-center gap-0.5 text-[10px] text-warning">
                       <Star className="h-2.5 w-2.5" />
                       Default
                     </span>
                   )}
                 </div>
                 {form.name && (
-                  <p className="font-mono text-xs text-zinc-500">{form.name}</p>
+                  <p className="font-mono text-xs text-ink-subtle">
+                    {form.name}
+                  </p>
                 )}
               </div>
             </div>
@@ -474,7 +474,7 @@ export function TierDefinitionsTab() {
           <div className="flex-1 space-y-5">
             {/* Section: Identity */}
             <fieldset className="space-y-4">
-              <legend className="mb-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+              <legend className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-subtle">
                 Identity
               </legend>
 
@@ -489,12 +489,12 @@ export function TierDefinitionsTab() {
                   placeholder="e.g. Enterprise"
                   className={
                     formErrors.displayName
-                      ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                      ? "border-danger-line focus:border-danger-line focus:ring-danger-line"
                       : ""
                   }
                 />
                 {formErrors.displayName && (
-                  <p className="mt-1 text-xs text-red-400">
+                  <p className="mt-1 text-xs text-danger">
                     {formErrors.displayName}
                   </p>
                 )}
@@ -505,30 +505,30 @@ export function TierDefinitionsTab() {
                   <div className="mb-1.5 flex items-center gap-1.5">
                     <label
                       htmlFor="tier-name"
-                      className="text-sm font-medium text-zinc-300"
+                      className="text-sm font-medium text-ink-muted"
                     >
                       Slug
                     </label>
-                    <span className="text-[10px] text-zinc-500">
+                    <span className="text-[10px] text-ink-subtle">
                       (auto-generated)
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Tag className="h-4 w-4 shrink-0 text-zinc-500" />
+                    <Tag className="h-4 w-4 shrink-0 text-ink-subtle" />
                     <input
                       id="tier-name"
                       value={form.name}
                       onChange={(e) => updateFormField("name", e.target.value)}
                       placeholder="e.g. enterprise"
-                      className={`w-full rounded-md border bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 ${
+                      className={`w-full rounded-md border bg-surface px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-1 ${
                         formErrors.name
-                          ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                          : "border-zinc-700 focus:border-emerald-500 focus:ring-emerald-500"
+                          ? "border-danger-line focus:border-danger-line focus:ring-danger-line"
+                          : "border-line focus:border-accent-line focus:ring-accent-line"
                       }`}
                     />
                   </div>
                   {formErrors.name && (
-                    <p className="mt-1 text-xs text-red-400">
+                    <p className="mt-1 text-xs text-danger">
                       {formErrors.name}
                     </p>
                   )}
@@ -544,15 +544,15 @@ export function TierDefinitionsTab() {
               />
             </fieldset>
 
-            <hr className="border-zinc-800/60" />
+            <hr className="border-line" />
 
             {/* Section: Appearance */}
             <fieldset>
-              <legend className="mb-3 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+              <legend className="mb-3 text-[11px] font-medium uppercase tracking-wider text-ink-subtle">
                 Appearance
               </legend>
               <div>
-                <label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-zinc-300">
+                <label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-ink-muted">
                   <Palette className="h-3.5 w-3.5" />
                   Color
                 </label>
@@ -566,14 +566,14 @@ export function TierDefinitionsTab() {
                       className={`h-7 w-7 rounded-full border-2 transition-all ${
                         form.color.toLowerCase() === preset.hex
                           ? "scale-110 border-white shadow-lg"
-                          : "border-zinc-700 hover:scale-105 hover:border-zinc-400"
+                          : "border-line hover:scale-105 hover:border-line-strong"
                       }`}
                       style={{ backgroundColor: preset.hex }}
                     />
                   ))}
                   <div className="ml-1 flex items-center gap-1.5">
                     <div
-                      className="h-7 w-7 rounded-md border border-zinc-700"
+                      className="h-7 w-7 rounded-md border border-line"
                       style={{
                         backgroundColor: /^#[0-9a-fA-F]{6}$/.test(form.color)
                           ? form.color
@@ -586,27 +586,25 @@ export function TierDefinitionsTab() {
                       aria-label="Custom hex color"
                       onChange={(e) => updateFormField("color", e.target.value)}
                       placeholder="#a855f7"
-                      className={`w-24 rounded-md border bg-zinc-900 px-2 py-1.5 font-mono text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 ${
+                      className={`w-24 rounded-md border bg-surface px-2 py-1.5 font-mono text-xs text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-1 ${
                         formErrors.color
-                          ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                          : "border-zinc-700 focus:border-emerald-500 focus:ring-emerald-500"
+                          ? "border-danger-line focus:border-danger-line focus:ring-danger-line"
+                          : "border-line focus:border-accent-line focus:ring-accent-line"
                       }`}
                     />
                   </div>
                 </div>
                 {formErrors.color && (
-                  <p className="mt-1 text-xs text-red-400">
-                    {formErrors.color}
-                  </p>
+                  <p className="mt-1 text-xs text-danger">{formErrors.color}</p>
                 )}
               </div>
             </fieldset>
 
-            <hr className="border-zinc-800/60" />
+            <hr className="border-line" />
 
             {/* Section: Configuration */}
             <fieldset className="space-y-4">
-              <legend className="mb-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+              <legend className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-subtle">
                 Configuration
               </legend>
 
@@ -614,7 +612,7 @@ export function TierDefinitionsTab() {
                 <div>
                   <label
                     htmlFor="tier-sort-order"
-                    className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-zinc-300"
+                    className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-ink-muted"
                   >
                     <ArrowUpDown className="h-3.5 w-3.5" />
                     Sort Order
@@ -630,14 +628,14 @@ export function TierDefinitionsTab() {
                         parseInt(e.target.value, 10) || 0
                       )
                     }
-                    className={`w-full rounded-md border bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-1 ${
+                    className={`w-full rounded-md border bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-1 ${
                       formErrors.sortOrder
-                        ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                        : "border-zinc-700 focus:border-emerald-500 focus:ring-emerald-500"
+                        ? "border-danger-line focus:border-danger-line focus:ring-danger-line"
+                        : "border-line focus:border-accent-line focus:ring-accent-line"
                     }`}
                   />
                   {formErrors.sortOrder && (
-                    <p className="mt-1 text-xs text-red-400">
+                    <p className="mt-1 text-xs text-danger">
                       {formErrors.sortOrder}
                     </p>
                   )}
@@ -646,7 +644,7 @@ export function TierDefinitionsTab() {
                 <div>
                   <label
                     htmlFor="tier-polar-id"
-                    className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-zinc-300"
+                    className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-ink-muted"
                   >
                     <CreditCard className="h-3.5 w-3.5" />
                     Polar Product ID
@@ -659,41 +657,41 @@ export function TierDefinitionsTab() {
                       updateFormField("polarProductId", e.target.value)
                     }
                     placeholder="prod_..."
-                    className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-subtle focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
                   />
-                  <p className="mt-1 text-[10px] text-zinc-500">Optional</p>
+                  <p className="mt-1 text-[10px] text-ink-subtle">Optional</p>
                 </div>
               </div>
 
-              <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2.5 text-sm text-zinc-300 transition-colors hover:border-zinc-700">
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-line bg-surface/50 px-3 py-2.5 text-sm text-ink-muted transition-colors hover:border-line">
                 <input
                   type="checkbox"
                   checked={form.isDefault}
                   onChange={(e) =>
                     updateFormField("isDefault", e.target.checked)
                   }
-                  className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-emerald-500 focus:ring-emerald-500"
+                  className="h-4 w-4 rounded border-line-strong bg-surface-raised text-accent focus:ring-accent-line"
                 />
                 <div>
                   <span className="font-medium">Default tier</span>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-ink-subtle">
                     Auto-assigned to new users
                   </p>
                 </div>
               </label>
 
-              <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2.5 text-sm text-zinc-300 transition-colors hover:border-zinc-700">
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-line bg-surface/50 px-3 py-2.5 text-sm text-ink-muted transition-colors hover:border-line">
                 <input
                   type="checkbox"
                   checked={form.isComingSoon}
                   onChange={(e) =>
                     updateFormField("isComingSoon", e.target.checked)
                   }
-                  className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-amber-500 focus:ring-amber-500"
+                  className="h-4 w-4 rounded border-line-strong bg-surface-raised text-warning focus:ring-warning-line"
                 />
                 <div>
                   <span className="font-medium">Coming Soon</span>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-ink-subtle">
                     Disables the upgrade button on the pricing page
                   </p>
                 </div>
@@ -702,7 +700,7 @@ export function TierDefinitionsTab() {
           </div>
 
           {/* Sticky footer */}
-          <div className="mt-6 flex items-center justify-end gap-2 border-t border-zinc-800 pt-4">
+          <div className="mt-6 flex items-center justify-end gap-2 border-t border-line pt-4">
             <Button
               variant="ghost"
               onClick={async () => {

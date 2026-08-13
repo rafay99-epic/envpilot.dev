@@ -145,7 +145,7 @@ export function VariableForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+        <div className="rounded-lg p-3 text-sm bg-danger-soft text-danger">
           {error}
         </div>
       )}
@@ -154,9 +154,9 @@ export function VariableForm({
       <div>
         <label
           htmlFor="key"
-          className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          className="block text-sm font-medium text-ink-muted"
         >
-          Key <span className="text-red-500">*</span>
+          Key <span className="text-danger">*</span>
         </label>
         <input
           id="key"
@@ -165,10 +165,10 @@ export function VariableForm({
           onChange={handleKeyChange}
           disabled={isEditing}
           placeholder="DATABASE_URL"
-          className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 font-mono text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500 dark:disabled:bg-zinc-900"
+          className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong disabled:cursor-not-allowed border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
         />
         {isEditing && (
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 text-xs text-ink-muted">
             Variable key cannot be changed after creation
           </p>
         )}
@@ -178,11 +178,13 @@ export function VariableForm({
       <div>
         <label
           htmlFor="value"
-          className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          className="block text-sm font-medium text-ink-muted"
         >
-          Value {!isEditing && <span className="text-red-500">*</span>}
+          Value {!isEditing && <span className="text-danger">*</span>}
           {isEditing && (
-            <span className="text-zinc-400">(leave empty to keep current)</span>
+            <span className="text-ink-muted">
+              (leave empty to keep current)
+            </span>
           )}
         </label>
         <div className="relative mt-1">
@@ -196,12 +198,12 @@ export function VariableForm({
             placeholder={
               isEditing ? "Enter new value or leave empty" : "postgres://..."
             }
-            className="block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 pr-10 font-mono text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+            className="block w-full rounded-lg border px-4 py-2 pr-10 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
           />
           <button
             type="button"
             onClick={() => setShowValue((prev) => !prev)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-muted hover:text-ink-muted"
           >
             {showValue ? (
               <svg
@@ -245,9 +247,9 @@ export function VariableForm({
       <div>
         <label
           htmlFor="description"
-          className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          className="block text-sm font-medium text-ink-muted"
         >
-          Description <span className="text-zinc-400">(optional)</span>
+          Description <span className="text-ink-muted">(optional)</span>
         </label>
         <textarea
           id="description"
@@ -257,14 +259,14 @@ export function VariableForm({
           }
           placeholder="Brief description of what this variable is used for..."
           rows={2}
-          className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+          className="mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
         />
       </div>
 
       {/* Environments */}
       <div>
-        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Environments <span className="text-red-500">*</span>
+        <label className="block text-sm font-medium text-ink-muted">
+          Environments <span className="text-danger">*</span>
         </label>
         <div className="mt-2 flex flex-wrap gap-2">
           {ENVIRONMENTS.map((env) => (
@@ -312,16 +314,16 @@ export function VariableForm({
             }
             className="h-4 w-4"
           />
-          <span className="text-sm text-zinc-700 dark:text-zinc-300">
+          <span className="text-sm text-ink-muted">
             Mark as sensitive{" "}
-            <span className="text-zinc-400">(masks value by default)</span>
+            <span className="text-ink-muted">(masks value by default)</span>
           </span>
         </label>
       </div>
 
       {/* Rotation schedule (shown when feature is enabled for this org) */}
       {showRotation && (
-        <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+        <div className="rounded-lg border p-4 border-line">
           <label className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -329,8 +331,8 @@ export function VariableForm({
               onChange={handleRotationToggle}
               className="h-4 w-4"
             />
-            <span className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-              <RotateCcw className="h-4 w-4 text-zinc-400" />
+            <span className="flex items-center gap-2 text-sm text-ink-muted">
+              <RotateCcw className="h-4 w-4 text-ink-muted" />
               Enable rotation schedule
             </span>
           </label>
@@ -344,7 +346,7 @@ export function VariableForm({
                     rotationFrequencyDays: Number(e.target.value),
                   }))
                 }
-                className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                className="rounded-lg border px-3 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink"
               >
                 {ROTATION_PRESETS.map((preset) => (
                   <option key={preset.value} value={preset.value}>
@@ -352,7 +354,7 @@ export function VariableForm({
                   </option>
                 ))}
               </select>
-              <p className="mt-1.5 text-xs text-zinc-500">
+              <p className="mt-1.5 text-xs text-ink-subtle">
                 You&apos;ll receive reminders before the secret expires.
               </p>
             </div>
@@ -366,14 +368,14 @@ export function VariableForm({
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          className="rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
         >
           {isSubmitting ? "Saving..." : submitLabel}
         </button>

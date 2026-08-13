@@ -170,43 +170,43 @@ export default async function BlogPostPage({ params }: PageProps) {
                 <div className="mb-6 flex items-center justify-between gap-3">
                   <Link
                     href="/"
-                    className="inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 transition-colors hover:text-green-400"
+                    className="inline-flex items-center gap-1.5 font-mono text-xs text-ink-subtle transition-colors hover:text-accent"
                   >
                     <ArrowLeft className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">back to blog</span>
                     <span className="sm:hidden">blog</span>
                   </Link>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-green-500/20 bg-green-500/5 px-2.5 py-0.5 font-mono text-[10px] tracking-wider text-green-400">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft px-2.5 py-0.5 font-mono text-[10px] tracking-wider text-accent">
                     {"// blog"}
                   </span>
                 </div>
 
                 {/* Title */}
-                <h1 className="font-sans text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl md:text-4xl">
+                <h1 className="font-sans text-2xl font-bold tracking-tight text-ink sm:text-3xl md:text-4xl">
                   {post.title}
                 </h1>
 
                 {/* Author + Date + Reading time row */}
                 <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full border border-green-500/20 bg-green-500/10 text-[10px] font-bold text-green-400 sm:h-8 sm:w-8 sm:text-xs">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full border border-accent-line bg-accent-soft text-[10px] font-bold text-accent sm:h-8 sm:w-8 sm:text-xs">
                       {post.author.name.charAt(0)}
                     </div>
-                    <span className="font-mono text-sm text-zinc-300">
+                    <span className="font-mono text-sm text-ink-muted">
                       {post.author.name}
                     </span>
                   </div>
                   <span
                     aria-hidden
-                    className="hidden h-1 w-1 rounded-full bg-zinc-700 sm:block"
+                    className="hidden h-1 w-1 rounded-full bg-surface-hover sm:block"
                   />
                   <time
                     dateTime={post.date}
-                    className="font-mono text-xs text-zinc-500 sm:text-sm"
+                    className="font-mono text-xs text-ink-subtle sm:text-sm"
                   >
                     {format(parseISO(post.date), "MMMM d, yyyy")}
                   </time>
-                  <span className="flex items-center gap-1 font-mono text-xs text-zinc-600">
+                  <span className="flex items-center gap-1 font-mono text-xs text-ink-faint">
                     <Clock className="h-3 w-3" />
                     {post.readingTime}
                   </span>
@@ -214,11 +214,11 @@ export default async function BlogPostPage({ params }: PageProps) {
 
                 {/* Series */}
                 {post.series && (
-                  <div className="mt-4 inline-flex items-center gap-2 rounded-md border border-green-500/20 bg-green-500/5 px-2.5 py-1 font-mono text-xs text-green-400">
+                  <div className="mt-4 inline-flex items-center gap-2 rounded-md border border-accent-line bg-accent-soft px-2.5 py-1 font-mono text-xs text-accent">
                     <Layers className="h-3 w-3" />
                     <span>{post.series}</span>
                     {post.seriesPart && (
-                      <span className="text-zinc-500">
+                      <span className="text-ink-subtle">
                         part {post.seriesPart}
                         {post.seriesTotal ? ` of ${post.seriesTotal}` : ""}
                       </span>
@@ -233,7 +233,7 @@ export default async function BlogPostPage({ params }: PageProps) {
                       <Link
                         key={tag}
                         href={`/?tag=${encodeURIComponent(tag)}`}
-                        className="rounded-full border border-zinc-800 bg-zinc-900/40 px-2.5 py-0.5 font-mono text-[10px] text-zinc-500 transition-colors hover:border-green-500/30 hover:text-green-400 sm:text-[11px]"
+                        className="rounded-full border border-line bg-surface/40 px-2.5 py-0.5 font-mono text-[10px] text-ink-subtle transition-colors hover:border-accent-line hover:text-accent sm:text-[11px]"
                       >
                         #{tag}
                       </Link>
@@ -255,10 +255,10 @@ export default async function BlogPostPage({ params }: PageProps) {
             </article>
 
             {/* Bottom back link */}
-            <div className="mt-16 border-t border-zinc-800/60 pt-8">
+            <div className="mt-16 border-t border-line pt-8">
               <Link
                 href="/"
-                className="inline-flex items-center gap-2 font-mono text-sm text-zinc-500 transition-colors hover:text-green-400"
+                className="inline-flex items-center gap-2 font-mono text-sm text-ink-subtle transition-colors hover:text-accent"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to all posts

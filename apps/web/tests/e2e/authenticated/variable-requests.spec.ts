@@ -292,7 +292,7 @@ test.describe("variable requests — reviewer approvals page", () => {
 
     // Value must be hidden before the toggle is clicked (revealed value uses a
     // green <code>; nothing green until we fetch it).
-    const revealedValue = row.locator("code.text-green-400");
+    const revealedValue = row.locator("code.text-accent");
     await expect(revealedValue).toHaveCount(0);
 
     // Reveal → toggle env off/on → approve, retried as a unit: RequestRow

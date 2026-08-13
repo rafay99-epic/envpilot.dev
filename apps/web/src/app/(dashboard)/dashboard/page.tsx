@@ -20,6 +20,7 @@ import {
   TerminalEmptyState,
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
+import { PageHeader } from "@envpilot/ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { SharedSecretsWidget } from "@/components/dashboard/shared-secrets-widget";
 import { normalizeOrgRole, roleLabel } from "@/lib/roles";
@@ -63,10 +64,10 @@ export default function DashboardPage() {
   if (!organization) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="font-mono text-sm text-zinc-500">
-          <span className="text-green-400">$</span> envpilot whoami
+        <p className="font-mono text-sm text-ink-subtle">
+          <span className="text-accent">$</span> envpilot whoami
         </p>
-        <p className="mt-2 text-sm text-zinc-400">
+        <p className="mt-2 text-sm text-ink-muted">
           No active organization. Create or join one to continue.
         </p>
         <TerminalButtonLink href="/organizations" className="mt-6">
@@ -78,23 +79,18 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="font-mono">
-          <p className="text-xs text-zinc-500">
-            [{user?.firstName || "user"}@envpilot ~]$
-          </p>
-          <h1 className="mt-1 text-xl font-bold text-zinc-100">
-            Welcome back, {user?.firstName || "there"}
-          </h1>
-        </div>
-        {canCreateProject && (
-          <TerminalButtonLink href="/dashboard/projects/new">
-            <Plus className="h-4 w-4" />
-            New Project
-          </TerminalButtonLink>
-        )}
-      </div>
+      <PageHeader
+        cmd={"[" + (user?.firstName || "user") + "@envpilot ~]$"}
+        title={"Welcome back, " + (user?.firstName || "there")}
+        actions={
+          canCreateProject ? (
+            <TerminalButtonLink href="/dashboard/projects/new">
+              <Plus className="h-4 w-4" />
+              New Project
+            </TerminalButtonLink>
+          ) : undefined
+        }
+      />
 
       {/* Stats as terminal output */}
       <TerminalWindow title="system-status">
@@ -103,8 +99,8 @@ export default function DashboardPage() {
             <TerminalLoading />
           ) : (
             <div className="space-y-1.5">
-              <p className="text-xs text-zinc-500 mb-3">
-                <span className="text-green-400">$</span> envpilot stats
+              <p className="text-xs text-ink-subtle mb-3">
+                <span className="text-accent">$</span> envpilot stats
               </p>
               <StatLine
                 label="projects"
@@ -141,7 +137,7 @@ export default function DashboardPage() {
             !isOnboardingComplete(onboardingStatus) && (
               <TerminalWindow title="getting-started">
                 <div className="p-5 font-mono text-sm">
-                  <p className="text-xs text-zinc-500 mb-4">
+                  <p className="text-xs text-ink-subtle mb-4">
                     Complete these steps to get the most out of Envpilot.
                   </p>
                   <div className="space-y-2">
@@ -175,19 +171,11 @@ export default function DashboardPage() {
             )}
 
           {/* Recent Projects */}
-          <TerminalWindow title="recent-projects">
-            <div className="flex items-center justify-between border-b border-zinc-700/50 px-5 py-2.5">
-              <span className="font-mono text-xs text-zinc-500">
-                <span className="text-green-400">$</span> envpilot project list
-                --recent
-              </span>
-              <Link
-                href="/dashboard/projects"
-                className="text-xs text-zinc-500 hover:text-green-400"
-              >
-                View all
-              </Link>
-            </div>
+          <TerminalWindow
+            title="recent-projects"
+            cmd="envpilot project list --recent"
+            action={{ label: "View all", href: "/dashboard/projects" }}
+          >
             {projectsLoading ? (
               <TerminalLoading />
             ) : projects.length === 0 ? (
@@ -204,7 +192,7 @@ export default function DashboardPage() {
                 }
               />
             ) : (
-              <AnimatedList className="divide-y divide-zinc-800/50">
+              <AnimatedList className="divide-y divide-line">
                 {projects.map((project: RecentProject) => (
                   <ProjectRow key={project._id} project={project} />
                 ))}
@@ -213,18 +201,11 @@ export default function DashboardPage() {
           </TerminalWindow>
 
           {/* Recent Activity */}
-          <TerminalWindow title="activity-log">
-            <div className="flex items-center justify-between border-b border-zinc-700/50 px-5 py-2.5">
-              <span className="font-mono text-xs text-zinc-500">
-                <span className="text-green-400">$</span> envpilot audit --tail
-              </span>
-              <Link
-                href="/dashboard/audit"
-                className="text-xs text-zinc-500 hover:text-green-400"
-              >
-                View all
-              </Link>
-            </div>
+          <TerminalWindow
+            title="activity-log"
+            cmd="envpilot audit --tail"
+            action={{ label: "View all", href: "/dashboard/audit" }}
+          >
             {activityLoading ? (
               <TerminalLoading />
             ) : activity.length === 0 ? (
@@ -233,7 +214,7 @@ export default function DashboardPage() {
                 message="No recent activity. Start by creating a project!"
               />
             ) : (
-              <AnimatedList className="divide-y divide-zinc-800/50">
+              <AnimatedList className="divide-y divide-line">
                 {activity.slice(0, 5).map((item: ActivityItem) => (
                   <ActivityRow key={item._id} activity={item} />
                 ))}
@@ -243,26 +224,18 @@ export default function DashboardPage() {
 
           {/* Expiring Secrets */}
           {showRotation && (
-            <TerminalWindow title="expiring-secrets">
-              <div className="flex items-center justify-between border-b border-zinc-700/50 px-5 py-2.5">
-                <span className="font-mono text-xs text-zinc-500">
-                  <span className="text-green-400">$</span> envpilot secrets
-                  --expiring
-                </span>
-                <Link
-                  href="/dashboard/variables"
-                  className="text-xs text-zinc-500 hover:text-green-400"
-                >
-                  View all
-                </Link>
-              </div>
+            <TerminalWindow
+              title="expiring-secrets"
+              cmd="envpilot secrets --expiring"
+              action={{ label: "View all", href: "/dashboard/variables" }}
+            >
               {expiringVariables.length === 0 ? (
                 <TerminalEmptyState
                   command="envpilot secrets --expiring"
                   message="No secrets expiring in the next 7 days."
                 />
               ) : (
-                <AnimatedList className="divide-y divide-zinc-800/50">
+                <AnimatedList className="divide-y divide-line">
                   {expiringVariables.map((v) => (
                     <ExpiringSecretRow key={String(v._id)} variable={v} />
                   ))}
@@ -282,18 +255,11 @@ export default function DashboardPage() {
 
         {/* Right Column -- Team */}
         <div className="space-y-6">
-          <TerminalWindow title="team-members">
-            <div className="flex items-center justify-between border-b border-zinc-700/50 px-5 py-2.5">
-              <span className="font-mono text-xs text-zinc-500">
-                <span className="text-green-400">$</span> envpilot team list
-              </span>
-              <Link
-                href="/dashboard/team"
-                className="text-xs text-zinc-500 hover:text-green-400"
-              >
-                Manage
-              </Link>
-            </div>
+          <TerminalWindow
+            title="team-members"
+            cmd="envpilot team list"
+            action={{ label: "Manage", href: "/dashboard/team" }}
+          >
             {membersLoading ? (
               <TerminalLoading />
             ) : members.length === 0 ? (
@@ -310,7 +276,7 @@ export default function DashboardPage() {
                 }
               />
             ) : (
-              <AnimatedList className="divide-y divide-zinc-800/50">
+              <AnimatedList className="divide-y divide-line">
                 {members
                   .filter(
                     (member): member is NonNullable<typeof member> =>
@@ -353,11 +319,11 @@ function StatLine({
 }) {
   const dots = ".".repeat(Math.max(2, 20 - label.length));
   return (
-    <p className="text-zinc-300">
-      <span className="text-zinc-500">{label}</span>
-      <span className="text-zinc-700"> {dots} </span>
-      <span className="text-green-400 font-semibold">{value}</span>
-      <span className="text-zinc-600 ml-3 text-xs">({detail})</span>
+    <p className="text-ink-muted">
+      <span className="text-ink-subtle">{label}</span>
+      <span className="text-ink-faint"> {dots} </span>
+      <span className="text-accent font-semibold">{value}</span>
+      <span className="text-ink-faint ml-3 text-xs">({detail})</span>
     </p>
   );
 }
@@ -376,24 +342,24 @@ function OnboardingStep({
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-green-500/5"
+      className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-accent-soft"
     >
-      <span className="text-zinc-600 text-xs w-6">
+      <span className="text-ink-faint text-xs w-6">
         [{String(number).padStart(2, "0")}]
       </span>
-      <span className="text-zinc-500">$</span>
+      <span className="text-ink-subtle">$</span>
       <span
-        className={completed ? "text-zinc-600 line-through" : "text-zinc-300"}
+        className={completed ? "text-ink-faint line-through" : "text-ink-muted"}
       >
         {command}
       </span>
       <span className="ml-auto">
         {completed ? (
-          <span className="text-green-400 text-xs flex items-center gap-1">
+          <span className="text-accent text-xs flex items-center gap-1">
             <Check className="h-3 w-3" /> DONE
           </span>
         ) : (
-          <span className="text-amber-400 text-xs">PENDING</span>
+          <span className="text-warning text-xs">PENDING</span>
         )}
       </span>
     </Link>
@@ -415,16 +381,16 @@ function ProjectRow({ project }: { project: RecentProject }) {
   return (
     <Link
       href={`/dashboard/projects/${project.slug}`}
-      className="flex items-center justify-between px-5 py-3 transition-colors hover:bg-green-500/5"
+      className="flex items-center justify-between px-5 py-3 transition-colors hover:bg-accent-soft"
     >
       <div className="flex items-center gap-3">
-        <span className="text-green-400 font-mono text-xs">{">"}</span>
+        <span className="text-accent font-mono text-xs">{">"}</span>
         <div>
-          <p className="text-sm font-medium font-mono text-zinc-100">
+          <p className="text-sm font-medium font-mono text-ink">
             {project.name}
           </p>
           {project.description && (
-            <p className="mt-0.5 text-xs text-zinc-500 truncate max-w-xs">
+            <p className="mt-0.5 text-xs text-ink-subtle truncate max-w-xs">
               {project.description}
             </p>
           )}
@@ -434,7 +400,7 @@ function ProjectRow({ project }: { project: RecentProject }) {
         <TerminalBadge color="zinc">
           {project.variableCount} {project.variableCount === 1 ? "var" : "vars"}
         </TerminalBadge>
-        <ChevronRight className="h-4 w-4 text-zinc-600" />
+        <ChevronRight className="h-4 w-4 text-ink-faint" />
       </div>
     </Link>
   );
@@ -498,17 +464,17 @@ function ActivityRow({ activity }: { activity: ActivityItem }) {
 
   return (
     <div className="flex items-start gap-3 px-5 py-3 font-mono text-xs">
-      <span className="text-zinc-600 whitespace-nowrap">[{time}]</span>
+      <span className="text-ink-faint whitespace-nowrap">[{time}]</span>
       <div className="min-w-0">
-        <p className="text-zinc-300">
-          <span className="text-green-400">
+        <p className="text-ink-muted">
+          <span className="text-accent">
             {activity.user?.name || "unknown"}
           </span>{" "}
           {actionLabel}
           {activity.project && (
             <>
               {" "}
-              in <span className="text-amber-400">{activity.project.name}</span>
+              in <span className="text-warning">{activity.project.name}</span>
             </>
           )}
         </p>
@@ -540,7 +506,7 @@ function TeamMemberRow({
   return (
     <div className="flex items-center justify-between px-5 py-2.5">
       <div className="flex items-center gap-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-800 text-xs font-medium text-zinc-400">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-raised text-xs font-medium text-ink-muted">
           {member.user.avatarUrl ? (
             <img
               src={member.user.avatarUrl}
@@ -551,7 +517,7 @@ function TeamMemberRow({
             (member.user.name || member.user.email).charAt(0).toUpperCase()
           )}
         </div>
-        <span className="text-sm text-zinc-300">
+        <span className="text-sm text-ink-muted">
           {member.user.name || member.user.email}
         </span>
       </div>
@@ -580,10 +546,10 @@ function ExpiringSecretRow({
   return (
     <div className="flex items-center justify-between px-5 py-3 font-mono text-xs">
       <div className="flex items-center gap-3">
-        <RotateCcw className="h-3.5 w-3.5 text-amber-400" />
+        <RotateCcw className="h-3.5 w-3.5 text-warning" />
         <div>
-          <p className="text-sm text-zinc-300">{variable.key}</p>
-          <p className="text-zinc-600">{variable.projectName}</p>
+          <p className="text-sm text-ink-muted">{variable.key}</p>
+          <p className="text-ink-faint">{variable.projectName}</p>
         </div>
       </div>
       <TerminalBadge color={isExpired ? "red" : "amber"}>{label}</TerminalBadge>

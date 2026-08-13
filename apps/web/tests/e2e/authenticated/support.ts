@@ -279,11 +279,12 @@ export async function createVariable(
 
     for (const env of opts.environments ?? []) {
       const envButton = drawer.getByRole("button", { name: env, exact: true });
-      // The toggle has no aria-pressed; selection is class-based — an
-      // UNselected env carries the neutral `bg-zinc-100` background, a
-      // selected one carries a colored ring instead. Only click to turn on.
+      // The toggle has no aria-pressed; selection is class-based. Keyed on the
+      // ring rather than a background colour: envToggleClasses gives every
+      // selected state `ring-1` and no unselected state one, so this survives
+      // a repaint in a way a palette class name does not.
       const cls = (await envButton.getAttribute("class").catch(() => "")) ?? "";
-      const selected = !cls.includes("bg-zinc-100");
+      const selected = cls.includes("ring-1");
       if (!selected) await envButton.click({ timeout: 8_000 });
     }
 

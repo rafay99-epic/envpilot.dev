@@ -49,33 +49,33 @@ export function DocSharesList({ docId }: { docId: Id<"docs"> }) {
   };
 
   return (
-    <section className="mt-10 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-      <h2 className="mb-3 font-mono text-xs tracking-wide text-zinc-500 uppercase">
+    <section className="mt-10 border-t pt-6 border-line">
+      <h2 className="mb-3 font-mono text-xs tracking-wide text-ink-subtle uppercase">
         Shared with ({shares.length})
       </h2>
       <ul className="space-y-1.5">
         {shares.map((share) => (
           <li
             key={share._id}
-            className="flex items-center gap-3 rounded-lg border border-zinc-200 px-3 py-2.5 dark:border-zinc-800"
+            className="flex items-center gap-3 rounded-lg border px-3 py-2.5 border-line"
           >
             {share.audience === "member" ? (
-              <Users className="h-4 w-4 shrink-0 text-zinc-500" />
+              <Users className="h-4 w-4 shrink-0 text-ink-subtle" />
             ) : (
-              <Globe className="h-4 w-4 shrink-0 text-amber-500" />
+              <Globe className="h-4 w-4 shrink-0 text-warning" />
             )}
 
             <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-1.5 truncate text-sm text-zinc-800 dark:text-zinc-200">
+              <p className="flex items-center gap-1.5 truncate text-sm text-ink">
                 {share.recipientName}
                 {share.hasPassphrase && (
                   <Lock
-                    className="h-3 w-3 text-zinc-500"
+                    className="h-3 w-3 text-ink-subtle"
                     aria-label="Passphrase protected"
                   />
                 )}
               </p>
-              <p className="truncate text-[11px] text-zinc-500">
+              <p className="truncate text-[11px] text-ink-subtle">
                 {share.isExpired
                   ? "Expired"
                   : `Expires ${new Date(share.expiresAt).toLocaleDateString()}`}
@@ -92,11 +92,11 @@ export function DocSharesList({ docId }: { docId: Id<"docs"> }) {
               <button
                 type="button"
                 onClick={() => copy(share._id, share.token!)}
-                className="shrink-0 rounded p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                className="shrink-0 rounded p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-ink"
                 aria-label="Copy link"
               >
                 {copiedId === share._id ? (
-                  <Check className="h-3.5 w-3.5 text-green-500" />
+                  <Check className="h-3.5 w-3.5 text-accent" />
                 ) : (
                   <Copy className="h-3.5 w-3.5" />
                 )}
@@ -111,7 +111,7 @@ export function DocSharesList({ docId }: { docId: Id<"docs"> }) {
                 type="button"
                 onClick={() => onRevoke(share._id)}
                 disabled={busyId === share._id}
-                className="shrink-0 rounded p-1.5 text-zinc-500 hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
+                className="shrink-0 rounded p-1.5 text-ink-subtle hover:bg-danger-soft hover:text-danger disabled:opacity-40"
                 aria-label={`Revoke access for ${share.recipientName}`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -120,7 +120,7 @@ export function DocSharesList({ docId }: { docId: Id<"docs"> }) {
           </li>
         ))}
       </ul>
-      {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
     </section>
   );
 }

@@ -26,15 +26,15 @@ export function SectionHeading({
 
   return (
     <Reveal className={`flex flex-col ${alignClasses} ${className}`}>
-      <span className="inline-flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/5 px-3 py-1 font-mono text-[11px] tracking-widest text-green-400">
-        <span className="h-1.5 w-1.5 rounded-full bg-green-400 [animation:pulse-glow_2.4s_ease-in-out_infinite]" />
+      <span className="inline-flex items-center gap-2 rounded-full border border-accent-line bg-accent-soft px-3 py-1 font-mono text-[11px] tracking-widest text-accent">
+        <span className="h-1.5 w-1.5 rounded-full bg-accent [animation:pulse-glow_2.4s_ease-in-out_infinite]" />
         {`// ${eyebrow}`}
       </span>
-      <h2 className="mt-4 max-w-3xl font-sans text-3xl font-bold tracking-tight text-zinc-100 md:text-5xl">
+      <h2 className="mt-4 max-w-3xl font-sans text-3xl font-bold tracking-tight text-ink md:text-5xl">
         {title}
       </h2>
       {description && (
-        <p className="mt-4 max-w-2xl font-mono text-sm leading-relaxed text-zinc-500">
+        <p className="mt-4 max-w-2xl font-mono text-sm leading-relaxed text-ink-subtle">
           {description}
         </p>
       )}

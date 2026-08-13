@@ -49,13 +49,13 @@ function ReadinessItem({
   return (
     <div className="flex items-center gap-2 text-sm">
       {ok ? (
-        <CheckCircle2 className="h-4 w-4 shrink-0 text-green-400" />
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-accent" />
       ) : (
-        <XCircle className="h-4 w-4 shrink-0 text-red-400" />
+        <XCircle className="h-4 w-4 shrink-0 text-danger" />
       )}
-      <span className="text-zinc-300">{label}</span>
+      <span className="text-ink-muted">{label}</span>
       {detail && (
-        <span className="ml-auto text-xs text-zinc-500">{detail}</span>
+        <span className="ml-auto text-xs text-ink-subtle">{detail}</span>
       )}
     </div>
   );
@@ -124,13 +124,13 @@ function DashboardPage() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-100">Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
 
         <div className="flex items-center gap-3">
           {/* Payment Gateway Toggle */}
-          <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5">
-            <CreditCard className="h-4 w-4 text-zinc-400" />
-            <span className="text-sm text-zinc-300">Payments</span>
+          <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5">
+            <CreditCard className="h-4 w-4 text-ink-muted" />
+            <span className="text-sm text-ink-muted">Payments</span>
             <Switch
               checked={paymentsEnabled}
               onChange={handleTogglePayments}
@@ -146,9 +146,9 @@ function DashboardPage() {
           </div>
 
           {/* Tier Enforcement Toggle */}
-          <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5">
-            <Shield className="h-4 w-4 text-zinc-400" />
-            <span className="text-sm text-zinc-300">Tier Enforcement</span>
+          <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5">
+            <Shield className="h-4 w-4 text-ink-muted" />
+            <span className="text-sm text-ink-muted">Tier Enforcement</span>
             <Switch
               checked={tierEnforcement}
               onChange={handleToggleEnforcement}
@@ -169,8 +169,8 @@ function DashboardPage() {
           {(readiness) => (
             <>
               <div className="mb-4 flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-green-500" />
-                <h2 className="text-sm font-semibold text-zinc-100">
+                <CreditCard className="h-4 w-4 text-accent" />
+                <h2 className="text-sm font-semibold text-ink">
                   Payment System Readiness
                 </h2>
               </div>
@@ -208,7 +208,7 @@ function DashboardPage() {
                 />
               </div>
               {!readiness.canEnable && !readiness.paymentsEnabled && (
-                <p className="mt-3 text-xs text-amber-400">
+                <p className="mt-3 text-xs text-warning">
                   Configure payment products in Tiers &amp; Limits → Payment
                   Products before enabling payments. Run the
                   "seed-payment-products" migration from the Migrations page to
@@ -295,8 +295,8 @@ function DashboardPage() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <Card>
                 <div className="mb-4 flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
-                  <h2 className="text-sm font-semibold text-zinc-100">
+                  <TrendingUp className="h-4 w-4 text-accent" />
+                  <h2 className="text-sm font-semibold text-ink">
                     Platform Growth
                   </h2>
                 </div>
@@ -333,8 +333,8 @@ function DashboardPage() {
 
               <Card>
                 <div className="mb-4 flex items-center gap-2">
-                  <Users className="h-4 w-4 text-blue-500" />
-                  <h2 className="text-sm font-semibold text-zinc-100">
+                  <Users className="h-4 w-4 text-info" />
+                  <h2 className="text-sm font-semibold text-ink">
                     New Users Per Month
                   </h2>
                 </div>
@@ -352,7 +352,7 @@ function DashboardPage() {
             {/* Distribution Charts */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <Card>
-                <h2 className="mb-4 text-sm font-semibold text-zinc-100">
+                <h2 className="mb-4 text-sm font-semibold text-ink">
                   Tier Distribution
                 </h2>
                 <DonutChart
@@ -368,7 +368,7 @@ function DashboardPage() {
               </Card>
 
               <Card>
-                <h2 className="mb-4 text-sm font-semibold text-zinc-100">
+                <h2 className="mb-4 text-sm font-semibold text-ink">
                   Ticket Status
                 </h2>
                 <DonutChart
@@ -381,7 +381,7 @@ function DashboardPage() {
               </Card>
 
               <Card>
-                <h2 className="mb-4 text-sm font-semibold text-zinc-100">
+                <h2 className="mb-4 text-sm font-semibold text-ink">
                   Messages
                 </h2>
                 <DonutChart
@@ -406,7 +406,7 @@ function DashboardPage() {
             {/* Activity & Feature Requests */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <Card>
-                <h2 className="mb-4 text-sm font-semibold text-zinc-100">
+                <h2 className="mb-4 text-sm font-semibold text-ink">
                   Feature Request Status
                 </h2>
                 <BarChart
@@ -418,7 +418,7 @@ function DashboardPage() {
               </Card>
 
               <Card>
-                <h2 className="mb-4 text-sm font-semibold text-zinc-100">
+                <h2 className="mb-4 text-sm font-semibold text-ink">
                   Ticket Categories
                 </h2>
                 <BarChart
@@ -433,8 +433,8 @@ function DashboardPage() {
             {/* Monthly Activity */}
             <Card>
               <div className="mb-4 flex items-center gap-2">
-                <Ticket className="h-4 w-4 text-amber-500" />
-                <h2 className="text-sm font-semibold text-zinc-100">
+                <Ticket className="h-4 w-4 text-warning" />
+                <h2 className="text-sm font-semibold text-ink">
                   Monthly Activity
                 </h2>
               </div>
@@ -464,7 +464,7 @@ function DashboardPage() {
             {/* Top Feature Requests */}
             {a.topFeatureRequests.length > 0 && (
               <Card>
-                <h2 className="mb-4 text-sm font-semibold text-zinc-100">
+                <h2 className="mb-4 text-sm font-semibold text-ink">
                   Top Feature Requests by Votes
                 </h2>
                 <BarChart

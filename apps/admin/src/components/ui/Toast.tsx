@@ -17,17 +17,17 @@ export function toast(type: ToastType, message: string) {
 }
 
 const icons: Record<ToastType, React.ReactNode> = {
-  success: <CheckCircle2 className="h-4 w-4 text-green-400" />,
-  error: <XCircle className="h-4 w-4 text-red-400" />,
-  warning: <AlertTriangle className="h-4 w-4 text-amber-400" />,
-  info: <Info className="h-4 w-4 text-blue-400" />,
+  success: <CheckCircle2 className="h-4 w-4 text-accent" />,
+  error: <XCircle className="h-4 w-4 text-danger" />,
+  warning: <AlertTriangle className="h-4 w-4 text-warning" />,
+  info: <Info className="h-4 w-4 text-info" />,
 };
 
 const bgColors: Record<ToastType, string> = {
-  success: "border-green-500/30 bg-zinc-900/90",
-  error: "border-red-500/30 bg-zinc-900/90",
-  warning: "border-amber-500/30 bg-zinc-900/90",
-  info: "border-blue-500/30 bg-zinc-900/90",
+  success: "border-accent-line bg-surface/90",
+  error: "border-danger-line bg-surface/90",
+  warning: "border-warning-line bg-surface/90",
+  info: "border-info-line bg-surface/90",
 };
 
 export function ToastContainer() {
@@ -59,12 +59,12 @@ export function ToastContainer() {
           )}
         >
           {icons[t.type]}
-          <span className="text-sm text-zinc-200">{t.message}</span>
+          <span className="text-sm text-ink">{t.message}</span>
           <button
             onClick={() =>
               setToasts((prev) => prev.filter((x) => x.id !== t.id))
             }
-            className="ml-2 text-zinc-500 hover:text-zinc-300"
+            className="ml-2 text-ink-subtle hover:text-ink-muted"
           >
             <X className="h-3.5 w-3.5" />
           </button>

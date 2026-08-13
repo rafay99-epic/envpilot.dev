@@ -57,7 +57,7 @@ export function AccessNotices({
   // ── Security hold on the active org ─────────────────────────────────
   if (membershipStatus?.status === "suspended" && !onEscapeRoute) {
     return (
-      <div className="dark fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a] px-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-canvas px-4">
         {/* Subtle grid background (matches auth-error-page) */}
         <div
           className="pointer-events-none fixed inset-0 opacity-[0.03]"
@@ -72,20 +72,18 @@ export function AccessNotices({
           className="relative z-10 w-full max-w-md shadow-2xl"
         >
           <div className="p-8 font-mono text-sm">
-            <p className="text-red-400">
-              ERROR: access revoked [exit code 403]
-            </p>
-            <p className="mt-3 text-zinc-400">
+            <p className="text-danger">ERROR: access revoked [exit code 403]</p>
+            <p className="mt-3 text-ink-muted">
               Your access to this organization has been revoked
               {membershipStatus.suspendedAt
                 ? ` on ${new Date(membershipStatus.suspendedAt).toLocaleDateString()}`
                 : ""}
               .
             </p>
-            <p className="mt-2 text-zinc-400">
+            <p className="mt-2 text-ink-muted">
               Please contact your organization.
             </p>
-            <p className="mt-4 text-xs text-zinc-600">
+            <p className="mt-4 text-xs text-ink-faint">
               Your role and project assignments are preserved — if an
               administrator reinstates you, everything returns as it was.
             </p>
@@ -136,14 +134,14 @@ export function AccessNotices({
   }
 
   return (
-    <div className="dark fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
       <TerminalWindow
         title="notice"
         className="relative z-10 w-full max-w-md shadow-2xl"
       >
         <div className="p-8 font-mono text-sm">
-          <p className="text-amber-400">NOTICE: {heading}</p>
-          <p className="mt-3 text-zinc-400">{message}</p>
+          <p className="text-warning">NOTICE: {heading}</p>
+          <p className="mt-3 text-ink-muted">{message}</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <TerminalButton
               variant="primary"

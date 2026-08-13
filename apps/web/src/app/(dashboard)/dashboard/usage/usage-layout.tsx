@@ -138,13 +138,13 @@ export function UsageLayout(props: UsageLayoutProps) {
 
   const retentionRows = [
     {
-      icon: <ScrollText className="h-4 w-4 text-zinc-400" />,
+      icon: <ScrollText className="h-4 w-4 text-ink-muted" />,
       label: "Audit Log Retention",
       days: meterLimits.auditDays,
       proDays: 365,
     },
     {
-      icon: <BarChart3 className="h-4 w-4 text-zinc-400" />,
+      icon: <BarChart3 className="h-4 w-4 text-ink-muted" />,
       label: "Analytics Retention",
       days: meterLimits.analyticsDays,
       proDays: 30,
@@ -182,10 +182,10 @@ export function UsageLayout(props: UsageLayoutProps) {
     <div className="space-y-6">
       {/* ── 1. Plan strip ─────────────────────────────────────────────── */}
       <div
-        className={`rounded-xl border bg-zinc-900 p-4 ${
+        className={`rounded-xl border bg-surface p-4 ${
           tier === "pro"
-            ? "border-purple-500/30 ring-1 ring-purple-500/10"
-            : "border-green-500/30 ring-1 ring-green-500/10"
+            ? "border-premium-line ring-1 ring-premium-line"
+            : "border-accent-line ring-1 ring-accent-line"
         }`}
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -194,18 +194,18 @@ export function UsageLayout(props: UsageLayoutProps) {
             <span
               className={`text-[10px] font-medium rounded px-1.5 py-0.5 ${
                 tier === "pro"
-                  ? "text-purple-400 bg-purple-400/10"
-                  : "text-green-400 bg-green-400/10"
+                  ? "text-premium bg-premium-soft"
+                  : "text-accent bg-accent-soft"
               }`}
             >
               Current plan
             </span>
-            <span className="text-lg font-mono font-bold text-zinc-100">
+            <span className="text-lg font-mono font-bold text-ink">
               {isFree ? "$0" : "$15/mo"}
             </span>
             {!enforcementEnabled && (
-              <span className="inline-flex items-center gap-1 rounded border border-green-700 bg-green-900/30 px-1.5 py-0.5 text-[9px] text-green-400">
-                <span className="h-1 w-1 rounded-full bg-green-400 animate-pulse" />
+              <span className="inline-flex items-center gap-1 rounded border border-accent-line bg-accent-soft px-1.5 py-0.5 text-[9px] text-accent">
+                <span className="h-1 w-1 rounded-full bg-accent animate-pulse" />
                 Pre-alpha
               </span>
             )}
@@ -214,7 +214,7 @@ export function UsageLayout(props: UsageLayoutProps) {
             {enforcementEnabled && isFree && onUpgrade && (
               <button
                 onClick={onUpgrade}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2.5 text-sm font-medium text-green-400 transition-all hover:border-green-500/50 hover:bg-green-500/20"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-4 py-2.5 text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
               >
                 <Crown className="h-4 w-4" />
                 Upgrade
@@ -223,14 +223,14 @@ export function UsageLayout(props: UsageLayoutProps) {
             )}
             <Link
               href="/dashboard/settings?tab=billing"
-              className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400/80 hover:text-green-400 transition-colors"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-accent/80 hover:text-accent transition-colors"
             >
               Manage billing
               <ExternalLink className="h-3 w-3" />
             </Link>
             <Link
               href="/pricing"
-              className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400/80 hover:text-green-400 transition-colors"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-accent/80 hover:text-accent transition-colors"
             >
               Compare plans
               <ExternalLink className="h-3 w-3" />
@@ -244,14 +244,14 @@ export function UsageLayout(props: UsageLayoutProps) {
         <div
           className={`rounded-lg border px-4 py-3 ${
             alertVariant === "red"
-              ? "border-red-500/30 bg-red-500/5"
-              : "border-amber-500/20 bg-amber-500/5"
+              ? "border-danger-line bg-danger-soft"
+              : "border-warning-line bg-warning-soft"
           }`}
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p
               className={`text-sm font-medium ${
-                alertVariant === "red" ? "text-red-400" : "text-amber-400"
+                alertVariant === "red" ? "text-danger" : "text-warning"
               }`}
             >
               {alertVariant === "red"
@@ -264,7 +264,7 @@ export function UsageLayout(props: UsageLayoutProps) {
               onUpgrade && (
                 <button
                   onClick={onUpgrade}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs font-medium text-green-400 transition-all hover:border-green-500/50 hover:bg-green-500/20"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-3 py-1.5 text-xs font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
                 >
                   <Crown className="h-3.5 w-3.5" />
                   Upgrade
@@ -278,7 +278,7 @@ export function UsageLayout(props: UsageLayoutProps) {
       {/* ── 3. Quotas & limits ────────────────────────────────────────── */}
       <TerminalWindow title="usage — quotas & limits">
         <div className="p-6 space-y-4">
-          <p className="font-mono text-xs text-zinc-500">
+          <p className="font-mono text-xs text-ink-subtle">
             $ envpilot status --usage
           </p>
 
@@ -287,7 +287,7 @@ export function UsageLayout(props: UsageLayoutProps) {
             if (rows.length === 0) return null;
             return (
               <div key={group}>
-                <h3 className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-3">
+                <h3 className="text-[10px] uppercase tracking-widest text-ink-faint font-bold mb-3">
                   {group}
                 </h3>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -321,28 +321,28 @@ export function UsageLayout(props: UsageLayoutProps) {
 
           {/* Data retention */}
           <div>
-            <h3 className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-3">
+            <h3 className="text-[10px] uppercase tracking-widest text-ink-faint font-bold mb-3">
               Data retention
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
               {retentionRows.map((r) => (
                 <div
                   key={r.label}
-                  className="rounded-lg border border-zinc-700/40 bg-zinc-800/20 p-3"
+                  className="rounded-lg border border-line bg-surface-raised/20 p-3"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {r.icon}
-                      <span className="text-sm font-medium text-zinc-300">
+                      <span className="text-sm font-medium text-ink-muted">
                         {r.label}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-sm font-mono text-zinc-100">
+                      <span className="text-sm font-mono text-ink">
                         {r.days} days
                       </span>
                       {enforcementEnabled && isFree && (
-                        <p className="text-[10px] text-zinc-600">
+                        <p className="text-[10px] text-ink-faint">
                           Pro: {r.proDays} days
                         </p>
                       )}
@@ -358,7 +358,7 @@ export function UsageLayout(props: UsageLayoutProps) {
       {/* ── 4. Plan features ──────────────────────────────────────────── */}
       <TerminalWindow title={`plan features — ${tier}`}>
         <div className="p-6">
-          <p className="font-mono text-xs text-zinc-500 mb-4">
+          <p className="font-mono text-xs text-ink-subtle mb-4">
             $ envpilot features --plan {tier}
           </p>
 
@@ -367,7 +367,7 @@ export function UsageLayout(props: UsageLayoutProps) {
             if (visible.length === 0) return null;
             return (
               <div key={cat.name} className="mb-4">
-                <h3 className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-1.5 mt-3">
+                <h3 className="text-[10px] uppercase tracking-widest text-ink-faint font-bold mb-1.5 mt-3">
                   {cat.label}
                 </h3>
                 <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
@@ -390,13 +390,13 @@ export function UsageLayout(props: UsageLayoutProps) {
                         className="flex items-center gap-2 py-1.5"
                       >
                         {included ? (
-                          <Check className="h-4 w-4 text-green-400 shrink-0" />
+                          <Check className="h-4 w-4 text-accent shrink-0" />
                         ) : (
-                          <Lock className="h-3.5 w-3.5 text-zinc-600 shrink-0" />
+                          <Lock className="h-3.5 w-3.5 text-ink-faint shrink-0" />
                         )}
                         <span
                           className={`text-sm ${
-                            included ? "text-zinc-300" : "text-zinc-500"
+                            included ? "text-ink-muted" : "text-ink-subtle"
                           }`}
                         >
                           {f.label}
@@ -404,11 +404,11 @@ export function UsageLayout(props: UsageLayoutProps) {
                         {!included && (
                           <>
                             {proVal.enabled ? (
-                              <span className="text-[10px] text-purple-400 bg-purple-400/10 rounded px-1.5 py-0.5">
+                              <span className="text-[10px] text-premium bg-premium-soft rounded px-1.5 py-0.5">
                                 Pro
                               </span>
                             ) : (
-                              <span className="text-[10px] text-zinc-500 bg-zinc-500/10 rounded px-1.5 py-0.5">
+                              <span className="text-[10px] text-ink-subtle bg-surface-hover/10 rounded px-1.5 py-0.5">
                                 Soon
                               </span>
                             )}
@@ -423,14 +423,14 @@ export function UsageLayout(props: UsageLayoutProps) {
           })}
 
           {isFree && enforcementEnabled && onUpgrade && (
-            <div className="border-t border-zinc-700/30 pt-3 mt-2">
+            <div className="border-t border-line pt-3 mt-2">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-ink-subtle">
                   Locked features are included in Pro.
                 </p>
                 <button
                   onClick={onUpgrade}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2.5 text-sm font-medium text-green-400 transition-all hover:border-green-500/50 hover:bg-green-500/20"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-4 py-2.5 text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
                 >
                   <Crown className="h-4 w-4" />
                   Upgrade
@@ -443,10 +443,10 @@ export function UsageLayout(props: UsageLayoutProps) {
       </TerminalWindow>
 
       {/* ── 5. Info bar ───────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-zinc-700/30 bg-zinc-800/20 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="rounded-lg border border-line bg-surface-raised/20 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
-          <HelpCircle className="h-4 w-4 text-zinc-500 shrink-0" />
-          <p className="text-xs text-zinc-500">
+          <HelpCircle className="h-4 w-4 text-ink-subtle shrink-0" />
+          <p className="text-xs text-ink-subtle">
             Usage is computed in real time from your data. Limits are enforced
             per resource &mdash; existing data is never deleted.
           </p>
@@ -454,14 +454,14 @@ export function UsageLayout(props: UsageLayoutProps) {
         <div className="flex items-center gap-3 shrink-0 ml-auto">
           <Link
             href="/faq#usage-limits"
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400/80 hover:text-green-400 transition-colors"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-accent/80 hover:text-accent transition-colors"
           >
             How it works
             <ExternalLink className="h-3 w-3" />
           </Link>
           <Link
             href="/faq#plans-billing"
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400/80 hover:text-green-400 transition-colors"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-accent/80 hover:text-accent transition-colors"
           >
             Billing FAQ
             <ExternalLink className="h-3 w-3" />
@@ -501,17 +501,17 @@ function QuotaRow({
 
   if (gated) {
     return (
-      <div className="rounded-lg border border-zinc-700/40 bg-zinc-800/20 p-3 opacity-60">
+      <div className="rounded-lg border border-line bg-surface-raised/20 p-3 opacity-60">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Lock className="h-3.5 w-3.5 text-zinc-600" />
-            <span className="text-xs font-medium text-zinc-500">{label}</span>
-            <span className="text-[10px] text-zinc-600">Requires Pro</span>
+            <Lock className="h-3.5 w-3.5 text-ink-faint" />
+            <span className="text-xs font-medium text-ink-subtle">{label}</span>
+            <span className="text-[10px] text-ink-faint">Requires Pro</span>
           </div>
           {onUpgrade && (
             <button
               onClick={onUpgrade}
-              className="text-[11px] font-medium text-amber-400/80 hover:text-amber-300 transition-colors"
+              className="text-[11px] font-medium text-warning/80 hover:text-warning transition-colors"
             >
               Unlock &rarr;
             </button>
@@ -528,17 +528,17 @@ function QuotaRow({
     <div
       className={`rounded-lg border p-3 ${
         isAt
-          ? "border-red-500/30 bg-red-500/5"
+          ? "border-danger-line bg-danger-soft"
           : isNear
-            ? "border-amber-500/20 bg-amber-500/5"
-            : "border-zinc-700/40 bg-zinc-800/20"
+            ? "border-warning-line bg-warning-soft"
+            : "border-line bg-surface-raised/20"
       }`}
     >
-      <div className="flex items-center gap-2 text-xs font-medium text-zinc-400 mb-2">
+      <div className="flex items-center gap-2 text-xs font-medium text-ink-muted mb-2">
         {icon}
         <span className="flex-1">{label}</span>
         {enforcementEnabled && isFree && (
-          <span className="text-[10px] text-zinc-600">Pro: Unlimited</span>
+          <span className="text-[10px] text-ink-faint">Pro: Unlimited</span>
         )}
       </div>
       <UsageMeter
@@ -551,7 +551,7 @@ function QuotaRow({
       {isAt && enforcementEnabled && isFree && onUpgrade && (
         <button
           onClick={onUpgrade}
-          className="mt-1.5 text-[11px] font-medium text-amber-400 hover:text-amber-300 transition-colors"
+          className="mt-1.5 text-[11px] font-medium text-warning hover:text-warning transition-colors"
         >
           Upgrade for more &rarr;
         </button>
@@ -577,7 +577,7 @@ function VariableByProject({
     <div className="mt-2">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-400 transition-colors"
+        className="flex items-center gap-1 text-xs font-medium text-ink-subtle hover:text-ink-muted transition-colors"
       >
         <ChevronDown
           className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}

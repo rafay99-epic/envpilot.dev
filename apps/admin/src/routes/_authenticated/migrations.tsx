@@ -60,42 +60,42 @@ const CATEGORY_CONFIG: Record<
 > = {
   "Feature & Tier System": {
     icon: <Layers className="h-4 w-4" />,
-    dot: "bg-purple-400",
-    border: "border-purple-500/20",
-    bg: "bg-purple-500/5",
-    text: "text-purple-400",
+    dot: "bg-premium",
+    border: "border-premium-line",
+    bg: "bg-premium-soft",
+    text: "text-premium",
     description: "Run these when adding new features or updating tier limits",
   },
   "Content Seeding": {
     icon: <Database className="h-4 w-4" />,
-    dot: "bg-blue-400",
-    border: "border-blue-500/20",
-    bg: "bg-blue-500/5",
-    text: "text-blue-400",
+    dot: "bg-info",
+    border: "border-info-line",
+    bg: "bg-info-soft",
+    text: "text-info",
     description: "Populate database tables with initial or historical data",
   },
   Destructive: {
     icon: <Trash2 className="h-4 w-4" />,
-    dot: "bg-red-400",
-    border: "border-red-500/20",
-    bg: "bg-red-500/5",
-    text: "text-red-400",
+    dot: "bg-danger",
+    border: "border-danger-line",
+    bg: "bg-danger-soft",
+    text: "text-danger",
     description: "Wipe data — use before re-seeding or to start fresh",
   },
   "One-Time Migrations": {
     icon: <Clock className="h-4 w-4" />,
-    dot: "bg-amber-400",
-    border: "border-amber-500/20",
-    bg: "bg-amber-500/5",
-    text: "text-amber-400",
+    dot: "bg-warning",
+    border: "border-warning-line",
+    bg: "bg-warning-soft",
+    text: "text-warning",
     description: "Schema migrations that should only be run once per deploy",
   },
   "Active Bridge": {
     icon: <GitBranch className="h-4 w-4" />,
-    dot: "bg-amber-400",
-    border: "border-amber-500/20",
-    bg: "bg-amber-500/5",
-    text: "text-amber-400",
+    dot: "bg-warning",
+    border: "border-warning-line",
+    bg: "bg-warning-soft",
+    text: "text-warning",
     description:
       "Ongoing compatibility bridge — safe to re-run, keep running until the legacy path is retired",
   },
@@ -142,15 +142,13 @@ function MigrationRow({
   onRun: (migration: Migration) => void;
 }) {
   return (
-    <div className="flex items-start justify-between rounded-lg border border-zinc-800/60 bg-zinc-900/40 px-4 py-3 transition-colors hover:border-zinc-700">
+    <div className="flex items-start justify-between rounded-lg border border-line bg-surface/40 px-4 py-3 transition-colors hover:border-line">
       <div className="mr-4 flex-1">
         <div className="mb-1 flex items-center gap-2">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-zinc-800 text-[10px] font-bold text-zinc-400">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-surface-raised text-[10px] font-bold text-ink-muted">
             {index + 1}
           </span>
-          <h3 className="text-sm font-medium text-zinc-100">
-            {migration.name}
-          </h3>
+          <h3 className="text-sm font-medium text-ink">{migration.name}</h3>
           {migration.destructive && <Badge variant="danger">destructive</Badge>}
           {migration.runOnce && <Badge variant="warning">run once</Badge>}
           {CI_MANAGED_KEYS.has(migration.name) && (
@@ -162,7 +160,7 @@ function MigrationRow({
               <Badge variant="success">safe to re-run</Badge>
             )}
         </div>
-        <p className="pl-7 text-xs leading-relaxed text-zinc-500">
+        <p className="pl-7 text-xs leading-relaxed text-ink-subtle">
           {migration.description}
         </p>
 
@@ -170,8 +168,8 @@ function MigrationRow({
           <div
             className={`ml-7 mt-2 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-xs ${
               result.success
-                ? "border-green-500/20 bg-green-500/10 text-green-400"
-                : "border-red-500/20 bg-red-500/10 text-red-400"
+                ? "border-accent-line bg-accent-soft text-accent"
+                : "border-danger-line bg-danger-soft text-danger"
             }`}
           >
             {result.success ? (
@@ -225,26 +223,26 @@ function CategoryGroup({
     <div>
       <div
         className={`mb-3 flex items-center gap-2.5 rounded-lg border px-4 py-2.5 ${
-          config?.border ?? "border-zinc-700"
-        } ${config?.bg ?? "bg-zinc-800/50"}`}
+          config?.border ?? "border-line"
+        } ${config?.bg ?? "bg-surface-raised/50"}`}
       >
-        <span className={config?.text ?? "text-zinc-400"}>
+        <span className={config?.text ?? "text-ink-muted"}>
           {config?.icon ?? <ArrowUpDown className="h-4 w-4" />}
         </span>
         <div>
           <h2
-            className={`text-sm font-semibold ${config?.text ?? "text-zinc-300"}`}
+            className={`text-sm font-semibold ${config?.text ?? "text-ink-muted"}`}
           >
             {category}
           </h2>
           {config?.description && (
-            <p className="text-[11px] text-zinc-500">{config.description}</p>
+            <p className="text-[11px] text-ink-subtle">{config.description}</p>
           )}
         </div>
         {category === "Active Bridge" && (
           <Badge variant="warning">active bridge</Badge>
         )}
-        <span className="ml-auto rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-500">
+        <span className="ml-auto rounded-full bg-surface-raised px-2 py-0.5 text-[10px] font-medium text-ink-subtle">
           {items.length}
         </span>
       </div>
@@ -329,7 +327,7 @@ function MigrationsPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">Migrations</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-ink">Migrations</h1>
 
       <QueryState
         data={migrations as Migration[] | undefined}
@@ -367,7 +365,9 @@ function MigrationsPage() {
 
           if (list.length === 0) {
             return (
-              <p className="text-sm text-zinc-500">No migrations available.</p>
+              <p className="text-sm text-ink-subtle">
+                No migrations available.
+              </p>
             );
           }
 
@@ -376,10 +376,10 @@ function MigrationsPage() {
               {/* Seeds & Tools */}
               {seedsCategories.length > 0 && (
                 <section>
-                  <h2 className="mb-3 font-mono text-xs uppercase tracking-wide text-zinc-500">
+                  <h2 className="mb-3 font-mono text-xs uppercase tracking-wide text-ink-subtle">
                     Seeds &amp; Tools
                   </h2>
-                  <p className="mb-4 font-mono text-[11px] text-zinc-500">
+                  <p className="mb-4 font-mono text-[11px] text-ink-subtle">
                     seed-feature-registry, seed-tier-features,
                     seed-role-registry, migrate-roles, seed-changelog — runs
                     automatically on every deploy
@@ -402,7 +402,7 @@ function MigrationsPage() {
               {/* Active Bridge */}
               {bridgeItems && bridgeItems.length > 0 && (
                 <section>
-                  <h2 className="mb-3 font-mono text-xs uppercase tracking-wide text-zinc-500">
+                  <h2 className="mb-3 font-mono text-xs uppercase tracking-wide text-ink-subtle">
                     Active Bridge
                   </h2>
                   <CategoryGroup
@@ -422,7 +422,7 @@ function MigrationsPage() {
                     type="button"
                     aria-expanded={legacyOpen}
                     onClick={() => setLegacyOpen((v) => !v)}
-                    className="mb-3 flex w-full items-center gap-2 font-mono text-xs uppercase tracking-wide text-zinc-500 hover:text-zinc-300"
+                    className="mb-3 flex w-full items-center gap-2 font-mono text-xs uppercase tracking-wide text-ink-subtle hover:text-ink-muted"
                   >
                     <ChevronRight
                       className={`h-3.5 w-3.5 transition-transform ${
@@ -430,13 +430,13 @@ function MigrationsPage() {
                       }`}
                     />
                     Legacy
-                    <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] normal-case text-zinc-500">
+                    <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[10px] normal-case text-ink-subtle">
                       {legacyItems.length}
                     </span>
                   </button>
                   {legacyOpen && (
                     <>
-                      <p className="mb-4 font-mono text-[11px] text-zinc-500">
+                      <p className="mb-4 font-mono text-[11px] text-ink-subtle">
                         one-shot drains — run once, confirm 0 remaining, then
                         these get deleted
                       </p>

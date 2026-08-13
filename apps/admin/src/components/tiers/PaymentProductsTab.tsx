@@ -100,7 +100,7 @@ export function PaymentProductsTab() {
       key: "productId",
       header: "Product ID",
       render: (p) => (
-        <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-300">
+        <code className="rounded bg-surface-raised px-1.5 py-0.5 text-xs text-ink-muted">
           {p.productId}
         </code>
       ),
@@ -108,7 +108,7 @@ export function PaymentProductsTab() {
     {
       key: "label",
       header: "Label",
-      render: (p) => <span className="text-zinc-400">{p.label || "—"}</span>,
+      render: (p) => <span className="text-ink-muted">{p.label || "—"}</span>,
     },
     {
       key: "isActive",
@@ -136,14 +136,14 @@ export function PaymentProductsTab() {
           <button
             onClick={() => openEdit(p)}
             aria-label={`Edit ${p.tierName} mapping`}
-            className="rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+            className="rounded p-1 text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => handleDelete(p)}
             aria-label={`Delete ${p.tierName} mapping`}
-            className="rounded p-1 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-400"
+            className="rounded p-1 text-ink-muted transition-colors hover:bg-danger-soft hover:text-danger"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -156,10 +156,8 @@ export function PaymentProductsTab() {
     <section>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-zinc-100">
-            Payment Products
-          </h2>
-          <p className="text-xs text-zinc-400">
+          <h2 className="text-lg font-semibold text-ink">Payment Products</h2>
+          <p className="text-xs text-ink-muted">
             Map payment provider product IDs to tiers. Supports multiple
             providers for easy migration.
           </p>

@@ -27,7 +27,7 @@ interface Organization {
 
 function ProBadge() {
   return (
-    <span className="flex-shrink-0 rounded-full bg-amber-900/30 px-2 py-0.5 text-xs font-medium text-amber-400">
+    <span className="flex-shrink-0 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning">
       Pro
     </span>
   );
@@ -94,7 +94,7 @@ export default function OrganizationsPage() {
         actions={
           orgLimitReached ? (
             <span
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-500 cursor-not-allowed"
+              className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface-raised px-4 py-2 text-sm font-medium text-ink-subtle cursor-not-allowed"
               title={`Organization limit reached (${ownedOrgs.length}/${maxOrgs}). Upgrade to Pro for unlimited organizations.`}
             >
               <Plus className="h-4 w-4" />
@@ -103,7 +103,7 @@ export default function OrganizationsPage() {
           ) : (
             <Link
               href="/organizations/new"
-              className="inline-flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:border-green-500/50 hover:bg-green-500/20"
+              className="inline-flex items-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-4 py-2 text-sm font-medium text-accent transition-colors hover:border-accent-line hover:bg-accent-soft"
             >
               <Plus className="h-4 w-4" />
               New Organization
@@ -113,20 +113,20 @@ export default function OrganizationsPage() {
       />
 
       {organizations.length === 0 ? (
-        <div className="rounded-xl border border-zinc-700/50 bg-zinc-900 p-12 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800">
-            <Building2 className="h-8 w-8 text-zinc-500" />
+        <div className="rounded-xl border border-line bg-surface p-12 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-line bg-surface-raised">
+            <Building2 className="h-8 w-8 text-ink-subtle" />
           </div>
-          <h3 className="mt-4 text-lg font-semibold text-zinc-100">
+          <h3 className="mt-4 text-lg font-semibold text-ink">
             No organizations yet
           </h3>
-          <p className="mt-2 text-sm text-zinc-400">
+          <p className="mt-2 text-sm text-ink-muted">
             Create your first organization to start collaborating with your
             team.
           </p>
           <Link
             href="/organizations/new"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:border-green-500/50 hover:bg-green-500/20"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-4 py-2 text-sm font-medium text-accent transition-colors hover:border-accent-line hover:bg-accent-soft"
           >
             <Plus className="h-4 w-4" />
             Create Organization
@@ -139,7 +139,7 @@ export default function OrganizationsPage() {
               <Link
                 key={org._id}
                 href={`/organizations/${org.slug}`}
-                className="group flex flex-col rounded-xl border border-zinc-700/50 bg-zinc-900 p-6 transition-all hover:border-zinc-600 hover:bg-zinc-800/80"
+                className="group flex flex-col rounded-xl border border-line bg-surface p-6 transition-all hover:border-line-strong hover:bg-surface-hover/80"
               >
                 <div className="flex items-start gap-4">
                   {org.logoUrl ? (
@@ -149,26 +149,26 @@ export default function OrganizationsPage() {
                       className="h-12 w-12 rounded-lg object-cover"
                     />
                   ) : (
-                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-800">
-                      <span className="text-lg font-semibold text-zinc-400">
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg border border-line bg-surface-raised">
+                      <span className="text-lg font-semibold text-ink-muted">
                         {org.name.charAt(0).toUpperCase()}
                       </span>
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="truncate font-semibold text-zinc-100">
+                      <h3 className="truncate font-semibold text-ink">
                         {org.name}
                       </h3>
                       {proOrgIds.has(org._id) && <ProBadge />}
                     </div>
-                    <p className="mt-0.5 truncate text-sm text-zinc-500">
+                    <p className="mt-0.5 truncate text-sm text-ink-subtle">
                       {org.slug}
                     </p>
                   </div>
                 </div>
                 {org.description && (
-                  <p className="mt-3 line-clamp-2 text-sm text-zinc-400">
+                  <p className="mt-3 line-clamp-2 text-sm text-ink-muted">
                     {org.description}
                   </p>
                 )}
@@ -176,17 +176,17 @@ export default function OrganizationsPage() {
                   <span
                     className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                       normalizeOrgRole(org.role) === "owner"
-                        ? "border border-green-500/30 bg-green-500/10 text-green-400"
+                        ? "border border-accent-line bg-accent-soft text-accent"
                         : normalizeOrgRole(org.role) === "project_manager"
-                          ? "border border-amber-500/30 bg-amber-500/10 text-amber-400"
+                          ? "border border-warning-line bg-warning-soft text-warning"
                           : normalizeOrgRole(org.role) === "team_lead"
-                            ? "border border-blue-500/30 bg-blue-500/10 text-blue-400"
-                            : "border border-zinc-700 bg-zinc-800 text-zinc-400"
+                            ? "border border-info-line bg-info-soft text-info"
+                            : "border border-line bg-surface-raised text-ink-muted"
                     }`}
                   >
                     {roleLabel(org.role)}
                   </span>
-                  <ChevronRight className="h-4 w-4 text-zinc-600 transition-transform group-hover:translate-x-1 group-hover:text-zinc-400" />
+                  <ChevronRight className="h-4 w-4 text-ink-faint transition-transform group-hover:translate-x-1 group-hover:text-ink-muted" />
                 </div>
               </Link>
             ))}

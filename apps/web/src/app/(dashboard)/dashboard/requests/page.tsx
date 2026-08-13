@@ -73,16 +73,16 @@ const STATUS_BADGE_COLOR: Record<
 // convention used across the variables UI.
 const ENV_COLOR: Record<string, { on: string; off: string }> = {
   development: {
-    on: "border-green-500/30 bg-green-500/10 text-green-400",
-    off: "border-zinc-700 text-zinc-500 hover:text-zinc-300",
+    on: "border-accent-line bg-accent-soft text-accent",
+    off: "border-line text-ink-subtle hover:text-ink-muted",
   },
   staging: {
-    on: "border-amber-500/30 bg-amber-500/10 text-amber-400",
-    off: "border-zinc-700 text-zinc-500 hover:text-zinc-300",
+    on: "border-warning-line bg-warning-soft text-warning",
+    off: "border-line text-ink-subtle hover:text-ink-muted",
   },
   production: {
-    on: "border-red-500/30 bg-red-500/10 text-red-400",
-    off: "border-zinc-700 text-zinc-500 hover:text-zinc-300",
+    on: "border-danger-line bg-danger-soft text-danger",
+    off: "border-line text-ink-subtle hover:text-ink-muted",
   },
 };
 
@@ -243,10 +243,10 @@ export default function RequestsPage() {
   if (!organization) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="font-mono text-sm text-zinc-500">
-          <span className="text-green-400">$</span> envpilot request list
+        <p className="font-mono text-sm text-ink-subtle">
+          <span className="text-accent">$</span> envpilot request list
         </p>
-        <p className="mt-2 text-sm text-zinc-400">
+        <p className="mt-2 text-sm text-ink-muted">
           Select or create an organization to review variable requests.
         </p>
         <TerminalButtonLink href="/organizations" className="mt-6">
@@ -286,13 +286,13 @@ export default function RequestsPage() {
 
       {/* Notices */}
       {notice && (
-        <div className="rounded-lg border border-green-700/50 bg-green-900/20 px-4 py-3">
-          <p className="text-sm text-green-400">{notice}</p>
+        <div className="rounded-lg border border-accent-line bg-accent-soft px-4 py-3">
+          <p className="text-sm text-accent">{notice}</p>
         </div>
       )}
       {error && (
-        <div className="rounded-lg border border-red-700/50 bg-red-900/20 px-4 py-3">
-          <p className="text-sm text-red-400">{error}</p>
+        <div className="rounded-lg border border-danger-line bg-danger-soft px-4 py-3">
+          <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
@@ -304,8 +304,8 @@ export default function RequestsPage() {
             onClick={() => setStatus(tab.value)}
             className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
               status === tab.value
-                ? "border-green-500/30 bg-green-500/10 text-green-400"
-                : "border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                ? "border-accent-line bg-accent-soft text-accent"
+                : "border-line text-ink-muted hover:border-line-strong hover:text-ink-muted"
             }`}
           >
             {tab.label}
@@ -328,25 +328,25 @@ export default function RequestsPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-zinc-700/50">
-                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-green-500/70">
+                <tr className="border-b border-line">
+                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-accent/70">
                     Request
                   </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-green-500/70">
+                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-accent/70">
                     Environments
                   </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-green-500/70">
+                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-accent/70">
                     Value
                   </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-green-500/70">
+                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-accent/70">
                     Requested
                   </th>
-                  <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-green-500/70">
+                  <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-accent/70">
                     {isPendingTab ? "Actions" : "Review"}
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/50">
+              <tbody className="divide-y divide-line">
                 {requests.map((request, i) => (
                   <RequestRow
                     key={request._id}
@@ -429,23 +429,19 @@ function RequestRow({
 
   return (
     <tr
-      className="animate-row-in align-top transition-colors hover:bg-green-500/5"
+      className="animate-row-in align-top transition-colors hover:bg-accent-soft"
       data-testid="request-row"
       style={{ animationDelay: `${index * 40}ms` }}
     >
       {/* Request: key, project, requester */}
       <td className="px-5 py-3">
         <div className="flex items-center gap-2">
-          {request.isSensitive && (
-            <Lock className="h-3.5 w-3.5 text-amber-500" />
-          )}
-          <code className="font-mono text-sm text-amber-400">
-            {request.key}
-          </code>
+          {request.isSensitive && <Lock className="h-3.5 w-3.5 text-warning" />}
+          <code className="font-mono text-sm text-warning">{request.key}</code>
         </div>
-        <p className="mt-0.5 text-xs text-zinc-500">{request.projectName}</p>
+        <p className="mt-0.5 text-xs text-ink-subtle">{request.projectName}</p>
         {isMachine ? (
-          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-zinc-600">
+          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
             <TerminalBadge color="amber">automated</TerminalBadge>
             <span>
               API key &quot;{request.requestedByKeyName}&quot; · created by{" "}
@@ -453,7 +449,7 @@ function RequestRow({
             </span>
           </p>
         ) : (
-          <p className="mt-0.5 text-xs text-zinc-600">
+          <p className="mt-0.5 text-xs text-ink-faint">
             {requesterName ?? "Unknown"}
             {requesterName && requesterEmail && requesterName !== requesterEmail
               ? ` · ${requesterEmail}`
@@ -461,7 +457,7 @@ function RequestRow({
           </p>
         )}
         {isMachine && request.description && (
-          <p className="mt-1 max-w-[24rem] text-xs italic text-zinc-500">
+          <p className="mt-1 max-w-[24rem] text-xs italic text-ink-subtle">
             &ldquo;{request.description}&rdquo;
           </p>
         )}
@@ -514,10 +510,10 @@ function RequestRow({
               value={suppliedValue}
               onChange={(e) => setSuppliedValue(e.target.value)}
               placeholder="Enter the value to approve"
-              className="w-44 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-green-500/50 focus:outline-none"
+              className="w-44 rounded-lg border border-line bg-surface px-2 py-1.5 font-mono text-xs text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none"
             />
           ) : (
-            <span className="text-xs text-zinc-600">
+            <span className="text-xs text-ink-faint">
               value supplied at approval
             </span>
           )
@@ -525,11 +521,11 @@ function RequestRow({
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
               {isValueVisible && revealedValue ? (
-                <code className="block max-w-[16rem] break-all font-mono text-xs text-green-400">
+                <code className="block max-w-[16rem] break-all font-mono text-xs text-accent">
                   {revealedValue}
                 </code>
               ) : (
-                <span className="font-mono text-sm text-zinc-500">
+                <span className="font-mono text-sm text-ink-subtle">
                   ••••••••
                 </span>
               )}
@@ -538,7 +534,7 @@ function RequestRow({
               data-testid="request-value-toggle"
               onClick={handleToggleReveal}
               disabled={isRevealing}
-              className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400 disabled:opacity-50"
+              className="rounded-lg p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-accent disabled:opacity-50"
               title={
                 isValueVisible && revealedValue ? "Hide value" : "Reveal value"
               }
@@ -556,7 +552,7 @@ function RequestRow({
       </td>
 
       {/* Requested date */}
-      <td className="whitespace-nowrap px-5 py-3 text-sm text-zinc-500">
+      <td className="whitespace-nowrap px-5 py-3 text-sm text-ink-subtle">
         {new Date(request.createdAt).toLocaleDateString()}
       </td>
 
@@ -577,7 +573,7 @@ function RequestRow({
                   selectedEnvironments.length === 0 ||
                   (!request.hasValue && suppliedValue.length === 0)
                 }
-                className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Check className="h-3.5 w-3.5" />
                 Accept
@@ -585,21 +581,21 @@ function RequestRow({
               <button
                 data-testid="request-reject"
                 onClick={onReject}
-                className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700"
+                className="inline-flex items-center gap-1 rounded-lg bg-danger px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-danger"
               >
                 <X className="h-3.5 w-3.5" />
                 Reject
               </button>
             </div>
             {selectedEnvironments.length === 0 && (
-              <p className="text-xs text-red-400">
+              <p className="text-xs text-danger">
                 Select at least one environment.
               </p>
             )}
             {!request.hasValue &&
               suppliedValue.length === 0 &&
               selectedEnvironments.length > 0 && (
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-ink-subtle">
                   Enter the value to approve this request.
                 </p>
               )}
@@ -610,17 +606,17 @@ function RequestRow({
               {request.status}
             </TerminalBadge>
             {request.reviewer && (
-              <span className="text-xs text-zinc-500">
+              <span className="text-xs text-ink-subtle">
                 by {request.reviewer.name ?? request.reviewer.email}
               </span>
             )}
             {request.reviewedAt && (
-              <span className="text-xs text-zinc-600">
+              <span className="text-xs text-ink-faint">
                 {new Date(request.reviewedAt).toLocaleDateString()}
               </span>
             )}
             {request.reviewReason && (
-              <span className="max-w-[16rem] text-xs text-zinc-500">
+              <span className="max-w-[16rem] text-xs text-ink-subtle">
                 Note: {request.reviewReason}
               </span>
             )}

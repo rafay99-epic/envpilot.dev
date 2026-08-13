@@ -53,10 +53,10 @@ export default function ProjectsPage() {
   if (!organization) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="font-mono text-sm text-zinc-500">
-          <span className="text-green-400">$</span> envpilot project list
+        <p className="font-mono text-sm text-ink-subtle">
+          <span className="text-accent">$</span> envpilot project list
         </p>
-        <p className="mt-2 text-sm text-zinc-400">
+        <p className="mt-2 text-sm text-ink-muted">
           Select or create an organization to manage projects.
         </p>
         <TerminalButtonLink href="/organizations" className="mt-6">
@@ -80,8 +80,8 @@ export default function ProjectsPage() {
                 onClick={() => setShowFavoritesFirst(!showFavoritesFirst)}
                 className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                   showFavoritesFirst
-                    ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
-                    : "border-zinc-700/50 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+                    ? "border-warning-line bg-warning-soft text-warning"
+                    : "border-line text-ink-subtle hover:border-line-strong hover:text-ink-muted"
                 }`}
               >
                 <Star
@@ -179,13 +179,13 @@ function ProjectCard({
   return (
     <Link
       href={`/dashboard/projects/${project.slug}`}
-      className="group flex flex-col overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 transition-all hover:border-green-500/30 hover:shadow-lg hover:shadow-green-500/5"
+      className="group flex flex-col overflow-hidden rounded-lg border border-line bg-surface/90 transition-all hover:border-accent-line hover:shadow-lg hover:shadow-accent-line"
     >
-      <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2">
-        <div className="h-2.5 w-2.5 rounded-full bg-[#ef5350]/80" />
-        <div className="h-2.5 w-2.5 rounded-full bg-[#fbbf24]/80" />
-        <div className="h-2.5 w-2.5 rounded-full bg-[#22c55e]/80" />
-        <span className="ml-2 truncate text-xs text-zinc-500">
+      <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2">
+        <div className="h-2.5 w-2.5 rounded-full bg-danger/80" />
+        <div className="h-2.5 w-2.5 rounded-full bg-warning/80" />
+        <div className="h-2.5 w-2.5 rounded-full bg-accent/80" />
+        <span className="ml-2 truncate text-xs text-ink-subtle">
           {project.slug}
         </span>
         {onToggleFavorite && (
@@ -201,26 +201,26 @@ function ProjectCard({
             <Star
               className={`h-3.5 w-3.5 ${
                 isFavorite
-                  ? "fill-amber-400 text-amber-400"
-                  : "text-zinc-600 hover:text-amber-400"
+                  ? "fill-warning text-warning"
+                  : "text-ink-faint hover:text-warning"
               }`}
             />
           </button>
         )}
         <ChevronRight
-          className={`${onToggleFavorite ? "" : "ml-auto"} h-3 w-3 text-zinc-600 transition-colors group-hover:text-green-400`}
+          className={`${onToggleFavorite ? "" : "ml-auto"} h-3 w-3 text-ink-faint transition-colors group-hover:text-accent`}
         />
       </div>
       <div className="flex-1 p-4">
-        <h3 className="font-mono text-sm font-semibold text-zinc-100 group-hover:text-green-400">
+        <h3 className="font-mono text-sm font-semibold text-ink group-hover:text-accent">
           {project.name}
         </h3>
         {project.description && (
-          <p className="mt-1 truncate text-xs text-zinc-500">
+          <p className="mt-1 truncate text-xs text-ink-subtle">
             {project.description}
           </p>
         )}
-        <div className="mt-3 flex items-center text-xs text-zinc-600">
+        <div className="mt-3 flex items-center text-xs text-ink-faint">
           <Clock className="mr-1.5 h-3 w-3" />
           Created {new Date(project.createdAt).toLocaleDateString()}
         </div>

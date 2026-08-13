@@ -159,34 +159,34 @@ export default async function DocPage({ params }: PageProps) {
                   <div className="flex flex-wrap items-center gap-3">
                     <nav
                       aria-label="Breadcrumb"
-                      className="flex items-center gap-2 font-mono text-[11px] tracking-widest text-zinc-600"
+                      className="flex items-center gap-2 font-mono text-[11px] tracking-widest text-ink-faint"
                     >
                       <Link
                         href="/"
-                        className="transition-colors hover:text-green-400"
+                        className="transition-colors hover:text-accent"
                       >
                         docs
                       </Link>
                       <span aria-hidden>/</span>
-                      <span className="text-green-400">{doc.section}</span>
+                      <span className="text-accent">{doc.section}</span>
                     </nav>
                     {doc.version && (
-                      <span className="rounded border border-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">
+                      <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] text-ink-subtle">
                         v{doc.version}
                       </span>
                     )}
                   </div>
 
                   <div className="mt-6 flex items-start gap-4">
-                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-green-500/30 bg-green-500/10 text-green-400">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-accent-line bg-accent-soft text-accent">
                       <Icon className="h-5 w-5" />
                     </span>
                     <div className="min-w-0">
-                      <h1 className="font-sans text-3xl font-bold tracking-tight text-zinc-100 md:text-4xl">
+                      <h1 className="font-sans text-3xl font-bold tracking-tight text-ink md:text-4xl">
                         {doc.title}
                       </h1>
                       {doc.description && (
-                        <p className="mt-3 font-mono text-sm leading-relaxed text-zinc-500">
+                        <p className="mt-3 font-mono text-sm leading-relaxed text-ink-subtle">
                           {doc.description}
                         </p>
                       )}
@@ -219,10 +219,10 @@ export default async function DocPage({ params }: PageProps) {
                   <Link href={`/${prev.slug}`} className="block h-full">
                     <GlowCard className="h-full">
                       <div className="flex h-full flex-col gap-2 p-5">
-                        <span className="font-mono text-[11px] tracking-widest text-zinc-500">
+                        <span className="font-mono text-[11px] tracking-widest text-ink-subtle">
                           ← {prev.section.toLowerCase()}
                         </span>
-                        <span className="font-sans text-base font-semibold text-zinc-200 transition-colors group-hover:text-green-400">
+                        <span className="font-sans text-base font-semibold text-ink transition-colors group-hover:text-accent">
                           {prev.title}
                         </span>
                       </div>
@@ -236,10 +236,10 @@ export default async function DocPage({ params }: PageProps) {
                   <Link href={`/${next.slug}`} className="block h-full">
                     <GlowCard className="h-full">
                       <div className="flex h-full flex-col items-end gap-2 p-5 text-right">
-                        <span className="font-mono text-[11px] tracking-widest text-zinc-500">
+                        <span className="font-mono text-[11px] tracking-widest text-ink-subtle">
                           {next.section.toLowerCase()} →
                         </span>
-                        <span className="font-sans text-base font-semibold text-zinc-200 transition-colors group-hover:text-green-400">
+                        <span className="font-sans text-base font-semibold text-ink transition-colors group-hover:text-accent">
                           {next.title}
                         </span>
                       </div>

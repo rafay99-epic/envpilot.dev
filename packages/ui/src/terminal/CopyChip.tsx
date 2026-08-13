@@ -41,16 +41,16 @@ export function CopyChip({
         copied ? "Copied to clipboard" : `Copy "${text}" to clipboard`
       }
       aria-live="polite"
-      className={`group inline-flex items-center gap-3 rounded-md px-4 py-3 ${terminal.mono} text-[13px] text-zinc-400 ring-1 ring-white/[0.08] transition-colors hover:text-zinc-100 hover:ring-white/20 ${className}`}
+      className={`group inline-flex items-center gap-3 rounded-md px-4 py-3 ${terminal.mono} text-[13px] text-ink-muted ring-1 ring-white/[0.08] transition-colors hover:text-ink hover:ring-white/20 ${className}`}
     >
-      <span aria-hidden className="text-zinc-600">
+      <span aria-hidden className="text-ink-faint">
         {prefix}
       </span>
       {text}
       {copied ? (
-        <Check aria-hidden className="h-3.5 w-3.5 text-green-400" />
+        <Check aria-hidden className="h-3.5 w-3.5 text-accent" />
       ) : (
-        <Copy aria-hidden className="h-3.5 w-3.5 text-zinc-600" />
+        <Copy aria-hidden className="h-3.5 w-3.5 text-ink-faint" />
       )}
     </button>
   );

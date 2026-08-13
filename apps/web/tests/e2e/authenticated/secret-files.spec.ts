@@ -177,7 +177,7 @@ test.describe("secret files", () => {
       // a toast and (in dev) the Next.js error overlay, which makes a bare
       // getByText a strict-mode violation.
       await expect(
-        page.locator("form div.bg-red-50").filter({
+        page.locator("form div.bg-danger-soft").filter({
           hasText: /already exists at/i,
         }),
         "an overlapping (path, environment) pair must be refused"

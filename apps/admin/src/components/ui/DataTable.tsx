@@ -79,17 +79,17 @@ export function DataTable<T extends Record<string, unknown>>({
   const clickable = Boolean(onRowClick || renderExpanded);
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-700/50">
+    <div className="overflow-x-auto rounded-lg border border-line">
       <table className="w-full text-left text-sm">
-        <thead className="border-b border-zinc-800/50 bg-zinc-900/50">
+        <thead className="border-b border-line bg-surface/50">
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
                 className={cn(
-                  "px-4 py-3 font-mono text-[0.68rem] font-medium uppercase tracking-wider text-zinc-500",
+                  "px-4 py-3 font-mono text-[0.68rem] font-medium uppercase tracking-wider text-ink-subtle",
                   col.sortable &&
-                    "cursor-pointer select-none hover:text-zinc-300",
+                    "cursor-pointer select-none hover:text-ink-muted",
                   col.className
                 )}
                 onClick={() => col.sortable && handleSort(col.key)}
@@ -109,7 +109,7 @@ export function DataTable<T extends Record<string, unknown>>({
             {renderExpanded && <th className="w-10 px-4 py-3" />}
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-800/50">
+        <tbody className="divide-y divide-line">
           {sorted.map((row, i) => {
             const id = rowKey ? rowKey(row) : String(i);
             const isExpanded = renderExpanded != null && currentExpanded === id;
@@ -117,7 +117,7 @@ export function DataTable<T extends Record<string, unknown>>({
               <Fragment key={id}>
                 <tr
                   className={cn(
-                    "transition-colors hover:bg-green-500/5",
+                    "transition-colors hover:bg-accent-soft",
                     clickable && "cursor-pointer"
                   )}
                   onClick={() => {
@@ -128,7 +128,7 @@ export function DataTable<T extends Record<string, unknown>>({
                   {columns.map((col) => (
                     <td
                       key={col.key}
-                      className={cn("px-4 py-3 text-zinc-300", col.className)}
+                      className={cn("px-4 py-3 text-ink-muted", col.className)}
                     >
                       {col.render
                         ? col.render(row)
@@ -136,18 +136,18 @@ export function DataTable<T extends Record<string, unknown>>({
                     </td>
                   ))}
                   {renderExpanded && (
-                    <td className="px-4 py-3 text-zinc-500">
+                    <td className="px-4 py-3 text-ink-subtle">
                       <ChevronRight
                         className={cn(
                           "h-4 w-4 transition-transform",
-                          isExpanded && "rotate-90 text-green-400"
+                          isExpanded && "rotate-90 text-accent"
                         )}
                       />
                     </td>
                   )}
                 </tr>
                 {isExpanded && (
-                  <tr className="bg-zinc-900/40">
+                  <tr className="bg-surface/40">
                     <td colSpan={totalCols} className="px-4 py-3">
                       {renderExpanded(row)}
                     </td>

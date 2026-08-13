@@ -33,7 +33,7 @@ export function FeatureRegistryTab() {
       header: "Key",
       sortable: true,
       render: (f) => (
-        <span className="font-mono text-xs text-zinc-300">{f.key}</span>
+        <span className="font-mono text-xs text-ink-muted">{f.key}</span>
       ),
     },
     { key: "displayName", header: "Display Name", sortable: true },
@@ -51,7 +51,7 @@ export function FeatureRegistryTab() {
       key: "defaultValue",
       header: "Default",
       render: (f) => (
-        <span className="text-xs text-zinc-400">
+        <span className="text-xs text-ink-muted">
           {f.defaultValue === "null" ? "unlimited" : f.defaultValue}
         </span>
       ),
@@ -78,10 +78,8 @@ export function FeatureRegistryTab() {
 
   return (
     <section data-wide>
-      <h2 className="mb-4 text-lg font-semibold text-zinc-100">
-        Feature Registry
-      </h2>
-      <p className="mb-4 text-xs text-zinc-500">
+      <h2 className="mb-4 text-lg font-semibold text-ink">Feature Registry</h2>
+      <p className="mb-4 text-xs text-ink-subtle">
         Features are developer-seeded. Admin can only toggle active/inactive.
       </p>
       <QueryState

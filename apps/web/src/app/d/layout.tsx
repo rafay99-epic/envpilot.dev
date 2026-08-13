@@ -40,20 +40,20 @@ export default function DocShareLayout({
   // `dark` is explicit: this route sits outside the dashboard shell, which is
   // where the rest of the app gets the class the `dark:` variants key on.
   return (
-    <div className="dark min-h-screen bg-zinc-950">
-      <header className="border-b border-zinc-800/80">
+    <div className="min-h-screen bg-canvas">
+      <header className="border-b border-line">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <span className="font-mono text-sm font-bold text-green-500">
+          <span className="font-mono text-sm font-bold text-accent">
             envpilot
           </span>
-          <span className="font-mono text-[11px] text-zinc-600">
+          <span className="font-mono text-[11px] text-ink-faint">
             shared document
           </span>
         </div>
       </header>
       {children}
       <footer className="mx-auto max-w-3xl px-6 pb-16">
-        <p className="text-center text-xs text-zinc-600">
+        <p className="text-center text-xs text-ink-faint">
           Shared securely with Envpilot. This link expires.
         </p>
       </footer>

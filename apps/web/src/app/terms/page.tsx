@@ -42,8 +42,8 @@ export default function TermsOfServicePage() {
   return (
     <MarketingShell>
       <PageHero eyebrow="terms" title="Terms of Service" align="left">
-        <span className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 font-mono text-xs text-zinc-400">
-          <span className="text-green-500">&#10095;</span>
+        <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/60 px-3 py-1.5 font-mono text-xs text-ink-muted">
+          <span className="text-accent">&#10095;</span>
           Effective: March 10, 2026 &middot; Last updated: August 2, 2026
         </span>
       </PageHero>
@@ -57,7 +57,7 @@ export default function TermsOfServicePage() {
           <ScrollSpySidebar sections={SECTIONS} />
 
           {/* Main content — fully server-rendered */}
-          <div className="min-w-0 font-mono text-sm leading-relaxed text-zinc-400">
+          <div className="min-w-0 font-mono text-sm leading-relaxed text-ink-muted">
             <Section id="acceptance" n={1} title="Acceptance of Terms">
               <p>
                 These Terms of Service (&ldquo;Terms&rdquo;) constitute a
@@ -76,7 +76,7 @@ export default function TermsOfServicePage() {
             </Section>
 
             <Section id="definitions" n={2} title="Definitions">
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
+              <div className="rounded-xl border border-line bg-surface/30 p-5">
                 <ul className="space-y-2 pl-4">
                   <Li>
                     <Term>&ldquo;Organization&rdquo;</Term> &mdash; a workspace
@@ -269,7 +269,7 @@ export default function TermsOfServicePage() {
                   select a brief cancellation reason (used solely to improve the
                   Service). Upon cancellation:
                 </p>
-                <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
+                <div className="mt-3 rounded-xl border border-line bg-surface/30 p-5">
                   <ul className="space-y-2 pl-4">
                     <Li>
                       Your Pro access{" "}
@@ -354,10 +354,7 @@ export default function TermsOfServicePage() {
             <Section id="privacy" n={9} title="Privacy">
               <p>
                 Your use of the Service is also governed by our{" "}
-                <Link
-                  href="/privacy"
-                  className="text-green-400 hover:underline"
-                >
+                <Link href="/privacy" className="text-accent hover:underline">
                   Privacy Policy
                 </Link>
                 , which describes how we collect, use, store, and protect your
@@ -449,8 +446,8 @@ export default function TermsOfServicePage() {
             </Section>
 
             <Section id="warranties" n={13} title="Disclaimer of Warranties">
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
-                <p className="text-xs uppercase tracking-wider text-amber-400">
+              <div className="rounded-xl border border-warning-line bg-warning-soft p-5">
+                <p className="text-xs uppercase tracking-wider text-warning">
                   THE SERVICE IS PROVIDED &ldquo;AS IS&rdquo; AND &ldquo;AS
                   AVAILABLE&rdquo; WITHOUT WARRANTIES OF ANY KIND, EITHER
                   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED
@@ -458,7 +455,7 @@ export default function TermsOfServicePage() {
                   PURPOSE, TITLE, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT
                   THE SERVICE WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE.
                 </p>
-                <p className="mt-3 text-xs uppercase tracking-wider text-amber-400">
+                <p className="mt-3 text-xs uppercase tracking-wider text-warning">
                   SOME JURISDICTIONS DO NOT ALLOW THE EXCLUSION OF IMPLIED
                   WARRANTIES. IN SUCH JURISDICTIONS, THE ABOVE EXCLUSIONS APPLY
                   TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW.
@@ -467,8 +464,8 @@ export default function TermsOfServicePage() {
             </Section>
 
             <Section id="liability" n={14} title="Limitation of Liability">
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
-                <p className="text-xs uppercase tracking-wider text-amber-400">
+              <div className="rounded-xl border border-warning-line bg-warning-soft p-5">
+                <p className="text-xs uppercase tracking-wider text-warning">
                   TO THE MAXIMUM EXTENT PERMITTED BY LAW, ENVPILOT SHALL NOT BE
                   LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
                   OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFITS, DATA, USE,
@@ -477,12 +474,12 @@ export default function TermsOfServicePage() {
                   CONDUCT, LOSS OF VARIABLES OR SECRETS, OR ANY OTHER MATTER
                   RELATING TO THE SERVICE.
                 </p>
-                <p className="mt-3 text-xs uppercase tracking-wider text-amber-400">
+                <p className="mt-3 text-xs uppercase tracking-wider text-warning">
                   OUR TOTAL AGGREGATE LIABILITY SHALL NOT EXCEED THE GREATER OF
                   (A) AMOUNTS YOU PAID IN THE 12 MONTHS PRECEDING THE CLAIM, OR
                   (B) USD $100.
                 </p>
-                <p className="mt-3 text-xs uppercase tracking-wider text-amber-400">
+                <p className="mt-3 text-xs uppercase tracking-wider text-warning">
                   THESE LIMITATIONS APPLY REGARDLESS OF THE THEORY OF LIABILITY
                   AND EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. SOME
                   JURISDICTIONS DO NOT ALLOW LIMITATIONS ON LIABILITY; THESE
@@ -593,7 +590,7 @@ export default function TermsOfServicePage() {
                   informal resolution by contacting{" "}
                   <a
                     href="mailto:legal@envpilot.dev"
-                    className="text-green-400 hover:underline"
+                    className="text-accent hover:underline"
                   >
                     legal@envpilot.dev
                   </a>
@@ -604,8 +601,8 @@ export default function TermsOfServicePage() {
               </Subsection>
 
               <Subsection title="18.3 Class Action Waiver">
-                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
-                  <p className="text-xs uppercase tracking-wider text-amber-400">
+                <div className="rounded-xl border border-warning-line bg-warning-soft p-5">
+                  <p className="text-xs uppercase tracking-wider text-warning">
                     TO THE EXTENT PERMITTED BY LAW, YOU AND ENVPILOT EACH WAIVE
                     THE RIGHT TO PARTICIPATE IN A CLASS ACTION, COLLECTIVE
                     ACTION, OR OTHER REPRESENTATIVE PROCEEDING. THIS WAIVER DOES
@@ -675,16 +672,16 @@ export default function TermsOfServicePage() {
 
             <Section id="contact" n={20} title="Contact">
               <p>For questions about these Terms:</p>
-              <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
-                <p className="flex items-center gap-2 text-zinc-200">
-                  <span className="text-green-500">&#10095;</span>
+              <div className="mt-4 rounded-xl border border-line bg-surface/30 p-5">
+                <p className="flex items-center gap-2 text-ink">
+                  <span className="text-accent">&#10095;</span>
                   <strong className="font-semibold">Envpilot Legal</strong>
                 </p>
                 <p className="mt-2">
                   Email:{" "}
                   <a
                     href="mailto:legal@envpilot.dev"
-                    className="text-green-400 hover:underline"
+                    className="text-accent hover:underline"
                   >
                     legal@envpilot.dev
                   </a>
@@ -712,14 +709,14 @@ function Section({
   return (
     <section
       id={id}
-      className="scroll-mt-24 border-b border-zinc-800/60 py-10 first:pt-0 last:border-b-0"
+      className="scroll-mt-24 border-b border-line py-10 first:pt-0 last:border-b-0"
     >
       <Reveal>
         <div className="flex items-baseline gap-3">
-          <span className="font-mono text-xs tracking-widest text-green-500">
+          <span className="font-mono text-xs tracking-widest text-accent">
             &sect; {String(n).padStart(2, "0")}
           </span>
-          <h2 className="font-sans text-xl font-semibold tracking-tight text-zinc-100">
+          <h2 className="font-sans text-xl font-semibold tracking-tight text-ink">
             {title}
           </h2>
         </div>
@@ -738,7 +735,7 @@ function Subsection({
 }) {
   return (
     <div className="mt-6">
-      <h3 className="font-sans text-sm font-semibold text-zinc-200">{title}</h3>
+      <h3 className="font-sans text-sm font-semibold text-ink">{title}</h3>
       <div className="mt-2">{children}</div>
     </div>
   );
@@ -747,7 +744,7 @@ function Subsection({
 /** List item with a green caret marker. */
 function Li({ children }: { children: React.ReactNode }) {
   return (
-    <li className="text-zinc-400 before:mr-2 before:text-green-500 before:content-['\276F']">
+    <li className="text-ink-muted before:mr-2 before:text-accent before:content-['\276F']">
       {children}
     </li>
   );
@@ -756,7 +753,7 @@ function Li({ children }: { children: React.ReactNode }) {
 /** List item for prohibited actions — red "x" marker. */
 function ProhibitedLi({ children }: { children: React.ReactNode }) {
   return (
-    <li className="text-zinc-400 before:mr-2 before:text-red-400 before:content-['x']">
+    <li className="text-ink-muted before:mr-2 before:text-danger before:content-['x']">
       {children}
     </li>
   );
@@ -764,5 +761,5 @@ function ProhibitedLi({ children }: { children: React.ReactNode }) {
 
 /** Emphasized key term inside legal prose. */
 function Term({ children }: { children: React.ReactNode }) {
-  return <strong className="font-semibold text-zinc-200">{children}</strong>;
+  return <strong className="font-semibold text-ink">{children}</strong>;
 }

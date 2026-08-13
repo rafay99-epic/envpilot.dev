@@ -26,7 +26,7 @@ export function MarketingShell({
 }) {
   return (
     <div
-      className={`relative min-h-screen bg-zinc-950 font-mono text-zinc-300 antialiased ${className}`}
+      className={`relative min-h-screen bg-canvas font-mono text-ink-muted antialiased ${className}`}
     >
       <MarketingNav links={navLinks} actions={navActions} />
       <main className="relative pt-16">{children}</main>

@@ -66,13 +66,13 @@ export function UpgradePrompt({
   if (variant === "inline") {
     return (
       <div
-        className={`flex items-center gap-2 rounded-lg border border-amber-600/30 bg-amber-900/10 px-3 py-2 text-sm text-amber-400 ${className}`}
+        className={`flex items-center gap-2 rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning ${className}`}
       >
         <Sparkles className="h-4 w-4 shrink-0" />
         <span className="flex-1">{reason}</span>
         <button
           onClick={handleUpgradeClick}
-          className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-green-400 transition-colors hover:text-green-300"
+          className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-accent transition-colors hover:text-accent"
         >
           Upgrade to {upgradeName}
           <ArrowRight className="h-3.5 w-3.5" />
@@ -84,22 +84,22 @@ export function UpgradePrompt({
   if (variant === "banner") {
     return (
       <div
-        className={`rounded-lg border border-zinc-700/50 bg-zinc-900/90 p-4 ${className}`}
+        className={`rounded-lg border border-line bg-surface/90 p-4 ${className}`}
       >
         <div className="flex items-start gap-3">
           <div className="shrink-0">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-green-500/30 bg-green-500/10">
-              <Sparkles className="h-5 w-5 text-green-400" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-accent-line bg-accent-soft">
+              <Sparkles className="h-5 w-5 text-accent" />
             </div>
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-zinc-100">
+            <h3 className="text-sm font-semibold text-ink">
               {feature ? `Unlock ${feature}` : `Upgrade to ${upgradeName}`}
             </h3>
-            <p className="mt-1 text-sm text-zinc-400">{reason}</p>
+            <p className="mt-1 text-sm text-ink-muted">{reason}</p>
             <button
               onClick={handleUpgradeClick}
-              className="mt-3 inline-flex items-center gap-2 rounded-md border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-all hover:border-green-500/50 hover:bg-green-500/20"
+              className="mt-3 inline-flex items-center gap-2 rounded-md border border-accent-line bg-accent-soft px-4 py-2 text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
             >
               Upgrade to {upgradeName}
               <ArrowRight className="h-4 w-4" />
@@ -113,18 +113,18 @@ export function UpgradePrompt({
   if (variant === "card") {
     return (
       <div
-        className={`overflow-hidden rounded-xl border border-zinc-700/50 bg-zinc-900 ${className}`}
+        className={`overflow-hidden rounded-xl border border-line bg-surface ${className}`}
       >
-        <div className="border-b border-zinc-700/50 bg-zinc-800/50 px-6 py-4">
+        <div className="border-b border-line bg-surface-raised/50 px-6 py-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-green-400" />
-            <h3 className="text-base font-semibold text-zinc-100">
+            <Sparkles className="h-5 w-5 text-accent" />
+            <h3 className="text-base font-semibold text-ink">
               Upgrade to {upgradeName}
             </h3>
           </div>
         </div>
         <div className="p-6">
-          <p className="text-sm text-zinc-400">{reason}</p>
+          <p className="text-sm text-ink-muted">{reason}</p>
           <ul className="mt-4 space-y-2">
             {[
               "Unlimited projects",
@@ -135,16 +135,16 @@ export function UpgradePrompt({
             ].map((item) => (
               <li
                 key={item}
-                className="flex items-center gap-2 text-sm text-zinc-300"
+                className="flex items-center gap-2 text-sm text-ink-muted"
               >
-                <Check className="h-4 w-4 shrink-0 text-green-400" />
+                <Check className="h-4 w-4 shrink-0 text-accent" />
                 {item}
               </li>
             ))}
           </ul>
           <button
             onClick={handleUpgradeClick}
-            className="mt-6 w-full rounded-lg border border-green-500/30 bg-green-500/10 py-2 px-4 text-sm font-medium text-green-400 transition-all hover:border-green-500/50 hover:bg-green-500/20"
+            className="mt-6 w-full rounded-lg border border-accent-line bg-accent-soft py-2 px-4 text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
           >
             Upgrade Now
           </button>
@@ -162,30 +162,30 @@ export function UpgradePrompt({
         className="absolute inset-0 bg-black/60"
         onClick={() => onUpgradeClick?.()}
       />
-      <div className="relative w-full max-w-md mx-4 overflow-hidden rounded-xl border border-zinc-700/50 bg-zinc-900 shadow-2xl">
-        <div className="border-b border-zinc-700/50 bg-zinc-800/50 px-6 py-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-green-500/30 bg-green-500/10">
-            <Sparkles className="h-8 w-8 text-green-400" />
+      <div className="relative w-full max-w-md mx-4 overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
+        <div className="border-b border-line bg-surface-raised/50 px-6 py-8 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-accent-line bg-accent-soft">
+            <Sparkles className="h-8 w-8 text-accent" />
           </div>
-          <h2 className="text-xl font-bold text-zinc-100">
+          <h2 className="text-xl font-bold text-ink">
             {feature ? `Unlock ${feature}` : `Upgrade to ${upgradeName}`}
           </h2>
-          <p className="mt-2 text-sm text-zinc-400">
+          <p className="mt-2 text-sm text-ink-muted">
             Get unlimited access to all features
           </p>
         </div>
         <div className="p-6">
-          <p className="text-center text-sm text-zinc-400 mb-6">{reason}</p>
+          <p className="text-center text-sm text-ink-muted mb-6">{reason}</p>
           <div className="flex gap-3">
             <button
               onClick={() => onUpgradeClick?.()}
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 py-2 px-4 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-700"
+              className="flex-1 rounded-lg border border-line bg-surface-raised py-2 px-4 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-hover"
             >
               Maybe Later
             </button>
             <button
               onClick={handleUpgradeClick}
-              className="flex-1 rounded-lg border border-green-500/30 bg-green-500/10 py-2 px-4 text-sm font-medium text-green-400 transition-all hover:border-green-500/50 hover:bg-green-500/20"
+              className="flex-1 rounded-lg border border-accent-line bg-accent-soft py-2 px-4 text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
             >
               Upgrade Now
             </button>

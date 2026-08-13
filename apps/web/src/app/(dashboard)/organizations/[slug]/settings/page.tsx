@@ -252,11 +252,11 @@ function OrganizationSettingsPageContent({
   if (error && !organization) {
     return (
       <div className="mx-auto max-w-2xl">
-        <TerminalCard className="border-red-500/30">
-          <p className="text-red-400">{error}</p>
+        <TerminalCard className="border-danger-line">
+          <p className="text-danger">{error}</p>
           <Link
             href="/organizations"
-            className="mt-4 inline-flex items-center gap-1 text-sm text-red-400 hover:underline"
+            className="mt-4 inline-flex items-center gap-1 text-sm text-danger hover:underline"
           >
             Back to Organizations
           </Link>
@@ -271,15 +271,15 @@ function OrganizationSettingsPageContent({
   ) {
     return (
       <div className="mx-auto max-w-2xl">
-        <TerminalCard className="border-amber-500/30">
-          <h3 className="font-semibold text-amber-400">Permission Denied</h3>
-          <p className="mt-1 text-sm text-amber-400/80">
+        <TerminalCard className="border-warning-line">
+          <h3 className="font-semibold text-warning">Permission Denied</h3>
+          <p className="mt-1 text-sm text-warning/80">
             Only organization owners, project managers, and team leads can
             access settings.
           </p>
           <Link
             href={`/organizations/${slug}`}
-            className="mt-4 inline-flex items-center gap-1 text-sm text-amber-400 hover:underline"
+            className="mt-4 inline-flex items-center gap-1 text-sm text-warning hover:underline"
           >
             Back to Organization
           </Link>
@@ -298,7 +298,7 @@ function OrganizationSettingsPageContent({
       />
 
       {/* Tabs */}
-      <div className="border-b border-zinc-800">
+      <div className="border-b border-line">
         <nav className="-mb-px flex space-x-6">
           {tabs.map((tab) => (
             <button
@@ -306,8 +306,8 @@ function OrganizationSettingsPageContent({
               onClick={() => setActiveTab(tab.id)}
               className={`border-b-2 py-3 text-sm font-medium transition-colors ${
                 effectiveTab === tab.id
-                  ? "border-green-400 text-green-400"
-                  : "border-transparent text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+                  ? "border-accent-line text-accent"
+                  : "border-transparent text-ink-subtle hover:border-line-strong hover:text-ink-muted"
               }`}
             >
               {tab.label}
@@ -403,23 +403,23 @@ function GeneralOrgSettings({
   return (
     <div className="space-y-6">
       {successMessage && (
-        <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
-          <p className="text-sm text-green-400">{successMessage}</p>
+        <div className="rounded-lg border border-accent-line bg-accent-soft p-4">
+          <p className="text-sm text-accent">{successMessage}</p>
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-          <p className="text-sm text-red-400">{error}</p>
+        <div className="rounded-lg border border-danger-line bg-danger-soft p-4">
+          <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
       <form onSubmit={handleSave}>
         <TerminalCard>
-          <h2 className="text-base font-semibold text-zinc-100">Profile</h2>
+          <h2 className="text-base font-semibold text-ink">Profile</h2>
           <div className="mt-6 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
+              <label className="block text-sm font-medium text-ink-muted">
                 Organization Name
               </label>
               <TerminalInput
@@ -433,7 +433,7 @@ function GeneralOrgSettings({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
+              <label className="block text-sm font-medium text-ink-muted">
                 URL Slug
               </label>
               <TerminalInput
@@ -442,13 +442,13 @@ function GeneralOrgSettings({
                 disabled
                 className="mt-1 cursor-not-allowed opacity-50"
               />
-              <p className="mt-1 text-xs text-zinc-600">
+              <p className="mt-1 text-xs text-ink-faint">
                 Slug cannot be changed after creation.
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
+              <label className="block text-sm font-medium text-ink-muted">
                 Description
               </label>
               <textarea
@@ -456,7 +456,7 @@ function GeneralOrgSettings({
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 maxLength={500}
-                className="mt-1 w-full resize-none rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
+                className="mt-1 w-full resize-none rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink placeholder-ink-subtle focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
               />
             </div>
           </div>
@@ -471,13 +471,13 @@ function GeneralOrgSettings({
 
       {/* Plan Info */}
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">Plan</h2>
+        <h2 className="text-base font-semibold text-ink">Plan</h2>
         <div className="mt-4 flex items-start justify-between gap-4">
           <div>
             <TerminalBadge color={orgTier === "pro" ? "green" : "zinc"}>
               {orgTier === "pro" ? "Pro Plan" : "Free Plan"}
             </TerminalBadge>
-            <p className="mt-2 text-sm text-zinc-500">
+            <p className="mt-2 text-sm text-ink-subtle">
               View your resource usage and available features on the Usage &amp;
               Plan page.
             </p>
@@ -536,17 +536,15 @@ function DangerZoneSettings({
     <div className="space-y-6">
       {/* Transfer Ownership */}
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">
-          Transfer Ownership
-        </h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h2 className="text-base font-semibold text-ink">Transfer Ownership</h2>
+        <p className="mt-1 text-sm text-ink-subtle">
           Transfer this organization to another user. They will become the owner
           and all current members will be removed.
         </p>
 
         <div className="mt-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-zinc-300">
+            <label className="block text-sm font-medium text-ink-muted">
               New Owner&apos;s Email
             </label>
             <TerminalInput
@@ -559,19 +557,19 @@ function DangerZoneSettings({
           </div>
 
           {showTransferConfirm && transferEmail ? (
-            <div className="space-y-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+            <div className="space-y-4 rounded-lg border border-danger-line bg-danger-soft p-4">
               <div className="text-sm">
-                <p className="font-medium text-red-400">
+                <p className="font-medium text-danger">
                   This action cannot be undone.
                 </p>
-                <ul className="mt-2 list-inside list-disc space-y-1 text-zinc-400">
+                <ul className="mt-2 list-inside list-disc space-y-1 text-ink-muted">
                   <li>New owner takes over the organization</li>
                   <li>You will be removed from the organization</li>
                   <li>All other members retain their roles and access</li>
                   <li>All projects, variables, and settings stay intact</li>
                 </ul>
               </div>
-              <p className="text-sm text-zinc-100">
+              <p className="text-sm text-ink">
                 Type{" "}
                 <span className="font-mono font-semibold">
                   {organization.name}
@@ -618,9 +616,9 @@ function DangerZoneSettings({
       </TerminalCard>
 
       {/* Delete Organization */}
-      <TerminalCard className="border-red-500/30">
-        <h2 className="text-base font-semibold text-red-400">Danger Zone</h2>
-        <p className="mt-2 text-sm text-zinc-500">
+      <TerminalCard className="border-danger-line">
+        <h2 className="text-base font-semibold text-danger">Danger Zone</h2>
+        <p className="mt-2 text-sm text-ink-subtle">
           Once you delete an organization, there is no going back. All projects
           and team data will be permanently removed; its environment variables
           and shared accounts follow the same 7-day retention before permanent
@@ -629,7 +627,7 @@ function DangerZoneSettings({
 
         {showDeleteConfirm ? (
           <div className="mt-4 space-y-4">
-            <p className="text-sm text-zinc-100">
+            <p className="text-sm text-ink">
               Type{" "}
               <span className="font-mono font-semibold">
                 {organization.name}
@@ -928,8 +926,8 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
 
   if (isFetchError) {
     return (
-      <TerminalCard className="border-red-500/30">
-        <p className="text-sm text-red-400">
+      <TerminalCard className="border-danger-line">
+        <p className="text-sm text-danger">
           Failed to load tags. Please try again.
         </p>
         <TerminalButton
@@ -946,11 +944,11 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
   return (
     <div className="space-y-6">
       {tagError && (
-        <div className="flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-          <p className="text-sm text-red-400">{tagError}</p>
+        <div className="flex items-center justify-between rounded-lg border border-danger-line bg-danger-soft p-4">
+          <p className="text-sm text-danger">{tagError}</p>
           <button
             onClick={() => setTagError(null)}
-            className="ml-4 shrink-0 text-xs text-red-400/60 hover:text-red-400"
+            className="ml-4 shrink-0 text-xs text-danger/60 hover:text-danger"
           >
             Dismiss
           </button>
@@ -958,11 +956,11 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
       )}
 
       {tagSuccess && (
-        <div className="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-4">
-          <p className="text-sm text-green-400">{tagSuccess}</p>
+        <div className="flex items-center justify-between rounded-lg border border-accent-line bg-accent-soft p-4">
+          <p className="text-sm text-accent">{tagSuccess}</p>
           <button
             onClick={() => setTagSuccess(null)}
-            className="ml-4 shrink-0 text-xs text-green-400/60 hover:text-green-400"
+            className="ml-4 shrink-0 text-xs text-accent/60 hover:text-accent"
           >
             Dismiss
           </button>
@@ -972,13 +970,11 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
       <TerminalCard>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-zinc-100">
-              Variable Tags
-            </h2>
-            <p className="mt-1 text-sm text-zinc-500">
+            <h2 className="text-base font-semibold text-ink">Variable Tags</h2>
+            <p className="mt-1 text-sm text-ink-subtle">
               Create and manage tags to organize your environment variables.
               {tags.length > 0 && (
-                <span className="ml-1 text-zinc-600">
+                <span className="ml-1 text-ink-faint">
                   ({tags.length} tag{tags.length !== 1 ? "s" : ""})
                 </span>
               )}
@@ -1011,12 +1007,12 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
 
         {/* Bulk paste form */}
         {showBulkPaste && (
-          <div className="mt-4 space-y-4 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
+          <div className="mt-4 space-y-4 rounded-lg border border-line bg-surface-raised/50 p-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
+              <label className="block text-sm font-medium text-ink-muted">
                 Paste tag names
               </label>
-              <p className="mt-0.5 text-xs text-zinc-500">
+              <p className="mt-0.5 text-xs text-ink-subtle">
                 Separate with commas, semicolons, or newlines. Duplicates and
                 existing tags are skipped.
               </p>
@@ -1025,12 +1021,12 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
                 onChange={(e) => handleBulkTextChange(e.target.value)}
                 placeholder={`Database, AWS, API Keys\nFrontend, Backend, Auth\nCache; Storage; Monitoring`}
                 rows={4}
-                className="mt-2 block w-full resize-none rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
+                className="mt-2 block w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 font-mono text-sm text-ink placeholder-ink-faint focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
                 disabled={isBulkCreating}
                 autoFocus
               />
               {bulkText.trim() && (
-                <p className="mt-1 text-xs text-zinc-500">
+                <p className="mt-1 text-xs text-ink-subtle">
                   {bulkEntries.length} new tag
                   {bulkEntries.length !== 1 ? "s" : ""} to create
                   {bulkEntries.length === 0 &&
@@ -1043,14 +1039,14 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
             {/* Preview with color dots and remove buttons */}
             {bulkEntries.length > 0 && (
               <div>
-                <label className="block text-xs font-medium text-zinc-400">
+                <label className="block text-xs font-medium text-ink-muted">
                   Preview
                 </label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {bulkEntries.map((entry) => (
                     <span
                       key={entry.name}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800 py-0.5 pl-2 pr-1 text-xs text-zinc-200"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-raised py-0.5 pl-2 pr-1 text-xs text-ink"
                     >
                       <span
                         className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -1061,7 +1057,7 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
                         type="button"
                         onClick={() => removeBulkEntry(entry.name)}
                         disabled={isBulkCreating}
-                        className="rounded-full p-0.5 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300 disabled:opacity-50"
+                        className="rounded-full p-0.5 text-ink-subtle hover:bg-surface-hover hover:text-ink-muted disabled:opacity-50"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -1073,13 +1069,13 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
 
             {/* Progress */}
             {bulkProgress && (
-              <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 p-3">
-                <Loader2 className="h-4 w-4 animate-spin text-green-400" />
-                <span className="text-sm text-zinc-300">
+              <div className="flex items-center gap-2 rounded-lg border border-line bg-surface p-3">
+                <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                <span className="text-sm text-ink-muted">
                   Creating {bulkProgress.completed}/{bulkProgress.total}...
                 </span>
                 {bulkProgress.failures.length > 0 && (
-                  <span className="text-sm text-red-400">
+                  <span className="text-sm text-danger">
                     ({bulkProgress.failures.length} failed)
                   </span>
                 )}
@@ -1090,13 +1086,13 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
             {bulkProgress &&
               bulkProgress.failures.length > 0 &&
               !isBulkCreating && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-                  <p className="text-xs font-medium text-red-400">
+                <div className="rounded-lg border border-danger-line bg-danger-soft p-3">
+                  <p className="text-xs font-medium text-danger">
                     Failed tags:
                   </p>
                   <ul className="mt-1 space-y-0.5">
                     {bulkProgress.failures.map((f, i) => (
-                      <li key={i} className="text-xs text-red-400/80">
+                      <li key={i} className="text-xs text-danger/80">
                         {f.name}: {f.error}
                       </li>
                     ))}
@@ -1131,7 +1127,7 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
 
         {/* Inline create form */}
         {showCreate && (
-          <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
+          <div className="mt-4 rounded-lg border border-line bg-surface-raised/50 p-4">
             <div className="flex items-center gap-3">
               <TerminalInput
                 type="text"
@@ -1188,12 +1184,12 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
         {/* Tags list */}
         <div className="mt-6">
           {tags.length === 0 ? (
-            <p className="py-8 text-center text-sm text-zinc-500">
+            <p className="py-8 text-center text-sm text-ink-subtle">
               No tags yet. Create your first tag to start organizing variables.
             </p>
           ) : (
             <>
-              <div className="divide-y divide-zinc-800">
+              <div className="divide-y divide-line">
                 {pagination.pageItems.map((tag) => (
                   <div key={tag._id} className="flex items-center gap-3 py-3">
                     {editingId === tag._id ? (
@@ -1250,7 +1246,7 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
                     ) : deletingId === tag._id ? (
                       <>
                         <div className="flex-1">
-                          <p className="text-sm text-red-400">
+                          <p className="text-sm text-danger">
                             Delete &ldquo;{tag.name}&rdquo;? This will remove it
                             from all variables.
                           </p>
@@ -1278,21 +1274,21 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
                           style={{ backgroundColor: tag.color }}
                         />
                         <div className="flex-1">
-                          <span className="text-sm font-medium text-zinc-100">
+                          <span className="text-sm font-medium text-ink">
                             {tag.name}
                           </span>
                         </div>
                         <div className="flex gap-1">
                           <button
                             onClick={() => startEdit(tag)}
-                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400"
+                            className="rounded-lg p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-accent"
                             title="Edit tag"
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => setDeletingId(tag._id)}
-                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
+                            className="rounded-lg p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-danger"
                             title="Delete tag"
                           >
                             <Trash2 className="h-4 w-4" />

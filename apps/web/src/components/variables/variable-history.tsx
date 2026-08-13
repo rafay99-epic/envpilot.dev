@@ -135,19 +135,17 @@ export function VariableHistory({
       size="xl"
     >
       {/* Filter and Compare Controls */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 pb-4 dark:border-zinc-800">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-4 border-line">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-            Filter:
-          </span>
+          <span className="text-xs font-medium text-ink-muted">Filter:</span>
           {(["all", "updates", "rollbacks"] as FilterType[]).map((type) => (
             <button
               key={type}
               onClick={() => setFilterType(type)}
               className={`rounded-md px-2 py-1 text-xs font-medium capitalize transition-colors ${
                 filterType === type
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                  ? "bg-accent-soft text-accent ring-1 ring-accent-line"
+                  : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
               }`}
             >
               {type}
@@ -161,8 +159,8 @@ export function VariableHistory({
           }}
           className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
             compareMode
-              ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-              : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              ? "bg-info-soft text-info"
+              : "bg-surface-raised text-ink-muted hover:bg-surface-hover"
           }`}
         >
           <svg
@@ -184,7 +182,7 @@ export function VariableHistory({
 
       {/* Compare Mode Instructions */}
       {compareMode && (
-        <div className="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+        <div className="mb-4 rounded-lg p-3 text-sm bg-info-soft text-info">
           <p className="font-medium">Compare Mode</p>
           <p className="mt-1 text-xs">
             Select two versions to compare.{" "}
@@ -199,27 +197,27 @@ export function VariableHistory({
 
       {/* Comparison View */}
       {compareMode && compareVersions && (
-        <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
-          <h4 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+        <div className="mb-4 rounded-lg border p-4 border-line bg-surface-raised/50">
+          <h4 className="mb-3 text-sm font-semibold text-ink">
             Comparing v{compareVersions.older.version} → v
             {compareVersions.newer.version}
           </h4>
           <div className="grid grid-cols-2 gap-4 text-xs">
             <div>
-              <span className="font-medium text-zinc-500 dark:text-zinc-400">
+              <span className="font-medium text-ink-muted">
                 Older (v{compareVersions.older.version})
               </span>
               <div className="mt-2 space-y-2">
                 <div>
-                  <span className="text-zinc-400">Environments:</span>
+                  <span className="text-ink-muted">Environments:</span>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {compareVersions.older.environments.map((env) => (
                       <span
                         key={env}
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                           !compareVersions.newer.environments.includes(env)
-                            ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                            : "bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
+                            ? "bg-danger-soft text-danger"
+                            : "bg-surface-hover text-ink-muted"
                         }`}
                       >
                         {env}
@@ -229,8 +227,8 @@ export function VariableHistory({
                 </div>
                 {compareVersions.older.description && (
                   <div>
-                    <span className="text-zinc-400">Description:</span>
-                    <p className="mt-1 text-zinc-700 dark:text-zinc-300">
+                    <span className="text-ink-muted">Description:</span>
+                    <p className="mt-1 text-ink-muted">
                       {compareVersions.older.description}
                     </p>
                   </div>
@@ -238,20 +236,20 @@ export function VariableHistory({
               </div>
             </div>
             <div>
-              <span className="font-medium text-zinc-500 dark:text-zinc-400">
+              <span className="font-medium text-ink-muted">
                 Newer (v{compareVersions.newer.version})
               </span>
               <div className="mt-2 space-y-2">
                 <div>
-                  <span className="text-zinc-400">Environments:</span>
+                  <span className="text-ink-muted">Environments:</span>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {compareVersions.newer.environments.map((env) => (
                       <span
                         key={env}
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                           !compareVersions.older.environments.includes(env)
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                            : "bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
+                            ? "bg-accent-soft text-accent"
+                            : "bg-surface-hover text-ink-muted"
                         }`}
                       >
                         {env}
@@ -261,8 +259,8 @@ export function VariableHistory({
                 </div>
                 {compareVersions.newer.description && (
                   <div>
-                    <span className="text-zinc-400">Description:</span>
-                    <p className="mt-1 text-zinc-700 dark:text-zinc-300">
+                    <span className="text-ink-muted">Description:</span>
+                    <p className="mt-1 text-ink-muted">
                       {compareVersions.newer.description}
                     </p>
                   </div>
@@ -277,9 +275,9 @@ export function VariableHistory({
         {/* Error State */}
         {error ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
+            <div className="rounded-full p-3 bg-danger-soft">
               <svg
-                className="h-6 w-6 text-red-600 dark:text-red-400"
+                className="h-6 w-6 text-danger"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -292,22 +290,20 @@ export function VariableHistory({
                 />
               </svg>
             </div>
-            <p className="mt-3 text-sm font-medium text-red-600 dark:text-red-400">
-              {error}
-            </p>
+            <p className="mt-3 text-sm font-medium text-danger">{error}</p>
           </div>
         ) : isLoading ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900 dark:border-zinc-700 dark:border-t-zinc-100" />
-            <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-line" />
+            <p className="mt-3 text-sm text-ink-muted">
               Loading version history...
             </p>
           </div>
         ) : filteredHistory.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="rounded-full bg-zinc-100 p-3 dark:bg-zinc-800">
+            <div className="rounded-full p-3 bg-surface-raised">
               <svg
-                className="h-6 w-6 text-zinc-400"
+                className="h-6 w-6 text-ink-muted"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -320,25 +316,25 @@ export function VariableHistory({
                 />
               </svg>
             </div>
-            <p className="mt-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            <p className="mt-3 text-sm font-medium text-ink">
               {history.length === 0
                 ? "No version history"
                 : "No matching versions"}
             </p>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 text-sm text-ink-muted">
               {history.length === 0
                 ? "This variable has no recorded changes yet."
                 : `Try changing the filter to see other versions.`}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <div className="divide-y divide-line">
             {filteredHistory.map((record) => (
               <div
                 key={record._id}
                 className={`flex items-start justify-between py-4 transition-colors ${
                   compareMode && selectedVersions.includes(record.version)
-                    ? "bg-blue-50 dark:bg-blue-900/10"
+                    ? "bg-info-soft"
                     : ""
                 }`}
               >
@@ -352,20 +348,20 @@ export function VariableHistory({
                       className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
                         compareMode
                           ? selectedVersions.includes(record.version)
-                            ? "bg-blue-500 text-white ring-2 ring-blue-300 dark:ring-blue-700"
-                            : "bg-zinc-100 text-zinc-700 hover:bg-blue-100 hover:text-blue-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
-                          : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                            ? "bg-info text-white ring-2 ring-info-line"
+                            : "bg-surface-raised text-ink-muted hover:bg-info-soft hover:text-info"
+                          : "bg-surface-raised text-ink-muted"
                       }`}
                     >
                       v{record.version}
                     </button>
                     {record.version === currentVersion && (
-                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-accent-soft text-accent">
                         Current
                       </span>
                     )}
                     {isRollback(record.changeReason) && (
-                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                      <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-premium-soft text-premium">
                         Rollback
                       </span>
                     )}
@@ -377,10 +373,10 @@ export function VariableHistory({
                         key={env}
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                           env === "production"
-                            ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                            ? "bg-danger-soft text-danger"
                             : env === "staging"
-                              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                              : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              ? "bg-warning-soft text-warning"
+                              : "bg-accent-soft text-accent"
                         }`}
                       >
                         {env}
@@ -389,20 +385,20 @@ export function VariableHistory({
                   </div>
 
                   {record.changeReason && (
-                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                    <p className="mt-2 text-sm text-ink-muted">
                       <span className="font-medium">Reason:</span>{" "}
                       {record.changeReason}
                     </p>
                   )}
 
                   {record.description && (
-                    <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-500">
+                    <p className="mt-1 text-sm text-ink-subtle">
                       <span className="font-medium">Description:</span>{" "}
                       {record.description}
                     </p>
                   )}
 
-                  <div className="mt-2 flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500">
+                  <div className="mt-2 flex items-center gap-2 text-xs text-ink-subtle">
                     <svg
                       className="h-3 w-3"
                       fill="none"
@@ -452,11 +448,11 @@ export function VariableHistory({
                     <button
                       onClick={() => handleRollback(record.version)}
                       disabled={isRollingBack}
-                      className="ml-4 flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      className="ml-4 flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
                     >
                       {isRollingBack && rollbackTarget === record.version ? (
                         <>
-                          <div className="h-3 w-3 animate-spin rounded-full border border-zinc-400 border-t-zinc-700" />
+                          <div className="h-3 w-3 animate-spin rounded-full border border-line-strong border-t-line" />
                           Rolling back...
                         </>
                       ) : (

@@ -118,7 +118,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
       >
         <svg
           className="h-4 w-4"
@@ -143,7 +143,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
         size="md"
       >
         <div className="space-y-4">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-ink-muted">
             Export your audit logs for compliance reporting or external
             analysis.
           </p>
@@ -151,7 +151,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
           {/* Date Range */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <label className="block text-sm font-medium text-ink-muted">
                 Start Date
               </label>
               <input
@@ -160,11 +160,11 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
                 onChange={(e) =>
                   setDateRange((prev) => ({ ...prev, start: e.target.value }))
                 }
-                className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                className="mt-1 block w-full rounded-lg border px-3 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <label className="block text-sm font-medium text-ink-muted">
                 End Date
               </label>
               <input
@@ -173,14 +173,14 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
                 onChange={(e) =>
                   setDateRange((prev) => ({ ...prev, end: e.target.value }))
                 }
-                className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                className="mt-1 block w-full rounded-lg border px-3 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
               />
             </div>
           </div>
 
           {/* Format Selection */}
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label className="block text-sm font-medium text-ink-muted">
               Export Format
             </label>
             <div className="mt-2 flex gap-4">
@@ -193,9 +193,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
                   onChange={() => setFormat("csv")}
                   className="h-4 w-4"
                 />
-                <span className="text-sm text-zinc-700 dark:text-zinc-300">
-                  CSV
-                </span>
+                <span className="text-sm text-ink-muted">CSV</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -206,9 +204,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
                   onChange={() => setFormat("json")}
                   className="h-4 w-4"
                 />
-                <span className="text-sm text-zinc-700 dark:text-zinc-300">
-                  JSON
-                </span>
+                <span className="text-sm text-ink-muted">JSON</span>
               </label>
             </div>
           </div>
@@ -222,28 +218,28 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
                 onChange={(e) => setIncludeDetails(e.target.checked)}
                 className="h-4 w-4"
               />
-              <span className="text-sm text-zinc-700 dark:text-zinc-300">
+              <span className="text-sm text-ink-muted">
                 Include detailed event data
               </span>
             </label>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 text-xs text-ink-muted">
               Includes additional context like variable keys, permission levels,
               and change reasons.
             </p>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+          <div className="flex justify-end gap-3 border-t pt-4 border-line">
             <button
               onClick={() => setIsOpen(false)}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-ink-muted hover:bg-surface-hover"
             >
               Cancel
             </button>
             <button
               onClick={handleExport}
               disabled={isExporting}
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
             >
               {isExporting ? (
                 <>

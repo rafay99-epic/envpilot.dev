@@ -14,23 +14,24 @@ interface ConfirmDialogProps {
   variant?: "danger" | "warning" | "default";
 }
 
+// Solid confirm buttons: the fill carries the meaning, so the label is the
+// inverse ink. Hover has to differ from the resting fill or nothing moves.
 const variantClasses = {
-  danger: "bg-red-600 hover:bg-red-700 focus:ring-red-500",
-  warning: "bg-amber-600 hover:bg-amber-700 focus:ring-amber-500",
-  default:
-    "bg-zinc-900 hover:bg-zinc-800 focus:ring-zinc-500 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900",
+  danger: "bg-danger hover:bg-danger-line focus:ring-danger-line",
+  warning: "bg-warning hover:bg-warning-line focus:ring-warning-line",
+  default: "bg-ink hover:bg-ink-muted focus:ring-line-strong text-ink-inverse",
 };
 
 const iconColors = {
-  danger: "text-red-600 dark:text-red-400",
-  warning: "text-amber-600 dark:text-amber-400",
-  default: "text-zinc-600 dark:text-zinc-400",
+  danger: "text-danger",
+  warning: "text-warning",
+  default: "text-ink-muted",
 };
 
 const iconBgColors = {
-  danger: "bg-red-100 dark:bg-red-900/20",
-  warning: "bg-amber-100 dark:bg-amber-900/20",
-  default: "bg-zinc-100 dark:bg-zinc-800",
+  danger: "bg-danger-soft",
+  warning: "bg-warning-soft",
+  default: "bg-surface-raised",
 };
 
 export function ConfirmDialog({
@@ -108,15 +109,13 @@ export function ConfirmDialog({
           )}
         </div>
 
-        <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
-          {message}
-        </p>
+        <p className="mt-4 text-sm text-ink-muted">{message}</p>
 
         <div className="mt-6 flex w-full gap-3">
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="flex-1 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line text-ink-muted hover:bg-surface-hover"
           >
             {cancelText}
           </button>

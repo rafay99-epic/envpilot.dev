@@ -13,19 +13,19 @@ const SKELETON_BAR_HEIGHTS = [35, 58, 42, 71, 28, 63, 49, 76, 33, 55, 44, 68];
 // Skeleton placeholder for lazy-loaded chart panels
 function ChartSkeleton({ height = "h-48" }: { height?: string }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90">
-      <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
-        <div className="h-3 w-3 rounded-full bg-zinc-700" />
-        <div className="h-3 w-3 rounded-full bg-zinc-700" />
-        <div className="h-3 w-3 rounded-full bg-zinc-700" />
-        <div className="ml-2 h-3 w-28 animate-pulse rounded bg-zinc-700" />
+    <div className="overflow-hidden rounded-lg border border-line bg-surface/90">
+      <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2.5">
+        <div className="h-3 w-3 rounded-full bg-surface-hover" />
+        <div className="h-3 w-3 rounded-full bg-surface-hover" />
+        <div className="h-3 w-3 rounded-full bg-surface-hover" />
+        <div className="ml-2 h-3 w-28 animate-pulse rounded bg-surface-hover" />
       </div>
-      <div className={`${height} animate-pulse bg-zinc-900/50 p-6`}>
+      <div className={`${height} animate-pulse bg-surface/50 p-6`}>
         <div className="flex h-full items-end gap-1">
           {SKELETON_BAR_HEIGHTS.map((h, i) => (
             <div
               key={i}
-              className="flex-1 rounded-t bg-zinc-800/60"
+              className="flex-1 rounded-t bg-surface-raised/60"
               style={{ height: `${h}%` }}
             />
           ))}
@@ -42,13 +42,13 @@ function InsightsSkeleton() {
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
-          className="rounded-lg border border-zinc-700/50 bg-zinc-900/90 p-6"
+          className="rounded-lg border border-line bg-surface/90 p-6"
         >
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 animate-pulse rounded-full bg-zinc-800" />
+            <div className="h-9 w-9 animate-pulse rounded-full bg-surface-raised" />
             <div className="space-y-1.5">
-              <div className="h-3 w-16 animate-pulse rounded bg-zinc-800/60" />
-              <div className="h-5 w-10 animate-pulse rounded bg-zinc-800" />
+              <div className="h-3 w-16 animate-pulse rounded bg-surface-raised/60" />
+              <div className="h-5 w-10 animate-pulse rounded bg-surface-raised" />
             </div>
           </div>
         </div>
@@ -230,13 +230,13 @@ function Header({
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="font-mono">
-        <p className="text-xs text-zinc-500">
-          <span className="text-green-400">$</span> envpilot analytics
+        <p className="text-xs text-ink-subtle">
+          <span className="text-accent">$</span> envpilot analytics
         </p>
-        <h1 className="mt-1 text-xl font-bold text-zinc-100">Analytics</h1>
+        <h1 className="mt-1 text-xl font-bold text-ink">Analytics</h1>
       </div>
       <div className="flex items-center gap-2">
-        <div className="flex gap-1 rounded-lg border border-zinc-700/50 bg-zinc-900/50 p-1">
+        <div className="flex gap-1 rounded-lg border border-line bg-surface/50 p-1">
           {ranges.map((range) => {
             const disabled =
               maxRetentionDays !== null && range > maxRetentionDays;
@@ -248,10 +248,10 @@ function Header({
                 title={disabled ? "Upgrade for longer history" : undefined}
                 className={`rounded-md px-3 py-1.5 font-mono text-xs font-medium transition-colors ${
                   disabled
-                    ? "cursor-not-allowed text-zinc-700"
+                    ? "cursor-not-allowed text-ink-faint"
                     : daysBack === range
-                      ? "bg-green-500/15 text-green-400"
-                      : "text-zinc-500 hover:text-zinc-300"
+                      ? "bg-accent-soft text-accent"
+                      : "text-ink-subtle hover:text-ink-muted"
                 }`}
               >
                 {range}d
@@ -261,7 +261,7 @@ function Header({
         </div>
         {maxRetentionDays !== null && (
           <span
-            className="text-[10px] text-zinc-600"
+            className="text-[10px] text-ink-faint"
             title="Your plan limits analytics retention"
           >
             max {maxRetentionDays}d

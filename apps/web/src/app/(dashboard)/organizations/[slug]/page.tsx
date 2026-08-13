@@ -93,16 +93,14 @@ export default function OrganizationPage({
   if (error || !organization) {
     return (
       <div className="space-y-8">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-900/20">
-          <h3 className="font-semibold text-red-600 dark:text-red-400">
-            Error
-          </h3>
-          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+        <div className="rounded-xl border p-6 border-danger-line bg-danger-soft">
+          <h3 className="font-semibold text-danger">Error</h3>
+          <p className="mt-1 text-sm text-danger">
             {error || "Organization not found"}
           </p>
           <Link
             href="/organizations"
-            className="mt-4 inline-flex items-center gap-1 text-sm text-red-600 hover:underline dark:text-red-400"
+            className="mt-4 inline-flex items-center gap-1 text-sm hover:underline text-danger"
           >
             <svg
               className="h-4 w-4"
@@ -142,8 +140,8 @@ export default function OrganizationPage({
               className="h-10 w-10 shrink-0 rounded-lg object-cover"
             />
           ) : (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800">
-              <span className="text-base font-semibold text-zinc-400">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-raised">
+              <span className="text-base font-semibold text-ink-muted">
                 {organization.name.charAt(0).toUpperCase()}
               </span>
             </div>
@@ -161,7 +159,7 @@ export default function OrganizationPage({
         actions={
           <>
             {orgTier === "pro" && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
                 Pro
               </span>
             )}
@@ -181,9 +179,9 @@ export default function OrganizationPage({
         {isTeamLeadPlus && (
           <Link
             href={`/organizations/${slug}/members`}
-            className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+            className="group flex items-center gap-4 rounded-xl border p-6 transition-all hover:shadow-md border-line bg-surface hover:border-line"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-info-soft text-info">
               <svg
                 className="h-6 w-6"
                 fill="none"
@@ -199,15 +197,13 @@ export default function OrganizationPage({
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                Members
-              </h3>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <h3 className="font-semibold text-ink">Members</h3>
+              <p className="text-sm text-ink-muted">
                 {memberCount} member{memberCount !== 1 ? "s" : ""}
               </p>
             </div>
             <svg
-              className="h-5 w-5 text-zinc-400 transition-transform group-hover:translate-x-1"
+              className="h-5 w-5 text-ink-muted transition-transform group-hover:translate-x-1"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -225,9 +221,9 @@ export default function OrganizationPage({
         {isOwner && (
           <Link
             href={`/organizations/${slug}/settings`}
-            className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+            className="group flex items-center gap-4 rounded-xl border p-6 transition-all hover:shadow-md border-line bg-surface hover:border-line"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-surface-raised text-ink-muted">
               <svg
                 className="h-6 w-6"
                 fill="none"
@@ -248,15 +244,11 @@ export default function OrganizationPage({
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                Settings
-              </h3>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Configure organization
-              </p>
+              <h3 className="font-semibold text-ink">Settings</h3>
+              <p className="text-sm text-ink-muted">Configure organization</p>
             </div>
             <svg
-              className="h-5 w-5 text-zinc-400 transition-transform group-hover:translate-x-1"
+              className="h-5 w-5 text-ink-muted transition-transform group-hover:translate-x-1"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -279,9 +271,9 @@ export default function OrganizationPage({
             router.push("/dashboard/projects");
             router.refresh();
           }}
-          className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-6 text-left transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+          className="group flex items-center gap-4 rounded-xl border p-6 text-left transition-all hover:shadow-md border-line bg-surface hover:border-line"
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-accent-soft text-accent">
             <svg
               className="h-6 w-6"
               fill="none"
@@ -297,15 +289,11 @@ export default function OrganizationPage({
             </svg>
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
-              Projects
-            </h3>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              View all projects
-            </p>
+            <h3 className="font-semibold text-ink">Projects</h3>
+            <p className="text-sm text-ink-muted">View all projects</p>
           </div>
           <svg
-            className="h-5 w-5 text-zinc-400 transition-transform group-hover:translate-x-1"
+            className="h-5 w-5 text-ink-muted transition-transform group-hover:translate-x-1"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -321,16 +309,12 @@ export default function OrganizationPage({
       </div>
 
       {/* Organization Info */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          Organization Details
-        </h2>
+      <div className="rounded-xl border p-6 border-line bg-surface">
+        <h2 className="text-lg font-semibold text-ink">Organization Details</h2>
         <dl className="mt-4 space-y-4">
-          <div className="flex justify-between border-b border-zinc-100 pb-4 dark:border-zinc-800">
-            <dt className="text-sm text-zinc-500 dark:text-zinc-400">
-              Created
-            </dt>
-            <dd className="text-sm text-zinc-900 dark:text-zinc-100">
+          <div className="flex justify-between border-b pb-4 border-line">
+            <dt className="text-sm text-ink-muted">Created</dt>
+            <dd className="text-sm text-ink">
               {new Date(organization.createdAt).toLocaleDateString("en-US", {
                 year: "numeric",
                 month: "long",
@@ -338,17 +322,15 @@ export default function OrganizationPage({
               })}
             </dd>
           </div>
-          <div className="flex justify-between border-b border-zinc-100 pb-4 dark:border-zinc-800">
-            <dt className="text-sm text-zinc-500 dark:text-zinc-400">Plan</dt>
-            <dd className="text-sm text-zinc-900 dark:text-zinc-100">
+          <div className="flex justify-between border-b pb-4 border-line">
+            <dt className="text-sm text-ink-muted">Plan</dt>
+            <dd className="text-sm text-ink">
               {orgTier === "pro" ? "Pro Plan" : "Free Plan"}
             </dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-sm text-zinc-500 dark:text-zinc-400">
-              Last Updated
-            </dt>
-            <dd className="text-sm text-zinc-900 dark:text-zinc-100">
+            <dt className="text-sm text-ink-muted">Last Updated</dt>
+            <dd className="text-sm text-ink">
               {new Date(organization.updatedAt).toLocaleDateString("en-US", {
                 year: "numeric",
                 month: "long",

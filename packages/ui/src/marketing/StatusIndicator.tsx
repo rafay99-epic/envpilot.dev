@@ -14,28 +14,28 @@ const STATUS_CONFIG: Record<
 > = {
   operational: {
     label: "All systems operational",
-    dot: "bg-green-500",
-    ping: "bg-green-400",
-    text: "text-zinc-600 hover:text-green-400",
+    dot: "bg-accent",
+    ping: "bg-accent",
+    text: "text-ink-faint hover:text-accent",
   },
   degraded: {
     label: "Partial service disruption",
-    dot: "bg-amber-500",
-    ping: "bg-amber-400",
-    text: "text-amber-500 hover:text-amber-400",
+    dot: "bg-warning",
+    ping: "bg-warning",
+    text: "text-warning hover:text-warning",
   },
   down: {
     label: "Service disruption",
-    dot: "bg-red-500",
-    ping: "bg-red-400",
-    text: "text-red-500 hover:text-red-400",
+    dot: "bg-danger",
+    ping: "bg-danger",
+    text: "text-danger hover:text-danger",
   },
   // No monitoring data — still show the optimistic default with the link.
   unknown: {
     label: "All systems operational",
-    dot: "bg-green-500",
-    ping: "bg-green-400",
-    text: "text-zinc-600 hover:text-green-400",
+    dot: "bg-accent",
+    ping: "bg-accent",
+    text: "text-ink-faint hover:text-accent",
   },
 };
 
@@ -85,7 +85,7 @@ export function StatusIndicator({
         />
       </span>
       {config.label}
-      <span className="text-zinc-700">·</span>
+      <span className="text-ink-faint">·</span>
       <span className="underline-offset-4 hover:underline">status</span>
     </a>
   );

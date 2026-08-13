@@ -54,7 +54,7 @@ interface ProjectIconProps {
 export function ProjectIcon({
   icon,
   size = 20,
-  className = "text-zinc-700",
+  className = "text-ink-faint",
 }: ProjectIconProps) {
   // Framework logo icon (e.g., "framework:nextjs")
   if (icon && isFrameworkIcon(icon)) {

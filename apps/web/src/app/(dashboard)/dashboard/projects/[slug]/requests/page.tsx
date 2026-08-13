@@ -91,17 +91,17 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
   if (!project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
-          <GitPullRequest className="h-6 w-6 text-red-600 dark:text-red-400" />
+        <div className="rounded-full p-3 bg-danger-soft">
+          <GitPullRequest className="h-6 w-6 text-danger" />
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="mt-4 text-lg font-semibold text-ink">
           {projectError instanceof Error
             ? projectError.message
             : "Project not found"}
         </h2>
         <Link
           href="/dashboard/projects"
-          className="mt-6 text-sm font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300"
+          className="mt-6 text-sm font-medium text-ink-inverse hover:text-ink-muted"
         >
           Back to Projects
         </Link>
@@ -126,29 +126,29 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
       </div>
 
       {notice && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/40 dark:bg-green-900/20">
-          <p className="text-sm text-green-700 dark:text-green-400">{notice}</p>
+        <div className="rounded-lg border p-4 border-accent-line bg-accent-soft">
+          <p className="text-sm text-accent">{notice}</p>
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-900/20">
-          <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+        <div className="rounded-lg border p-4 border-danger-line bg-danger-soft">
+          <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
-      <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+      <div className="rounded-xl border border-line bg-surface">
+        <div className="divide-y divide-line">
           {isLoadingRequests ? (
             <TerminalLoading />
           ) : requests.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
+            <div className="px-6 py-10 text-center text-sm text-ink-muted">
               No requests yet.
             </div>
           ) : (
             <>
               <AnimatedList
-                className="divide-y divide-zinc-200 dark:divide-zinc-800"
+                className="divide-y divide-line"
                 pageKey={requestPagination.currentPage}
               >
                 {requestPagination.pageItems.map((request) => (
@@ -156,18 +156,18 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <div className="flex items-center gap-2">
-                          <code className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                          <code className="font-mono text-sm font-semibold text-ink">
                             {request.key}
                           </code>
                           <span
                             className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                               request.status === "approved"
-                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                ? "bg-accent-soft text-accent"
                                 : request.status === "rejected"
-                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                  ? "bg-danger-soft text-danger"
                                   : request.status === "canceled"
-                                    ? "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
-                                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                    ? "bg-surface-hover text-ink-muted"
+                                    : "bg-warning-soft text-warning"
                             }`}
                           >
                             {request.status}
@@ -177,23 +177,23 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                               key={env}
                               className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
                                 env === "production"
-                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                  ? "bg-danger-soft text-danger"
                                   : env === "staging"
-                                    ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                    : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                    ? "bg-warning-soft text-warning"
+                                    : "bg-accent-soft text-accent"
                               }`}
                             >
                               {env}
                             </span>
                           ))}
                         </div>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <p className="mt-1 text-xs text-ink-muted">
                           Requested by{" "}
                           {request.requester?.name ??
                             request.requester?.email ??
                             "Unknown"}
                           {request.requestedByKeyId && (
-                            <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                            <span className="ml-1.5 rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
                               automated · API key
                             </span>
                           )}
@@ -201,12 +201,12 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                           {formatDate(request.createdAt)}
                         </p>
                         {request.description && (
-                          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+                          <p className="mt-2 text-sm text-ink-muted">
                             {request.description}
                           </p>
                         )}
                         {request.reviewReason && (
-                          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                          <p className="mt-2 text-xs text-ink-muted">
                             Review note: {request.reviewReason}
                           </p>
                         )}
@@ -215,7 +215,7 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                         {canReviewRequests && request.status === "pending" && (
                           <Link
                             href="/dashboard/requests"
-                            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                            className="rounded-lg border px-3 py-1.5 text-xs font-medium border-line text-ink-muted hover:bg-surface-hover"
                           >
                             Review →
                           </Link>
@@ -230,7 +230,7 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                                   request._id as Id<"environmentVariableRequests">
                                 )
                               }
-                              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                              className="rounded-lg border px-3 py-1.5 text-xs font-medium border-line text-ink-muted hover:bg-surface-hover"
                             >
                               Cancel
                             </button>

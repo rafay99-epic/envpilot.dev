@@ -116,11 +116,11 @@ export function DocsSearch() {
       <button
         type="button"
         onClick={openDialog}
-        className="flex w-full items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-left text-xs text-zinc-500 transition-colors hover:border-green-500/30 hover:text-zinc-300"
+        className="flex w-full items-center gap-2 rounded-lg border border-line bg-surface/40 px-3 py-2 text-left text-xs text-ink-subtle transition-colors hover:border-accent-line hover:text-ink-muted"
       >
         <Search className="h-3.5 w-3.5 shrink-0" />
         <span className="flex-1">search docs</span>
-        <kbd className="rounded border border-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-zinc-600">
+        <kbd className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] text-ink-faint">
           ⌘K
         </kbd>
       </button>
@@ -134,11 +134,11 @@ export function DocsSearch() {
             role="dialog"
             aria-modal="true"
             aria-label="Search documentation"
-            className="w-full max-w-xl overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl"
+            className="w-full max-w-xl overflow-hidden rounded-xl border border-line bg-canvas shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3">
-              <Search className="h-4 w-4 shrink-0 text-zinc-600" />
+            <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+              <Search className="h-4 w-4 shrink-0 text-ink-faint" />
               <input
                 ref={inputRef}
                 value={query}
@@ -149,21 +149,21 @@ export function DocsSearch() {
                 onKeyDown={onInputKeyDown}
                 placeholder="Search the docs…"
                 aria-label="Search the docs"
-                className="w-full bg-transparent text-sm text-zinc-200 outline-none placeholder:text-zinc-600"
+                className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
               />
-              <kbd className="rounded border border-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-zinc-600">
+              <kbd className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] text-ink-faint">
                 esc
               </kbd>
             </div>
 
             <ul className="max-h-[55vh] overflow-y-auto p-2">
               {entries === null && (
-                <li className="px-3 py-6 text-center font-mono text-xs text-zinc-600">
+                <li className="px-3 py-6 text-center font-mono text-xs text-ink-faint">
                   loading index…
                 </li>
               )}
               {entries !== null && results.length === 0 && (
-                <li className="px-3 py-6 text-center font-mono text-xs text-zinc-600">
+                <li className="px-3 py-6 text-center font-mono text-xs text-ink-faint">
                   no matches for &ldquo;{query}&rdquo;
                 </li>
               )}
@@ -175,17 +175,17 @@ export function DocsSearch() {
                     onClick={() => setOpen(false)}
                     className={`block rounded-lg px-3 py-2 transition-colors ${
                       index === active
-                        ? "bg-green-500/10 text-green-400"
-                        : "text-zinc-300 hover:bg-zinc-900"
+                        ? "bg-accent-soft text-accent"
+                        : "text-ink-muted hover:bg-surface-hover"
                     }`}
                   >
                     <span className="flex items-baseline gap-2">
                       <span className="text-sm">{entry.title}</span>
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-600">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-ink-faint">
                         {entry.section}
                       </span>
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-zinc-500">
+                    <span className="mt-0.5 block truncate text-xs text-ink-subtle">
                       {entry.description}
                     </span>
                   </a>

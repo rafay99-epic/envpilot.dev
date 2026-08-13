@@ -587,33 +587,33 @@ function OrganizationMembersPageContent({
         {/* Header skeleton */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="h-4 w-32 animate-pulse rounded bg-zinc-800/60" />
-            <div className="mt-4 h-8 w-44 animate-pulse rounded bg-zinc-800" />
-            <div className="mt-2 h-4 w-56 animate-pulse rounded bg-zinc-800/40" />
+            <div className="h-4 w-32 animate-pulse rounded bg-surface-raised/60" />
+            <div className="mt-4 h-8 w-44 animate-pulse rounded bg-surface-raised" />
+            <div className="mt-2 h-4 w-56 animate-pulse rounded bg-surface-raised/40" />
           </div>
-          <div className="h-10 w-32 animate-pulse rounded-lg bg-zinc-800" />
+          <div className="h-10 w-32 animate-pulse rounded-lg bg-surface-raised" />
         </div>
         {/* Members list skeleton */}
-        <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-            <div className="h-5 w-24 animate-pulse rounded bg-zinc-800" />
+        <div className="rounded-xl border border-line bg-surface">
+          <div className="border-b px-6 py-4 border-line">
+            <div className="h-5 w-24 animate-pulse rounded bg-surface-raised" />
           </div>
-          <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <div className="divide-y divide-line">
             {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
                 className="flex items-center justify-between px-6 py-4"
               >
                 <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 animate-pulse rounded-full bg-zinc-800" />
+                  <div className="h-10 w-10 animate-pulse rounded-full bg-surface-raised" />
                   <div className="space-y-1.5">
-                    <div className="h-4 w-28 animate-pulse rounded bg-zinc-800" />
-                    <div className="h-3 w-40 animate-pulse rounded bg-zinc-800/40" />
+                    <div className="h-4 w-28 animate-pulse rounded bg-surface-raised" />
+                    <div className="h-3 w-40 animate-pulse rounded bg-surface-raised/40" />
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-24 animate-pulse rounded-lg bg-zinc-800/60" />
-                  <div className="h-8 w-8 animate-pulse rounded bg-zinc-800/40" />
+                  <div className="h-8 w-24 animate-pulse rounded-lg bg-surface-raised/60" />
+                  <div className="h-8 w-8 animate-pulse rounded bg-surface-raised/40" />
                 </div>
               </div>
             ))}
@@ -626,8 +626,8 @@ function OrganizationMembersPageContent({
   if (error && !org) {
     return (
       <div className="mx-auto max-w-4xl">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-900/20">
-          <p className="text-red-600 dark:text-red-400">{error}</p>
+        <div className="rounded-xl border p-6 border-danger-line bg-danger-soft">
+          <p className="text-danger">{error}</p>
         </div>
       </div>
     );
@@ -638,7 +638,7 @@ function OrganizationMembersPageContent({
       <div>
         <Link
           href={`/organizations/${slug}`}
-          className="inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          className="inline-flex items-center gap-1 text-sm text-ink-faint hover:text-ink"
         >
           <svg
             className="h-4 w-4"
@@ -672,8 +672,8 @@ function OrganizationMembersPageContent({
                   }
                   className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                     memberLimitReached
-                      ? "cursor-not-allowed bg-zinc-700 text-zinc-400"
-                      : "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                      ? "cursor-not-allowed bg-ink text-ink-muted"
+                      : "bg-ink text-ink-inverse hover:bg-ink-muted"
                   }`}
                 >
                   <svg
@@ -710,15 +710,15 @@ function OrganizationMembersPageContent({
         <div
           className={`rounded-lg border p-4 ${
             notice.includes("could not be sent")
-              ? "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/20"
-              : "border-green-200 bg-green-50 dark:border-green-900/40 dark:bg-green-900/20"
+              ? "border-warning-line bg-warning-soft"
+              : "border-accent-line bg-accent-soft"
           }`}
         >
           <p
             className={`text-sm ${
               notice.includes("could not be sent")
-                ? "text-amber-700 dark:text-amber-400"
-                : "text-green-700 dark:text-green-400"
+                ? "text-warning"
+                : "text-accent"
             }`}
           >
             {notice}
@@ -727,20 +727,18 @@ function OrganizationMembersPageContent({
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-900/20">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <div className="rounded-lg border p-4 border-danger-line bg-danger-soft">
+          <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
       {/* Members List */}
-      <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-          <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-            Members ({members.length})
-          </h2>
+      <div className="rounded-xl border border-line bg-surface">
+        <div className="border-b px-6 py-4 border-line">
+          <h2 className="font-semibold text-ink">Members ({members.length})</h2>
         </div>
         <AnimatedList
-          className="divide-y divide-zinc-200 dark:divide-zinc-800"
+          className="divide-y divide-line"
           pageKey={membersPagination.currentPage}
         >
           {membersPagination.pageItems.map((member) => (
@@ -754,8 +752,8 @@ function OrganizationMembersPageContent({
                       className="h-10 w-10 rounded-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-                      <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-raised">
+                      <span className="text-sm font-semibold text-ink-muted">
                         {(member.user.name || member.user.email)
                           .charAt(0)
                           .toUpperCase()}
@@ -763,15 +761,15 @@ function OrganizationMembersPageContent({
                     </div>
                   )}
                   <div>
-                    <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                    <p className="font-medium text-ink">
                       {member.user.name || "Unnamed User"}
                       {member.status === "suspended" && (
-                        <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                        <span className="ml-2 rounded-full px-2 py-0.5 text-xs font-medium bg-danger-soft text-danger">
                           Suspended
                         </span>
                       )}
                     </p>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    <p className="text-sm text-ink-muted">
                       {member.user.email}
                     </p>
                   </div>
@@ -786,7 +784,7 @@ function OrganizationMembersPageContent({
                           e.target.value as OrgRole
                         )
                       }
-                      className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      className="rounded-lg border px-3 py-1.5 text-sm border-line bg-surface-raised text-ink"
                     >
                       {assignable.map((role) => (
                         <option key={role.slug} value={role.slug}>
@@ -808,8 +806,8 @@ function OrganizationMembersPageContent({
                       onClick={() => toggleSessions(member.user._id)}
                       className={`rounded-md p-1.5 transition-colors ${
                         expandedSessionsUserId === member.user._id
-                          ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
-                          : "text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                          ? "bg-surface-raised text-ink"
+                          : "text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
                       }`}
                       title="Manage sessions"
                     >
@@ -834,7 +832,7 @@ function OrganizationMembersPageContent({
                     (member.status === "suspended" ? (
                       <button
                         onClick={() => handleReinstateMember(member.user._id)}
-                        className="rounded-md px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                        className="rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft"
                         title="Reinstate access"
                       >
                         Reinstate
@@ -847,7 +845,7 @@ function OrganizationMembersPageContent({
                             name: member.user.name || member.user.email,
                           })
                         }
-                        className="text-zinc-400 hover:text-amber-600 dark:hover:text-amber-400"
+                        className="text-ink-muted hover:text-warning"
                         title="Suspend access (security hold)"
                       >
                         <svg
@@ -868,7 +866,7 @@ function OrganizationMembersPageContent({
                   {canRemoveMembers && (
                     <button
                       onClick={() => handleRemoveMember(member.user._id)}
-                      className="text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
+                      className="text-ink-muted hover:text-danger"
                     >
                       <svg
                         className="h-5 w-5"
@@ -890,11 +888,11 @@ function OrganizationMembersPageContent({
 
               {/* Expandable Sessions Panel */}
               {expandedSessionsUserId === member.user._id && (
-                <div className="border-t border-zinc-100 bg-zinc-50 px-6 py-4 dark:border-zinc-800 dark:bg-zinc-950">
+                <div className="border-t px-6 py-4 border-line bg-canvas">
                   {isLoadingSessions ? (
                     <div className="flex items-center justify-center py-4">
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-zinc-700 dark:border-t-zinc-400" />
-                      <span className="ml-2 text-sm text-zinc-500">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-line border-t-line-strong" />
+                      <span className="ml-2 text-sm text-ink-subtle">
                         Loading sessions...
                       </span>
                     </div>
@@ -902,11 +900,11 @@ function OrganizationMembersPageContent({
                     <div className="space-y-4">
                       {/* CLI Tokens */}
                       <div>
-                        <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
                           CLI Tokens ({memberSessions.cliTokens.length})
                         </h4>
                         {memberSessions.cliTokens.length === 0 ? (
-                          <p className="mt-2 text-sm text-zinc-400 dark:text-zinc-500">
+                          <p className="mt-2 text-sm text-ink-subtle">
                             No active CLI sessions.
                           </p>
                         ) : (
@@ -914,11 +912,11 @@ function OrganizationMembersPageContent({
                             {memberSessions.cliTokens.map((token) => (
                               <div
                                 key={token._id}
-                                className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900"
+                                className="flex items-center justify-between rounded-lg border px-4 py-3 border-line bg-surface"
                               >
                                 <div className="flex items-center gap-3">
                                   <svg
-                                    className="h-4 w-4 text-zinc-400"
+                                    className="h-4 w-4 text-ink-muted"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -931,10 +929,10 @@ function OrganizationMembersPageContent({
                                     />
                                   </svg>
                                   <div>
-                                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                    <p className="text-sm font-medium text-ink">
                                       {token.deviceName}
                                     </p>
-                                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                    <p className="text-xs text-ink-muted">
                                       Created{" "}
                                       {new Date(
                                         token.createdAt
@@ -963,7 +961,7 @@ function OrganizationMembersPageContent({
                                     })
                                   }
                                   disabled={isRevokingSession}
-                                  className="rounded-md px-3 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                  className="rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 text-danger hover:bg-danger-soft"
                                 >
                                   Revoke
                                 </button>
@@ -975,12 +973,12 @@ function OrganizationMembersPageContent({
 
                       {/* Extension Sessions */}
                       <div>
-                        <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
                           VS Code Extension (
                           {memberSessions.extensionSessions.length})
                         </h4>
                         {memberSessions.extensionSessions.length === 0 ? (
-                          <p className="mt-2 text-sm text-zinc-400 dark:text-zinc-500">
+                          <p className="mt-2 text-sm text-ink-subtle">
                             No active extension sessions.
                           </p>
                         ) : (
@@ -988,11 +986,11 @@ function OrganizationMembersPageContent({
                             {memberSessions.extensionSessions.map((session) => (
                               <div
                                 key={session._id}
-                                className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900"
+                                className="flex items-center justify-between rounded-lg border px-4 py-3 border-line bg-surface"
                               >
                                 <div className="flex items-center gap-3">
                                   <svg
-                                    className="h-4 w-4 text-zinc-400"
+                                    className="h-4 w-4 text-ink-muted"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -1005,10 +1003,10 @@ function OrganizationMembersPageContent({
                                     />
                                   </svg>
                                   <div>
-                                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                    <p className="text-sm font-medium text-ink">
                                       {session.projectName}
                                     </p>
-                                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                    <p className="text-xs text-ink-muted">
                                       {session.deviceName} · Linked{" "}
                                       {new Date(
                                         session.createdAt
@@ -1033,7 +1031,7 @@ function OrganizationMembersPageContent({
                                     })
                                   }
                                   disabled={isRevokingSession}
-                                  className="rounded-md px-3 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                  className="rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 text-danger hover:bg-danger-soft"
                                 >
                                   Revoke
                                 </button>
@@ -1046,7 +1044,7 @@ function OrganizationMembersPageContent({
                       {/* Revoke All Button */}
                       {(memberSessions.cliTokens.length > 0 ||
                         memberSessions.extensionSessions.length > 0) && (
-                        <div className="flex justify-end border-t border-zinc-200 pt-3 dark:border-zinc-700">
+                        <div className="flex justify-end border-t pt-3 border-line">
                           <button
                             onClick={() =>
                               setConfirmDialog({
@@ -1058,7 +1056,7 @@ function OrganizationMembersPageContent({
                               })
                             }
                             disabled={isRevokingSession}
-                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50 dark:bg-red-700 dark:hover:bg-red-800"
+                            className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 bg-danger hover:bg-danger"
                           >
                             {isRevokingSession
                               ? "Revoking..."
@@ -1089,14 +1087,14 @@ function OrganizationMembersPageContent({
 
       {/* Pending Invitations */}
       {invitations.length > 0 && (
-        <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-            <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+        <div className="rounded-xl border border-line bg-surface">
+          <div className="border-b px-6 py-4 border-line">
+            <h2 className="font-semibold text-ink">
               Pending Invitations ({invitations.length})
             </h2>
           </div>
           <AnimatedList
-            className="divide-y divide-zinc-200 dark:divide-zinc-800"
+            className="divide-y divide-line"
             pageKey={invitationsPagination.currentPage}
           >
             {invitationsPagination.pageItems.map((invitation) => (
@@ -1105,9 +1103,9 @@ function OrganizationMembersPageContent({
                 className="flex items-center justify-between px-6 py-4"
               >
                 <div className="flex items-center gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning-soft">
                     <svg
-                      className="h-5 w-5 text-amber-600 dark:text-amber-400"
+                      className="h-5 w-5 text-warning"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -1121,10 +1119,8 @@ function OrganizationMembersPageContent({
                     </svg>
                   </div>
                   <div>
-                    <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                      {invitation.email}
-                    </p>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    <p className="font-medium text-ink">{invitation.email}</p>
+                    <p className="text-sm text-ink-muted">
                       Invited{" "}
                       {new Date(invitation.createdAt).toLocaleDateString()} ·
                       Expires{" "}
@@ -1144,7 +1140,7 @@ function OrganizationMembersPageContent({
                     <>
                       <button
                         onClick={() => handleResendInvitation(invitation._id)}
-                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                        className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink-muted"
                         title="Resend invitation"
                       >
                         <svg
@@ -1163,7 +1159,7 @@ function OrganizationMembersPageContent({
                       </button>
                       <button
                         onClick={() => handleCancelInvitation(invitation._id)}
-                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                        className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-danger-soft hover:text-danger"
                         title="Cancel invitation"
                       >
                         <svg
@@ -1237,16 +1233,14 @@ function OrganizationMembersPageContent({
       >
         <form onSubmit={handleInvite} className="space-y-4">
           {inviteError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-900/20">
-              <p className="text-sm text-red-600 dark:text-red-400">
-                {inviteError}
-              </p>
+            <div className="rounded-lg border p-3 border-danger-line bg-danger-soft">
+              <p className="text-sm text-danger">{inviteError}</p>
             </div>
           )}
           <div className="relative">
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+              className="block text-sm font-medium text-ink"
             >
               Email Address
             </label>
@@ -1266,16 +1260,16 @@ function OrganizationMembersPageContent({
                 placeholder="Search by email or name..."
                 required
                 autoComplete="off"
-                className="block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                className="block w-full rounded-lg border px-4 py-2.5 placeholder:text-ink-muted focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
               />
               {isSearching && (
                 <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-zinc-700 dark:border-t-zinc-400" />
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-line-strong" />
                 </div>
               )}
             </div>
             {showSearchResults && searchResults.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
+              <div className="absolute z-10 mt-1 w-full rounded-lg border shadow-lg border-line bg-surface-raised">
                 <ul className="max-h-60 overflow-auto py-1">
                   {searchResults.map((user) => (
                     <li key={user._id}>
@@ -1283,7 +1277,7 @@ function OrganizationMembersPageContent({
                         type="button"
                         onClick={() => selectUser(user)}
                         disabled={user.isMember || user.hasPendingInvitation}
-                        className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-zinc-700"
+                        className="flex w-full items-center gap-3 px-4 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50 hover:bg-surface-hover"
                       >
                         {user.avatarUrl ? (
                           <img
@@ -1292,8 +1286,8 @@ function OrganizationMembersPageContent({
                             className="h-8 w-8 rounded-full object-cover"
                           />
                         ) : (
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-700">
-                            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-hover">
+                            <span className="text-xs font-semibold text-ink-muted">
                               {(user.name || user.email)
                                 .charAt(0)
                                 .toUpperCase()}
@@ -1301,20 +1295,20 @@ function OrganizationMembersPageContent({
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          <p className="truncate text-sm font-medium text-ink">
                             {user.name || "Unnamed User"}
                           </p>
-                          <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                          <p className="truncate text-xs text-ink-muted">
                             {user.email}
                           </p>
                         </div>
                         {user.isMember && (
-                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-accent-soft text-accent">
                             Member
                           </span>
                         )}
                         {user.hasPendingInvitation && (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
                             Pending
                           </span>
                         )}
@@ -1328,7 +1322,7 @@ function OrganizationMembersPageContent({
           <div>
             <label
               htmlFor="role"
-              className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+              className="block text-sm font-medium text-ink"
             >
               Role
             </label>
@@ -1336,7 +1330,7 @@ function OrganizationMembersPageContent({
               id="role"
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as OrgRole)}
-              className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              className="mt-2 block w-full rounded-lg border px-4 py-2.5 focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
             >
               {inviteRoleOptions.map((role) => (
                 <option key={role.slug} value={role.slug}>
@@ -1344,15 +1338,15 @@ function OrganizationMembersPageContent({
                 </option>
               ))}
             </select>
-            <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1.5 text-xs text-ink-muted">
               {roleMetaBySlug.get(inviteRole)?.description ??
                 ORG_ROLE_DESCRIPTIONS[inviteRole] ??
                 ""}
             </p>
           </div>
           {inviteRole !== "owner" && projects.length === 0 && (
-            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <div className="rounded-lg border p-3 border-line bg-surface-raised">
+              <p className="text-xs text-ink-muted">
                 No projects available. Create a project first to assign
                 project-level access during invitation.
               </p>
@@ -1361,18 +1355,18 @@ function OrganizationMembersPageContent({
           {inviteRole !== "owner" && projects.length > 0 && (
             <>
               <div>
-                <label className="block text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                <label className="block text-sm font-medium text-ink">
                   Assign to Projects
                 </label>
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="mt-1 text-xs text-ink-muted">
                   Select which projects this member is assigned to. What they
                   can do there follows from their organization role.
                 </p>
-                <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+                <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2 border-line">
                   {projects.map((project) => (
                     <label
                       key={project._id}
-                      className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                      className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-surface-hover"
                     >
                       <input
                         type="checkbox"
@@ -1402,9 +1396,7 @@ function OrganizationMembersPageContent({
                         >
                           <ProjectIcon icon={project.icon} size={14} />
                         </span>
-                        <span className="text-sm text-zinc-900 dark:text-zinc-100">
-                          {project.name}
-                        </span>
+                        <span className="text-sm text-ink">{project.name}</span>
                       </div>
                     </label>
                   ))}
@@ -1423,7 +1415,7 @@ function OrganizationMembersPageContent({
             <button
               type="button"
               onClick={resetInviteForm}
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors border-line text-ink-muted hover:bg-surface-hover"
             >
               Cancel
             </button>
@@ -1434,7 +1426,7 @@ function OrganizationMembersPageContent({
                 !inviteEmail ||
                 (inviteEnvScopeApplies && inviteEnvScope.length === 0)
               }
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
             >
               {isInviting ? "Sending..." : "Send Invitation"}
             </button>

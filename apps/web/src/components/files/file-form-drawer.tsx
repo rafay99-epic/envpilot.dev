@@ -35,7 +35,7 @@ const MODES = [
 ];
 
 const inputClasses =
-  "mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500";
+  "mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle";
 
 export function FileFormDrawer({
   isOpen,
@@ -154,7 +154,7 @@ export function FileFormDrawer({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+          <div className="rounded-lg p-3 text-sm bg-danger-soft text-danger">
             {error}
           </div>
         )}
@@ -163,9 +163,9 @@ export function FileFormDrawer({
           <div>
             <label
               htmlFor="secret-file-input"
-              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              className="block text-sm font-medium text-ink-muted"
             >
-              File <span className="text-red-500">*</span>
+              File <span className="text-danger">*</span>
             </label>
             <div
               onDragOver={(e) => {
@@ -181,12 +181,12 @@ export function FileFormDrawer({
               }}
               className={`mt-1 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
                 dragging
-                  ? "border-zinc-500 bg-zinc-50 dark:bg-zinc-800"
-                  : "border-zinc-300 dark:border-zinc-700"
+                  ? "border-line-strong bg-surface-raised"
+                  : "border-line"
               }`}
             >
-              <Upload className="mx-auto h-6 w-6 text-zinc-400" />
-              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              <Upload className="mx-auto h-6 w-6 text-ink-muted" />
+              <p className="mt-2 text-sm text-ink-muted">
                 {picked ? (
                   <span className="font-mono text-xs">
                     {picked.name} · {formatBytes(picked.size)}
@@ -198,7 +198,7 @@ export function FileFormDrawer({
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
-                className="mt-2 text-sm font-medium text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-100"
+                className="mt-2 text-sm font-medium underline-offset-2 hover:underline text-ink"
               >
                 {picked ? "Choose a different file" : "Browse files"}
               </button>
@@ -221,9 +221,9 @@ export function FileFormDrawer({
             <div>
               <label
                 htmlFor="secret-file-name"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                className="block text-sm font-medium text-ink-muted"
               >
-                Name <span className="text-red-500">*</span>
+                Name <span className="text-danger">*</span>
               </label>
               <input
                 id="secret-file-name"
@@ -238,9 +238,9 @@ export function FileFormDrawer({
             <div>
               <label
                 htmlFor="secret-file-path"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                className="block text-sm font-medium text-ink-muted"
               >
-                Destination path <span className="text-red-500">*</span>
+                Destination path <span className="text-danger">*</span>
               </label>
               <input
                 id="secret-file-path"
@@ -250,7 +250,7 @@ export function FileFormDrawer({
                 placeholder="android/app/upload.jks"
                 className={`${inputClasses} font-mono`}
               />
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 text-xs text-ink-muted">
                 Relative to the project root — where{" "}
                 <code className="font-mono">envpilot pull</code>, the extension,
                 and CI will write it.
@@ -260,7 +260,7 @@ export function FileFormDrawer({
             <div>
               <label
                 htmlFor="secret-file-mode"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                className="block text-sm font-medium text-ink-muted"
               >
                 File permissions
               </label>
@@ -281,9 +281,9 @@ export function FileFormDrawer({
             <div>
               <label
                 htmlFor="secret-file-description"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                className="block text-sm font-medium text-ink-muted"
               >
-                Description <span className="text-zinc-400">(optional)</span>
+                Description <span className="text-ink-muted">(optional)</span>
               </label>
               <textarea
                 id="secret-file-description"
@@ -296,8 +296,8 @@ export function FileFormDrawer({
             </div>
 
             <fieldset>
-              <legend className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Environments <span className="text-red-500">*</span>
+              <legend className="block text-sm font-medium text-ink-muted">
+                Environments <span className="text-danger">*</span>
               </legend>
               <div className="mt-2 flex flex-wrap gap-2">
                 {ENVIRONMENTS.map((env) => (
@@ -315,7 +315,7 @@ export function FileFormDrawer({
                   </button>
                 ))}
               </div>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 text-xs text-ink-muted">
                 The same path may exist in other environments, as long as they
                 do not overlap with these.
               </p>
@@ -324,7 +324,7 @@ export function FileFormDrawer({
         )}
 
         {replaceMode && (
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="text-xs text-ink-muted">
             Replacing contents only. The name, path, and environments stay as
             they are.
           </p>
@@ -335,14 +335,14 @@ export function FileFormDrawer({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {isSubmitting

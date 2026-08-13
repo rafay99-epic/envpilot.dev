@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 
 const INPUT_CLASSES =
-  "w-full rounded-lg border border-zinc-800 bg-zinc-900/60 px-3.5 py-2.5 font-mono text-sm text-zinc-200 placeholder-zinc-600 transition-colors focus:border-green-500/40 focus:outline-none focus:ring-2 focus:ring-green-500/20";
+  "w-full rounded-lg border border-line bg-surface/60 px-3.5 py-2.5 font-mono text-sm text-ink placeholder-ink-faint transition-colors focus:border-accent-line focus:outline-none focus:ring-2 focus:ring-accent-line";
 
 const EMAILS = [
   { label: "General inquiries", address: "hello@envpilot.dev" },
@@ -37,19 +37,19 @@ const CHANNELS = [
     href: "/support",
     title: "Submit a support ticket",
     description: "Hit a bug or need a hand? Open a ticket.",
-    icon: <LifeBuoy className="h-4 w-4 text-green-400" />,
+    icon: <LifeBuoy className="h-4 w-4 text-accent" />,
   },
   {
     href: "/faq",
     title: "Browse the FAQ",
     description: "Plans, billing, limits, and security — answered.",
-    icon: <HelpCircle className="h-4 w-4 text-green-400" />,
+    icon: <HelpCircle className="h-4 w-4 text-accent" />,
   },
   {
     href: "/wishlist",
     title: "Request a feature",
     description: "Tell us what to build next on the wishlist.",
-    icon: <Sparkles className="h-4 w-4 text-green-400" />,
+    icon: <Sparkles className="h-4 w-4 text-accent" />,
   },
 ];
 
@@ -98,10 +98,10 @@ export default function ContactPage() {
             <div className="lg:col-span-2">
               <Stagger className="space-y-5">
                 <StaggerItem>
-                  <h2 className="font-sans text-2xl font-bold tracking-tight text-zinc-100">
+                  <h2 className="font-sans text-2xl font-bold tracking-tight text-ink">
                     Real humans, fast replies.
                   </h2>
-                  <p className="mt-3 text-sm leading-relaxed text-zinc-500">
+                  <p className="mt-3 text-sm leading-relaxed text-ink-subtle">
                     Whether it&apos;s feedback, a partnership idea, or a
                     question about Envpilot — drop us a line and we&apos;ll
                     route it to the right person.
@@ -113,15 +113,15 @@ export default function ContactPage() {
                     <Link href={channel.href} className="block">
                       <GlowCard className="p-5">
                         <div className="flex items-start gap-3">
-                          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-green-500/20 bg-green-500/5">
+                          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-accent-line bg-accent-soft">
                             {channel.icon}
                           </span>
                           <div className="min-w-0">
-                            <p className="flex items-center gap-1.5 font-sans text-sm font-semibold text-zinc-100">
+                            <p className="flex items-center gap-1.5 font-sans text-sm font-semibold text-ink">
                               {channel.title}
-                              <ArrowRight className="h-3.5 w-3.5 text-green-500 transition-transform group-hover:translate-x-0.5" />
+                              <ArrowRight className="h-3.5 w-3.5 text-accent transition-transform group-hover:translate-x-0.5" />
                             </p>
-                            <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                            <p className="mt-1 text-xs leading-relaxed text-ink-subtle">
                               {channel.description}
                             </p>
                           </div>
@@ -133,19 +133,19 @@ export default function ContactPage() {
 
                 <StaggerItem>
                   <GlowCard className="p-5">
-                    <div className="flex items-center gap-2 font-sans text-sm font-semibold text-zinc-100">
-                      <Mail className="h-4 w-4 text-green-400" />
+                    <div className="flex items-center gap-2 font-sans text-sm font-semibold text-ink">
+                      <Mail className="h-4 w-4 text-accent" />
                       Email us
                     </div>
                     <div className="mt-4 space-y-3">
                       {EMAILS.map((item) => (
                         <div key={item.address}>
-                          <p className="text-[10px] uppercase tracking-widest text-zinc-600">
+                          <p className="text-[10px] uppercase tracking-widest text-ink-faint">
                             {item.label}
                           </p>
                           <a
                             href={`mailto:${item.address}`}
-                            className="mt-1 block text-sm text-green-400 underline-offset-4 hover:underline"
+                            className="mt-1 block text-sm text-accent underline-offset-4 hover:underline"
                           >
                             {item.address}
                           </a>
@@ -160,20 +160,20 @@ export default function ContactPage() {
             {/* Right — the form */}
             <div className="lg:col-span-3">
               <Reveal>
-                <div className="relative rounded-xl bg-gradient-to-b from-green-500/25 via-zinc-700/30 to-zinc-800/30 p-px shadow-[0_0_80px_-16px_rgba(34,197,94,0.25)]">
-                  <div className="rounded-[11px] bg-zinc-950/95 p-6 backdrop-blur-md sm:p-8">
+                <div className="relative rounded-xl bg-gradient-to-b from-accent-line via-line to-line p-px shadow-[0_0_80px_-16px_rgba(34,197,94,0.25)]">
+                  <div className="rounded-[11px] bg-canvas/95 p-6 backdrop-blur-md sm:p-8">
                     {isSubmitted ? (
                       <div className="py-10 text-center">
-                        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-green-500/30 bg-green-500/10 shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)]">
-                          <CheckCircle className="h-7 w-7 text-green-400" />
+                        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-accent-line bg-accent-soft shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)]">
+                          <CheckCircle className="h-7 w-7 text-accent" />
                         </span>
-                        <h2 className="mt-5 font-sans text-xl font-bold tracking-tight text-zinc-100">
+                        <h2 className="mt-5 font-sans text-xl font-bold tracking-tight text-ink">
                           Message sent
                         </h2>
-                        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-zinc-400">
-                          <span className="text-green-400">$</span> echo
+                        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-muted">
+                          <span className="text-accent">$</span> echo
                           &quot;Thanks for reaching out! We&apos;ll get back to
-                          you at <span className="text-green-400">{email}</span>{" "}
+                          you at <span className="text-accent">{email}</span>{" "}
                           soon.&quot;
                         </p>
                         <button
@@ -184,7 +184,7 @@ export default function ContactPage() {
                             setSubject("");
                             setMessage("");
                           }}
-                          className="mt-7 rounded-lg border border-zinc-800 px-5 py-2.5 text-xs text-zinc-400 transition-colors hover:border-green-500/30 hover:text-zinc-200"
+                          className="mt-7 rounded-lg border border-line px-5 py-2.5 text-xs text-ink-muted transition-colors hover:border-accent-line hover:text-ink"
                         >
                           Send another message
                         </button>
@@ -192,7 +192,7 @@ export default function ContactPage() {
                     ) : (
                       <form onSubmit={handleSubmit} className="space-y-6">
                         {error && (
-                          <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-xs text-red-400">
+                          <div className="flex items-center gap-2 rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-xs text-danger">
                             <AlertTriangle className="h-4 w-4 shrink-0" />
                             {error}
                           </div>
@@ -203,9 +203,9 @@ export default function ContactPage() {
                           <div>
                             <label
                               htmlFor="contact-name"
-                              className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500"
+                              className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-subtle"
                             >
-                              <span className="text-green-500">❯</span> Name
+                              <span className="text-accent">❯</span> Name
                             </label>
                             <input
                               id="contact-name"
@@ -223,9 +223,9 @@ export default function ContactPage() {
                           <div>
                             <label
                               htmlFor="contact-email"
-                              className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500"
+                              className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-subtle"
                             >
-                              <span className="text-green-500">❯</span> Email
+                              <span className="text-accent">❯</span> Email
                             </label>
                             <input
                               id="contact-email"
@@ -246,9 +246,9 @@ export default function ContactPage() {
                         <div>
                           <label
                             htmlFor="contact-subject"
-                            className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500"
+                            className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-subtle"
                           >
-                            <span className="text-green-500">❯</span> Subject
+                            <span className="text-accent">❯</span> Subject
                           </label>
                           <input
                             id="contact-subject"
@@ -267,9 +267,9 @@ export default function ContactPage() {
                         <div>
                           <label
                             htmlFor="contact-message"
-                            className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500"
+                            className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-subtle"
                           >
-                            <span className="text-green-500">❯</span> Message
+                            <span className="text-accent">❯</span> Message
                           </label>
                           <textarea
                             id="contact-message"
@@ -282,7 +282,7 @@ export default function ContactPage() {
                             placeholder="Tell us what's on your mind…"
                             className={`${INPUT_CLASSES} resize-y`}
                           />
-                          <p className="mt-1 text-right text-[10px] text-zinc-700">
+                          <p className="mt-1 text-right text-[10px] text-ink-faint">
                             {message.length}/5000
                           </p>
                         </div>
@@ -291,7 +291,7 @@ export default function ContactPage() {
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className="rounded-lg bg-green-500 px-6 py-2.5 text-sm font-semibold text-zinc-950 shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] transition-shadow hover:shadow-[0_0_60px_-8px_rgba(34,197,94,0.8)] disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-ink-inverse shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] transition-shadow hover:shadow-[0_0_60px_-8px_rgba(34,197,94,0.8)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {isSubmitting ? (
                             <span className="flex items-center gap-2">

@@ -18,8 +18,8 @@ const LINKS = [
 ];
 
 const LINK_BASE = `${terminal.mono} text-[13px] transition-colors`;
-const LINK_ACCENT = "text-green-400 hover:text-green-300";
-const LINK_MUTED = "text-zinc-500 hover:text-zinc-200";
+const LINK_ACCENT = "text-accent hover:text-accent";
+const LINK_MUTED = "text-ink-subtle hover:text-ink";
 
 export function Why() {
   return (
@@ -28,15 +28,15 @@ export function Why() {
       className={`scroll-mt-24 border-y ${terminal.line} bg-white/[0.015] py-24 sm:py-32`}
     >
       <div className={terminal.shell}>
-        <p className={`${terminal.mono} text-[13px] text-zinc-600`}>
-          <span aria-hidden className="mr-1.5 text-zinc-700">
+        <p className={`${terminal.mono} text-[13px] text-ink-faint`}>
+          <span aria-hidden className="mr-1.5 text-ink-faint">
             #
           </span>
           why this exists
         </p>
 
         <div className="mt-8 grid gap-12 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="max-w-2xl space-y-6 font-sans text-[19px] leading-relaxed text-zinc-300">
+          <div className="max-w-2xl space-y-6 font-sans text-[19px] leading-relaxed text-ink-muted">
             <p>
               Every team starts the same way. Someone pastes the .env into a
               channel so the new hire can run the app. It works, so it happens
@@ -49,7 +49,7 @@ export function Why() {
               industry pretends that&apos;s a discipline problem rather than a
               tooling one.
             </p>
-            <p className="text-zinc-100">
+            <p className="text-ink">
               Envpilot is the boring version: one flat price per organization,
               the whole platform MIT-licensed so you can read exactly how your
               secrets are handled — or run it yourself and never send us
@@ -60,12 +60,12 @@ export function Why() {
           <div
             className={`border-t ${terminal.line} pt-8 lg:border-t-0 lg:pt-0`}
           >
-            <p className="font-sans text-[15px] leading-relaxed text-zinc-400">
+            <p className="font-sans text-[15px] leading-relaxed text-ink-muted">
               {
                 "“It’s the tool I wanted: encrypted, synced, and boring to use.”"
               }
             </p>
-            <p className={`mt-4 ${terminal.mono} text-[12px] text-zinc-500`}>
+            <p className={`mt-4 ${terminal.mono} text-[12px] text-ink-subtle`}>
               Abdul Rafay — founder, and the person who answers your support
               email
             </p>

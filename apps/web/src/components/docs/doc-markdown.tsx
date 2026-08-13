@@ -19,7 +19,7 @@ const MermaidChart = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="my-6 h-24 animate-pulse rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40" />
+      <div className="my-6 h-24 animate-pulse rounded-xl border border-line bg-surface/40" />
     ),
   }
 );
@@ -98,7 +98,7 @@ export function DocMarkdown({ body }: { body: string }) {
         components={{
           h1: ({ node, children, ...props }) => (
             <h1
-              className="mt-8 mb-4 scroll-mt-4 text-2xl font-bold text-zinc-900 first:mt-0 dark:text-zinc-100"
+              className="mt-8 mb-4 scroll-mt-4 text-2xl font-bold first:mt-0 text-ink"
               {...props}
             >
               {children}
@@ -106,7 +106,7 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           h2: ({ node, children, ...props }) => (
             <h2
-              className="mt-8 mb-3 scroll-mt-4 border-b border-zinc-200 pb-2 text-xl font-semibold text-zinc-900 first:mt-0 dark:border-zinc-800 dark:text-zinc-100"
+              className="mt-8 mb-3 scroll-mt-4 border-b pb-2 text-xl font-semibold first:mt-0 border-line text-ink"
               {...props}
             >
               {children}
@@ -114,7 +114,7 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           h3: ({ node, children, ...props }) => (
             <h3
-              className="mt-6 mb-2 scroll-mt-4 text-base font-semibold text-zinc-900 dark:text-zinc-100"
+              className="mt-6 mb-2 scroll-mt-4 text-base font-semibold text-ink"
               {...props}
             >
               {children}
@@ -122,7 +122,7 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           h4: ({ node, children, ...props }) => (
             <h4
-              className="mt-5 mb-2 scroll-mt-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+              className="mt-5 mb-2 scroll-mt-4 text-sm font-semibold text-ink"
               {...props}
             >
               {children}
@@ -133,7 +133,7 @@ export function DocMarkdown({ body }: { body: string }) {
           // sentences past what is comfortable to read.
           p: ({ node, children, ...props }) => (
             <p
-              className="mb-4 max-w-[72ch] text-sm leading-relaxed text-zinc-700 dark:text-zinc-300"
+              className="mb-4 max-w-[72ch] text-sm leading-relaxed text-ink-muted"
               {...props}
             >
               {children}
@@ -141,7 +141,7 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           ul: ({ node, children, ...props }) => (
             <ul
-              className="mb-4 max-w-[72ch] list-disc space-y-1 pl-6 text-sm text-zinc-700 dark:text-zinc-300"
+              className="mb-4 max-w-[72ch] list-disc space-y-1 pl-6 text-sm text-ink-muted"
               {...props}
             >
               {children}
@@ -149,7 +149,7 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           ol: ({ node, children, ...props }) => (
             <ol
-              className="mb-4 max-w-[72ch] list-decimal space-y-1 pl-6 text-sm text-zinc-700 dark:text-zinc-300"
+              className="mb-4 max-w-[72ch] list-decimal space-y-1 pl-6 text-sm text-ink-muted"
               {...props}
             >
               {children}
@@ -166,7 +166,7 @@ export function DocMarkdown({ body }: { body: string }) {
               // Untrusted authors: noopener stops window.opener reach-back.
               target="_blank"
               rel="noopener noreferrer nofollow"
-              className="text-green-600 underline underline-offset-2 hover:text-green-500 dark:text-green-400"
+              className="text-accent-hover underline underline-offset-2 hover:text-accent"
               {...props}
             >
               {children}
@@ -178,7 +178,7 @@ export function DocMarkdown({ body }: { body: string }) {
           // reliable signal.
           code: ({ node, className, children, ...props }) => (
             <code
-              className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-[0.85em] text-green-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-green-400"
+              className="rounded border px-1 py-0.5 font-mono text-[0.85em] border-line bg-surface-raised text-accent"
               {...props}
             >
               {children}
@@ -206,7 +206,7 @@ export function DocMarkdown({ body }: { body: string }) {
             return (
               <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>
                 <CodeBlock language={code ? fenceLanguage(code) : undefined}>
-                  <pre className="overflow-x-auto bg-zinc-950 p-4 [&>code]:block [&>code]:rounded-none [&>code]:border-0 [&>code]:bg-transparent [&>code]:px-0 [&>code]:py-0 [&>code]:text-xs [&>code]:leading-relaxed [&>code]:text-zinc-200">
+                  <pre className="overflow-x-auto bg-canvas p-4 [&>code]:block [&>code]:rounded-none [&>code]:border-0 [&>code]:bg-transparent [&>code]:px-0 [&>code]:py-0 [&>code]:text-xs [&>code]:leading-relaxed [&>code]:text-ink">
                     {children}
                   </pre>
                 </CodeBlock>
@@ -217,7 +217,7 @@ export function DocMarkdown({ body }: { body: string }) {
           // code chip used to squeeze every other column down to one word per
           // line. Columns now take their natural width and the frame scrolls.
           table: ({ node, children, ...props }) => (
-            <div className="mb-6 overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+            <div className="mb-6 overflow-x-auto rounded-xl border border-line">
               <table
                 className="w-max min-w-full border-collapse text-sm"
                 {...props}
@@ -227,24 +227,18 @@ export function DocMarkdown({ body }: { body: string }) {
             </div>
           ),
           thead: ({ node, children, ...props }) => (
-            <thead
-              className="border-b border-zinc-200 bg-zinc-100/70 dark:border-zinc-800 dark:bg-zinc-900/60"
-              {...props}
-            >
+            <thead className="border-b border-line bg-surface/60" {...props}>
               {children}
             </thead>
           ),
           tr: ({ node, children, ...props }) => (
-            <tr
-              className="border-b border-zinc-200 last:border-b-0 dark:border-zinc-800/60"
-              {...props}
-            >
+            <tr className="border-b last:border-b-0 border-line" {...props}>
               {children}
             </tr>
           ),
           th: ({ node, children, ...props }) => (
             <th
-              className="px-4 py-2.5 text-left text-xs font-semibold whitespace-nowrap text-zinc-600 uppercase dark:text-zinc-400"
+              className="px-4 py-2.5 text-left text-xs font-semibold whitespace-nowrap uppercase text-ink-muted"
               {...props}
             >
               {children}
@@ -252,7 +246,7 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           td: ({ node, children, ...props }) => (
             <td
-              className="px-4 py-2.5 align-top leading-relaxed text-zinc-700 dark:text-zinc-300"
+              className="px-4 py-2.5 align-top leading-relaxed text-ink-muted"
               {...props}
             >
               {children}
@@ -260,18 +254,13 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           blockquote: ({ node, children, ...props }) => (
             <blockquote
-              className="mb-4 max-w-[72ch] border-l-2 border-green-500/40 pl-4 text-sm text-zinc-600 italic dark:text-zinc-400"
+              className="mb-4 max-w-[72ch] border-l-2 border-accent-line pl-4 text-sm italic text-ink-muted"
               {...props}
             >
               {children}
             </blockquote>
           ),
-          hr: (props) => (
-            <hr
-              className="my-6 border-zinc-200 dark:border-zinc-800"
-              {...props}
-            />
-          ),
+          hr: (props) => <hr className="my-6 border-line" {...props} />,
         }}
       >
         {deferredBody}

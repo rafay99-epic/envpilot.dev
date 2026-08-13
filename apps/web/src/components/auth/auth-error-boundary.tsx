@@ -94,9 +94,9 @@ export class AuthErrorBoundary extends Component<
         // instead of flashing the full error page for a self-healing race.
         if (this.state.retrying) {
           return (
-            <div className="dark flex min-h-screen items-center justify-center bg-[#0f172a]">
-              <p className="font-mono text-sm text-zinc-500">
-                <span className="text-green-400">$</span> retrying...
+            <div className="flex min-h-screen items-center justify-center bg-canvas">
+              <p className="font-mono text-sm text-ink-subtle">
+                <span className="text-accent">$</span> retrying...
               </p>
             </div>
           );

@@ -21,13 +21,13 @@ export function TerminalPanel({
           className={`flex items-center gap-3 border-b ${terminal.line} bg-white/[0.02] px-4 py-2`}
         >
           <span
-            className={`${terminal.mono} truncate text-[11.5px] text-zinc-400`}
+            className={`${terminal.mono} truncate text-[11.5px] text-ink-muted`}
           >
             {title}
           </span>
           {meta && (
             <span
-              className={`${terminal.mono} ml-auto hidden shrink-0 text-[11px] text-zinc-600 sm:block`}
+              className={`${terminal.mono} ml-auto hidden shrink-0 text-[11px] text-ink-faint sm:block`}
             >
               {meta}
             </span>
@@ -51,18 +51,18 @@ export function TerminalCommand({
   return (
     <header className={`max-w-3xl ${className}`}>
       <h2
-        className={`${terminal.mono} text-[clamp(1.25rem,2.8vw,1.75rem)] leading-snug tracking-tight text-zinc-100`}
+        className={`${terminal.mono} text-[clamp(1.25rem,2.8vw,1.75rem)] leading-snug tracking-tight text-ink`}
       >
-        <span aria-hidden className="mr-3 text-green-400">
+        <span aria-hidden className="mr-3 text-accent">
           ❯
         </span>
         {cmd}
       </h2>
       {comment && (
         <p
-          className={`${terminal.mono} mt-3 text-[13px] leading-relaxed text-zinc-500`}
+          className={`${terminal.mono} mt-3 text-[13px] leading-relaxed text-ink-subtle`}
         >
-          <span aria-hidden className="mr-1.5 text-zinc-700">
+          <span aria-hidden className="mr-1.5 text-ink-faint">
             #
           </span>
           {comment}

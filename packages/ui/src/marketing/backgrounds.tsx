@@ -83,7 +83,7 @@ export function Noise({ className = "" }: { className?: string }) {
 export function GlowDivider({ className = "" }: { className?: string }) {
   return (
     <div aria-hidden className={`relative h-px w-full ${className}`}>
-      <div className="absolute inset-0 bg-zinc-800/60" />
+      <div className="absolute inset-0 bg-surface-raised/60" />
       <div
         className="absolute inset-y-0 left-1/2 w-1/3 -translate-x-1/2"
         style={{

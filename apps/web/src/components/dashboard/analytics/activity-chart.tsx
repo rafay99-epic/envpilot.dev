@@ -12,7 +12,7 @@ import { TerminalWindow } from "@/components/dashboard/terminal-ui";
 const chartConfig = {
   count: {
     label: "Events",
-    color: "hsl(var(--chart-1))",
+    color: "var(--color-chart-1)",
   },
 } satisfies ChartConfig;
 
@@ -42,10 +42,10 @@ export function ActivityChart({ dailyCounts, daysBack }: ActivityChartProps) {
 
   return (
     <TerminalWindow title="activity-overview">
-      <div className="border-b border-zinc-700/50 px-5 py-2.5">
-        <span className="font-mono text-xs text-zinc-500">
-          <span className="text-green-400">$</span> envpilot analytics
-          --activity --days={daysBack}
+      <div className="border-b border-line px-5 py-2.5">
+        <span className="font-mono text-xs text-ink-subtle">
+          <span className="text-accent">$</span> envpilot analytics --activity
+          --days={daysBack}
         </span>
       </div>
       <div className="p-5">
@@ -58,19 +58,19 @@ export function ActivityChart({ dailyCounts, daysBack }: ActivityChartProps) {
               <linearGradient id="fillActivity" x1="0" y1="0" x2="0" y2="1">
                 <stop
                   offset="5%"
-                  stopColor="hsl(var(--chart-1))"
+                  stopColor="var(--color-chart-1)"
                   stopOpacity={0.3}
                 />
                 <stop
                   offset="95%"
-                  stopColor="hsl(var(--chart-1))"
+                  stopColor="var(--color-chart-1)"
                   stopOpacity={0.02}
                 />
               </linearGradient>
             </defs>
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke="#27272a"
+              stroke="var(--color-line-strong)"
               vertical={false}
             />
             <XAxis
@@ -99,7 +99,7 @@ export function ActivityChart({ dailyCounts, daysBack }: ActivityChartProps) {
             <Area
               type="monotone"
               dataKey="count"
-              stroke="hsl(var(--chart-1))"
+              stroke="var(--color-chart-1)"
               strokeWidth={2}
               fill="url(#fillActivity)"
             />

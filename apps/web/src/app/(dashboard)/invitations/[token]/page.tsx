@@ -126,9 +126,9 @@ export default function InvitationAcceptPage({
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-warning-soft">
             <svg
-              className="h-8 w-8 text-amber-600 dark:text-amber-400"
+              className="h-8 w-8 text-warning"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -141,16 +141,16 @@ export default function InvitationAcceptPage({
               />
             </svg>
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+          <h1 className="mt-4 text-2xl font-bold text-ink">
             Invitation Expired
           </h1>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-ink-muted">
             This invitation has expired. Please contact the organization admin
             to request a new invitation.
           </p>
           <Link
             href="/dashboard"
-            className="mt-6 inline-block rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="mt-6 inline-block rounded-lg bg-ink px-6 py-2.5 text-sm font-medium transition-colors text-ink-inverse hover:bg-ink-muted"
           >
             Go to Dashboard
           </Link>
@@ -163,9 +163,9 @@ export default function InvitationAcceptPage({
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-accent-soft">
             <svg
-              className="h-8 w-8 text-green-600 dark:text-green-400"
+              className="h-8 w-8 text-accent"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -178,10 +178,10 @@ export default function InvitationAcceptPage({
               />
             </svg>
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+          <h1 className="mt-4 text-2xl font-bold text-ink">
             Welcome to {invitation?.organization.name}!
           </h1>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-ink-muted">
             You have successfully joined the organization. Redirecting you to
             the organization page...
           </p>
@@ -194,9 +194,9 @@ export default function InvitationAcceptPage({
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-surface-raised">
             <svg
-              className="h-8 w-8 text-zinc-600 dark:text-zinc-400"
+              className="h-8 w-8 text-ink-muted"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -209,16 +209,16 @@ export default function InvitationAcceptPage({
               />
             </svg>
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+          <h1 className="mt-4 text-2xl font-bold text-ink">
             Invitation Declined
           </h1>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-ink-muted">
             You have declined the invitation to join{" "}
             {invitation?.organization.name}.
           </p>
           <Link
             href="/dashboard"
-            className="mt-6 inline-block rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="mt-6 inline-block rounded-lg bg-ink px-6 py-2.5 text-sm font-medium transition-colors text-ink-inverse hover:bg-ink-muted"
           >
             Go to Dashboard
           </Link>
@@ -231,9 +231,9 @@ export default function InvitationAcceptPage({
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-danger-soft">
             <svg
-              className="h-8 w-8 text-red-600 dark:text-red-400"
+              className="h-8 w-8 text-danger"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -246,16 +246,16 @@ export default function InvitationAcceptPage({
               />
             </svg>
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+          <h1 className="mt-4 text-2xl font-bold text-ink">
             Invalid Invitation
           </h1>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-ink-muted">
             {error ||
               "This invitation link is invalid or has already been used."}
           </p>
           <Link
             href="/dashboard"
-            className="mt-6 inline-block rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="mt-6 inline-block rounded-lg bg-ink px-6 py-2.5 text-sm font-medium transition-colors text-ink-inverse hover:bg-ink-muted"
           >
             Go to Dashboard
           </Link>
@@ -267,7 +267,7 @@ export default function InvitationAcceptPage({
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="rounded-xl border p-8 text-center border-line bg-surface">
           {invitation.organization.logoUrl ? (
             <img
               src={invitation.organization.logoUrl}
@@ -275,18 +275,18 @@ export default function InvitationAcceptPage({
               className="mx-auto h-16 w-16 rounded-xl object-cover"
             />
           ) : (
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800">
-              <span className="text-2xl font-semibold text-zinc-600 dark:text-zinc-400">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-surface-raised">
+              <span className="text-2xl font-semibold text-ink-muted">
                 {invitation.organization.name.charAt(0).toUpperCase()}
               </span>
             </div>
           )}
 
-          <h1 className="mt-6 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+          <h1 className="mt-6 text-2xl font-bold text-ink">
             Join {invitation.organization.name}
           </h1>
 
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-ink-muted">
             <span className="font-medium">
               {invitation.invitedBy.name || invitation.invitedBy.email}
             </span>{" "}
@@ -294,16 +294,16 @@ export default function InvitationAcceptPage({
             <span className="font-medium">{roleLabel(invitation.role)}</span>
           </p>
 
-          <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="mt-4 text-sm text-ink-muted">
             This invitation was sent to{" "}
-            <span className="font-medium text-zinc-700 dark:text-zinc-300">
+            <span className="font-medium text-ink-muted">
               {invitation.email}
             </span>
           </p>
 
           {error && (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-900/20">
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            <div className="mt-4 rounded-lg border p-3 border-danger-line bg-danger-soft">
+              <p className="text-sm text-danger">{error}</p>
             </div>
           )}
 
@@ -311,20 +311,20 @@ export default function InvitationAcceptPage({
             <button
               onClick={handleDecline}
               disabled={isDeclining || isAccepting}
-              className="flex-1 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line text-ink-muted hover:bg-surface-hover"
             >
               {isDeclining ? "Declining..." : "Decline"}
             </button>
             <button
               onClick={handleAccept}
               disabled={isAccepting || isDeclining}
-              className="flex-1 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
             >
               {isAccepting ? "Accepting..." : "Accept Invitation"}
             </button>
           </div>
 
-          <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-4 text-xs text-ink-muted">
             Expires{" "}
             {new Date(invitation.expiresAt).toLocaleDateString("en-US", {
               year: "numeric",

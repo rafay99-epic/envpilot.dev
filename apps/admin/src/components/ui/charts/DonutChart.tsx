@@ -102,7 +102,7 @@ export function DonutChart({
                 slice.endAngle
               )}
               fill={slice.color}
-              stroke="#18181b"
+              stroke="var(--color-surface)"
               strokeWidth={2}
               opacity={hovered === null || hovered === slice.index ? 1 : 0.4}
               className="transition-opacity duration-150"
@@ -113,10 +113,10 @@ export function DonutChart({
         </svg>
         {showTotal && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-2xl font-semibold text-zinc-100">
+            <span className="text-2xl font-semibold text-ink">
               {formatValue(total)}
             </span>
-            <span className="text-xs text-zinc-500">{totalLabel}</span>
+            <span className="text-xs text-ink-subtle">{totalLabel}</span>
           </div>
         )}
       </div>
@@ -134,11 +134,13 @@ export function DonutChart({
                 className="h-3 w-3 rounded-full"
                 style={{ backgroundColor: slice.color }}
               />
-              <span className="text-zinc-400">{slice.label}</span>
-              <span className="ml-auto font-medium text-zinc-200">
+              <span className="text-ink-muted">{slice.label}</span>
+              <span className="ml-auto font-medium text-ink">
                 {formatValue(slice.value)}
               </span>
-              <span className="text-xs text-zinc-500">{slice.percentage}%</span>
+              <span className="text-xs text-ink-subtle">
+                {slice.percentage}%
+              </span>
             </div>
           ))}
         </div>

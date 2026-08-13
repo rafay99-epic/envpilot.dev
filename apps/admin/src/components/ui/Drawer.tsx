@@ -118,7 +118,7 @@ export function Drawer({
         aria-labelledby={titleId}
         tabIndex={-1}
         className={cn(
-          "absolute inset-y-0 right-0 flex w-full flex-col border-l border-zinc-700/50 bg-zinc-900 shadow-2xl focus:outline-none",
+          "absolute inset-y-0 right-0 flex w-full flex-col border-l border-line bg-surface shadow-2xl focus:outline-none",
           "transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
           width,
           entering ? "translate-x-0" : "translate-x-full",
@@ -126,18 +126,18 @@ export function Drawer({
         )}
       >
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-zinc-700/50 px-6 py-5">
+        <div className="flex items-start justify-between border-b border-line px-6 py-5">
           <div>
-            <h2 id={titleId} className="text-lg font-semibold text-zinc-100">
+            <h2 id={titleId} className="text-lg font-semibold text-ink">
               {title}
             </h2>
             {description && (
-              <p className="mt-0.5 text-sm text-zinc-500">{description}</p>
+              <p className="mt-0.5 text-sm text-ink-subtle">{description}</p>
             )}
           </div>
           <button
             onClick={handleClose}
-            className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-green-500/5 hover:text-green-400"
+            className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-accent-soft hover:text-accent"
           >
             <X className="h-4 w-4" />
           </button>

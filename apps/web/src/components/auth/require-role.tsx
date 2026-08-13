@@ -52,13 +52,13 @@ export function RequireRole({ minimum, children }: RequireRoleProps) {
   if (!allowed) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
-        <div className="rounded-full border border-red-500/20 bg-red-500/10 p-4">
-          <ShieldAlert className="h-8 w-8 text-red-400" />
+        <div className="rounded-full border border-danger-line bg-danger-soft p-4">
+          <ShieldAlert className="h-8 w-8 text-danger" />
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-zinc-100">
+        <h2 className="mt-4 text-lg font-semibold text-ink">
           You don&apos;t have access to this page
         </h2>
-        <p className="mt-2 max-w-sm text-sm text-zinc-400">
+        <p className="mt-2 max-w-sm text-sm text-ink-muted">
           This page requires the {roleLabel(minimum)} role or higher in your
           organization. Ask an owner if you think you need access.
         </p>

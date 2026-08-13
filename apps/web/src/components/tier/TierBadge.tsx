@@ -10,12 +10,12 @@ interface TierBadgeProps {
 }
 
 const DEFAULT_TIER_STYLES: Record<string, string> = {
-  free: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300",
-  pro: "bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-sm",
+  free: "bg-surface-hover text-ink-muted",
+  pro: "bg-gradient-to-r from-premium-line to-info-line text-white shadow-sm",
 };
 
 const FALLBACK_STYLE =
-  "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm";
+  "bg-gradient-to-r from-accent-line to-info-line text-white shadow-sm";
 
 /**
  * Badge component to display the organization's subscription tier.

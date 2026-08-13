@@ -67,8 +67,8 @@ export function DocsSidebar({
       {/* ── Desktop sticky rail ───────────────────────────────────── */}
       <aside className="hidden w-56 shrink-0 lg:block">
         <nav aria-label="Documentation" className="sticky top-24">
-          <p className="flex items-center gap-2 px-3 font-mono text-[11px] tracking-widest text-green-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-green-400 [animation:pulse-glow_2.4s_ease-in-out_infinite]" />
+          <p className="flex items-center gap-2 px-3 font-mono text-[11px] tracking-widest text-accent">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent [animation:pulse-glow_2.4s_ease-in-out_infinite]" />
             {"// documentation"}
           </p>
 
@@ -81,7 +81,7 @@ export function DocsSidebar({
                   {active && (
                     <span
                       aria-hidden
-                      className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-green-400"
+                      className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-accent"
                     />
                   )}
                   <Link
@@ -89,8 +89,8 @@ export function DocsSidebar({
                     aria-current={active ? "page" : undefined}
                     className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
                       active
-                        ? "bg-green-500/5 text-green-400"
-                        : "text-zinc-500 hover:bg-zinc-900/60 hover:text-zinc-200"
+                        ? "bg-accent-soft text-accent"
+                        : "text-ink-subtle hover:bg-surface-hover/60 hover:text-ink"
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -101,8 +101,8 @@ export function DocsSidebar({
             })}
           </ul>
 
-          <div className="mt-8 border-t border-zinc-800/60 pt-4">
-            <p className="px-3 font-mono text-[10px] tracking-widest text-zinc-600">
+          <div className="mt-8 border-t border-line pt-4">
+            <p className="px-3 font-mono text-[10px] tracking-widest text-ink-faint">
               {"// resources"}
             </p>
             <ul className="mt-2 space-y-0.5">
@@ -112,7 +112,7 @@ export function DocsSidebar({
                     href={resource.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-zinc-600 transition-colors hover:text-green-400"
+                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-ink-faint transition-colors hover:text-accent"
                   >
                     <ExternalLink className="h-3 w-3 shrink-0" />
                     {resource.label}
@@ -140,8 +140,8 @@ export function DocsSidebar({
                 aria-current={active ? "page" : undefined}
                 className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors ${
                   active
-                    ? "border-green-500/30 bg-green-500/10 text-green-400"
-                    : "border-zinc-800 bg-zinc-900/40 text-zinc-500 hover:border-zinc-700 hover:text-zinc-200"
+                    ? "border-accent-line bg-accent-soft text-accent"
+                    : "border-line bg-surface/40 text-ink-subtle hover:border-line hover:text-ink"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />

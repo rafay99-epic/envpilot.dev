@@ -75,8 +75,8 @@ function NavLink({
         collapsed ? "justify-center" : ""
       } ${
         isActive
-          ? "border-l-2 border-green-400 bg-green-500/10 text-green-400"
-          : "border-l-2 border-transparent text-zinc-500 hover:bg-green-500/5 hover:text-green-400"
+          ? "border-l-2 border-accent-line bg-accent-soft text-accent"
+          : "border-l-2 border-transparent text-ink-subtle hover:bg-accent-soft hover:text-accent"
       }`}
     >
       {item.icon}
@@ -84,7 +84,7 @@ function NavLink({
         <>
           <span className="flex-1">{item.label}</span>
           {!!item.badge && (
-            <span className="rounded-full bg-green-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-green-400">
+            <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold text-accent">
               {item.badge}
             </span>
           )}
@@ -278,21 +278,21 @@ export function DashboardNav() {
     <>
       {/* Desktop Sidebar */}
       <aside
-        className={`relative z-20 hidden shrink-0 border-r border-zinc-800 bg-[#0f172a] transition-all duration-200 md:block ${
+        className={`relative z-20 hidden shrink-0 border-r border-line bg-chrome transition-all duration-200 md:block ${
           isCollapsed ? "w-16" : "w-60"
         }`}
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-14 items-center border-b border-zinc-800 px-5">
+          <div className="flex h-14 items-center border-b border-line px-5">
             <Link
               href="/dashboard"
               className="flex items-center gap-2.5 font-mono"
             >
-              <Terminal className="h-5 w-5 shrink-0 text-green-400" />
+              <Terminal className="h-5 w-5 shrink-0 text-accent" />
               {!isCollapsed && (
-                <span className="text-sm font-semibold text-zinc-100">
-                  <span className="text-green-400">$</span> envpilot
+                <span className="text-sm font-semibold text-ink">
+                  <span className="text-accent">$</span> envpilot
                 </span>
               )}
             </Link>
@@ -300,7 +300,7 @@ export function DashboardNav() {
 
           {/* Organization Switcher */}
           <div
-            className={`border-b border-zinc-800 ${isCollapsed ? "p-2" : "p-3"}`}
+            className={`border-b border-line ${isCollapsed ? "p-2" : "p-3"}`}
           >
             <OrganizationSwitcher
               currentOrgId={organization?.id ?? undefined}
@@ -310,14 +310,14 @@ export function DashboardNav() {
 
           {/* Search Trigger */}
           <div
-            className={`border-b border-zinc-800 ${isCollapsed ? "p-2" : "px-3 py-2"}`}
+            className={`border-b border-line ${isCollapsed ? "p-2" : "px-3 py-2"}`}
           >
             <button
               onClick={() =>
                 window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT))
               }
               title={isCollapsed ? "Search (⌘K)" : undefined}
-              className={`flex w-full items-center rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 ${
+              className={`flex w-full items-center rounded-lg px-3 py-2 text-sm text-ink-subtle transition-colors hover:bg-surface-hover hover:text-ink-muted ${
                 isCollapsed ? "justify-center" : "gap-3"
               }`}
             >
@@ -325,7 +325,7 @@ export function DashboardNav() {
               {!isCollapsed && (
                 <>
                   <span className="flex-1 text-left">Search...</span>
-                  <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600">
+                  <kbd className="rounded border border-line bg-surface-raised px-1.5 py-0.5 text-[10px] font-medium text-ink-faint">
                     ⌘K
                   </kbd>
                 </>
@@ -345,10 +345,10 @@ export function DashboardNav() {
           </nav>
 
           {/* Collapse Toggle */}
-          <div className="border-t border-zinc-800 p-2">
+          <div className="border-t border-line p-2">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="flex w-full items-center justify-center rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+              className="flex w-full items-center justify-center rounded-lg p-2 text-ink-subtle transition-colors hover:bg-surface-hover hover:text-ink-muted"
               title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
               {isCollapsed ? (
@@ -360,18 +360,18 @@ export function DashboardNav() {
           </div>
 
           {/* User Menu */}
-          <div className="border-t border-zinc-800 p-3">
+          <div className="border-t border-line p-3">
             <UserButton collapsed={isCollapsed} />
           </div>
         </div>
       </aside>
 
       {/* Mobile Header */}
-      <div className="fixed inset-x-0 top-0 z-50 flex h-14 items-center justify-between border-b border-zinc-800 bg-[#0f172a] px-4 md:hidden">
+      <div className="fixed inset-x-0 top-0 z-50 flex h-14 items-center justify-between border-b border-line bg-chrome px-4 md:hidden">
         <Link href="/dashboard" className="flex items-center gap-2 font-mono">
-          <Terminal className="h-5 w-5 text-green-400" />
-          <span className="text-sm font-semibold text-zinc-100">
-            <span className="text-green-400">$</span> envpilot
+          <Terminal className="h-5 w-5 text-accent" />
+          <span className="text-sm font-semibold text-ink">
+            <span className="text-accent">$</span> envpilot
           </span>
         </Link>
 
@@ -379,7 +379,7 @@ export function DashboardNav() {
           <UserButton collapsed />
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink"
           >
             {isMobileMenuOpen ? (
               <X className="h-5 w-5" />
@@ -394,13 +394,13 @@ export function DashboardNav() {
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div
-            className="fixed inset-0 bg-black/60"
+            className="fixed inset-0 bg-overlay"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 w-60 bg-[#0f172a]">
+          <div className="fixed inset-y-0 left-0 w-60 bg-chrome">
             <div className="flex h-full flex-col pt-14">
               {/* Organization Switcher */}
-              <div className="border-b border-zinc-800 p-3">
+              <div className="border-b border-line p-3">
                 <OrganizationSwitcher
                   currentOrgId={organization?.id ?? undefined}
                 />

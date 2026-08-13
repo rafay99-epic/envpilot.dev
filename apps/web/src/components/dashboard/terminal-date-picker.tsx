@@ -156,12 +156,12 @@ export function TerminalDatePicker({
         onClick={() => (open ? setOpen(false) : openPicker())}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="flex w-full items-center justify-between rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-left text-sm text-zinc-100 transition-colors hover:border-zinc-600 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
+        className="flex w-full items-center justify-between rounded-lg border border-line bg-surface-raised px-3 py-2 text-left text-sm text-ink transition-colors hover:border-line-strong focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
       >
-        <span className={selectedDate ? "text-zinc-100" : "text-zinc-500"}>
+        <span className={selectedDate ? "text-ink" : "text-ink-subtle"}>
           {selectedDate ? format(selectedDate, "MMM d, yyyy") : placeholder}
         </span>
-        <Calendar className="h-4 w-4 shrink-0 text-zinc-500" />
+        <Calendar className="h-4 w-4 shrink-0 text-ink-subtle" />
       </button>
 
       {open &&
@@ -178,10 +178,10 @@ export function TerminalDatePicker({
               left: coords.left,
               width: POPOVER_WIDTH,
             }}
-            className="z-[100] rounded-lg border border-zinc-700 bg-zinc-900 p-3 shadow-2xl"
+            className="z-[100] rounded-lg border border-line bg-surface p-3 shadow-2xl"
           >
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-zinc-100">
+              <span className="text-sm font-medium text-ink">
                 {format(viewMonth, "MMMM yyyy")}
               </span>
               <div className="flex items-center gap-1">
@@ -189,7 +189,7 @@ export function TerminalDatePicker({
                   type="button"
                   aria-label="Previous month"
                   onClick={() => setViewMonth((m) => addMonths(m, -1))}
-                  className="rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                  className="rounded p-1 text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
@@ -197,7 +197,7 @@ export function TerminalDatePicker({
                   type="button"
                   aria-label="Next month"
                   onClick={() => setViewMonth((m) => addMonths(m, 1))}
-                  className="rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                  className="rounded p-1 text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -208,7 +208,7 @@ export function TerminalDatePicker({
               {WEEKDAYS.map((weekday, i) => (
                 <div
                   key={`${weekday}-${i}`}
-                  className="py-1 text-center text-xs font-medium text-zinc-500"
+                  className="py-1 text-center text-xs font-medium text-ink-subtle"
                 >
                   {weekday}
                 </div>
@@ -231,13 +231,13 @@ export function TerminalDatePicker({
                     onClick={() => selectDay(day)}
                     className={`h-8 rounded-md text-sm transition-colors ${
                       selected
-                        ? "bg-green-500/20 font-semibold text-green-300 ring-1 ring-green-500/40"
+                        ? "bg-accent-soft font-semibold text-accent ring-1 ring-accent-line"
                         : disabled
-                          ? "cursor-not-allowed text-zinc-700"
+                          ? "cursor-not-allowed text-ink-faint"
                           : inMonth
-                            ? "text-zinc-200 hover:bg-zinc-800"
-                            : "text-zinc-600 hover:bg-zinc-800/60"
-                    } ${isToday && !selected ? "ring-1 ring-zinc-600" : ""}`}
+                            ? "text-ink hover:bg-surface-hover"
+                            : "text-ink-faint hover:bg-surface-hover/60"
+                    } ${isToday && !selected ? "ring-1 ring-line-strong" : ""}`}
                   >
                     {format(day, "d")}
                   </button>
@@ -245,14 +245,14 @@ export function TerminalDatePicker({
               })}
             </div>
 
-            <div className="mt-2 flex items-center justify-between border-t border-zinc-800 pt-2">
+            <div className="mt-2 flex items-center justify-between border-t border-line pt-2">
               <button
                 type="button"
                 onClick={() => {
                   onChange("");
                   setOpen(false);
                 }}
-                className="text-xs font-medium text-zinc-400 transition-colors hover:text-zinc-200"
+                className="text-xs font-medium text-ink-muted transition-colors hover:text-ink"
               >
                 Clear
               </button>
@@ -260,7 +260,7 @@ export function TerminalDatePicker({
                 type="button"
                 onClick={() => selectDay(startOfDay(today))}
                 disabled={isDisabled(today)}
-                className="text-xs font-medium text-green-400 transition-colors hover:text-green-300 disabled:cursor-not-allowed disabled:text-zinc-700"
+                className="text-xs font-medium text-accent transition-colors hover:text-accent disabled:cursor-not-allowed disabled:text-ink-faint"
               >
                 Today
               </button>
