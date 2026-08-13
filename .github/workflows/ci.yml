@@ -311,22 +311,15 @@ jobs:
       - uses: ./.github/actions/load-env
         with:
           token: ${{ secrets.ENVPILOT_TOKEN }}
+          environment: development
           required: |
-            E2E_CONVEX_DEPLOY_KEY
-            E2E_CONVEX_URL
-            E2E_WORKOS_API_KEY
-            E2E_WORKOS_CLIENT_ID
-            E2E_WORKOS_COOKIE_PASSWORD
+            CONVEX_DEPLOY_KEY
+            NEXT_PUBLIC_CONVEX_URL
+            WORKOS_API_KEY
+            WORKOS_CLIENT_ID
+            WORKOS_COOKIE_PASSWORD
             E2E_TEST_EMAIL
             E2E_TEST_PASSWORD
-      - name: Map e2e variables to application variables
-        run: |
-          {
-            echo "NEXT_PUBLIC_CONVEX_URL=$E2E_CONVEX_URL"
-            echo "WORKOS_API_KEY=$E2E_WORKOS_API_KEY"
-            echo "WORKOS_CLIENT_ID=$E2E_WORKOS_CLIENT_ID"
-            echo "WORKOS_COOKIE_PASSWORD=$E2E_WORKOS_COOKIE_PASSWORD"
-          } >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup
       # A gate that silently skips is fake safety: the authenticated specs
       # self-skip without credentials and the suite would go green having
@@ -334,11 +327,11 @@ jobs:
       - name: Verify e2e variables are configured
         run: |
           missing=""
-          [ -z "$E2E_CONVEX_DEPLOY_KEY" ] && missing="$missing E2E_CONVEX_DEPLOY_KEY"
-          [ -z "$NEXT_PUBLIC_CONVEX_URL" ] && missing="$missing E2E_CONVEX_URL"
-          [ -z "$WORKOS_API_KEY" ] && missing="$missing E2E_WORKOS_API_KEY"
-          [ -z "$WORKOS_CLIENT_ID" ] && missing="$missing E2E_WORKOS_CLIENT_ID"
-          [ -z "$WORKOS_COOKIE_PASSWORD" ] && missing="$missing E2E_WORKOS_COOKIE_PASSWORD"
+          [ -z "$CONVEX_DEPLOY_KEY" ] && missing="$missing CONVEX_DEPLOY_KEY"
+          [ -z "$NEXT_PUBLIC_CONVEX_URL" ] && missing="$missing NEXT_PUBLIC_CONVEX_URL"
+          [ -z "$WORKOS_API_KEY" ] && missing="$missing WORKOS_API_KEY"
+          [ -z "$WORKOS_CLIENT_ID" ] && missing="$missing WORKOS_CLIENT_ID"
+          [ -z "$WORKOS_COOKIE_PASSWORD" ] && missing="$missing WORKOS_COOKIE_PASSWORD"
           [ -z "$E2E_TEST_EMAIL" ] && missing="$missing E2E_TEST_EMAIL"
           [ -z "$E2E_TEST_PASSWORD" ] && missing="$missing E2E_TEST_PASSWORD"
           if [ -n "$missing" ]; then
@@ -348,7 +341,7 @@ jobs:
           echo "All e2e variables present ✓"
 
       - name: Push convex functions to the e2e deployment
-        run: CONVEX_DEPLOY_KEY="$E2E_CONVEX_DEPLOY_KEY" bunx convex deploy --yes
+        run: bunx convex deploy --yes
 
       # The suite runs parallel workers against per-worker fixture projects
       # (support.ts getWorkerProjectSlug). Free-tier caps (max_projects: 3,
@@ -357,8 +350,7 @@ jobs:
       # user hasn't signed in yet or is already pro.
       - name: Ensure the e2e account is on the pro tier
         run: |
-          CONVEX_DEPLOY_KEY="$E2E_CONVEX_DEPLOY_KEY" \
-            bunx convex run features/admin/e2e:ensureE2EUserPro "{\"email\": \"$E2E_TEST_EMAIL\"}"
+          bunx convex run features/admin/e2e:ensureE2EUserPro "{\"email\": \"$E2E_TEST_EMAIL\"}"
 
       - name: Install Playwright browsers
         working-directory: apps/web
