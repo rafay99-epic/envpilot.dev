@@ -47,10 +47,20 @@ export function TagFilter({
               aria-pressed={isSelected}
               className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 isSelected
-                  ? "text-white"
-                  : "bg-surface-raised text-ink-muted hover:bg-surface-hover"
+                  ? ""
+                  : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
               }`}
-              style={isSelected ? { backgroundColor: safeColor } : undefined}
+              // Selected tags carry the tag's own colour as a soft tint, the
+              // same treatment TagBadge and the tag selector already use.
+              style={
+                isSelected
+                  ? {
+                      backgroundColor: `${safeColor}15`,
+                      boxShadow: `inset 0 0 0 1px ${safeColor}40`,
+                      color: safeColor,
+                    }
+                  : undefined
+              }
             >
               <Tag className="h-3 w-3" />
               {tag.name}
