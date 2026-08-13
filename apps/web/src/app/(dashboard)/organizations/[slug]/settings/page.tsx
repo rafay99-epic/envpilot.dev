@@ -31,8 +31,8 @@ import {
   useCreateTag,
   useUpdateTag,
   useDeleteTag,
+  useOrganizationBySlug,
   type Tag as TagType,
-  useConvexUser,
 } from "@/hooks";
 import { useFeatureGate, usePagination } from "@/hooks";
 import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
@@ -75,8 +75,7 @@ function OrganizationSettingsPageContent({
 }) {
   const { slug } = use(params);
   const router = useRouter();
-  const [organization, setOrganization] = useState<Organization | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const organization = useOrganizationBySlug(slug);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -86,6 +85,7 @@ function OrganizationSettingsPageContent({
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const seededOrganizationId = useRef<string | null>(null);
 
   // Transfer state
   const [transferEmail, setTransferEmail] = useState("");
@@ -145,28 +145,12 @@ function OrganizationSettingsPageContent({
     : (tabs[0]?.id ?? "general");
 
   useEffect(() => {
-    async function fetchOrganization() {
-      try {
-        const response = await fetch(`/api/organizations/${slug}`);
-        if (!response.ok) {
-          if (response.status === 403) {
-            throw new Error("You do not have permission to access this page");
-          }
-          throw new Error("Failed to fetch organization");
-        }
-        const data = await response.json();
-        setOrganization(data.organization);
-        setName(data.organization.name);
-        setDescription(data.organization.description || "");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchOrganization();
-  }, [slug]);
+    if (!organization || seededOrganizationId.current === organization._id)
+      return;
+    seededOrganizationId.current = organization._id;
+    setName(organization.name);
+    setDescription(organization.description || "");
+  }, [organization]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -186,8 +170,6 @@ function OrganizationSettingsPageContent({
         throw new Error(data.error || "Failed to update organization");
       }
 
-      const data = await response.json();
-      setOrganization({ ...organization!, ...data.organization });
       setSuccessMessage("Organization settings updated successfully");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -245,7 +227,7 @@ function OrganizationSettingsPageContent({
     }
   }
 
-  if (isLoading) {
+  if (organization === undefined) {
     return <TerminalLoading fullPage />;
   }
 
@@ -691,15 +673,11 @@ const TAG_COLORS = [
 ];
 
 function TagSettingsTab({ organizationId }: { organizationId: string }) {
-  const { tags, isLoading } = useOrganizationTags(organizationId);
+  const { tags, hasOverflow, isLoading } = useOrganizationTags(organizationId);
   const isFetchError = false; // Convex handles errors via error boundaries
   const createTagMut = useCreateTag();
   const updateTagMut = useUpdateTag();
   const deleteTagMut = useDeleteTag();
-
-  // Get Convex user ID for mutation `createdBy`/`updatedBy`/`deletedBy` fields
-  const { user } = useAuthContext();
-  const { convexUserId } = useConvexUser(user?.id);
 
   // UI state
   const [showCreate, setShowCreate] = useState(false);
@@ -817,7 +795,6 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
           organizationId,
           name: entry.name,
           color: entry.color,
-          createdBy: convexUserId as string,
         });
         progress.completed++;
       } catch (err) {
@@ -868,7 +845,6 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
         organizationId,
         name: trimmed,
         color: newColor,
-        createdBy: convexUserId as string,
       });
       setNewName("");
       setNewColor(TAG_COLORS[0]);
@@ -891,7 +867,6 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
         tagId,
         name: trimmed,
         color: editColor,
-        updatedBy: convexUserId as string,
       });
       setEditingId(null);
       showSuccess(`Tag updated to "${trimmed}"`);
@@ -905,7 +880,6 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
     try {
       await deleteTagMut.mutateAsync({
         tagId,
-        deletedBy: convexUserId as string,
       });
       setDeletingId(null);
       showSuccess(`Tag "${tagName}" deleted`);
@@ -964,6 +938,15 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
           >
             Dismiss
           </button>
+        </div>
+      )}
+
+      {hasOverflow && (
+        <div className="rounded-lg border border-warning-line bg-warning-soft p-4">
+          <p className="text-sm text-warning">
+            Showing the first 100 tags. Delete unused tags to reveal the
+            remaining legacy tags.
+          </p>
         </div>
       )}
 
@@ -1191,7 +1174,11 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
             <>
               <div className="divide-y divide-line">
                 {pagination.pageItems.map((tag) => (
-                  <div key={tag._id} className="flex items-center gap-3 py-3">
+                  <div
+                    key={tag._id}
+                    data-testid="tag-row"
+                    className="flex items-center gap-3 py-3"
+                  >
                     {editingId === tag._id ? (
                       <>
                         <div className="flex flex-1 items-center gap-3">

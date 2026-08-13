@@ -5,11 +5,8 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
-import { createLogger } from "@/lib/logger";
 import { reportApiError } from "@/lib/api-errors";
 import { normalizeOrgRole } from "@/lib/roles";
-
-const log = createLogger("api/projects/move");
 
 const moveProjectSchema = z.object({
   targetOrganizationId: z.string().min(1, "Target organization ID is required"),
@@ -99,55 +96,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       projectId: id as Id<"projects">,
       targetOrganizationId: targetOrganizationId as Id<"organizations">,
     });
-
-    // Send notification email to target org admins (non-blocking)
-    try {
-      const targetOrg = await convex.query(
-        api.features.organizations.queries.getById,
-        {
-          organizationId: targetOrganizationId as Id<"organizations">,
-        }
-      );
-      const targetMembers = await convex.query(
-        api.features.organizations.queries.getMembers,
-        {
-          organizationId: targetOrganizationId as Id<"organizations">,
-        }
-      );
-
-      const adminMembers = targetMembers.filter(
-        (m) => m && normalizeOrgRole(m.role) === "owner"
-      );
-      const userName =
-        user.firstName && user.lastName
-          ? `${user.firstName} ${user.lastName}`
-          : user.email;
-
-      for (const admin of adminMembers) {
-        if (admin?.user?.email) {
-          await convex
-            .action(api.features.emails.emails.sendProjectTransferEmail, {
-              to: admin.user.email,
-              projectName: project.name,
-              organizationName: targetOrg?.name || "your organization",
-              transferredByName: userName,
-            })
-            .catch((err: unknown) =>
-              log.error(
-                "project_transfer_email_failed",
-                { projectId: id, targetOrganizationId },
-                err
-              )
-            );
-        }
-      }
-    } catch (emailErr) {
-      log.error(
-        "project_transfer_notification_failed",
-        { projectId: id, targetOrganizationId },
-        emailErr
-      );
-    }
 
     return NextResponse.json({ success: true, projectId: id });
   } catch (error) {

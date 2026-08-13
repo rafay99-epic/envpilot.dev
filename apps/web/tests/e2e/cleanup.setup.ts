@@ -14,10 +14,9 @@ import { hasE2ECredentials, SKIP_REASON } from "./env";
  * of the form and every variable-creating spec times out. This sweep resets
  * the fixture to a clean baseline so one bad run can't poison the next.
  *
- * Runs through the real authenticated REST API (same session storage state
- * as the specs), so deletes follow the product's soft-delete path — trashed
- * rows keep their restore window and the vault GC cron purges them after
- * retention, exactly as user-initiated deletes would.
+ * Runs through authenticated product surfaces. Variables/projects use their
+ * surviving REST adapters; tags use the real settings UI and native Convex
+ * mutation. Deletes follow the same soft-delete paths users trigger.
  */
 
 /** Variable keys created by the suite — every helper/spec uses this prefix. */
@@ -42,8 +41,10 @@ const STALE_AGE_MS = 30 * 60 * 1000;
 const STALE_PROJECT_PATTERN = /^E2E Project \d+$/;
 
 const BULK_DELETE_MAX = 50; // /api/variables/bulk-delete caps ids per call
+const TAG_CLEANUP_MAX = 15; // leave headroom under tagMutate's 20/minute limit
+const CLEANUP_TITLE = "purge stale E2E data from the fixture org";
 
-setup("purge stale E2E data from the fixture org", async ({ request }) => {
+setup(CLEANUP_TITLE, async ({ request, page }) => {
   setup.skip(!hasE2ECredentials, SKIP_REASON);
   setup.setTimeout(120_000);
 
@@ -55,7 +56,12 @@ setup("purge stale E2E data from the fixture org", async ({ request }) => {
     );
   }
   const { organizations } = (await orgsResponse.json()) as {
-    organizations: Array<{ _id: string; name: string; role: string }>;
+    organizations: Array<{
+      _id: string;
+      name: string;
+      slug: string;
+      role: string;
+    }>;
   };
 
   let deletedVariables = 0;
@@ -71,27 +77,65 @@ setup("purge stale E2E data from the fixture org", async ({ request }) => {
   for (const org of organizations.filter((o) => o.role === "owner")) {
     // Stale org-scoped tags (each tags-spec run creates one; failed runs
     // never delete it, and 40+ accumulated tags slow the picker down).
-    const tagsResponse = await request.get(
-      `/api/tags?organizationId=${org._id}`
-    );
-    if (tagsResponse.ok()) {
-      const { tags } = (await tagsResponse.json()) as {
-        tags: Array<{ _id: string; name: string; _creationTime: number }>;
-      };
-      const staleTags = tags.filter(
-        (t) =>
-          STALE_TAG_PATTERN.test(t.name) &&
-          t._creationTime < Date.now() - STALE_AGE_MS
+    await page.goto(`/organizations/${org.slug}/settings?tab=tags`, {
+      waitUntil: "domcontentloaded",
+    });
+    const tagsAvailable = await page
+      .getByText("Variable Tags", { exact: true })
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    let hasNextPage = tagsAvailable;
+    if (!tagsAvailable) {
+      warnings.push(
+        `tag cleanup unavailable for org "${org.name}" — feature may be gated`
       );
-      for (const tag of staleTags) {
-        const res = await request.delete(`/api/tags/${tag._id}`);
-        if (res.ok()) deletedTags += 1;
-        else {
-          warnings.push(
-            `tag "${tag.name}" not deleted (${res.status()}) — will retry next run`
-          );
-        }
+    }
+    while (hasNextPage) {
+      if (deletedTags >= TAG_CLEANUP_MAX) {
+        warnings.push(
+          `tag cleanup stopped after ${TAG_CLEANUP_MAX} deletions to avoid rate limiting`
+        );
+        break;
       }
+
+      const rows = page.getByTestId("tag-row");
+      const rowCount = await rows.count();
+      let deletedOnPage = false;
+
+      for (let index = 0; index < rowCount; index++) {
+        const row = rows.nth(index);
+        const text = (await row.textContent()) ?? "";
+        const match = text.match(/e2e-tag-(\d+)-\d+/);
+        if (
+          !match ||
+          !STALE_TAG_PATTERN.test(match[0]) ||
+          Number(match[1]) >= Date.now() - STALE_AGE_MS
+        ) {
+          continue;
+        }
+
+        try {
+          await row.getByTitle("Delete tag").click();
+          await row
+            .getByRole("button", { name: "Delete", exact: true })
+            .click();
+          await row.waitFor({ state: "detached" });
+          deletedTags += 1;
+          deletedOnPage = true;
+        } catch {
+          warnings.push(`tag "${match[0]}" not deleted — will retry next run`);
+          hasNextPage = false;
+        }
+        break;
+      }
+
+      if (deletedOnPage) continue;
+      if (!hasNextPage) break;
+      const next = page.getByRole("button", { name: "Next page" });
+      hasNextPage = await next.isEnabled().catch(() => false);
+      if (hasNextPage) await next.click();
     }
 
     const projectsResponse = await request.get(

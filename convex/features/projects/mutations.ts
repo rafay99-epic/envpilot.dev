@@ -10,8 +10,59 @@ import {
   assertOrgAction,
   assertProjectAction,
   getRoleProfile,
+  normalizeOrgRole,
   bypassesAssignment,
 } from "../../lib/authz";
+import { internal } from "../../_generated/api";
+
+const PROJECT_NAME_MAX = 100;
+const PROJECT_SLUG_MAX = 50;
+const PROJECT_DESCRIPTION_MAX = 500;
+
+function validateProjectInput(args: {
+  name?: string;
+  slug?: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+}) {
+  if (args.name !== undefined) {
+    const name = args.name.trim();
+    if (!name) throw new ConvexError("Project name is required.");
+    if (name.length > PROJECT_NAME_MAX) {
+      throw new ConvexError("Project name must be 100 characters or less.");
+    }
+  }
+  if (args.slug !== undefined) {
+    if (!args.slug || args.slug.length > PROJECT_SLUG_MAX) {
+      throw new ConvexError("Project slug must be 1 to 50 characters.");
+    }
+    if (!/^[a-z0-9-]+$/.test(args.slug)) {
+      throw new ConvexError(
+        "Project slug must contain only lowercase letters, numbers, and hyphens."
+      );
+    }
+  }
+  if (
+    args.description !== undefined &&
+    args.description.length > PROJECT_DESCRIPTION_MAX
+  ) {
+    throw new ConvexError(
+      "Project description must be 500 characters or less."
+    );
+  }
+  if (
+    args.icon !== undefined &&
+    args.icon !== "" &&
+    !args.icon.startsWith("framework:") &&
+    !/^[a-z0-9-]+$/.test(args.icon)
+  ) {
+    throw new ConvexError("Invalid project icon.");
+  }
+  if (args.color !== undefined && !/^#[0-9a-fA-F]{6}$/.test(args.color)) {
+    throw new ConvexError("Project color must be a valid hex color.");
+  }
+}
 
 // ==========================================
 // MUTATIONS
@@ -26,8 +77,10 @@ export const create = mutation({
     icon: v.optional(v.string()),
     color: v.optional(v.string()),
   },
+  returns: v.id("projects"),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
+    validateProjectInput(args);
 
     // Authorization: owners and project managers can create projects
     const { membership: creatorMembership } = await assertOrgAction(
@@ -41,7 +94,7 @@ export const create = mutation({
 
     const org = await ctx.db.get(args.organizationId);
     if (!org) {
-      throw new Error("Organization not found");
+      throw new ConvexError("Organization not found");
     }
 
     // Check tier limits for project creation
@@ -53,7 +106,7 @@ export const create = mutation({
       projectCount
     );
     if (!projectCheck.allowed) {
-      throw new Error(projectCheck.reason!);
+      throw new ConvexError(projectCheck.reason!);
     }
 
     const existingProject = await ctx.db
@@ -64,7 +117,7 @@ export const create = mutation({
       .first();
 
     if (existingProject && !existingProject.deletedAt) {
-      throw new Error("Project slug already exists in this organization");
+      throw new ConvexError("Project slug already exists in this organization");
     }
 
     const projectId = await ctx.db.insert("projects", {
@@ -113,8 +166,10 @@ export const update = mutation({
     color: v.optional(v.string()),
     vscodeAutoUnsyncOnClose: v.optional(v.boolean()),
   },
+  returns: v.id("projects"),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
+    validateProjectInput(args);
 
     // Authorization: org admins or project managers can update
     await assertProjectAction(ctx, actor._id, args.projectId, "project:update");
@@ -239,7 +294,7 @@ export const remove = mutation({
 
     const project = await ctx.db.get(args.projectId);
     if (!project) {
-      throw new Error("Project not found");
+      throw new ConvexError("Project not found");
     }
 
     // Authorization: only org admins can delete projects
@@ -416,21 +471,21 @@ export const move = mutation({
 
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
-      throw new Error("Project not found");
+      throw new ConvexError("Project not found");
     }
 
     if (project.organizationId === args.targetOrganizationId) {
-      throw new Error("Project is already in the target organization");
+      throw new ConvexError("Project is already in the target organization");
     }
 
     const sourceOrg = await ctx.db.get(project.organizationId);
     if (!sourceOrg) {
-      throw new Error("Source organization not found");
+      throw new ConvexError("Source organization not found");
     }
 
     const targetOrg = await ctx.db.get(args.targetOrganizationId);
     if (!targetOrg) {
-      throw new Error("Target organization not found");
+      throw new ConvexError("Target organization not found");
     }
 
     // Authorization: moving a project removes it from the source org
@@ -460,7 +515,7 @@ export const move = mutation({
       targetProjectCount
     );
     if (!moveCheck.allowed) {
-      throw new Error(
+      throw new ConvexError(
         `Target organization has reached its project limit. ${moveCheck.reason}`
       );
     }
@@ -477,7 +532,7 @@ export const move = mutation({
       .then((rows) => rows.find((doc) => doc.deletedAt === undefined) ?? null);
 
     if (existingSlug) {
-      throw new Error(
+      throw new ConvexError(
         `A project with slug "${project.slug}" already exists in the target organization`
       );
     }
@@ -487,6 +542,31 @@ export const move = mutation({
       organizationId: args.targetOrganizationId,
       updatedAt: now,
     });
+
+    const targetOwners = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.targetOrganizationId)
+      )
+      .collect()
+      .then((members) =>
+        members.filter((member) => normalizeOrgRole(member.role) === "owner")
+      );
+    const transferredByName = actor.name || actor.email;
+    for (const owner of targetOwners) {
+      const user = await ctx.db.get(owner.userId);
+      if (!user?.email) continue;
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.emails.emails.sendProjectTransferEmailInternal,
+        {
+          to: user.email,
+          projectName: project.name,
+          organizationName: targetOrg.name,
+          transferredByName,
+        }
+      );
+    }
 
     // Clean up source org relationships
     // Delete project members
