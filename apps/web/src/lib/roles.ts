@@ -109,21 +109,21 @@ export function roleLabel(role: string | null | undefined): string {
 export function roleBadgeColor(colorToken: string): string {
   switch (colorToken) {
     case "purple":
-      return "bg-premium-soft text-premium bg-premium-soft text-premium";
+      return "bg-premium-soft text-premium";
     case "amber":
-      return "bg-warning-soft text-warning bg-warning-soft text-warning";
+      return "bg-warning-soft text-warning";
     case "blue":
-      return "bg-info-soft text-info bg-info-soft text-info";
+      return "bg-info-soft text-info";
     case "teal":
-      return "bg-info-soft text-info bg-info-soft text-info";
+      return "bg-info-soft text-info";
     case "green":
-      return "bg-accent-soft text-accent-hover bg-accent-soft text-accent";
+      return "bg-accent-soft text-accent";
     case "red":
-      return "bg-danger-soft text-danger bg-danger-soft text-danger";
+      return "bg-danger-soft text-danger";
     case "slate":
-      return "bg-surface-raised text-ink-faint bg-surface-raised text-ink-muted";
+      return "bg-surface-raised text-ink-muted";
     default:
-      return "bg-surface-raised text-ink-faint bg-surface-raised text-ink-muted";
+      return "bg-surface-raised text-ink-muted";
   }
 }
 

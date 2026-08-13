@@ -203,9 +203,7 @@ function DataBrowserPage() {
 
   return (
     <div data-wide>
-      <h1 className="mb-6 text-2xl font-semibold text-ink">
-        Data Browser
-      </h1>
+      <h1 className="mb-6 text-2xl font-semibold text-ink">Data Browser</h1>
 
       {/* Command bar */}
       <div className="mb-4 flex flex-wrap items-end gap-3">

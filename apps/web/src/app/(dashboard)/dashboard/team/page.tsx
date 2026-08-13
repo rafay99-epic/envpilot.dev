@@ -27,7 +27,7 @@ export default function TeamPage() {
         </p>
         <Link
           href="/organizations"
-          className="mt-6 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white hover:bg-surface-hover text-ink-inverse hover:bg-surface-hover"
+          className="mt-6 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-ink-inverse hover:bg-ink-muted"
         >
           Manage Organizations
         </Link>

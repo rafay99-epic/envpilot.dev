@@ -44,7 +44,7 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
         {[...Array(4)].map((_, i) => (
           <div
             key={i}
-            className="animate-pulse rounded-lg border border-line bg-white p-4 border-line bg-surface"
+            className="animate-pulse rounded-lg border p-4 border-line bg-surface"
           >
             <div className="h-4 w-24 rounded bg-surface-hover" />
             <div className="mt-2 h-8 w-16 rounded bg-surface-hover" />
@@ -157,7 +157,7 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
         {statCards.map((stat) => (
           <div
             key={stat.label}
-            className="rounded-lg border border-line bg-white p-4 border-line bg-surface"
+            className="rounded-lg border p-4 border-line bg-surface"
           >
             <div className="flex items-center gap-3">
               <div
@@ -178,7 +178,7 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
       {/* Breakdown Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {/* Severity Distribution */}
-        <div className="rounded-lg border border-line bg-white p-4 border-line bg-surface">
+        <div className="rounded-lg border p-4 border-line bg-surface">
           <h3 className="text-sm font-medium text-ink">
             Severity Distribution
           </h3>
@@ -216,7 +216,7 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
         </div>
 
         {/* Resource Types */}
-        <div className="rounded-lg border border-line bg-white p-4 border-line bg-surface">
+        <div className="rounded-lg border p-4 border-line bg-surface">
           <h3 className="text-sm font-medium text-ink">Activity by Resource</h3>
           <div className="mt-4 space-y-2">
             {Object.entries(summary.resourceTypeCounts).length > 0 ? (
@@ -242,13 +242,13 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
         </div>
 
         {/* Top Users */}
-        <div className="rounded-lg border border-line bg-white p-4 border-line bg-surface">
+        <div className="rounded-lg border p-4 border-line bg-surface">
           <h3 className="text-sm font-medium text-ink">Most Active Users</h3>
           <div className="mt-4 space-y-3">
             {summary.topActiveUsers.length > 0 ? (
               summary.topActiveUsers.map((user, index) => (
                 <div key={user.userId} className="flex items-center gap-3">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-raised text-xs font-medium text-ink-faint bg-surface-raised text-ink-muted">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium bg-surface-raised text-ink-muted">
                     {index + 1}
                   </span>
                   <div className="flex-1 truncate">

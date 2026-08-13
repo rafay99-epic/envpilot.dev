@@ -10,7 +10,7 @@ interface TierBadgeProps {
 }
 
 const DEFAULT_TIER_STYLES: Record<string, string> = {
-  free: "bg-surface-raised text-ink-faint bg-surface-hover text-ink-muted",
+  free: "bg-surface-hover text-ink-muted",
   pro: "bg-gradient-to-r from-premium-line to-info-line text-white shadow-sm",
 };
 

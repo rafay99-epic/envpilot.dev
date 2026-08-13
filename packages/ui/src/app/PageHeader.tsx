@@ -8,6 +8,12 @@ export interface PageHeaderProps {
   title: string;
   description?: ReactNode;
   actions?: ReactNode;
+  /**
+   * Mono command line above the title, matching the landing page's `❯ cmd`
+   * treatment — e.g. "envpilot usage". Pages that map to a real CLI command
+   * should set it; the rest read fine without.
+   */
+  cmd?: string;
 }
 
 /**
@@ -24,10 +30,19 @@ export function PageHeader({
   title,
   description,
   actions,
+  cmd,
 }: PageHeaderProps) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
+        {cmd ? (
+          <p className="mb-2 truncate font-mono text-[13px] leading-snug text-ink-muted">
+            <span aria-hidden className="mr-2.5 text-accent">
+              ❯
+            </span>
+            {cmd}
+          </p>
+        ) : null}
         <div className="flex items-center gap-2.5">
           {leading ??
             (Icon ? (

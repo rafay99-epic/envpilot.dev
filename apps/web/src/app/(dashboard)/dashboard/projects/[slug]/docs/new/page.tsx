@@ -149,7 +149,7 @@ export default function NewDocPage({ params }: NewDocPageProps) {
               onChange={(e) => setTitle(e.target.value)}
               maxLength={200}
               placeholder="Charge a wallet"
-              className="mt-1.5 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse outline-none focus:border-line bg-surface text-ink"
+              className="mt-1.5 w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-line bg-surface text-ink"
             />
           </div>
 
@@ -168,7 +168,7 @@ export default function NewDocPage({ params }: NewDocPageProps) {
               maxLength={100}
               list="doc-known-modules"
               placeholder="E-Commerce Platform"
-              className="mt-1.5 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse outline-none focus:border-line bg-surface text-ink"
+              className="mt-1.5 w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-line bg-surface text-ink"
             />
             <datalist id="doc-known-modules">
               {knownModules.map((name) => (
@@ -195,8 +195,8 @@ export default function NewDocPage({ params }: NewDocPageProps) {
                   onClick={() => setType(value)}
                   className={`rounded-lg border px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                     type === value
-                      ? "border-line bg-surface text-white border-line bg-surface-raised text-ink-inverse"
-                      : "border-line text-ink-faint hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
+                      ? "border-line bg-ink text-ink-inverse"
+                      : "border-line text-ink-muted hover:bg-ink-muted"
                   }`}
                 >
                   {value}
@@ -224,7 +224,7 @@ export default function NewDocPage({ params }: NewDocPageProps) {
               value={prUrl}
               onChange={(e) => setPrUrl(e.target.value)}
               placeholder="https://github.com/org/repo/pull/123"
-              className="mt-1.5 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse outline-none focus:border-line bg-surface text-ink"
+              className="mt-1.5 w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-line bg-surface text-ink"
             />
           </div>
 
@@ -233,13 +233,13 @@ export default function NewDocPage({ params }: NewDocPageProps) {
               type="submit"
               data-testid="doc-create-submit"
               disabled={!canSubmit}
-              className="rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+              className="rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
             >
               {isSaving ? "Creating…" : "Create draft"}
             </button>
             <Link
               href={`/dashboard/projects/${slug}/docs`}
-              className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
+              className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors border-line text-ink-muted hover:bg-surface-hover"
             >
               Cancel
             </Link>

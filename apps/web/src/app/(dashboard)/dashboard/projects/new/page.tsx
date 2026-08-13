@@ -192,7 +192,7 @@ export default function NewProjectPage() {
   if (!canCreateProject) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="rounded-full bg-danger-soft p-3 bg-danger-soft">
+        <div className="rounded-full p-3 bg-danger-soft">
           <svg
             className="h-6 w-6 text-danger"
             fill="none"
@@ -227,7 +227,7 @@ export default function NewProjectPage() {
       <div className="flex items-center gap-4">
         <Link
           href="/dashboard/projects"
-          className="rounded-lg p-2 text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+          className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover"
         >
           <svg
             className="h-5 w-5"
@@ -262,7 +262,7 @@ export default function NewProjectPage() {
         )}
 
       {error && (
-        <div className="rounded-lg border border-danger-line bg-danger-soft p-4 border-danger-line bg-danger-soft">
+        <div className="rounded-lg border p-4 border-danger-line bg-danger-soft">
           <p className="text-sm text-danger">{error}</p>
         </div>
       )}
@@ -271,7 +271,7 @@ export default function NewProjectPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Left: Template Selector */}
         <div className="lg:col-span-3">
-          <div className="rounded-xl border border-line bg-white p-4 border-line bg-surface">
+          <div className="rounded-xl border p-4 border-line bg-surface">
             <p className="mb-3 text-xs font-medium uppercase tracking-wider text-ink-muted">
               Choose a template
             </p>
@@ -289,7 +289,7 @@ export default function NewProjectPage() {
           <div className="lg:sticky lg:top-6">
             <form
               onSubmit={handleSubmit}
-              className="space-y-5 rounded-xl border border-line bg-white p-4 border-line bg-surface"
+              className="space-y-5 rounded-xl border p-4 border-line bg-surface"
             >
               <p className="text-xs font-medium uppercase tracking-wider text-ink-muted">
                 Project Details
@@ -297,7 +297,7 @@ export default function NewProjectPage() {
 
               {/* Template Badge */}
               {selectedTemplate && (
-                <div className="flex items-center gap-2.5 rounded-lg border border-line bg-surface-raised px-3 py-2 border-line bg-surface-raised/50">
+                <div className="flex items-center gap-2.5 rounded-lg border px-3 py-2 border-line bg-surface-raised/50">
                   <div
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded"
                     style={{
@@ -321,7 +321,7 @@ export default function NewProjectPage() {
               )}
 
               {/* Preview */}
-              <div className="flex items-center gap-3 rounded-lg bg-surface-raised p-3 bg-surface-raised/50">
+              <div className="flex items-center gap-3 rounded-lg p-3 bg-surface-raised/50">
                 <div
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
                   style={{
@@ -358,7 +358,7 @@ export default function NewProjectPage() {
                   id="name"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+                  className="mt-1 block w-full rounded-lg border px-3 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
                   placeholder="My Awesome Project"
                   required
                 />
@@ -372,7 +372,7 @@ export default function NewProjectPage() {
                 >
                   Slug
                 </label>
-                <div className="mt-1 flex rounded-lg border border-line bg-white border-line bg-surface-raised">
+                <div className="mt-1 flex rounded-lg border border-line bg-surface-raised">
                   <span className="flex items-center px-2.5 text-xs text-ink-muted">
                     /projects/
                   </span>
@@ -381,7 +381,7 @@ export default function NewProjectPage() {
                     id="slug"
                     value={formData.slug}
                     onChange={(e) => handleSlugChange(e.target.value)}
-                    className="block w-full rounded-r-lg border-0 bg-transparent px-0 py-1.5 text-sm text-ink-inverse placeholder-ink-muted focus:outline-none focus:ring-0 text-ink placeholder-ink-subtle"
+                    className="block w-full rounded-r-lg border-0 bg-transparent px-0 py-1.5 text-sm focus:outline-none focus:ring-0 text-ink placeholder-ink-subtle"
                     placeholder="my-awesome-project"
                     required
                   />
@@ -406,14 +406,14 @@ export default function NewProjectPage() {
                     }))
                   }
                   rows={2}
-                  className="mt-1 block w-full rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+                  className="mt-1 block w-full rounded-lg border px-3 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
                   placeholder="A brief description..."
                 />
               </div>
 
               {/* Icon & Color -- hidden when using framework logo */}
               {isFrameworkIcon(formData.icon) ? (
-                <div className="flex items-center justify-between rounded-lg border border-line bg-surface-raised px-3 py-2 border-line bg-surface-raised/50">
+                <div className="flex items-center justify-between rounded-lg border px-3 py-2 border-line bg-surface-raised/50">
                   <div className="flex items-center gap-2">
                     <ProjectIcon icon={formData.icon} size={18} />
                     <span className="text-xs text-ink-muted">
@@ -487,7 +487,7 @@ export default function NewProjectPage() {
                           }
                           className={`h-7 w-7 rounded-lg transition-all ${
                             formData.color === color
-                              ? "ring-2 ring-line ring-offset-1 ring-line"
+                              ? "ring-2 ring-offset-1 ring-line"
                               : ""
                           }`}
                           style={{ backgroundColor: color }}
@@ -507,7 +507,7 @@ export default function NewProjectPage() {
               <div className="flex items-center gap-2 pt-2">
                 <Link
                   href="/dashboard/projects"
-                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-ink-muted hover:bg-surface-hover"
                 >
                   Cancel
                 </Link>
@@ -519,7 +519,7 @@ export default function NewProjectPage() {
                     !formData.slug ||
                     !hasSelection
                   }
-                  className="ml-auto flex items-center gap-1.5 rounded-lg bg-surface px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+                  className="ml-auto flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
                 >
                   {isSubmitting ? (
                     <>

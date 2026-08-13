@@ -179,13 +179,13 @@ function mapClass(
     if (LINE_PREFIXES.includes(prefix)) {
       token = `${family}-line`;
     } else if (SURFACE_PREFIXES.includes(prefix)) {
-      token = alpha || Number(step) <= 200 || Number(step) >= 900
-        ? `${family}-soft`
-        : family;
+      token =
+        alpha || Number(step) <= 200 || Number(step) >= 900
+          ? `${family}-soft`
+          : family;
     } else {
-      token = Number(step) >= 600 && family === "accent"
-        ? "accent-hover"
-        : family;
+      token =
+        Number(step) >= 600 && family === "accent" ? "accent-hover" : family;
     }
     // -soft and -line already encode alpha; keeping the suffix would double it.
     const keepAlpha = token === family ? alpha : "";
@@ -198,7 +198,10 @@ function mapClass(
     token = SURFACE_BY_STEP[step];
     // A neutral background behind an interaction variant is a hover surface,
     // whatever step the author reached for.
-    if (token && /\b(hover|focus|active|group-hover|aria-selected):/.test(variants)) {
+    if (
+      token &&
+      /\b(hover|focus|active|group-hover|aria-selected):/.test(variants)
+    ) {
       token = "surface-hover";
     }
   } else if (LINE_PREFIXES.includes(prefix)) {
@@ -267,6 +270,47 @@ function collapseMigratedDarkPairs(text: string): string {
   );
 }
 
+/**
+ * Drop earlier duplicates of the same property within one class list.
+ *
+ * The pair collapses above only fire when the two halves are adjacent. Authors
+ * frequently wrote them apart — `bg-white … text-zinc-900 … dark:bg-zinc-800
+ * dark:text-zinc-100` — so after unwrapping `dark:` BOTH halves land in the
+ * same list and CSS source order silently decides the winner. The dark half was
+ * the intended one, and it is always last, so last-wins is the correct rule.
+ */
+function dedupeClassLists(text: string): string {
+  const prefixes = ALL_PREFIXES.join("|");
+  const tokens = TOKEN_NAMES.join("|");
+  const tokenClass = new RegExp(
+    String.raw`^((?:[a-z0-9-]+:)*)(${prefixes})-(?:${tokens})(?:\/[\d.]+)?$`
+  );
+
+  // Only touch strings that already contain a migrated token class.
+  const candidate = new RegExp(
+    String.raw`(?:^|\s)(?:[a-z0-9-]+:)*(?:${prefixes})-(?:${tokens})(?:\/[\d.]+)?(?:\s|$)`
+  );
+
+  return text.replace(/[^\s"'`{}<>]+(?:[ \t]+[^\s"'`{}<>]+)+/g, (run) => {
+    if (!candidate.test(run)) return run;
+
+    const parts = run.split(/[ \t]+/);
+    const lastIndexByKey = new Map<string, number>();
+    parts.forEach((part, i) => {
+      const match = part.match(tokenClass);
+      if (match) lastIndexByKey.set(`${match[1]}${match[2]}`, i);
+    });
+
+    return parts
+      .filter((part, i) => {
+        const match = part.match(tokenClass);
+        if (!match) return true;
+        return lastIndexByKey.get(`${match[1]}${match[2]}`) === i;
+      })
+      .join(" ");
+  });
+}
+
 /** Inline styles reach the palette through var(--color-zinc-500). */
 function migrateColorVars(text: string): string {
   return text.replace(
@@ -302,6 +346,7 @@ function migrate(text: string): string {
     mapClass(variants, prefix, palette, step, alpha ?? "")
   );
   out = collapseMigratedDarkPairs(out);
+  out = dedupeClassLists(out);
   out = migrateColorVars(out);
   return out;
 }
@@ -342,6 +387,17 @@ function selftest(): void {
     ['"var(--color-green-500)"', '"var(--color-accent)"'],
     // a size utility must survive next to a dark: color
     ['"text-sm dark:text-ink"', '"text-sm text-ink"'],
+    // non-adjacent light/dark halves: after unwrapping, the dark half (last)
+    // is the one the author meant to win
+    [
+      '"rounded border bg-white p-2 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"',
+      '"rounded border p-2 bg-surface-raised text-ink"',
+    ],
+    // different variant chains are different properties, both survive
+    [
+      '"bg-surface hover:bg-surface-hover"',
+      '"bg-surface hover:bg-surface-hover"',
+    ],
     // untouched: not a class, no palette step
     ['"text-sm font-medium"', '"text-sm font-medium"'],
     ['"variable.rotation_reminder_sent"', '"variable.rotation_reminder_sent"'],
@@ -356,7 +412,9 @@ function selftest(): void {
     }
   }
   console.log(
-    failed ? `selftest: ${failed}/${cases.length} failed` : `selftest: ${cases.length} passed`
+    failed
+      ? `selftest: ${failed}/${cases.length} failed`
+      : `selftest: ${cases.length} passed`
   );
   if (failed) process.exit(1);
 }

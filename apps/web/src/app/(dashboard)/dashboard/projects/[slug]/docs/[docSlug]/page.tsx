@@ -298,7 +298,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                         data-testid="doc-save"
                         onClick={handleSave}
                         disabled={isBusy}
-                        className="rounded-lg bg-surface-raised px-4 py-1.5 text-sm font-medium text-ink-inverse transition-colors hover:bg-white disabled:opacity-50"
+                        className="rounded-lg bg-ink px-4 py-1.5 text-sm font-medium text-ink-inverse transition-colors hover:bg-ink-muted disabled:opacity-50"
                       >
                         {isBusy ? "Saving…" : "Save"}
                       </button>
@@ -348,7 +348,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                             data-testid="doc-publish"
                             onClick={handlePublish}
                             disabled={isBusy}
-                            className="flex items-center gap-1.5 rounded-lg bg-surface-raised px-4 py-1.5 text-sm font-medium text-ink-inverse transition-colors hover:bg-white disabled:opacity-50"
+                            className="flex items-center gap-1.5 rounded-lg bg-ink px-4 py-1.5 text-sm font-medium text-ink-inverse transition-colors hover:bg-ink-muted disabled:opacity-50"
                           >
                             <Send className="h-3.5 w-3.5" />
                             Publish

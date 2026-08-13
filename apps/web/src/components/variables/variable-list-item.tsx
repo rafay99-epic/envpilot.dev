@@ -107,19 +107,19 @@ export function VariableListItem({
                 {variable.key}
               </code>
               {variable.isSensitive && (
-                <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning bg-warning-soft text-warning">
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
                   Sensitive
                 </span>
               )}
-              <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-subtle bg-surface-raised text-ink-muted">
+              <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
                 v{variable.version}
               </span>
               {permissionLevel && (
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     permissionLevel === "write"
-                      ? "bg-warning-soft text-warning bg-warning-soft text-warning"
-                      : "bg-info-soft text-info bg-info-soft text-info"
+                      ? "bg-warning-soft text-warning"
+                      : "bg-info-soft text-info"
                   }`}
                 >
                   {permissionLevel}
@@ -138,10 +138,10 @@ export function VariableListItem({
                     key={env}
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                       env === "production"
-                        ? "bg-danger-soft text-danger bg-danger-soft text-danger"
+                        ? "bg-danger-soft text-danger"
                         : env === "staging"
-                          ? "bg-warning-soft text-warning bg-warning-soft text-warning"
-                          : "bg-accent-soft text-accent-hover bg-accent-soft text-accent"
+                          ? "bg-warning-soft text-warning"
+                          : "bg-accent-soft text-accent"
                     }`}
                   >
                     {env}
@@ -163,7 +163,7 @@ export function VariableListItem({
             <button
               onClick={handleToggleReveal}
               disabled={isRevealing}
-              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
+              className="rounded-lg p-2 text-ink-muted disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
               title={
                 isValueVisible && revealedValue ? "Hide value" : "Reveal value"
               }
@@ -180,7 +180,7 @@ export function VariableListItem({
           {revealedValue && (
             <button
               onClick={handleCopy}
-              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title={copied ? "Copied!" : "Copy key=value"}
             >
               {copied ? (
@@ -193,7 +193,7 @@ export function VariableListItem({
           {onShare && (
             <button
               onClick={onShare}
-              className="relative rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+              className="relative rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title="Share via secure link"
             >
               <Share2 className="h-4 w-4" />
@@ -205,7 +205,7 @@ export function VariableListItem({
           {onViewHistory && (
             <button
               onClick={onViewHistory}
-              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title="View history"
             >
               <svg
@@ -226,7 +226,7 @@ export function VariableListItem({
           {canManagePermissions && onManagePermissions && (
             <button
               onClick={onManagePermissions}
-              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title="Manage access permissions"
             >
               <svg
@@ -247,7 +247,7 @@ export function VariableListItem({
           {canEdit && onEdit && (
             <button
               onClick={onEdit}
-              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title="Edit variable"
             >
               <svg
@@ -268,7 +268,7 @@ export function VariableListItem({
           {canDelete && onDelete && (
             <button
               onClick={onDelete}
-              className="rounded-lg p-2 text-ink-muted hover:bg-danger-soft hover:text-danger hover:bg-danger-soft hover:text-danger"
+              className="rounded-lg p-2 text-ink-muted hover:bg-danger-soft hover:text-danger"
               title="Delete variable"
             >
               <svg
@@ -291,7 +291,7 @@ export function VariableListItem({
 
       {/* Revealed value display */}
       {isValueVisible && revealedValue && (
-        <div className="mt-2 rounded-lg bg-surface-raised px-3 py-2 bg-surface-raised">
+        <div className="mt-2 rounded-lg px-3 py-2 bg-surface-raised">
           <code className="break-all font-mono text-xs text-ink-muted">
             {revealedValue}
           </code>

@@ -224,7 +224,7 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
   if (!project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="rounded-full bg-danger-soft p-3 bg-danger-soft">
+        <div className="rounded-full p-3 bg-danger-soft">
           <KeyRound className="h-6 w-6 text-danger" />
         </div>
         <h2 className="mt-4 text-lg font-semibold text-ink">
@@ -262,12 +262,12 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
         </div>
 
         {notice && (
-          <div className="rounded-lg border border-accent-line bg-accent-soft p-4 border-accent-line bg-accent-soft">
+          <div className="rounded-lg border p-4 border-accent-line bg-accent-soft">
             <p className="text-sm text-accent">{notice}</p>
           </div>
         )}
         {error && (
-          <div className="rounded-lg border border-danger-line bg-danger-soft p-4 border-danger-line bg-danger-soft">
+          <div className="rounded-lg border p-4 border-danger-line bg-danger-soft">
             <p className="text-sm text-danger">{error}</p>
           </div>
         )}
@@ -282,8 +282,8 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
               onClick={() => setSelectedEnvironment("all")}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 selectedEnvironment === "all"
-                  ? "bg-surface text-white bg-surface-raised text-ink-inverse"
-                  : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+                  ? "bg-ink text-ink-inverse"
+                  : "bg-ink text-ink-muted hover:bg-ink-muted"
               }`}
             >
               All
@@ -294,8 +294,8 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
                 onClick={() => setSelectedEnvironment(env)}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                   selectedEnvironment === env
-                    ? "bg-surface text-white bg-surface-raised text-ink-inverse"
-                    : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+                    ? "bg-ink text-ink-inverse"
+                    : "bg-ink text-ink-muted hover:bg-ink-muted"
                 }`}
               >
                 {env}
@@ -305,8 +305,8 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
         </div>
 
         {/* List */}
-        <div className="rounded-xl border border-line bg-white border-line bg-surface">
-          <div className="flex items-center justify-between border-b border-line px-6 py-4 border-line">
+        <div className="rounded-xl border border-line bg-surface">
+          <div className="flex items-center justify-between border-b px-6 py-4 border-line">
             <div>
               <h2 className="font-semibold text-ink">Accounts</h2>
               <p className="mt-1 text-sm text-ink-muted">
@@ -324,7 +324,7 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
                     ? "Account limit reached. Upgrade to add more."
                     : undefined
                 }
-                className="flex items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+                className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
               >
                 <svg
                   className="h-4 w-4"

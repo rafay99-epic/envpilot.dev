@@ -138,7 +138,9 @@ export function DonutChart({
               <span className="ml-auto font-medium text-ink">
                 {formatValue(slice.value)}
               </span>
-              <span className="text-xs text-ink-subtle">{slice.percentage}%</span>
+              <span className="text-xs text-ink-subtle">
+                {slice.percentage}%
+              </span>
             </div>
           ))}
         </div>

@@ -300,7 +300,7 @@ export function AuditLogList({
         {[...Array(5)].map((_, i) => (
           <div
             key={i}
-            className="animate-pulse rounded-lg border border-line bg-white p-4 border-line bg-surface"
+            className="animate-pulse rounded-lg border p-4 border-line bg-surface"
           >
             <div className="flex items-start gap-3">
               <div className="h-8 w-8 rounded-full bg-surface-hover" />
@@ -317,7 +317,7 @@ export function AuditLogList({
 
   if (!logs || logs.length === 0) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center border-line bg-surface">
+      <div className="rounded-lg border p-8 text-center border-line bg-surface">
         <svg
           className="mx-auto h-12 w-12 text-ink-muted"
           fill="none"
@@ -350,7 +350,7 @@ export function AuditLogList({
             className={`rounded-lg border p-4 transition-colors ${
               severity === "critical" || severity === "warning"
                 ? `${colors.bg} border-${severity === "critical" ? "red" : "yellow"}-200 border-${severity === "critical" ? "red" : "yellow"}-800`
-                : "border-line bg-white border-line bg-surface"
+                : "border-line bg-surface"
             }`}
           >
             <div className="flex items-start gap-3">
@@ -365,7 +365,7 @@ export function AuditLogList({
                     {actionLabels[log.action] || log.action}
                   </span>
                   {log.involvesSensitiveData && (
-                    <span className="inline-flex items-center rounded-full bg-danger-soft px-2 py-0.5 text-xs font-medium text-danger bg-danger-soft text-danger">
+                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-danger-soft text-danger">
                       Sensitive
                     </span>
                   )}
@@ -397,7 +397,7 @@ export function AuditLogList({
                 </div>
                 {log.parsedDetails &&
                   Object.keys(log.parsedDetails).length > 0 && (
-                    <div className="mt-2 rounded bg-surface-raised p-2 text-xs font-mono text-ink-faint bg-surface-raised text-ink-muted">
+                    <div className="mt-2 rounded p-2 text-xs font-mono bg-surface-raised text-ink-muted">
                       {Object.entries(log.parsedDetails)
                         .filter(
                           ([key]) =>

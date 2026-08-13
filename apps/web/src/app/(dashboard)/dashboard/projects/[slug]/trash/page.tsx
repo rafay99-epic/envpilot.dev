@@ -237,7 +237,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                   type="button"
                   onClick={() => setConfirmOpen(true)}
                   disabled={emptying}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-danger-line bg-danger-soft px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-50 text-danger"
+                  className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-danger-line bg-danger-soft px-4 py-2 text-sm font-medium transition-colors hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-50 text-danger"
                 >
                   {emptying ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -254,7 +254,7 @@ export default function TrashPage({ params }: TrashPageProps) {
 
       {/* Body */}
       {loading ? (
-        <div className="rounded-xl border border-line bg-white p-6 border-line bg-surface">
+        <div className="rounded-xl border p-6 border-line bg-surface">
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <div
@@ -265,7 +265,7 @@ export default function TrashPage({ params }: TrashPageProps) {
           </div>
         </div>
       ) : totalCount === 0 ? (
-        <div className="rounded-xl border border-dashed border-line bg-white px-6 py-16 text-center border-line bg-surface">
+        <div className="rounded-xl border border-dashed px-6 py-16 text-center border-line bg-surface">
           <Trash2 className="mx-auto h-10 w-10 text-ink-faint" />
           <h2 className="mt-4 font-semibold text-ink">Trash is empty</h2>
           <p className="mt-1 text-sm text-ink-muted">
@@ -276,11 +276,11 @@ export default function TrashPage({ params }: TrashPageProps) {
       ) : (
         <div className="space-y-6">
           {deletedVariables && deletedVariables.length > 0 && (
-            <section className="rounded-xl border border-line bg-white border-line bg-surface">
-              <div className="flex items-center gap-2 border-b border-line px-6 py-4 border-line">
+            <section className="rounded-xl border border-line bg-surface">
+              <div className="flex items-center gap-2 border-b px-6 py-4 border-line">
                 <KeyRound className="h-4 w-4 text-ink-muted" />
                 <h2 className="font-semibold text-ink">Variables</h2>
-                <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-faint bg-surface-raised text-ink-muted">
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
                   {deletedVariables.length}
                 </span>
               </div>
@@ -291,7 +291,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                     className="flex items-center justify-between gap-4 px-6 py-3"
                   >
                     <div className="min-w-0 flex-1 opacity-60">
-                      <code className="font-mono text-sm font-semibold text-ink-subtle line-through text-ink-muted">
+                      <code className="font-mono text-sm font-semibold line-through text-ink-muted">
                         {variable.key}
                       </code>
                       <p className="mt-1 text-xs text-ink-subtle">
@@ -314,7 +314,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                         handleRestoreVariable(variable._id, variable.key)
                       }
                       disabled={restoringId === variable._id || emptying}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-faint shadow-sm transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
                     >
                       {restoringId === variable._id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -330,11 +330,11 @@ export default function TrashPage({ params }: TrashPageProps) {
           )}
 
           {deletedAccounts && deletedAccounts.length > 0 && (
-            <section className="rounded-xl border border-line bg-white border-line bg-surface">
-              <div className="flex items-center gap-2 border-b border-line px-6 py-4 border-line">
+            <section className="rounded-xl border border-line bg-surface">
+              <div className="flex items-center gap-2 border-b px-6 py-4 border-line">
                 <UserRound className="h-4 w-4 text-ink-muted" />
                 <h2 className="font-semibold text-ink">Shared accounts</h2>
-                <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-faint bg-surface-raised text-ink-muted">
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
                   {deletedAccounts.length}
                 </span>
               </div>
@@ -345,7 +345,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                     className="flex items-center justify-between gap-4 px-6 py-3"
                   >
                     <div className="min-w-0 flex-1 opacity-60">
-                      <span className="text-sm font-semibold text-ink-subtle line-through text-ink-muted">
+                      <span className="text-sm font-semibold line-through text-ink-muted">
                         {account.name}
                       </span>
                       <p className="mt-1 text-xs text-ink-subtle">
@@ -368,7 +368,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                         handleRestoreAccount(account._id, account.name)
                       }
                       disabled={restoringId === account._id || emptying}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-faint shadow-sm transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
                     >
                       {restoringId === account._id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -384,11 +384,11 @@ export default function TrashPage({ params }: TrashPageProps) {
           )}
 
           {deletedFiles && deletedFiles.length > 0 && (
-            <section className="rounded-xl border border-line bg-white border-line bg-surface">
-              <div className="flex items-center gap-2 border-b border-line px-6 py-4 border-line">
+            <section className="rounded-xl border border-line bg-surface">
+              <div className="flex items-center gap-2 border-b px-6 py-4 border-line">
                 <FileKey className="h-4 w-4 text-ink-muted" />
                 <h2 className="font-semibold text-ink">Secret files</h2>
-                <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-faint bg-surface-raised text-ink-muted">
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
                   {deletedFiles.length}
                 </span>
               </div>
@@ -399,7 +399,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                     className="flex items-center justify-between gap-4 px-6 py-3"
                   >
                     <div className="min-w-0 flex-1 opacity-60">
-                      <span className="text-sm font-semibold text-ink-subtle line-through text-ink-muted">
+                      <span className="text-sm font-semibold line-through text-ink-muted">
                         {file.name}
                       </span>
                       <p className="truncate font-mono text-xs text-ink-subtle">
@@ -423,7 +423,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                       type="button"
                       onClick={() => handleRestoreFile(file._id, file.name)}
                       disabled={restoringId === file._id || emptying}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-faint shadow-sm transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
                     >
                       {restoringId === file._id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -439,11 +439,11 @@ export default function TrashPage({ params }: TrashPageProps) {
           )}
 
           {deletedDocs && deletedDocs.length > 0 && (
-            <section className="rounded-xl border border-line bg-white border-line bg-surface">
-              <div className="flex items-center gap-2 border-b border-line px-6 py-4 border-line">
+            <section className="rounded-xl border border-line bg-surface">
+              <div className="flex items-center gap-2 border-b px-6 py-4 border-line">
                 <BookText className="h-4 w-4 text-ink-muted" />
                 <h2 className="font-semibold text-ink">Documentation</h2>
-                <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-faint bg-surface-raised text-ink-muted">
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
                   {deletedDocs.length}
                 </span>
               </div>
@@ -454,7 +454,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                     className="flex items-center justify-between gap-4 px-6 py-3"
                   >
                     <div className="min-w-0 flex-1 opacity-60">
-                      <span className="text-sm font-semibold text-ink-subtle line-through text-ink-muted">
+                      <span className="text-sm font-semibold line-through text-ink-muted">
                         {doc.title}
                       </span>
                       <p className="truncate font-mono text-xs text-ink-subtle">
@@ -480,7 +480,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                       type="button"
                       onClick={() => handleRestoreDoc(doc._id, doc.title)}
                       disabled={restoringId === doc._id || emptying}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-faint shadow-sm transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
                     >
                       {restoringId === doc._id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />

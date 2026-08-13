@@ -19,7 +19,7 @@ const MermaidChart = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="my-6 h-24 animate-pulse rounded-xl border border-line bg-surface-raised border-line bg-surface/40" />
+      <div className="my-6 h-24 animate-pulse rounded-xl border border-line bg-surface/40" />
     ),
   }
 );
@@ -98,7 +98,7 @@ export function DocMarkdown({ body }: { body: string }) {
         components={{
           h1: ({ node, children, ...props }) => (
             <h1
-              className="mt-8 mb-4 scroll-mt-4 text-2xl font-bold text-ink-inverse first:mt-0 text-ink"
+              className="mt-8 mb-4 scroll-mt-4 text-2xl font-bold first:mt-0 text-ink"
               {...props}
             >
               {children}
@@ -106,7 +106,7 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           h2: ({ node, children, ...props }) => (
             <h2
-              className="mt-8 mb-3 scroll-mt-4 border-b border-line pb-2 text-xl font-semibold text-ink-inverse first:mt-0 border-line text-ink"
+              className="mt-8 mb-3 scroll-mt-4 border-b pb-2 text-xl font-semibold first:mt-0 border-line text-ink"
               {...props}
             >
               {children}
@@ -178,7 +178,7 @@ export function DocMarkdown({ body }: { body: string }) {
           // reliable signal.
           code: ({ node, className, children, ...props }) => (
             <code
-              className="rounded border border-line bg-surface-raised px-1 py-0.5 font-mono text-[0.85em] text-accent-hover border-line bg-surface-raised text-accent"
+              className="rounded border px-1 py-0.5 font-mono text-[0.85em] border-line bg-surface-raised text-accent"
               {...props}
             >
               {children}
@@ -227,24 +227,18 @@ export function DocMarkdown({ body }: { body: string }) {
             </div>
           ),
           thead: ({ node, children, ...props }) => (
-            <thead
-              className="border-b border-line bg-surface-raised/70 border-line bg-surface/60"
-              {...props}
-            >
+            <thead className="border-b border-line bg-surface/60" {...props}>
               {children}
             </thead>
           ),
           tr: ({ node, children, ...props }) => (
-            <tr
-              className="border-b border-line last:border-b-0 border-line"
-              {...props}
-            >
+            <tr className="border-b last:border-b-0 border-line" {...props}>
               {children}
             </tr>
           ),
           th: ({ node, children, ...props }) => (
             <th
-              className="px-4 py-2.5 text-left text-xs font-semibold whitespace-nowrap text-ink-faint uppercase text-ink-muted"
+              className="px-4 py-2.5 text-left text-xs font-semibold whitespace-nowrap uppercase text-ink-muted"
               {...props}
             >
               {children}
@@ -260,7 +254,7 @@ export function DocMarkdown({ body }: { body: string }) {
           ),
           blockquote: ({ node, children, ...props }) => (
             <blockquote
-              className="mb-4 max-w-[72ch] border-l-2 border-accent-line pl-4 text-sm text-ink-faint italic text-ink-muted"
+              className="mb-4 max-w-[72ch] border-l-2 border-accent-line pl-4 text-sm italic text-ink-muted"
               {...props}
             >
               {children}

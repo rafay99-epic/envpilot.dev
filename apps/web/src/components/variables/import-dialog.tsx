@@ -158,7 +158,7 @@ export function ImportDialog({
           />
         ) : result ? (
           <div className="space-y-4">
-            <div className="rounded-lg border border-accent-line bg-accent-soft p-4 text-sm text-accent-hover border-accent-line bg-accent-soft text-accent">
+            <div className="rounded-lg border p-4 text-sm border-accent-line bg-accent-soft text-accent">
               {result.requested ? (
                 <p>
                   Created {result.requested} pending request(s). A Project
@@ -174,7 +174,7 @@ export function ImportDialog({
             </div>
             <button
               onClick={handleClose}
-              className="w-full rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line-strong text-ink-muted hover:bg-surface-hover"
+              className="w-full rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors border-line-strong text-ink-muted hover:bg-surface-hover"
             >
               Done
             </button>
@@ -191,7 +191,7 @@ export function ImportDialog({
                   onChange={(e) =>
                     handleFormatChange(e.target.value as FormatType)
                   }
-                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
+                  className="w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
                 >
                   {ALL_FORMATS.map((f) => (
                     <option key={f} value={f}>
@@ -207,7 +207,7 @@ export function ImportDialog({
                 <select
                   value={environment}
                   onChange={(e) => setEnvironment(e.target.value)}
-                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
+                  className="w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
                 >
                   <option value="development">Development</option>
                   <option value="staging">Staging</option>
@@ -223,7 +223,7 @@ export function ImportDialog({
               <select
                 value={mode}
                 onChange={(e) => setMode(e.target.value as "merge" | "replace")}
-                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
+                className="w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
               >
                 <option value="merge">Merge (add/update, keep existing)</option>
                 <option value="replace">
@@ -237,7 +237,7 @@ export function ImportDialog({
                 File or Content
               </label>
               <div className="space-y-2">
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-line p-3 text-sm text-ink-subtle transition-colors hover:border-line-strong text-ink-muted hover:border-line-strong">
+                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-line p-3 text-sm transition-colors text-ink-muted hover:border-line-strong">
                   <FileUp className="h-4 w-4 shrink-0" />
                   <span className="truncate">
                     {fileName || "Choose a file..."}
@@ -255,20 +255,20 @@ export function ImportDialog({
                 <textarea
                   value={content}
                   onChange={(e) => handleContentChange(e.target.value)}
-                  className="h-32 w-full rounded-lg border border-line bg-surface-raised px-3 py-2 font-mono text-sm text-ink-inverse transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
+                  className="h-32 w-full rounded-lg border px-3 py-2 font-mono text-sm transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
                   placeholder={`Paste your ${FORMAT_LABELS[format]} content here...`}
                 />
               </div>
             </div>
 
             {parseError && (
-              <div className="rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger border-danger-line bg-danger-soft text-danger">
+              <div className="rounded-lg border px-4 py-3 text-sm border-danger-line bg-danger-soft text-danger">
                 {parseError}
               </div>
             )}
 
             {preview && previewKeys.length > 0 && (
-              <div className="rounded-lg border border-line bg-surface-raised p-3 border-line bg-surface-raised">
+              <div className="rounded-lg border p-3 border-line bg-surface-raised">
                 <p className="mb-2 text-sm font-medium text-ink-muted">
                   Preview: {previewKeys.length} variable
                   {previewKeys.length !== 1 ? "s" : ""} found
@@ -286,7 +286,7 @@ export function ImportDialog({
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleClose}
-                className="flex-1 rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line-strong text-ink-muted hover:bg-surface-hover"
+                className="flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors border-line-strong text-ink-muted hover:bg-surface-hover"
               >
                 Cancel
               </button>
@@ -295,7 +295,7 @@ export function ImportDialog({
                 disabled={
                   isImporting || !content.trim() || previewKeys.length === 0
                 }
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-surface px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
               >
                 {isImporting ? (
                   <>

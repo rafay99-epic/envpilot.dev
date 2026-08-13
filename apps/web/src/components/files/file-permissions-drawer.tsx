@@ -21,7 +21,7 @@ interface FilePermissionsDrawerProps {
 }
 
 const selectClasses =
-  "mt-1 block w-full rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink-inverse focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink";
+  "mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink";
 
 /**
  * Per-file grants — the same viewer-sharing model accounts use.
@@ -94,12 +94,12 @@ export function FilePermissionsDrawer({
     >
       <div className="space-y-6">
         {error && (
-          <div className="rounded-lg bg-danger-soft p-3 text-sm text-danger bg-danger-soft text-danger">
+          <div className="rounded-lg p-3 text-sm bg-danger-soft text-danger">
             {error}
           </div>
         )}
 
-        <div className="rounded-lg border border-line p-4 border-line">
+        <div className="rounded-lg border p-4 border-line">
           <label
             htmlFor="file-grant-user"
             className="block text-sm font-medium text-ink-muted"
@@ -133,7 +133,7 @@ export function FilePermissionsDrawer({
               type="button"
               onClick={handleGrant}
               disabled={!selectedUser || busy}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto bg-ink text-ink-inverse hover:bg-ink-muted"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               Grant
@@ -150,7 +150,7 @@ export function FilePermissionsDrawer({
               No individual grants. Access follows project roles.
             </p>
           ) : (
-            <div className="mt-2 divide-y divide-line rounded-lg border border-line divide-line border-line">
+            <div className="mt-2 divide-y rounded-lg border divide-line border-line">
               {grants.map((grant) => (
                 <div
                   key={grant._id as string}
@@ -163,8 +163,8 @@ export function FilePermissionsDrawer({
                     <span
                       className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
                         grant.permission === "write"
-                          ? "bg-warning-soft text-warning bg-warning-soft text-warning"
-                          : "bg-info-soft text-info bg-info-soft text-info"
+                          ? "bg-warning-soft text-warning"
+                          : "bg-info-soft text-info"
                       }`}
                     >
                       {grant.permission}
@@ -176,7 +176,7 @@ export function FilePermissionsDrawer({
                     disabled={busy}
                     aria-label={`Revoke access for ${grant.userEmail}`}
                     title="Revoke access"
-                    className="rounded-lg p-2 text-ink-muted hover:bg-danger-soft hover:text-danger disabled:opacity-50 hover:bg-danger-soft hover:text-danger"
+                    className="rounded-lg p-2 text-ink-muted disabled:opacity-50 hover:bg-danger-soft hover:text-danger"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

@@ -70,9 +70,7 @@ function TiersPage() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">
-          Tiers & Features
-        </h1>
+        <h1 className="text-2xl font-semibold text-ink">Tiers & Features</h1>
 
         <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5">
           <Shield className="h-4 w-4 text-ink-muted" />

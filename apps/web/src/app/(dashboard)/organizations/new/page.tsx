@@ -119,7 +119,7 @@ export default function NewOrganizationPage() {
           </div>
         )}
 
-        <div className="rounded-xl border border-line bg-white p-6 border-line bg-surface">
+        <div className="rounded-xl border p-6 border-line bg-surface">
           <div className="space-y-6">
             <div>
               <label
@@ -136,7 +136,7 @@ export default function NewOrganizationPage() {
                 placeholder="Acme Inc."
                 required
                 maxLength={100}
-                className="mt-2 block w-full rounded-lg border border-line bg-white px-4 py-2.5 text-ink-inverse placeholder:text-ink-muted focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder:text-ink-subtle"
+                className="mt-2 block w-full rounded-lg border px-4 py-2.5 focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder:text-ink-subtle"
               />
             </div>
 
@@ -158,7 +158,7 @@ export default function NewOrganizationPage() {
                   required
                   maxLength={50}
                   pattern="^[a-z0-9-]+$"
-                  className="ml-1 block flex-1 rounded-lg border border-line bg-white px-4 py-2.5 text-ink-inverse placeholder:text-ink-muted focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder:text-ink-subtle"
+                  className="ml-1 block flex-1 rounded-lg border px-4 py-2.5 focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder:text-ink-subtle"
                 />
               </div>
               <p className="mt-1 text-xs text-ink-muted">
@@ -181,7 +181,7 @@ export default function NewOrganizationPage() {
                 placeholder="A brief description of your organization..."
                 rows={3}
                 maxLength={500}
-                className="mt-2 block w-full resize-none rounded-lg border border-line bg-white px-4 py-2.5 text-ink-inverse placeholder:text-ink-muted focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder:text-ink-subtle"
+                className="mt-2 block w-full resize-none rounded-lg border px-4 py-2.5 focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder:text-ink-subtle"
               />
             </div>
           </div>
@@ -190,14 +190,14 @@ export default function NewOrganizationPage() {
         <div className="flex items-center justify-end gap-3">
           <Link
             href="/organizations"
-            className="rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
+            className="rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors border-line text-ink-muted hover:bg-surface-hover"
           >
             Cancel
           </Link>
           <button
             type="submit"
             disabled={isSubmitting || !name || !slug}
-            className="inline-flex items-center gap-2 rounded-lg bg-surface px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
           >
             {isSubmitting ? (
               <>

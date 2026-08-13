@@ -185,7 +185,7 @@ export function ShareLinkForm({
         {(() => {
           const sentCount = emails.length - emailsFailed.length;
           return (
-            <div className="flex items-center gap-2 rounded-lg bg-accent-soft px-3 py-2 bg-accent-soft">
+            <div className="flex items-center gap-2 rounded-lg px-3 py-2 bg-accent-soft">
               <Check className="h-4 w-4 text-accent" />
               <span className="text-sm font-medium text-accent">
                 {sentCount > 0
@@ -199,7 +199,7 @@ export function ShareLinkForm({
         })()}
 
         {emailsFailed.length > 0 && (
-          <div className="flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2 bg-warning-soft">
+          <div className="flex items-start gap-2 rounded-lg px-3 py-2 bg-warning-soft">
             <Mail className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <div className="text-xs text-warning">
               <p className="font-medium">
@@ -220,7 +220,7 @@ export function ShareLinkForm({
             Share Link
           </label>
           <div className="flex items-center gap-2">
-            <code className="flex-1 truncate rounded-lg bg-surface-raised px-3 py-2 font-mono text-xs text-ink-faint bg-surface-raised text-ink-muted">
+            <code className="flex-1 truncate rounded-lg px-3 py-2 font-mono text-xs bg-surface-raised text-ink-muted">
               {generatedUrl}
             </code>
             <button
@@ -236,7 +236,7 @@ export function ShareLinkForm({
           </div>
         </div>
 
-        <div className="flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2 bg-warning-soft">
+        <div className="flex items-start gap-2 rounded-lg px-3 py-2 bg-warning-soft">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
           <div className="text-xs text-warning">
             <p className="font-medium">
@@ -253,10 +253,10 @@ export function ShareLinkForm({
           <p className="text-xs text-ink-muted">{oneTimeDestroyedMessage}</p>
         )}
 
-        <div className="flex justify-end border-t border-line pt-4 border-line">
+        <div className="flex justify-end border-t pt-4 border-line">
           <button
             onClick={onClose}
-            className="rounded-lg bg-surface-raised px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+            className="rounded-lg bg-surface-raised px-4 py-2 text-sm font-medium text-ink-muted hover:bg-surface-hover"
           >
             Done
           </button>
@@ -284,12 +284,12 @@ export function ShareLinkForm({
               }
             }}
             placeholder="Enter email and press Enter"
-            className="flex-1 rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse placeholder:text-ink-muted focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line border-line bg-surface text-ink"
+            className="flex-1 rounded-lg border px-3 py-2 text-sm placeholder:text-ink-muted focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line border-line bg-surface text-ink"
           />
           <button
             type="button"
             onClick={handleAddEmail}
-            className="rounded-lg bg-surface-raised px-3 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+            className="rounded-lg bg-surface-raised px-3 py-2 text-sm font-medium text-ink-muted hover:bg-surface-hover"
           >
             Add
           </button>
@@ -299,7 +299,7 @@ export function ShareLinkForm({
             {emails.map((email) => (
               <span
                 key={email}
-                className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent-hover bg-accent-soft text-accent"
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-accent-soft text-accent"
               >
                 <Mail className="h-3 w-3" />
                 {email}
@@ -327,8 +327,8 @@ export function ShareLinkForm({
             onClick={() => setMode("one_time")}
             className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
               mode === "one_time"
-                ? "border-accent-line bg-accent-soft text-accent-hover border-accent-line bg-accent-soft text-accent"
-                : "border-line text-ink-faint hover:border-line text-ink-muted hover:border-line-strong"
+                ? "border-accent-line bg-accent-soft text-accent"
+                : "border-line text-ink-muted hover:border-line-strong"
             }`}
           >
             One-time view
@@ -341,8 +341,8 @@ export function ShareLinkForm({
             onClick={() => setMode("time_limited")}
             className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
               mode === "time_limited"
-                ? "border-accent-line bg-accent-soft text-accent-hover border-accent-line bg-accent-soft text-accent"
-                : "border-line text-ink-faint hover:border-line text-ink-muted hover:border-line-strong"
+                ? "border-accent-line bg-accent-soft text-accent"
+                : "border-line text-ink-muted hover:border-line-strong"
             }`}
           >
             Time-limited
@@ -364,7 +364,7 @@ export function ShareLinkForm({
               className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                 ttlMs === opt.ms
                   ? "bg-accent text-white"
-                  : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+                  : "bg-surface-raised text-ink-muted hover:bg-surface-hover"
               }`}
             >
               {opt.label}
@@ -392,18 +392,18 @@ export function ShareLinkForm({
             value={passphrase}
             onChange={(e) => setPassphrase(e.target.value)}
             placeholder="Enter a passphrase"
-            className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse placeholder:text-ink-muted focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line border-line bg-surface text-ink"
+            className="mt-2 w-full rounded-lg border px-3 py-2 text-sm placeholder:text-ink-muted focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line border-line bg-surface text-ink"
           />
         )}
       </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}
 
-      <div className="flex gap-3 border-t border-line pt-4 border-line">
+      <div className="flex gap-3 border-t pt-4 border-line">
         <button
           type="button"
           onClick={onClose}
-          className="flex-1 rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
+          className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium border-line text-ink-muted hover:bg-surface-hover"
         >
           Cancel
         </button>

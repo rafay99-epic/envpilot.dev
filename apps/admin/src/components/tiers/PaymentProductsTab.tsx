@@ -156,9 +156,7 @@ export function PaymentProductsTab() {
     <section>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-ink">
-            Payment Products
-          </h2>
+          <h2 className="text-lg font-semibold text-ink">Payment Products</h2>
           <p className="text-xs text-ink-muted">
             Map payment provider product IDs to tiers. Supports multiple
             providers for easy migration.

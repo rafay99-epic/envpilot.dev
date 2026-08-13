@@ -150,7 +150,7 @@ export default function InvitationAcceptPage({
           </p>
           <Link
             href="/dashboard"
-            className="mt-6 inline-block rounded-lg bg-surface px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-surface-hover text-ink-inverse hover:bg-surface-hover"
+            className="mt-6 inline-block rounded-lg bg-ink px-6 py-2.5 text-sm font-medium transition-colors text-ink-inverse hover:bg-ink-muted"
           >
             Go to Dashboard
           </Link>
@@ -218,7 +218,7 @@ export default function InvitationAcceptPage({
           </p>
           <Link
             href="/dashboard"
-            className="mt-6 inline-block rounded-lg bg-surface px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-surface-hover text-ink-inverse hover:bg-surface-hover"
+            className="mt-6 inline-block rounded-lg bg-ink px-6 py-2.5 text-sm font-medium transition-colors text-ink-inverse hover:bg-ink-muted"
           >
             Go to Dashboard
           </Link>
@@ -255,7 +255,7 @@ export default function InvitationAcceptPage({
           </p>
           <Link
             href="/dashboard"
-            className="mt-6 inline-block rounded-lg bg-surface px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-surface-hover text-ink-inverse hover:bg-surface-hover"
+            className="mt-6 inline-block rounded-lg bg-ink px-6 py-2.5 text-sm font-medium transition-colors text-ink-inverse hover:bg-ink-muted"
           >
             Go to Dashboard
           </Link>
@@ -267,7 +267,7 @@ export default function InvitationAcceptPage({
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="rounded-xl border border-line bg-white p-8 text-center border-line bg-surface">
+        <div className="rounded-xl border p-8 text-center border-line bg-surface">
           {invitation.organization.logoUrl ? (
             <img
               src={invitation.organization.logoUrl}
@@ -302,7 +302,7 @@ export default function InvitationAcceptPage({
           </p>
 
           {error && (
-            <div className="mt-4 rounded-lg border border-danger-line bg-danger-soft p-3 border-danger-line bg-danger-soft">
+            <div className="mt-4 rounded-lg border p-3 border-danger-line bg-danger-soft">
               <p className="text-sm text-danger">{error}</p>
             </div>
           )}
@@ -311,14 +311,14 @@ export default function InvitationAcceptPage({
             <button
               onClick={handleDecline}
               disabled={isDeclining || isAccepting}
-              className="flex-1 rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 border-line text-ink-muted hover:bg-surface-hover"
+              className="flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line text-ink-muted hover:bg-surface-hover"
             >
               {isDeclining ? "Declining..." : "Decline"}
             </button>
             <button
               onClick={handleAccept}
               disabled={isAccepting || isDeclining}
-              className="flex-1 rounded-lg bg-surface px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+              className="flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
             >
               {isAccepting ? "Accepting..." : "Accept Invitation"}
             </button>

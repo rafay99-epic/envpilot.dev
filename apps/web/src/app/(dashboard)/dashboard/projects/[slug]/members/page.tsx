@@ -7,6 +7,7 @@ import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { usePagination } from "@/hooks";
 import { DrawerPanel } from "@/components/ui";
+import { PageHeader } from "@envpilot/ui";
 import {
   EnvironmentScopeSelector,
   allEnvironments,
@@ -313,16 +314,17 @@ export default function ProjectMembersPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-ink">Project Members</h1>
-          <p className="mt-1 text-sm text-ink-subtle">
-            Manage who has access to {project?.name}
-          </p>
+          <PageHeader
+            cmd="envpilot project members"
+            title="Project Members"
+            description={`Manage who has access to ${project?.name ?? ""}`}
+          />
         </div>
 
         {canManageMembers && addableMembers.length > 0 && (
           <button
             onClick={() => setShowAddMember(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover text-ink-inverse hover:bg-surface-hover"
+            className="inline-flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium transition-colors text-ink-inverse hover:bg-ink-muted"
           >
             <svg
               className="h-4 w-4"
@@ -344,13 +346,13 @@ export default function ProjectMembersPage({
 
       {/* Messages */}
       {error && (
-        <div className="rounded-lg border border-danger-line bg-danger-soft p-4 border-danger-line bg-danger-soft">
+        <div className="rounded-lg border p-4 border-danger-line bg-danger-soft">
           <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
       {successMessage && (
-        <div className="rounded-lg border border-accent-line bg-accent-soft p-4 border-accent-line bg-accent-soft">
+        <div className="rounded-lg border p-4 border-accent-line bg-accent-soft">
           <p className="text-sm text-accent">{successMessage}</p>
         </div>
       )}
@@ -364,8 +366,8 @@ export default function ProjectMembersPage({
       </div>
 
       {/* Members List */}
-      <div className="rounded-xl border border-line bg-white border-line bg-surface">
-        <div className="border-b border-line px-6 py-4 border-line">
+      <div className="rounded-xl border border-line bg-surface">
+        <div className="border-b px-6 py-4 border-line">
           <h2 className="font-semibold text-ink">Members ({members.length})</h2>
         </div>
 
@@ -387,7 +389,7 @@ export default function ProjectMembersPage({
                     className="flex items-center justify-between px-6 py-4"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-raised text-sm font-medium text-ink-faint bg-surface-hover text-ink-muted">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-medium bg-surface-hover text-ink-muted">
                         {member.user.name
                           ? member.user.name.charAt(0).toUpperCase()
                           : member.user.email.charAt(0).toUpperCase()}
@@ -427,7 +429,7 @@ export default function ProjectMembersPage({
                         canManageTarget(targetRole) && (
                           <button
                             onClick={() => openScopeEditor(member)}
-                            className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+                            className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
                             title="Edit environment access"
                           >
                             <svg
@@ -450,7 +452,7 @@ export default function ProjectMembersPage({
                         canManageTarget(targetRole) && (
                           <button
                             onClick={() => handleRemoveMember(member.userId)}
-                            className="rounded-lg p-1.5 text-ink-muted hover:bg-danger-soft hover:text-danger hover:bg-danger-soft hover:text-danger"
+                            className="rounded-lg p-1.5 text-ink-muted hover:bg-danger-soft hover:text-danger"
                             title="Remove from project"
                           >
                             <svg
@@ -515,7 +517,7 @@ export default function ProjectMembersPage({
               value={selectedUserId}
               onChange={(e) => setSelectedUserId(e.target.value)}
               required
-              className="mt-2 block w-full rounded-lg border border-line bg-white px-4 py-2.5 text-ink-inverse focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
+              className="mt-2 block w-full rounded-lg border px-4 py-2.5 focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
             >
               <option value="">Select a member...</option>
               {addableMembers.map((m) => (
@@ -545,7 +547,7 @@ export default function ProjectMembersPage({
                 setSelectedUserId("");
                 setAddEnvScope(allEnvironments());
               }}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-ink-muted hover:bg-surface-hover"
             >
               Cancel
             </button>
@@ -556,7 +558,7 @@ export default function ProjectMembersPage({
                 !selectedUserId ||
                 (addEnvScopeApplies && addEnvScope.length === 0)
               }
-              className="inline-flex items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
             >
               {isAdding ? "Adding..." : "Add Member"}
             </button>
@@ -593,14 +595,14 @@ export default function ProjectMembersPage({
                 <button
                   type="button"
                   onClick={() => setEditingScopeMember(null)}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-ink-muted hover:bg-surface-hover"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingScope || editEnvScope.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
                 >
                   {isSavingScope ? "Saving..." : "Save"}
                 </button>

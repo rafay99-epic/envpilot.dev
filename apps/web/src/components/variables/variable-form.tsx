@@ -145,7 +145,7 @@ export function VariableForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="rounded-lg bg-danger-soft p-3 text-sm text-danger bg-danger-soft text-danger">
+        <div className="rounded-lg p-3 text-sm bg-danger-soft text-danger">
           {error}
         </div>
       )}
@@ -165,7 +165,7 @@ export function VariableForm({
           onChange={handleKeyChange}
           disabled={isEditing}
           placeholder="DATABASE_URL"
-          className="mt-1 block w-full rounded-lg border border-line bg-white px-4 py-2 font-mono text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong disabled:cursor-not-allowed disabled:bg-surface-raised border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
+          className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong disabled:cursor-not-allowed border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
         />
         {isEditing && (
           <p className="mt-1 text-xs text-ink-muted">
@@ -198,7 +198,7 @@ export function VariableForm({
             placeholder={
               isEditing ? "Enter new value or leave empty" : "postgres://..."
             }
-            className="block w-full rounded-lg border border-line bg-white px-4 py-2 pr-10 font-mono text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+            className="block w-full rounded-lg border px-4 py-2 pr-10 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
           />
           <button
             type="button"
@@ -259,7 +259,7 @@ export function VariableForm({
           }
           placeholder="Brief description of what this variable is used for..."
           rows={2}
-          className="mt-1 block w-full rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+          className="mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
         />
       </div>
 
@@ -323,7 +323,7 @@ export function VariableForm({
 
       {/* Rotation schedule (shown when feature is enabled for this org) */}
       {showRotation && (
-        <div className="rounded-lg border border-line p-4 border-line">
+        <div className="rounded-lg border p-4 border-line">
           <label className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -346,7 +346,7 @@ export function VariableForm({
                     rotationFrequencyDays: Number(e.target.value),
                   }))
                 }
-                className="rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink-inverse focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink"
+                className="rounded-lg border px-3 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink"
               >
                 {ROTATION_PRESETS.map((preset) => (
                   <option key={preset.value} value={preset.value}>
@@ -368,14 +368,14 @@ export function VariableForm({
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
+          className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+          className="rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
         >
           {isSubmitting ? "Saving..." : submitLabel}
         </button>

@@ -101,7 +101,7 @@ export function TemplateSelector({
           placeholder="Search templates..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-lg border border-line bg-white py-2 pl-10 pr-4 text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+          className="w-full rounded-lg border py-2 pl-10 pr-4 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
         />
       </div>
 
@@ -112,8 +112,8 @@ export function TemplateSelector({
           onClick={() => setSelectedCategory("all")}
           className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
             selectedCategory === "all"
-              ? "bg-surface text-white bg-surface-raised text-ink-inverse"
-              : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+              ? "bg-ink text-ink-inverse"
+              : "bg-ink text-ink-muted hover:bg-ink-muted"
           }`}
         >
           All
@@ -129,8 +129,8 @@ export function TemplateSelector({
               onClick={() => setSelectedCategory(cat)}
               className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
                 selectedCategory === cat
-                  ? "bg-surface text-white bg-surface-raised text-ink-inverse"
-                  : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+                  ? "bg-ink text-ink-inverse"
+                  : "bg-ink text-ink-muted hover:bg-ink-muted"
               }`}
             >
               {IconComponent && <IconComponent className="h-3 w-3" />}
@@ -147,7 +147,7 @@ export function TemplateSelector({
         onClick={() => onSelectTemplate(null)}
         className={`flex w-full items-center gap-3 rounded-lg border-2 px-3 py-2.5 text-left transition-all ${
           selectedTemplateId === null
-            ? "border-line bg-surface-raised border-line bg-surface-raised"
+            ? "border-line bg-surface-raised"
             : "border-dashed border-line hover:border-line-strong"
         }`}
       >
@@ -181,8 +181,8 @@ export function TemplateSelector({
                 onClick={() => onSelectTemplate(template)}
                 className={`flex min-w-[180px] shrink-0 items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all ${
                   selectedTemplateId === template.id
-                    ? "border-line bg-surface-raised border-line bg-surface-raised/80"
-                    : "border-line bg-white hover:border-line bg-surface hover:border-line-strong"
+                    ? "border-line bg-surface-raised/80"
+                    : "border-line bg-surface hover:border-line-strong"
                 }`}
               >
                 <div
@@ -229,7 +229,7 @@ export function TemplateSelector({
 
       {/* No Results */}
       {filteredTemplates.length === 0 && (
-        <div className="rounded-lg border border-dashed border-line px-4 py-6 text-center border-line">
+        <div className="rounded-lg border border-dashed px-4 py-6 text-center border-line">
           <p className="text-sm text-ink-muted">No templates found</p>
           <button
             type="button"
@@ -268,7 +268,7 @@ function TemplateRow({
       onClick={onSelect}
       className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
         isSelected
-          ? "border-line bg-surface-raised border-line bg-surface-raised/80"
+          ? "border-line bg-surface-raised/80"
           : "border-transparent hover:bg-surface-hover/50"
       }`}
     >
@@ -284,7 +284,7 @@ function TemplateRow({
             {template.name}
           </p>
           {template.version && (
-            <span className="shrink-0 rounded bg-surface-raised px-1 py-0.5 text-[10px] font-medium text-ink-subtle bg-surface-raised text-ink-muted">
+            <span className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium bg-surface-raised text-ink-muted">
               {template.version}
             </span>
           )}
@@ -294,7 +294,7 @@ function TemplateRow({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
-        <span className="rounded bg-surface-raised px-1.5 py-0.5 text-[10px] font-medium text-ink-subtle bg-surface-raised text-ink-muted">
+        <span className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-surface-raised text-ink-muted">
           {template.variables.length}
         </span>
         {sensitiveCount > 0 && <Lock className="h-3 w-3 text-ink-subtle" />}
@@ -316,7 +316,7 @@ export function TemplateVariablesPreview({
   const sensitiveCount = template.variables.filter((v) => v.isSensitive).length;
 
   return (
-    <div className="rounded-lg border border-line bg-white p-3 border-line bg-surface">
+    <div className="rounded-lg border p-3 border-line bg-surface">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div

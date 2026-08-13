@@ -7,9 +7,7 @@ function RootErrorComponent({ error }: { error: Error }) {
     <div className="flex min-h-screen items-center justify-center bg-canvas">
       <div className="flex flex-col items-center gap-4 text-center">
         <AlertTriangle className="h-12 w-12 text-warning" />
-        <h1 className="text-xl font-semibold text-ink">
-          Something went wrong
-        </h1>
+        <h1 className="text-xl font-semibold text-ink">Something went wrong</h1>
         <p className="max-w-md text-sm text-ink-subtle">
           {error.message || "An unexpected error occurred"}
         </p>

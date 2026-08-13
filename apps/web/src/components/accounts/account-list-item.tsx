@@ -31,10 +31,10 @@ interface AccountListItemProps {
 
 function envBadgeClasses(env: string): string {
   return env === "production"
-    ? "bg-danger-soft text-danger bg-danger-soft text-danger"
+    ? "bg-danger-soft text-danger"
     : env === "staging"
-      ? "bg-warning-soft text-warning bg-warning-soft text-warning"
-      : "bg-accent-soft text-accent-hover bg-accent-soft text-accent";
+      ? "bg-warning-soft text-warning"
+      : "bg-accent-soft text-accent";
 }
 
 export function AccountListItem({
@@ -118,8 +118,8 @@ export function AccountListItem({
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     permissionLevel === "write"
-                      ? "bg-warning-soft text-warning bg-warning-soft text-warning"
-                      : "bg-info-soft text-info bg-info-soft text-info"
+                      ? "bg-warning-soft text-warning"
+                      : "bg-info-soft text-info"
                   }`}
                 >
                   {permissionLevel}
@@ -154,7 +154,7 @@ export function AccountListItem({
             <button
               onClick={handleToggleReveal}
               disabled={isRevealing}
-              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
+              className="rounded-lg p-2 text-ink-muted disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
               title={
                 isVisible && revealedValue
                   ? "Hide credentials"
@@ -173,7 +173,7 @@ export function AccountListItem({
           {onShare && (
             <button
               onClick={onShare}
-              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title="Share account"
             >
               <Share2 className="h-4 w-4" />
@@ -182,7 +182,7 @@ export function AccountListItem({
           {canManagePermissions && onManagePermissions && (
             <button
               onClick={onManagePermissions}
-              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title="Manage access permissions"
             >
               <svg
@@ -203,7 +203,7 @@ export function AccountListItem({
           {canEdit && onEdit && (
             <button
               onClick={onEdit}
-              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title="Edit account"
             >
               <svg
@@ -224,7 +224,7 @@ export function AccountListItem({
           {canDelete && onDelete && (
             <button
               onClick={onDelete}
-              className="rounded-lg p-2 text-ink-muted hover:bg-danger-soft hover:text-danger hover:bg-danger-soft hover:text-danger"
+              className="rounded-lg p-2 text-ink-muted hover:bg-danger-soft hover:text-danger"
               title="Delete account"
             >
               <svg
@@ -247,7 +247,7 @@ export function AccountListItem({
 
       {/* Revealed credentials */}
       {isVisible && revealedValue && (
-        <div className="mt-2 space-y-2 rounded-lg bg-surface-raised px-3 py-2.5 bg-surface-raised">
+        <div className="mt-2 space-y-2 rounded-lg px-3 py-2.5 bg-surface-raised">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <span className="block text-[10px] font-medium uppercase tracking-wide text-ink-subtle">
@@ -259,7 +259,7 @@ export function AccountListItem({
             </div>
             <button
               onClick={() => handleCopy("username", revealedValue.username)}
-              className="shrink-0 rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+              className="shrink-0 rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               title={copiedField === "username" ? "Copied!" : "Copy username"}
             >
               {copiedField === "username" ? (
@@ -283,7 +283,7 @@ export function AccountListItem({
             <div className="flex shrink-0 items-center gap-1">
               <button
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+                className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
                 title={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (
@@ -294,7 +294,7 @@ export function AccountListItem({
               </button>
               <button
                 onClick={() => handleCopy("password", revealedValue.password)}
-                className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+                className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
                 title={copiedField === "password" ? "Copied!" : "Copy password"}
               >
                 {copiedField === "password" ? (

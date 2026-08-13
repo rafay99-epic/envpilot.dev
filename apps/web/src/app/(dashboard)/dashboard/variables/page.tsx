@@ -42,6 +42,7 @@ import {
   Upload,
 } from "lucide-react";
 import { createLogger } from "@/lib/logger";
+import { PageHeader } from "@envpilot/ui";
 
 const log = createLogger("app/dashboard/variables");
 
@@ -298,12 +299,11 @@ export default function VariablesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-ink">Environment Variables</h1>
-          <p className="mt-1 text-sm text-ink-subtle">
-            Manage your encrypted secrets and configuration
-          </p>
-        </div>
+        <PageHeader
+          cmd="envpilot variable list"
+          title="Environment Variables"
+          description="Manage your encrypted secrets and configuration"
+        />
         <div className="flex items-center gap-2">
           {selectedProject !== "all" && (
             <TerminalButton onClick={() => setShowExportDialog(true)}>

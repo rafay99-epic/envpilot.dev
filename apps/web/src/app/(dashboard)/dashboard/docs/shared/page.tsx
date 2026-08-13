@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FileText, FolderOpen, Inbox } from "lucide-react";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
+import { PageHeader } from "@envpilot/ui";
 import { useSharedWithMe } from "@/hooks";
 
 /**
@@ -18,12 +19,11 @@ export default function SharedDocsPage() {
 
   return (
     <div className="space-y-5 pt-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink">Shared with me</h1>
-        <p className="mt-1 text-sm text-ink-subtle">
-          Pages and modules teammates have shared with you directly.
-        </p>
-      </div>
+      <PageHeader
+        icon={Inbox}
+        title="Shared with me"
+        description="Pages and modules teammates have shared with you directly."
+      />
 
       {shares === undefined ? (
         <TerminalLoading />

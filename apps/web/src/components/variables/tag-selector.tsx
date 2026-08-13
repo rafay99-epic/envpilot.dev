@@ -138,7 +138,7 @@ export function TagSelector({
             type="button"
             onClick={() => setShowCreate(true)}
             disabled={disabled}
-            className="inline-flex items-center gap-1 rounded-lg border border-dashed border-line px-2.5 py-1 text-xs font-medium text-ink-subtle transition-colors hover:border-line-strong hover:text-ink-faint disabled:cursor-not-allowed disabled:opacity-50 border-line-strong text-ink-muted hover:border-line-strong hover:text-ink-muted"
+            className="inline-flex items-center gap-1 rounded-lg border border-dashed px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line-strong text-ink-muted hover:border-line-strong hover:text-ink-muted"
           >
             <Plus className="h-3 w-3" />
             New tag
@@ -148,14 +148,14 @@ export function TagSelector({
 
       {/* Inline create form */}
       {showCreate && onCreateTag && (
-        <div className="space-y-3 rounded-lg border border-line bg-surface-raised p-3 border-line bg-surface-raised/50">
+        <div className="space-y-3 rounded-lg border p-3 border-line bg-surface-raised/50">
           <input
             type="text"
             value={newTagName}
             onChange={(e) => setNewTagName(e.target.value)}
             placeholder="Tag name"
             maxLength={50}
-            className="w-full rounded border border-line bg-white px-2.5 py-1.5 text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none border-line-strong bg-surface-raised text-ink placeholder-ink-subtle"
+            className="w-full rounded border px-2.5 py-1.5 text-sm focus:border-line-strong focus:outline-none border-line-strong bg-surface-raised text-ink placeholder-ink-subtle"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -192,7 +192,7 @@ export function TagSelector({
               type="button"
               onClick={handleCreate}
               disabled={!newTagName.trim() || isCreating}
-              className="rounded-lg bg-surface px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-surface-hover disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+              className="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
             >
               {isCreating ? "Creating..." : "Add Tag"}
             </button>

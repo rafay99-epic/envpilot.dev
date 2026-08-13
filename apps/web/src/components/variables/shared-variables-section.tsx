@@ -65,25 +65,25 @@ function getStatusBadge(status: ShareData["status"]) {
   switch (status) {
     case "active":
       return (
-        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-hover bg-accent-soft text-accent">
+        <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-accent-soft text-accent">
           Active
         </span>
       );
     case "burned":
       return (
-        <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning bg-warning-soft text-warning">
+        <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
           Viewed
         </span>
       );
     case "expired":
       return (
-        <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-subtle bg-surface-raised text-ink-muted">
+        <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
           Expired
         </span>
       );
     case "revoked":
       return (
-        <span className="rounded-full bg-danger-soft px-2 py-0.5 text-xs font-medium text-danger bg-danger-soft text-danger">
+        <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-danger-soft text-danger">
           Revoked
         </span>
       );
@@ -122,11 +122,11 @@ export function SharedVariablesSection({
   };
 
   return (
-    <div className="rounded-xl border border-line bg-white border-line bg-surface">
-      <div className="border-b border-line px-6 py-4 border-line">
+    <div className="rounded-xl border border-line bg-surface">
+      <div className="border-b px-6 py-4 border-line">
         <div className="flex items-center gap-2">
           <h2 className="font-semibold text-ink">Shared Variables</h2>
-          <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-faint bg-surface-raised text-ink-muted">
+          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
             {shares.length}
           </span>
         </div>
@@ -136,7 +136,7 @@ export function SharedVariablesSection({
       </div>
 
       {revokeError && (
-        <div className="border-b border-line bg-danger-soft px-6 py-2 text-xs text-danger border-line bg-danger-soft text-danger">
+        <div className="border-b px-6 py-2 text-xs border-line bg-danger-soft text-danger">
           {revokeError}
         </div>
       )}
@@ -181,7 +181,7 @@ export function SharedVariablesSection({
                           {recipient.hasViewed ? (
                             <Check className="h-3 w-3 text-accent" />
                           ) : (
-                            <Circle className="h-2.5 w-2.5 fill-ink-muted text-ink-muted fill-ink-faint text-ink-faint" />
+                            <Circle className="h-2.5 w-2.5 fill-ink-faint text-ink-faint" />
                           )}
                           {recipient.email}
                         </span>
@@ -207,7 +207,7 @@ export function SharedVariablesSection({
                     <button
                       onClick={() => handleRevoke(share._id)}
                       disabled={revokingId === share._id}
-                      className="shrink-0 rounded p-1 text-ink-muted hover:bg-danger-soft hover:text-danger disabled:opacity-50 hover:bg-danger-soft hover:text-danger"
+                      className="shrink-0 rounded p-1 text-ink-muted disabled:opacity-50 hover:bg-danger-soft hover:text-danger"
                       title="Revoke share"
                     >
                       {revokingId === share._id ? (

@@ -14,11 +14,12 @@ interface ConfirmDialogProps {
   variant?: "danger" | "warning" | "default";
 }
 
+// Solid confirm buttons: the fill carries the meaning, so the label is the
+// inverse ink. Hover has to differ from the resting fill or nothing moves.
 const variantClasses = {
-  danger: "bg-danger hover:bg-danger focus:ring-danger-line",
-  warning: "bg-warning hover:bg-warning focus:ring-warning-line",
-  default:
-    "bg-surface hover:bg-surface-hover focus:ring-line-strong bg-surface-raised hover:bg-surface-hover text-ink-inverse",
+  danger: "bg-danger hover:bg-danger-line focus:ring-danger-line",
+  warning: "bg-warning hover:bg-warning-line focus:ring-warning-line",
+  default: "bg-ink hover:bg-ink-muted focus:ring-line-strong text-ink-inverse",
 };
 
 const iconColors = {
@@ -114,7 +115,7 @@ export function ConfirmDialog({
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="flex-1 rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 border-line text-ink-muted hover:bg-surface-hover"
+            className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line text-ink-muted hover:bg-surface-hover"
           >
             {cancelText}
           </button>

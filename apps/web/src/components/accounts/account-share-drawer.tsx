@@ -86,19 +86,19 @@ export function AccountShareDrawer({
           <label className="mb-1.5 block text-xs font-medium text-ink-muted">
             Account
           </label>
-          <div className="rounded-lg bg-surface-raised px-3 py-2 text-sm font-semibold text-ink-inverse bg-surface-raised text-ink">
+          <div className="rounded-lg px-3 py-2 text-sm font-semibold bg-surface-raised text-ink">
             {account.name}
           </div>
         </div>
 
         {/* Mode tabs */}
-        <div className="flex gap-1 rounded-lg bg-surface-raised p-1 bg-surface-raised">
+        <div className="flex gap-1 rounded-lg p-1 bg-surface-raised">
           <button
             type="button"
             onClick={() => setTab("member")}
             className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               tab === "member"
-                ? "bg-white text-ink-inverse shadow-sm bg-surface-hover text-ink"
+                ? "shadow-sm bg-surface-hover text-ink"
                 : "text-ink-faint hover:text-ink"
             }`}
           >
@@ -110,7 +110,7 @@ export function AccountShareDrawer({
             onClick={() => setTab("external")}
             className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               tab === "external"
-                ? "bg-white text-ink-inverse shadow-sm bg-surface-hover text-ink"
+                ? "shadow-sm bg-surface-hover text-ink"
                 : "text-ink-faint hover:text-ink"
             }`}
           >
@@ -221,7 +221,7 @@ function TeamMemberMode({
             setError(null);
           }}
           disabled={members === undefined}
-          className="block w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong disabled:opacity-50 border-line bg-surface-raised text-ink"
+          className="block w-full rounded-lg border px-3 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong disabled:opacity-50 border-line bg-surface-raised text-ink"
         >
           <option value="">
             {members === undefined
@@ -251,8 +251,8 @@ function TeamMemberMode({
               onClick={() => setPermission(p)}
               className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors ${
                 permission === p
-                  ? "border-line bg-surface text-white border-line bg-surface-raised text-ink-inverse"
-                  : "border-line text-ink-faint hover:border-line text-ink-muted hover:border-line-strong"
+                  ? "border-line bg-ink text-ink-inverse"
+                  : "border-line text-ink-muted hover:border-line-strong"
               }`}
             >
               {p}
@@ -274,8 +274,8 @@ function TeamMemberMode({
               onClick={() => setExpiryMs(opt.ms)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 expiryMs === opt.ms
-                  ? "bg-surface text-white bg-surface-raised text-ink-inverse"
-                  : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+                  ? "bg-ink text-ink-inverse"
+                  : "bg-ink text-ink-muted hover:bg-ink-muted"
               }`}
             >
               {opt.label}
@@ -290,14 +290,14 @@ function TeamMemberMode({
         type="button"
         onClick={handleGrant}
         disabled={isGranting || !selectedMember}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
       >
         {isGranting && <Loader2 className="h-4 w-4 animate-spin" />}
         {isGranting ? "Granting…" : "Grant access"}
       </button>
 
       {/* Existing grants */}
-      <div className="border-t border-line pt-4 border-line">
+      <div className="border-t pt-4 border-line">
         <h3 className="text-xs font-medium text-ink-muted">
           Active grants ({activeGrants.length})
         </h3>
@@ -329,7 +329,7 @@ function TeamMemberMode({
                   type="button"
                   onClick={() => handleRevoke(g.userId)}
                   disabled={revokingId === g.userId}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-danger-line px-2.5 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger-soft disabled:opacity-50 border-danger-line text-danger hover:bg-danger-soft"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 border-danger-line text-danger hover:bg-danger-soft"
                 >
                   {revokingId === g.userId ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -344,11 +344,11 @@ function TeamMemberMode({
         )}
       </div>
 
-      <div className="flex justify-end border-t border-line pt-4 border-line">
+      <div className="flex justify-end border-t pt-4 border-line">
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+          className="rounded-lg px-4 py-2 text-sm font-medium text-ink-muted hover:bg-surface-hover"
         >
           Done
         </button>

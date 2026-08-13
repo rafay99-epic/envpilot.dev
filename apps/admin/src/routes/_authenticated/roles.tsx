@@ -404,7 +404,9 @@ function RolesPage() {
                   )}
 
                   <div className="flex items-center gap-4 text-xs text-ink-muted">
-                    <span className="font-mono text-ink-subtle">{role.slug}</span>
+                    <span className="font-mono text-ink-subtle">
+                      {role.slug}
+                    </span>
                     <span className="flex items-center gap-1" title="Level">
                       <Layers className="h-3 w-3" />
                       {role.level}
@@ -729,7 +731,9 @@ function RoleCategoryGroup({
             <div className="text-xs text-ink-muted" title={cap.description}>
               {cap.label}
             </div>
-            <div className="font-mono text-[10px] text-ink-subtle">{cap.key}</div>
+            <div className="font-mono text-[10px] text-ink-subtle">
+              {cap.key}
+            </div>
           </td>
           <td className="px-4 py-2">
             <Badge variant={RISK_VARIANT[cap.risk] ?? "default"}>

@@ -262,7 +262,9 @@ export function RowEditDrawer({
                     />
                   ) : value === null || value === undefined ? (
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-ink-faint italic">null</span>
+                      <span className="text-sm text-ink-faint italic">
+                        null
+                      </span>
                       <Button
                         variant="ghost"
                         size="sm"

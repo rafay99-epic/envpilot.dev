@@ -104,7 +104,7 @@ const INSERT_GROUPS: { heading: string; items: [string, Command][] }[] = [
 ];
 
 const ICON_BUTTON =
-  "rounded p-1.5 text-ink-subtle transition-colors hover:bg-surface-hover hover:text-ink-inverse disabled:cursor-not-allowed disabled:opacity-40 text-ink-muted hover:bg-surface-hover hover:text-ink";
+  "rounded p-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40 text-ink-muted hover:bg-surface-hover hover:text-ink";
 
 interface DocEditorToolbarProps {
   onWrap: (before: string, after: string) => void;
@@ -186,7 +186,7 @@ export function DocEditorToolbar({
           disabled={disabled}
           aria-expanded={menuOpen && !disabled}
           data-testid="doc-tool-insert"
-          className="ml-1 flex items-center gap-1 rounded px-2 py-1.5 text-xs font-medium text-ink-subtle transition-colors hover:bg-surface-hover hover:text-ink-inverse disabled:cursor-not-allowed disabled:opacity-40 text-ink-muted hover:bg-surface-hover hover:text-ink"
+          className="ml-1 flex items-center gap-1 rounded px-2 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 text-ink-muted hover:bg-surface-hover hover:text-ink"
         >
           <Plus className="h-3.5 w-3.5" />
           Insert
@@ -198,7 +198,7 @@ export function DocEditorToolbar({
             reaches the buttons natively. Never open while disabled — the
             menu could otherwise outlive the prop flipping mid-save. */}
         {menuOpen && !disabled && (
-          <div className="absolute top-full left-0 z-20 mt-1 w-48 rounded-lg border border-line bg-white py-1 shadow-lg border-line bg-surface">
+          <div className="absolute top-full left-0 z-20 mt-1 w-48 rounded-lg border py-1 shadow-lg border-line bg-surface">
             {INSERT_GROUPS.map((group, groupIndex) => (
               <div key={group.heading}>
                 {groupIndex > 0 && (
@@ -217,7 +217,7 @@ export function DocEditorToolbar({
                       setMenuOpen(false);
                     }}
                     data-testid={`doc-insert-${label.toLowerCase().replace(/\s+/g, "-")}`}
-                    className="block w-full px-3 py-1.5 text-left text-xs text-ink-faint transition-colors hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+                    className="block w-full px-3 py-1.5 text-left text-xs transition-colors text-ink-muted hover:bg-surface-hover"
                   >
                     {label}
                   </button>

@@ -64,9 +64,7 @@ function OrganizationsPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-ink">
-        Organizations
-      </h1>
+      <h1 className="mb-6 text-2xl font-semibold text-ink">Organizations</h1>
       <div className="mb-4">
         <SearchInput
           value={search}

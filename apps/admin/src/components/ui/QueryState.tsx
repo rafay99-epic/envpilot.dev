@@ -74,12 +74,11 @@ export function QueryState<T>({
     return (
       <div className="flex flex-col items-center justify-center px-5 py-10 text-center">
         <p className="font-mono text-sm text-warning">
-          <span className="text-ink-subtle">$</span> echo ${notConfigured.envVar}
+          <span className="text-ink-subtle">$</span> echo $
+          {notConfigured.envVar}
         </p>
         <p className="mt-2 max-w-md text-sm text-ink-muted">
-          <span className="font-mono text-warning">
-            {notConfigured.envVar}
-          </span>{" "}
+          <span className="font-mono text-warning">{notConfigured.envVar}</span>{" "}
           is not configured.
         </p>
         {notConfigured.hint && (

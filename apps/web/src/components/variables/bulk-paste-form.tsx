@@ -143,7 +143,7 @@ export function BulkPasteForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {submitError && (
-        <div className="rounded-lg bg-danger-soft p-3 text-sm text-danger bg-danger-soft text-danger">
+        <div className="rounded-lg p-3 text-sm bg-danger-soft text-danger">
           {submitError}
         </div>
       )}
@@ -163,7 +163,7 @@ export function BulkPasteForm({
           onChange={(e) => handleTextChange(e.target.value)}
           placeholder={`# Paste your .env file here\nDATABASE_URL=postgres://localhost:5432/mydb\nAPI_KEY=sk-1234567890\nNEXT_PUBLIC_APP_URL=http://localhost:3000`}
           rows={8}
-          className="mt-1 block w-full rounded-lg border border-line bg-white px-4 py-3 font-mono text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+          className="mt-1 block w-full rounded-lg border px-4 py-3 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
           disabled={isSubmitting}
         />
         {rawText.trim() && (
@@ -181,7 +181,7 @@ export function BulkPasteForm({
 
       {/* Parse errors */}
       {errors.length > 0 && (
-        <div className="rounded-lg border border-warning-line bg-warning-soft p-3 border-warning-line bg-warning-soft">
+        <div className="rounded-lg border p-3 border-warning-line bg-warning-soft">
           <p className="text-xs font-medium text-warning">Parse warnings:</p>
           <ul className="mt-1 space-y-0.5">
             {errors.slice(0, 5).map((err, i) => (
@@ -255,7 +255,7 @@ export function BulkPasteForm({
           <label className="block text-sm font-medium text-ink-muted">
             Preview ({entries.length})
           </label>
-          <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg border border-line p-2 border-line">
+          <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2 border-line">
             {entries.map((entry) => (
               <div
                 key={entry.key}
@@ -278,7 +278,7 @@ export function BulkPasteForm({
                   type="button"
                   onClick={() => handleRemoveEntry(entry.key)}
                   disabled={isSubmitting}
-                  className="ml-2 shrink-0 rounded p-1 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+                  className="ml-2 shrink-0 rounded p-1 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
                 >
                   <svg
                     className="h-3.5 w-3.5"
@@ -302,7 +302,7 @@ export function BulkPasteForm({
 
       {/* Progress */}
       {progress && (
-        <div className="rounded-lg border border-line bg-surface-raised p-3 border-line bg-surface-raised">
+        <div className="rounded-lg border p-3 border-line bg-surface-raised">
           <div className="flex items-center gap-2">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-line" />
             <span className="text-sm text-ink-muted">
@@ -327,14 +327,14 @@ export function BulkPasteForm({
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
+          className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting || entries.length === 0}
-          className="rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+          className="rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
         >
           {isSubmitting
             ? `Creating ${progress?.completed ?? 0}/${progress?.total ?? 0}...`

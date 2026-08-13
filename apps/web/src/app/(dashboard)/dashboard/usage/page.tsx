@@ -13,6 +13,7 @@ import type { UsageLayoutProps } from "./usage-data";
 import { UsageLayout } from "./usage-layout";
 import { usePaymentsEnabled } from "@/hooks/usePaymentsEnabled";
 import { normalizeOrgRole } from "@/lib/roles";
+import { PageHeader } from "@envpilot/ui";
 
 const CHECKOUT_URL = "/api/checkout?tier=pro";
 
@@ -69,14 +70,11 @@ function UsagePageContent() {
   if (isLoading || !tier) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="font-mono text-lg font-semibold text-ink">
-            <span className="text-accent">$</span> envpilot usage
-          </h1>
-          <p className="mt-1 text-sm text-ink-subtle">
-            Your plan, resource usage, and feature availability
-          </p>
-        </div>
+        <PageHeader
+          cmd="envpilot usage"
+          title="Usage & Plan"
+          description="Your plan, resource usage, and feature availability"
+        />
         <TerminalWindow title="loading">
           <div className="p-6">
             <TerminalLoading />
@@ -158,14 +156,11 @@ function UsagePageContent() {
   return (
     <div className="space-y-4">
       {/* Page Header */}
-      <div>
-        <h1 className="font-mono text-lg font-semibold text-ink">
-          <span className="text-accent">$</span> envpilot usage
-        </h1>
-        <p className="mt-1 text-sm text-ink-subtle">
-          Your plan, resource usage, and feature availability
-        </p>
-      </div>
+      <PageHeader
+        cmd="envpilot usage"
+        title="Usage & Plan"
+        description="Your plan, resource usage, and feature availability"
+      />
 
       <UsageLayout {...layoutProps} />
     </div>

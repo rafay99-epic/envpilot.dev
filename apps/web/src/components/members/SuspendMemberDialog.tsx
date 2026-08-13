@@ -97,7 +97,7 @@ export function SuspendMemberDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
-      <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl bg-surface">
+      <div className="w-full max-w-lg rounded-xl p-6 shadow-xl bg-surface">
         <FeatureGate
           organizationId={organizationId as Id<"organizations">}
           featureKey="security_hold"
@@ -123,7 +123,7 @@ export function SuspendMemberDialog({
               maxLength={500}
               rows={2}
               placeholder="e.g. Laptop reported compromised"
-              className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse border-line bg-surface-raised text-ink"
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm border-line bg-surface-raised text-ink"
             />
           </label>
 
@@ -140,7 +140,7 @@ export function SuspendMemberDialog({
                 {credentials.map((cred) => (
                   <label
                     key={cred.id}
-                    className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm border-line"
+                    className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm border-line"
                   >
                     <input
                       type="checkbox"
@@ -161,7 +161,7 @@ export function SuspendMemberDialog({
             <button
               onClick={onClose}
               disabled={submitting}
-              className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
+              className="rounded-lg border px-4 py-2 text-sm font-medium border-line text-ink-muted hover:bg-surface-hover"
             >
               Cancel
             </button>

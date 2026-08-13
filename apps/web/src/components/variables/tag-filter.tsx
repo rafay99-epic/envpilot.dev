@@ -29,8 +29,8 @@ export function TagFilter({
           onClick={onClearAll}
           className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
             !hasSelection
-              ? "bg-surface text-white bg-surface-raised text-ink-inverse"
-              : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+              ? "bg-ink text-ink-inverse"
+              : "bg-ink text-ink-muted hover:bg-ink-muted"
           }`}
         >
           All
@@ -48,7 +48,7 @@ export function TagFilter({
               className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 isSelected
                   ? "text-white"
-                  : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+                  : "bg-surface-raised text-ink-muted hover:bg-surface-hover"
               }`}
               style={isSelected ? { backgroundColor: safeColor } : undefined}
             >

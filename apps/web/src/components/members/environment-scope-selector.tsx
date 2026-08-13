@@ -68,7 +68,7 @@ export function EnvironmentScopeSelector({
         {helperText} A variable is visible only when all of its environments
         fall within this scope.
       </p>
-      <div className="mt-2 space-y-1 rounded-lg border border-line p-2 border-line">
+      <div className="mt-2 space-y-1 rounded-lg border p-2 border-line">
         {ENVIRONMENTS.map((env) => (
           <label
             key={env}

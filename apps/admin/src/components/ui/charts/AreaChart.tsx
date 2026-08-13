@@ -242,7 +242,9 @@ export function AreaChart({
             transform: "translateX(-50%)",
           }}
         >
-          <p className="mb-1 font-medium text-ink-muted">{labels[hoveredIdx]}</p>
+          <p className="mb-1 font-medium text-ink-muted">
+            {labels[hoveredIdx]}
+          </p>
           {series.map((s, si) => (
             <div key={si} className="flex items-center gap-1.5">
               <div

@@ -12,12 +12,9 @@ interface ToastProps {
 }
 
 const variantClasses = {
-  error:
-    "border-danger-line bg-danger-soft text-danger border-danger-line bg-danger-soft text-danger",
-  success:
-    "border-accent-line bg-accent-soft text-accent-hover border-accent-line bg-accent-soft text-accent",
-  warning:
-    "border-warning-line bg-warning-soft text-warning border-warning-line bg-warning-soft text-warning",
+  error: "border-danger-line bg-danger-soft text-danger",
+  success: "border-accent-line bg-accent-soft text-accent",
+  warning: "border-warning-line bg-warning-soft text-warning",
 };
 
 export function Toast({

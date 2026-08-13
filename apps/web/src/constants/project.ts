@@ -63,15 +63,15 @@ export const ENVIRONMENTS = ["development", "staging", "production"] as const;
  */
 export function envToggleClasses(env: Environment, selected: boolean): string {
   if (!selected) {
-    return "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover";
+    return "bg-surface-raised text-ink-muted hover:bg-surface-hover";
   }
   switch (env) {
     case "production":
-      return "bg-danger-soft text-danger ring-1 ring-danger-line bg-danger-soft text-danger ring-danger-line";
+      return "ring-1 bg-danger-soft text-danger ring-danger-line";
     case "staging":
-      return "bg-warning-soft text-warning ring-1 ring-warning-line bg-warning-soft text-warning ring-warning-line";
+      return "ring-1 bg-warning-soft text-warning ring-warning-line";
     default:
-      return "bg-accent-soft text-accent-hover ring-1 ring-accent-line bg-accent-soft text-accent ring-accent-line";
+      return "ring-1 bg-accent-soft text-accent ring-accent-line";
   }
 }
 

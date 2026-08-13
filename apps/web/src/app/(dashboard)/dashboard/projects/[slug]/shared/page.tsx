@@ -80,20 +80,19 @@ interface SharedPageProps {
 const STATUS_CONFIG: Record<ShareStatus, { label: string; classes: string }> = {
   active: {
     label: "Active",
-    classes: "bg-accent-soft text-accent-hover bg-accent-soft text-accent",
+    classes: "bg-accent-soft text-accent",
   },
   burned: {
     label: "Viewed",
-    classes: "bg-warning-soft text-warning bg-warning-soft text-warning",
+    classes: "bg-warning-soft text-warning",
   },
   expired: {
     label: "Expired",
-    classes:
-      "bg-surface-raised text-ink-subtle bg-surface-raised text-ink-muted",
+    classes: "bg-surface-raised text-ink-muted",
   },
   revoked: {
     label: "Revoked",
-    classes: "bg-danger-soft text-danger bg-danger-soft text-danger",
+    classes: "bg-danger-soft text-danger",
   },
 };
 
@@ -203,7 +202,7 @@ function StatsSkeleton({ count }: { count: number }) {
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="animate-pulse rounded-lg border border-line p-3 border-line"
+          className="animate-pulse rounded-lg border p-3 border-line"
         >
           <div className="flex items-center gap-2">
             <div className="h-4 w-4 rounded bg-surface-hover" />
@@ -274,12 +273,12 @@ function ShareCard({
 
             {/* Mode badge */}
             {share.mode === "one_time" ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning bg-warning-soft text-warning">
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
                 <Flame className="h-3 w-3" />
                 One-time
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2 py-0.5 text-xs font-medium text-info bg-info-soft text-info">
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-info-soft text-info">
                 <Clock className="h-3 w-3" />
                 Time-limited
               </span>
@@ -308,7 +307,7 @@ function ShareCard({
                 {recipient.hasViewed ? (
                   <Check className="h-3 w-3 text-accent" />
                 ) : (
-                  <Circle className="h-2.5 w-2.5 fill-ink-muted text-ink-muted fill-ink-faint text-ink-faint" />
+                  <Circle className="h-2.5 w-2.5 fill-ink-faint text-ink-faint" />
                 )}
                 <span>{recipient.email}</span>
                 {recipient.hasViewed && recipient.viewedAt && (
@@ -340,7 +339,7 @@ function ShareCard({
           <button
             onClick={() => onRevokeClick(share._id)}
             disabled={revokingId === share._id}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-danger-line px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger-soft disabled:opacity-50 border-danger-line text-danger hover:bg-danger-soft"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 border-danger-line text-danger hover:bg-danger-soft"
           >
             {revokingId === share._id ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -367,12 +366,12 @@ function KindSwitch({
   const tab = (key: ShareKind) =>
     `flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
       kind === key
-        ? "bg-white text-ink-inverse shadow-sm bg-surface text-ink"
+        ? "shadow-sm bg-surface text-ink"
         : "text-ink-subtle hover:text-ink-muted"
     }`;
 
   return (
-    <div className="flex gap-1 rounded-lg bg-surface-raised p-1 bg-surface-raised/60">
+    <div className="flex gap-1 rounded-lg p-1 bg-surface-raised/60">
       <button
         type="button"
         onClick={() => onSelect("variables")}
@@ -448,12 +447,12 @@ function DocShareCard({
 
             {/* Audience badge */}
             {share.audience === "external" ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning bg-warning-soft text-warning">
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
                 <Globe className="h-3 w-3" />
                 Public link
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2 py-0.5 text-xs font-medium text-info bg-info-soft text-info">
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-info-soft text-info">
                 <Users className="h-3 w-3" />
                 Member
               </span>
@@ -498,7 +497,7 @@ function DocShareCard({
           {share.token && (
             <button
               onClick={() => copyLink(share.token!)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
+              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors border-line text-ink-muted hover:bg-surface-hover"
             >
               {copied ? (
                 <Check className="h-3.5 w-3.5 text-accent" />
@@ -515,7 +514,7 @@ function DocShareCard({
             <button
               onClick={() => onRevokeClick(share._id)}
               disabled={revokingId === share._id}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-danger-line px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger-soft disabled:opacity-50 border-danger-line text-danger hover:bg-danger-soft"
+              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 border-danger-line text-danger hover:bg-danger-soft"
             >
               {revokingId === share._id ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -682,7 +681,7 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
   if (!project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="rounded-full bg-danger-soft p-3 bg-danger-soft">
+        <div className="rounded-full p-3 bg-danger-soft">
           <AlertTriangle className="h-6 w-6 text-danger" />
         </div>
         <h2 className="mt-4 text-lg font-semibold text-ink">
@@ -746,7 +745,7 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
           {statsConfig.map((stat) => (
             <div
               key={stat.label}
-              className={`rounded-lg border border-line p-3 border-line ${stat.color}`}
+              className={`rounded-lg border p-3 border-line ${stat.color}`}
             >
               <div className="flex items-center gap-2">
                 <stat.icon className="h-4 w-4" />
@@ -760,7 +759,7 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
 
       {/* Error Banner */}
       {revokeError && (
-        <div className="flex items-center justify-between rounded-lg border border-danger-line bg-danger-soft p-4 border-danger-line bg-danger-soft">
+        <div className="flex items-center justify-between rounded-lg border p-4 border-danger-line bg-danger-soft">
           <p className="text-sm text-danger">{revokeError}</p>
           <button
             onClick={dismissError}
@@ -781,8 +780,8 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
               onClick={() => setFilter(opt.key)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 filter === opt.key
-                  ? "bg-surface text-white bg-surface-raised text-ink-inverse"
-                  : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+                  ? "bg-ink text-ink-inverse"
+                  : "bg-ink text-ink-muted hover:bg-ink-muted"
               }`}
             >
               {opt.label}
@@ -795,7 +794,7 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
       )}
 
       {/* Share List */}
-      <div className="rounded-xl border border-line bg-white border-line bg-surface">
+      <div className="rounded-xl border border-line bg-surface">
         {isLoadingList ? (
           <ShareCardSkeleton />
         ) : isDocs ? (

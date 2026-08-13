@@ -22,7 +22,7 @@ interface Organization {
 
 function ProBadge() {
   return (
-    <span className="flex-shrink-0 rounded-full bg-warning-soft px-1.5 py-0.5 text-[10px] font-medium text-warning bg-warning-soft text-warning">
+    <span className="flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-warning-soft text-warning">
       Pro
     </span>
   );
@@ -143,7 +143,7 @@ export function OrganizationSwitcher({
       <Link
         href="/organizations/new"
         title={collapsed ? "Create Organization" : undefined}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-ink-faint transition-colors hover:bg-surface-hover text-ink-muted hover:bg-surface-hover ${collapsed ? "justify-center px-0" : ""}`}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors text-ink-muted hover:bg-surface-hover ${collapsed ? "justify-center px-0" : ""}`}
       >
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-line-strong">
           <svg
@@ -227,7 +227,7 @@ export function OrganizationSwitcher({
       {/* Dropdown */}
       {isOpen && (
         <div
-          className={`absolute z-50 mt-1 rounded-lg border border-line bg-white py-1 shadow-lg border-line bg-surface-raised ${
+          className={`absolute z-50 mt-1 rounded-lg border py-1 shadow-lg border-line bg-surface-raised ${
             collapsed ? "left-full top-0 ml-2 w-64" : "left-0 right-0"
           }`}
         >
@@ -289,7 +289,7 @@ export function OrganizationSwitcher({
             <Link
               href="/organizations"
               onClick={() => setIsOpen(false)}
-              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-ink-faint transition-colors hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors text-ink-muted hover:bg-surface-hover"
             >
               <svg
                 className="h-4 w-4"
@@ -314,7 +314,7 @@ export function OrganizationSwitcher({
             <Link
               href="/organizations/new"
               onClick={() => setIsOpen(false)}
-              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-ink-faint transition-colors hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors text-ink-muted hover:bg-surface-hover"
             >
               <svg
                 className="h-4 w-4"

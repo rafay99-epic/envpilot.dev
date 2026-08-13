@@ -78,9 +78,7 @@ export function FeatureRegistryTab() {
 
   return (
     <section data-wide>
-      <h2 className="mb-4 text-lg font-semibold text-ink">
-        Feature Registry
-      </h2>
+      <h2 className="mb-4 text-lg font-semibold text-ink">Feature Registry</h2>
       <p className="mb-4 text-xs text-ink-subtle">
         Features are developer-seeded. Admin can only toggle active/inactive.
       </p>

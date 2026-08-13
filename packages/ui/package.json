@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/ui",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Shared marketing, docs, and app-chrome UI components for Envpilot",
   "private": true,
   "license": "UNLICENSED",

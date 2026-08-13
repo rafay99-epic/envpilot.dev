@@ -26,10 +26,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen bg-canvas text-ink">
         {/* Subtle grid background */}
         <div
-          className="pointer-events-none fixed inset-0 opacity-[0.03]"
+          className="pointer-events-none fixed inset-0 opacity-[0.02]"
           style={{
             backgroundImage:
-              "linear-gradient(rgba(34,197,94,1) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,1) 1px, transparent 1px)",
+              "linear-gradient(var(--color-accent) 1px, transparent 1px), linear-gradient(90deg, var(--color-accent) 1px, transparent 1px)",
             backgroundSize: "40px 40px",
           }}
         />

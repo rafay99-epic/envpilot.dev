@@ -91,7 +91,7 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
   if (!project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="rounded-full bg-danger-soft p-3 bg-danger-soft">
+        <div className="rounded-full p-3 bg-danger-soft">
           <GitPullRequest className="h-6 w-6 text-danger" />
         </div>
         <h2 className="mt-4 text-lg font-semibold text-ink">
@@ -126,18 +126,18 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
       </div>
 
       {notice && (
-        <div className="rounded-lg border border-accent-line bg-accent-soft p-4 border-accent-line bg-accent-soft">
+        <div className="rounded-lg border p-4 border-accent-line bg-accent-soft">
           <p className="text-sm text-accent">{notice}</p>
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg border border-danger-line bg-danger-soft p-4 border-danger-line bg-danger-soft">
+        <div className="rounded-lg border p-4 border-danger-line bg-danger-soft">
           <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
-      <div className="rounded-xl border border-line bg-white border-line bg-surface">
+      <div className="rounded-xl border border-line bg-surface">
         <div className="divide-y divide-line">
           {isLoadingRequests ? (
             <TerminalLoading />
@@ -162,12 +162,12 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                           <span
                             className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                               request.status === "approved"
-                                ? "bg-accent-soft text-accent-hover bg-accent-soft text-accent"
+                                ? "bg-accent-soft text-accent"
                                 : request.status === "rejected"
-                                  ? "bg-danger-soft text-danger bg-danger-soft text-danger"
+                                  ? "bg-danger-soft text-danger"
                                   : request.status === "canceled"
-                                    ? "bg-surface-raised text-ink-faint bg-surface-hover text-ink-muted"
-                                    : "bg-warning-soft text-warning bg-warning-soft text-warning"
+                                    ? "bg-surface-hover text-ink-muted"
+                                    : "bg-warning-soft text-warning"
                             }`}
                           >
                             {request.status}
@@ -177,10 +177,10 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                               key={env}
                               className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
                                 env === "production"
-                                  ? "bg-danger-soft text-danger bg-danger-soft text-danger"
+                                  ? "bg-danger-soft text-danger"
                                   : env === "staging"
-                                    ? "bg-warning-soft text-warning bg-warning-soft text-warning"
-                                    : "bg-accent-soft text-accent-hover bg-accent-soft text-accent"
+                                    ? "bg-warning-soft text-warning"
+                                    : "bg-accent-soft text-accent"
                               }`}
                             >
                               {env}
@@ -193,7 +193,7 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                             request.requester?.email ??
                             "Unknown"}
                           {request.requestedByKeyId && (
-                            <span className="ml-1.5 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning bg-warning-soft text-warning">
+                            <span className="ml-1.5 rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
                               automated · API key
                             </span>
                           )}
@@ -215,7 +215,7 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                         {canReviewRequests && request.status === "pending" && (
                           <Link
                             href="/dashboard/requests"
-                            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-faint hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
+                            className="rounded-lg border px-3 py-1.5 text-xs font-medium border-line text-ink-muted hover:bg-surface-hover"
                           >
                             Review →
                           </Link>
@@ -230,7 +230,7 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                                   request._id as Id<"environmentVariableRequests">
                                 )
                               }
-                              className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-faint hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
+                              className="rounded-lg border px-3 py-1.5 text-xs font-medium border-line text-ink-muted hover:bg-surface-hover"
                             >
                               Cancel
                             </button>

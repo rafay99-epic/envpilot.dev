@@ -278,7 +278,7 @@ export function DashboardNav() {
     <>
       {/* Desktop Sidebar */}
       <aside
-        className={`relative z-20 hidden shrink-0 border-r border-line bg-canvas transition-all duration-200 md:block ${
+        className={`relative z-20 hidden shrink-0 border-r border-line bg-chrome transition-all duration-200 md:block ${
           isCollapsed ? "w-16" : "w-60"
         }`}
       >
@@ -367,7 +367,7 @@ export function DashboardNav() {
       </aside>
 
       {/* Mobile Header */}
-      <div className="fixed inset-x-0 top-0 z-50 flex h-14 items-center justify-between border-b border-line bg-canvas px-4 md:hidden">
+      <div className="fixed inset-x-0 top-0 z-50 flex h-14 items-center justify-between border-b border-line bg-chrome px-4 md:hidden">
         <Link href="/dashboard" className="flex items-center gap-2 font-mono">
           <Terminal className="h-5 w-5 text-accent" />
           <span className="text-sm font-semibold text-ink">
@@ -394,10 +394,10 @@ export function DashboardNav() {
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div
-            className="fixed inset-0 bg-black/60"
+            className="fixed inset-0 bg-overlay"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 w-60 bg-canvas">
+          <div className="fixed inset-y-0 left-0 w-60 bg-chrome">
             <div className="flex h-full flex-col pt-14">
               {/* Organization Switcher */}
               <div className="border-b border-line p-3">

@@ -1,24 +1,56 @@
 import Link from "next/link";
 
+/** The panel identity, shared with the landing page chrome. */
+const panel = "rounded-panel bg-surface ring-1 ring-line shadow-panel";
+
 export function TerminalWindow({
   title,
+  meta,
+  cmd,
+  action,
   children,
   className = "",
 }: {
   title: string;
+  /** Muted right-aligned note in the title bar. */
+  meta?: string;
+  /** Renders the `$ cmd` toolbar row under the title bar. */
+  cmd?: string;
+  /** Trailing link for that toolbar row, e.g. "View all". */
+  action?: { label: string; href: string };
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <div
-      className={`flex flex-col overflow-hidden rounded-lg border border-line bg-surface/90 shadow-xl ${className}`}
-    >
-      <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2.5">
-        <div className="h-3 w-3 rounded-full bg-danger/80" />
-        <div className="h-3 w-3 rounded-full bg-warning/80" />
-        <div className="h-3 w-3 rounded-full bg-accent/80" />
-        <span className="ml-2 text-xs text-ink-subtle">{title}</span>
+    <div className={`flex flex-col overflow-hidden ${panel} ${className}`}>
+      <div className="flex items-center gap-3 border-b border-line bg-white/[0.02] px-4 py-2">
+        <span className="truncate font-mono text-[11.5px] text-ink-muted">
+          {title}
+        </span>
+        {meta && (
+          <span className="ml-auto hidden shrink-0 font-mono text-[11px] text-ink-faint sm:block">
+            {meta}
+          </span>
+        )}
       </div>
+
+      {/* Every widget used to hand-roll this row; it is a prop now. */}
+      {cmd && (
+        <div className="flex items-center justify-between border-b border-line px-5 py-2.5">
+          <span className="truncate font-mono text-xs text-ink-subtle">
+            <span className="text-accent">$</span> {cmd}
+          </span>
+          {action && (
+            <Link
+              href={action.href}
+              className="shrink-0 text-xs text-ink-subtle transition-colors hover:text-accent"
+            >
+              {action.label}
+            </Link>
+          )}
+        </div>
+      )}
+
       <div className="flex-1">{children}</div>
     </div>
   );
@@ -31,13 +63,7 @@ export function TerminalCard({
   children: React.ReactNode;
   className?: string;
 }) {
-  return (
-    <div
-      className={`rounded-lg border border-line bg-surface/90 p-6 ${className}`}
-    >
-      {children}
-    </div>
-  );
+  return <div className={`${panel} p-6 ${className}`}>{children}</div>;
 }
 
 export function TerminalInput({
@@ -46,7 +72,7 @@ export function TerminalInput({
 }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink placeholder-ink-subtle focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line ${className}`}
+      className={`w-full rounded-panel border border-line bg-surface-raised px-3 py-2 text-sm text-ink placeholder-ink-subtle transition-colors focus:border-accent-line focus:ring-1 focus:ring-accent-line focus:outline-none ${className}`}
       {...props}
     />
   );
@@ -59,7 +85,7 @@ export function TerminalSelect({
 }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line ${className}`}
+      className={`rounded-panel border border-line bg-surface-raised px-3 py-2 text-sm text-ink transition-colors focus:border-accent-line focus:ring-1 focus:ring-accent-line focus:outline-none ${className}`}
       {...props}
     >
       {children}
@@ -69,12 +95,17 @@ export function TerminalSelect({
 
 type ButtonVariant = "primary" | "secondary" | "danger";
 
+// Hover has to differ from the resting fill — every variant previously hovered
+// to its own background, so nothing moved on pointer-over.
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: "border-accent-line bg-accent-soft text-accent hover:bg-accent-soft",
+  primary: "border-accent-line bg-accent-soft text-accent hover:bg-accent-line",
   secondary:
-    "border-line text-ink-muted hover:border-line-strong hover:text-ink-muted",
-  danger: "border-danger-line bg-danger-soft text-danger hover:bg-danger-soft",
+    "border-line text-ink-muted hover:border-line-strong hover:bg-surface-hover hover:text-ink",
+  danger: "border-danger-line bg-danger-soft text-danger hover:bg-danger-line",
 };
+
+const buttonBase =
+  "inline-flex items-center gap-2 rounded-panel border px-4 py-2 text-sm font-medium transition-colors";
 
 export function TerminalButton({
   variant = "primary",
@@ -86,7 +117,7 @@ export function TerminalButton({
 }) {
   return (
     <button
-      className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${buttonVariants[variant]} ${className}`}
+      className={`${buttonBase} ${buttonVariants[variant]} ${className}`}
       {...props}
     >
       {children}
@@ -111,7 +142,7 @@ export function TerminalButtonLink({
     <Link
       href={href}
       data-testid={dataTestId}
-      className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${buttonVariants[variant]} ${className}`}
+      className={`${buttonBase} ${buttonVariants[variant]} ${className}`}
     >
       {children}
     </Link>

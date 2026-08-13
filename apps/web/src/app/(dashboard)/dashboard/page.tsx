@@ -20,6 +20,7 @@ import {
   TerminalEmptyState,
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
+import { PageHeader } from "@envpilot/ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { SharedSecretsWidget } from "@/components/dashboard/shared-secrets-widget";
 import { normalizeOrgRole, roleLabel } from "@/lib/roles";
@@ -78,23 +79,18 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="font-mono">
-          <p className="text-xs text-ink-subtle">
-            [{user?.firstName || "user"}@envpilot ~]$
-          </p>
-          <h1 className="mt-1 text-xl font-bold text-ink">
-            Welcome back, {user?.firstName || "there"}
-          </h1>
-        </div>
-        {canCreateProject && (
-          <TerminalButtonLink href="/dashboard/projects/new">
-            <Plus className="h-4 w-4" />
-            New Project
-          </TerminalButtonLink>
-        )}
-      </div>
+      <PageHeader
+        cmd={"[" + (user?.firstName || "user") + "@envpilot ~]$"}
+        title={"Welcome back, " + (user?.firstName || "there")}
+        actions={
+          canCreateProject ? (
+            <TerminalButtonLink href="/dashboard/projects/new">
+              <Plus className="h-4 w-4" />
+              New Project
+            </TerminalButtonLink>
+          ) : undefined
+        }
+      />
 
       {/* Stats as terminal output */}
       <TerminalWindow title="system-status">
@@ -175,19 +171,11 @@ export default function DashboardPage() {
             )}
 
           {/* Recent Projects */}
-          <TerminalWindow title="recent-projects">
-            <div className="flex items-center justify-between border-b border-line px-5 py-2.5">
-              <span className="font-mono text-xs text-ink-subtle">
-                <span className="text-accent">$</span> envpilot project list
-                --recent
-              </span>
-              <Link
-                href="/dashboard/projects"
-                className="text-xs text-ink-subtle hover:text-accent"
-              >
-                View all
-              </Link>
-            </div>
+          <TerminalWindow
+            title="recent-projects"
+            cmd="envpilot project list --recent"
+            action={{ label: "View all", href: "/dashboard/projects" }}
+          >
             {projectsLoading ? (
               <TerminalLoading />
             ) : projects.length === 0 ? (
@@ -213,18 +201,11 @@ export default function DashboardPage() {
           </TerminalWindow>
 
           {/* Recent Activity */}
-          <TerminalWindow title="activity-log">
-            <div className="flex items-center justify-between border-b border-line px-5 py-2.5">
-              <span className="font-mono text-xs text-ink-subtle">
-                <span className="text-accent">$</span> envpilot audit --tail
-              </span>
-              <Link
-                href="/dashboard/audit"
-                className="text-xs text-ink-subtle hover:text-accent"
-              >
-                View all
-              </Link>
-            </div>
+          <TerminalWindow
+            title="activity-log"
+            cmd="envpilot audit --tail"
+            action={{ label: "View all", href: "/dashboard/audit" }}
+          >
             {activityLoading ? (
               <TerminalLoading />
             ) : activity.length === 0 ? (
@@ -243,19 +224,11 @@ export default function DashboardPage() {
 
           {/* Expiring Secrets */}
           {showRotation && (
-            <TerminalWindow title="expiring-secrets">
-              <div className="flex items-center justify-between border-b border-line px-5 py-2.5">
-                <span className="font-mono text-xs text-ink-subtle">
-                  <span className="text-accent">$</span> envpilot secrets
-                  --expiring
-                </span>
-                <Link
-                  href="/dashboard/variables"
-                  className="text-xs text-ink-subtle hover:text-accent"
-                >
-                  View all
-                </Link>
-              </div>
+            <TerminalWindow
+              title="expiring-secrets"
+              cmd="envpilot secrets --expiring"
+              action={{ label: "View all", href: "/dashboard/variables" }}
+            >
               {expiringVariables.length === 0 ? (
                 <TerminalEmptyState
                   command="envpilot secrets --expiring"
@@ -282,18 +255,11 @@ export default function DashboardPage() {
 
         {/* Right Column -- Team */}
         <div className="space-y-6">
-          <TerminalWindow title="team-members">
-            <div className="flex items-center justify-between border-b border-line px-5 py-2.5">
-              <span className="font-mono text-xs text-ink-subtle">
-                <span className="text-accent">$</span> envpilot team list
-              </span>
-              <Link
-                href="/dashboard/team"
-                className="text-xs text-ink-subtle hover:text-accent"
-              >
-                Manage
-              </Link>
-            </div>
+          <TerminalWindow
+            title="team-members"
+            cmd="envpilot team list"
+            action={{ label: "Manage", href: "/dashboard/team" }}
+          >
             {membersLoading ? (
               <TerminalLoading />
             ) : members.length === 0 ? (

@@ -103,8 +103,8 @@ export function ExportDialog({
               <div
                 className={`rounded-lg px-4 py-3 text-sm ${
                   notice.startsWith("Error")
-                    ? "border border-danger-line bg-danger-soft text-danger border-danger-line bg-danger-soft text-danger"
-                    : "border border-accent-line bg-accent-soft text-accent-hover border-accent-line bg-accent-soft text-accent"
+                    ? "border border-danger-line bg-danger-soft text-danger"
+                    : "border border-accent-line bg-accent-soft text-accent"
                 }`}
               >
                 {notice}
@@ -118,7 +118,7 @@ export function ExportDialog({
               <select
                 value={format}
                 onChange={(e) => setFormat(e.target.value as FormatType)}
-                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
+                className="w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
               >
                 {ALL_FORMATS.map((f) => (
                   <option key={f} value={f}>
@@ -135,7 +135,7 @@ export function ExportDialog({
               <select
                 value={environment}
                 onChange={(e) => setEnvironment(e.target.value)}
-                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
+                className="w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
               >
                 <option value="all">All Environments</option>
                 <option value="development">Development</option>
@@ -147,14 +147,14 @@ export function ExportDialog({
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleClose}
-                className="flex-1 rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line-strong text-ink-muted hover:bg-surface-hover"
+                className="flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors border-line-strong text-ink-muted hover:bg-surface-hover"
               >
                 Cancel
               </button>
               <button
                 onClick={handleExport}
                 disabled={isExporting}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-surface px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
               >
                 {isExporting ? (
                   <>

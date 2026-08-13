@@ -148,9 +148,7 @@ function MigrationRow({
           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-surface-raised text-[10px] font-bold text-ink-muted">
             {index + 1}
           </span>
-          <h3 className="text-sm font-medium text-ink">
-            {migration.name}
-          </h3>
+          <h3 className="text-sm font-medium text-ink">{migration.name}</h3>
           {migration.destructive && <Badge variant="danger">destructive</Badge>}
           {migration.runOnce && <Badge variant="warning">run once</Badge>}
           {CI_MANAGED_KEYS.has(migration.name) && (
@@ -367,7 +365,9 @@ function MigrationsPage() {
 
           if (list.length === 0) {
             return (
-              <p className="text-sm text-ink-subtle">No migrations available.</p>
+              <p className="text-sm text-ink-subtle">
+                No migrations available.
+              </p>
             );
           }
 

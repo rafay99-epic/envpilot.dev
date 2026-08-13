@@ -118,7 +118,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
       >
         <svg
           className="h-4 w-4"
@@ -160,7 +160,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
                 onChange={(e) =>
                   setDateRange((prev) => ({ ...prev, start: e.target.value }))
                 }
-                className="mt-1 block w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
+                className="mt-1 block w-full rounded-lg border px-3 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
               />
             </div>
             <div>
@@ -173,7 +173,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
                 onChange={(e) =>
                   setDateRange((prev) => ({ ...prev, end: e.target.value }))
                 }
-                className="mt-1 block w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
+                className="mt-1 block w-full rounded-lg border px-3 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
               />
             </div>
           </div>
@@ -229,17 +229,17 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 border-t border-line pt-4 border-line">
+          <div className="flex justify-end gap-3 border-t pt-4 border-line">
             <button
               onClick={() => setIsOpen(false)}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-ink-muted hover:bg-surface-hover"
             >
               Cancel
             </button>
             <button
               onClick={handleExport}
               disabled={isExporting}
-              className="inline-flex items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
             >
               {isExporting ? (
                 <>

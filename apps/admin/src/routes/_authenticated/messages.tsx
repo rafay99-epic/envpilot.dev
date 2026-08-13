@@ -86,7 +86,9 @@ function MessagesPage() {
       header: "Date",
       sortable: true,
       render: (m) => (
-        <span className="text-ink-muted">{formatDateTime(m._creationTime)}</span>
+        <span className="text-ink-muted">
+          {formatDateTime(m._creationTime)}
+        </span>
       ),
     },
     {
@@ -138,9 +140,7 @@ function MessagesPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-ink">
-        Contact Messages
-      </h1>
+      <h1 className="mb-6 text-2xl font-semibold text-ink">Contact Messages</h1>
 
       <div className="mb-4 flex items-center gap-3">
         <SearchInput

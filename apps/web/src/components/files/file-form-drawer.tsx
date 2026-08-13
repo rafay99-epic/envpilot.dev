@@ -35,7 +35,7 @@ const MODES = [
 ];
 
 const inputClasses =
-  "mt-1 block w-full rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle";
+  "mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle";
 
 export function FileFormDrawer({
   isOpen,
@@ -154,7 +154,7 @@ export function FileFormDrawer({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="rounded-lg bg-danger-soft p-3 text-sm text-danger bg-danger-soft text-danger">
+          <div className="rounded-lg p-3 text-sm bg-danger-soft text-danger">
             {error}
           </div>
         )}
@@ -198,7 +198,7 @@ export function FileFormDrawer({
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
-                className="mt-2 text-sm font-medium text-ink-inverse underline-offset-2 hover:underline text-ink"
+                className="mt-2 text-sm font-medium underline-offset-2 hover:underline text-ink"
               >
                 {picked ? "Choose a different file" : "Browse files"}
               </button>
@@ -335,14 +335,14 @@ export function FileFormDrawer({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
+            className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {isSubmitting

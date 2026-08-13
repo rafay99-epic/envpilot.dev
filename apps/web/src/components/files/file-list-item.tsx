@@ -19,10 +19,10 @@ interface FileListItemProps {
 /** Same environment palette the variables and accounts rows use. */
 function envBadgeClasses(env: string): string {
   return env === "production"
-    ? "bg-danger-soft text-danger bg-danger-soft text-danger"
+    ? "bg-danger-soft text-danger"
     : env === "staging"
-      ? "bg-warning-soft text-warning bg-warning-soft text-warning"
-      : "bg-accent-soft text-accent-hover bg-accent-soft text-accent";
+      ? "bg-warning-soft text-warning"
+      : "bg-accent-soft text-accent";
 }
 
 export function FileListItem({
@@ -57,7 +57,7 @@ export function FileListItem({
               {/* The destination path is the feature — mono, like the
                   account row treats its URL. */}
               <span
-                className="max-w-full truncate font-mono text-xs text-ink-subtle sm:max-w-[280px] text-ink-muted"
+                className="max-w-full truncate font-mono text-xs sm:max-w-[280px] text-ink-muted"
                 title={file.path}
               >
                 {file.path}
@@ -65,8 +65,8 @@ export function FileListItem({
               <span
                 className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                   isWritable
-                    ? "bg-warning-soft text-warning bg-warning-soft text-warning"
-                    : "bg-info-soft text-info bg-info-soft text-info"
+                    ? "bg-warning-soft text-warning"
+                    : "bg-info-soft text-info"
                 }`}
               >
                 {file.access}
@@ -106,7 +106,7 @@ export function FileListItem({
             disabled={isDownloading}
             aria-label={`Download ${file.name}`}
             title="Download (audited)"
-            className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
+            className="rounded-lg p-2 text-ink-muted disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
           >
             {isDownloading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -121,7 +121,7 @@ export function FileListItem({
                 onClick={onReplace}
                 aria-label={`Replace ${file.name}`}
                 title="Replace contents"
-                className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+                className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               >
                 <Upload className="h-4 w-4" />
               </button>
@@ -129,7 +129,7 @@ export function FileListItem({
                 onClick={onEdit}
                 aria-label={`Edit ${file.name}`}
                 title="Edit details"
-                className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+                className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
               >
                 <Pencil className="h-4 w-4" />
               </button>
@@ -141,7 +141,7 @@ export function FileListItem({
               onClick={onManagePermissions}
               aria-label={`Manage access for ${file.name}`}
               title="Manage access"
-              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
             >
               <Users className="h-4 w-4" />
             </button>
@@ -152,7 +152,7 @@ export function FileListItem({
               onClick={onDelete}
               aria-label={`Delete ${file.name}`}
               title="Move to trash"
-              className="rounded-lg p-2 text-ink-muted hover:bg-danger-soft hover:text-danger hover:bg-danger-soft hover:text-danger"
+              className="rounded-lg p-2 text-ink-muted hover:bg-danger-soft hover:text-danger"
             >
               <Trash2 className="h-4 w-4" />
             </button>

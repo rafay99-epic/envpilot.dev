@@ -197,7 +197,7 @@ export function DocEditor({
                         );
                       }}
                       style={{ paddingLeft: `${(heading.level - 1) * 10}px` }}
-                      className="w-full truncate rounded px-1.5 py-1 text-left text-xs text-ink-faint hover:bg-surface-hover hover:text-ink-muted hover:bg-surface-hover hover:text-ink"
+                      className="w-full truncate rounded px-1.5 py-1 text-left text-xs text-ink-faint hover:bg-surface-hover hover:text-ink"
                     >
                       {heading.text}
                     </button>

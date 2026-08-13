@@ -59,25 +59,25 @@ export function ActiveSharesList({ shares, onRefresh }: ActiveSharesListProps) {
     switch (status) {
       case "active":
         return (
-          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-hover bg-accent-soft text-accent">
+          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-accent-soft text-accent">
             Active
           </span>
         );
       case "burned":
         return (
-          <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning bg-warning-soft text-warning">
+          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
             Viewed
           </span>
         );
       case "expired":
         return (
-          <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-subtle bg-surface-raised text-ink-muted">
+          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
             Expired
           </span>
         );
       case "revoked":
         return (
-          <span className="rounded-full bg-danger-soft px-2 py-0.5 text-xs font-medium text-danger bg-danger-soft text-danger">
+          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-danger-soft text-danger">
             Revoked
           </span>
         );
@@ -98,14 +98,14 @@ export function ActiveSharesList({ shares, onRefresh }: ActiveSharesListProps) {
 
   return (
     <div className="mt-3 rounded-lg border border-line">
-      <div className="flex items-center gap-2 border-b border-line px-3 py-2 border-line">
+      <div className="flex items-center gap-2 border-b px-3 py-2 border-line">
         <Shield className="h-3.5 w-3.5 text-ink-muted" />
         <span className="text-xs font-medium text-ink-muted">
           Shared Links ({shares.length})
         </span>
       </div>
       {revokeError && (
-        <div className="border-b border-line bg-danger-soft px-3 py-2 text-xs text-danger border-line bg-danger-soft text-danger">
+        <div className="border-b px-3 py-2 text-xs border-line bg-danger-soft text-danger">
           {revokeError}
         </div>
       )}
@@ -141,7 +141,7 @@ export function ActiveSharesList({ shares, onRefresh }: ActiveSharesListProps) {
               <button
                 onClick={() => handleRevoke(share._id)}
                 disabled={revokingId === share._id}
-                className="rounded p-1 text-ink-muted hover:bg-danger-soft hover:text-danger disabled:opacity-50 hover:bg-danger-soft hover:text-danger"
+                className="rounded p-1 text-ink-muted disabled:opacity-50 hover:bg-danger-soft hover:text-danger"
                 title="Revoke share"
               >
                 {revokingId === share._id ? (

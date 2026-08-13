@@ -594,8 +594,8 @@ function OrganizationMembersPageContent({
           <div className="h-10 w-32 animate-pulse rounded-lg bg-surface-raised" />
         </div>
         {/* Members list skeleton */}
-        <div className="rounded-xl border border-line bg-white border-line bg-surface">
-          <div className="border-b border-line px-6 py-4 border-line">
+        <div className="rounded-xl border border-line bg-surface">
+          <div className="border-b px-6 py-4 border-line">
             <div className="h-5 w-24 animate-pulse rounded bg-surface-raised" />
           </div>
           <div className="divide-y divide-line">
@@ -626,7 +626,7 @@ function OrganizationMembersPageContent({
   if (error && !org) {
     return (
       <div className="mx-auto max-w-4xl">
-        <div className="rounded-xl border border-danger-line bg-danger-soft p-6 border-danger-line bg-danger-soft">
+        <div className="rounded-xl border p-6 border-danger-line bg-danger-soft">
           <p className="text-danger">{error}</p>
         </div>
       </div>
@@ -672,8 +672,8 @@ function OrganizationMembersPageContent({
                   }
                   className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                     memberLimitReached
-                      ? "cursor-not-allowed bg-surface-hover text-ink-muted"
-                      : "bg-surface text-white hover:bg-surface-hover text-ink-inverse hover:bg-surface-hover"
+                      ? "cursor-not-allowed bg-ink text-ink-muted"
+                      : "bg-ink text-ink-inverse hover:bg-ink-muted"
                   }`}
                 >
                   <svg
@@ -710,8 +710,8 @@ function OrganizationMembersPageContent({
         <div
           className={`rounded-lg border p-4 ${
             notice.includes("could not be sent")
-              ? "border-warning-line bg-warning-soft border-warning-line bg-warning-soft"
-              : "border-accent-line bg-accent-soft border-accent-line bg-accent-soft"
+              ? "border-warning-line bg-warning-soft"
+              : "border-accent-line bg-accent-soft"
           }`}
         >
           <p
@@ -727,14 +727,14 @@ function OrganizationMembersPageContent({
       )}
 
       {error && (
-        <div className="rounded-lg border border-danger-line bg-danger-soft p-4 border-danger-line bg-danger-soft">
+        <div className="rounded-lg border p-4 border-danger-line bg-danger-soft">
           <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
       {/* Members List */}
-      <div className="rounded-xl border border-line bg-white border-line bg-surface">
-        <div className="border-b border-line px-6 py-4 border-line">
+      <div className="rounded-xl border border-line bg-surface">
+        <div className="border-b px-6 py-4 border-line">
           <h2 className="font-semibold text-ink">Members ({members.length})</h2>
         </div>
         <AnimatedList
@@ -764,7 +764,7 @@ function OrganizationMembersPageContent({
                     <p className="font-medium text-ink">
                       {member.user.name || "Unnamed User"}
                       {member.status === "suspended" && (
-                        <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-medium text-danger bg-danger-soft text-danger">
+                        <span className="ml-2 rounded-full px-2 py-0.5 text-xs font-medium bg-danger-soft text-danger">
                           Suspended
                         </span>
                       )}
@@ -784,7 +784,7 @@ function OrganizationMembersPageContent({
                           e.target.value as OrgRole
                         )
                       }
-                      className="rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink-inverse border-line bg-surface-raised text-ink"
+                      className="rounded-lg border px-3 py-1.5 text-sm border-line bg-surface-raised text-ink"
                     >
                       {assignable.map((role) => (
                         <option key={role.slug} value={role.slug}>
@@ -806,8 +806,8 @@ function OrganizationMembersPageContent({
                       onClick={() => toggleSessions(member.user._id)}
                       className={`rounded-md p-1.5 transition-colors ${
                         expandedSessionsUserId === member.user._id
-                          ? "bg-surface-raised text-ink-inverse bg-surface-raised text-ink"
-                          : "text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+                          ? "bg-surface-raised text-ink"
+                          : "text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
                       }`}
                       title="Manage sessions"
                     >
@@ -832,7 +832,7 @@ function OrganizationMembersPageContent({
                     (member.status === "suspended" ? (
                       <button
                         onClick={() => handleReinstateMember(member.user._id)}
-                        className="rounded-md px-2 py-1 text-xs font-medium text-accent-hover hover:bg-accent-soft text-accent hover:bg-accent-soft"
+                        className="rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft"
                         title="Reinstate access"
                       >
                         Reinstate
@@ -888,7 +888,7 @@ function OrganizationMembersPageContent({
 
               {/* Expandable Sessions Panel */}
               {expandedSessionsUserId === member.user._id && (
-                <div className="border-t border-line bg-surface-raised px-6 py-4 border-line bg-canvas">
+                <div className="border-t px-6 py-4 border-line bg-canvas">
                   {isLoadingSessions ? (
                     <div className="flex items-center justify-center py-4">
                       <div className="h-5 w-5 animate-spin rounded-full border-2 border-line border-t-line-strong" />
@@ -912,7 +912,7 @@ function OrganizationMembersPageContent({
                             {memberSessions.cliTokens.map((token) => (
                               <div
                                 key={token._id}
-                                className="flex items-center justify-between rounded-lg border border-line bg-white px-4 py-3 border-line bg-surface"
+                                className="flex items-center justify-between rounded-lg border px-4 py-3 border-line bg-surface"
                               >
                                 <div className="flex items-center gap-3">
                                   <svg
@@ -961,7 +961,7 @@ function OrganizationMembersPageContent({
                                     })
                                   }
                                   disabled={isRevokingSession}
-                                  className="rounded-md px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger-soft disabled:opacity-50 text-danger hover:bg-danger-soft"
+                                  className="rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 text-danger hover:bg-danger-soft"
                                 >
                                   Revoke
                                 </button>
@@ -986,7 +986,7 @@ function OrganizationMembersPageContent({
                             {memberSessions.extensionSessions.map((session) => (
                               <div
                                 key={session._id}
-                                className="flex items-center justify-between rounded-lg border border-line bg-white px-4 py-3 border-line bg-surface"
+                                className="flex items-center justify-between rounded-lg border px-4 py-3 border-line bg-surface"
                               >
                                 <div className="flex items-center gap-3">
                                   <svg
@@ -1031,7 +1031,7 @@ function OrganizationMembersPageContent({
                                     })
                                   }
                                   disabled={isRevokingSession}
-                                  className="rounded-md px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger-soft disabled:opacity-50 text-danger hover:bg-danger-soft"
+                                  className="rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 text-danger hover:bg-danger-soft"
                                 >
                                   Revoke
                                 </button>
@@ -1044,7 +1044,7 @@ function OrganizationMembersPageContent({
                       {/* Revoke All Button */}
                       {(memberSessions.cliTokens.length > 0 ||
                         memberSessions.extensionSessions.length > 0) && (
-                        <div className="flex justify-end border-t border-line pt-3 border-line">
+                        <div className="flex justify-end border-t pt-3 border-line">
                           <button
                             onClick={() =>
                               setConfirmDialog({
@@ -1056,7 +1056,7 @@ function OrganizationMembersPageContent({
                               })
                             }
                             disabled={isRevokingSession}
-                            className="rounded-lg bg-danger px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-danger disabled:opacity-50 bg-danger hover:bg-danger"
+                            className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 bg-danger hover:bg-danger"
                           >
                             {isRevokingSession
                               ? "Revoking..."
@@ -1087,8 +1087,8 @@ function OrganizationMembersPageContent({
 
       {/* Pending Invitations */}
       {invitations.length > 0 && (
-        <div className="rounded-xl border border-line bg-white border-line bg-surface">
-          <div className="border-b border-line px-6 py-4 border-line">
+        <div className="rounded-xl border border-line bg-surface">
+          <div className="border-b px-6 py-4 border-line">
             <h2 className="font-semibold text-ink">
               Pending Invitations ({invitations.length})
             </h2>
@@ -1140,7 +1140,7 @@ function OrganizationMembersPageContent({
                     <>
                       <button
                         onClick={() => handleResendInvitation(invitation._id)}
-                        className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
+                        className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink-muted"
                         title="Resend invitation"
                       >
                         <svg
@@ -1159,7 +1159,7 @@ function OrganizationMembersPageContent({
                       </button>
                       <button
                         onClick={() => handleCancelInvitation(invitation._id)}
-                        className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-danger-soft hover:text-danger hover:bg-danger-soft hover:text-danger"
+                        className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-danger-soft hover:text-danger"
                         title="Cancel invitation"
                       >
                         <svg
@@ -1233,7 +1233,7 @@ function OrganizationMembersPageContent({
       >
         <form onSubmit={handleInvite} className="space-y-4">
           {inviteError && (
-            <div className="rounded-lg border border-danger-line bg-danger-soft p-3 border-danger-line bg-danger-soft">
+            <div className="rounded-lg border p-3 border-danger-line bg-danger-soft">
               <p className="text-sm text-danger">{inviteError}</p>
             </div>
           )}
@@ -1260,7 +1260,7 @@ function OrganizationMembersPageContent({
                 placeholder="Search by email or name..."
                 required
                 autoComplete="off"
-                className="block w-full rounded-lg border border-line bg-white px-4 py-2.5 text-ink-inverse placeholder:text-ink-muted focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
+                className="block w-full rounded-lg border px-4 py-2.5 placeholder:text-ink-muted focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
               />
               {isSearching && (
                 <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
@@ -1269,7 +1269,7 @@ function OrganizationMembersPageContent({
               )}
             </div>
             {showSearchResults && searchResults.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full rounded-lg border border-line bg-white shadow-lg border-line bg-surface-raised">
+              <div className="absolute z-10 mt-1 w-full rounded-lg border shadow-lg border-line bg-surface-raised">
                 <ul className="max-h-60 overflow-auto py-1">
                   {searchResults.map((user) => (
                     <li key={user._id}>
@@ -1277,7 +1277,7 @@ function OrganizationMembersPageContent({
                         type="button"
                         onClick={() => selectUser(user)}
                         disabled={user.isMember || user.hasPendingInvitation}
-                        className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 hover:bg-surface-hover"
+                        className="flex w-full items-center gap-3 px-4 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50 hover:bg-surface-hover"
                       >
                         {user.avatarUrl ? (
                           <img
@@ -1303,12 +1303,12 @@ function OrganizationMembersPageContent({
                           </p>
                         </div>
                         {user.isMember && (
-                          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-hover bg-accent-soft text-accent">
+                          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-accent-soft text-accent">
                             Member
                           </span>
                         )}
                         {user.hasPendingInvitation && (
-                          <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning bg-warning-soft text-warning">
+                          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
                             Pending
                           </span>
                         )}
@@ -1330,7 +1330,7 @@ function OrganizationMembersPageContent({
               id="role"
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as OrgRole)}
-              className="mt-2 block w-full rounded-lg border border-line bg-white px-4 py-2.5 text-ink-inverse focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
+              className="mt-2 block w-full rounded-lg border px-4 py-2.5 focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
             >
               {inviteRoleOptions.map((role) => (
                 <option key={role.slug} value={role.slug}>
@@ -1345,7 +1345,7 @@ function OrganizationMembersPageContent({
             </p>
           </div>
           {inviteRole !== "owner" && projects.length === 0 && (
-            <div className="rounded-lg border border-line bg-surface-raised p-3 border-line bg-surface-raised">
+            <div className="rounded-lg border p-3 border-line bg-surface-raised">
               <p className="text-xs text-ink-muted">
                 No projects available. Create a project first to assign
                 project-level access during invitation.
@@ -1362,7 +1362,7 @@ function OrganizationMembersPageContent({
                   Select which projects this member is assigned to. What they
                   can do there follows from their organization role.
                 </p>
-                <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-line p-2 border-line">
+                <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2 border-line">
                   {projects.map((project) => (
                     <label
                       key={project._id}
@@ -1415,7 +1415,7 @@ function OrganizationMembersPageContent({
             <button
               type="button"
               onClick={resetInviteForm}
-              className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
+              className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors border-line text-ink-muted hover:bg-surface-hover"
             >
               Cancel
             </button>
@@ -1426,7 +1426,7 @@ function OrganizationMembersPageContent({
                 !inviteEmail ||
                 (inviteEnvScopeApplies && inviteEnvScope.length === 0)
               }
-              className="rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+              className="rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
             >
               {isInviting ? "Sending..." : "Send Invitation"}
             </button>

@@ -37,7 +37,7 @@ export function ShareSecretDrawer({
           <label className="mb-1.5 block text-xs font-medium text-ink-muted">
             Variable
           </label>
-          <code className="block rounded-lg bg-surface-raised px-3 py-2 font-mono text-sm font-semibold text-ink-inverse bg-surface-raised text-ink">
+          <code className="block rounded-lg px-3 py-2 font-mono text-sm font-semibold bg-surface-raised text-ink">
             {variable.key}
           </code>
         </div>

@@ -99,7 +99,9 @@
 
 /* Pre — the scrollable code area */
 [data-rehype-pretty-code-figure] pre {
-  background: var(--color-canvas) !important; /* terminal-bg, matches landing page */
+  background: var(
+    --color-canvas
+  ) !important; /* terminal-bg, matches landing page */
 }
 
 /* Lines */

@@ -52,19 +52,19 @@ export function PromptDialog({
           type={inputType}
           placeholder={placeholder}
           required
-          className="mt-3 block w-full rounded-lg border border-line bg-white px-4 py-2.5 text-ink-inverse placeholder:text-ink-muted focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
+          className="mt-3 block w-full rounded-lg border px-4 py-2.5 placeholder:text-ink-muted focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
         />
         <div className="mt-4 flex gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
+            className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition-colors border-line text-ink-muted hover:bg-surface-hover"
           >
             {cancelText}
           </button>
           <button
             type="submit"
-            className="flex-1 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover text-ink-inverse hover:bg-surface-hover"
+            className="flex-1 rounded-lg bg-ink px-4 py-2 text-sm font-medium transition-colors text-ink-inverse hover:bg-ink-muted"
           >
             {submitText}
           </button>

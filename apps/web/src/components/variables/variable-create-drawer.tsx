@@ -160,13 +160,13 @@ export function VariableCreateDrawer({
         )}
 
       {/* Tab switcher */}
-      <div className="mb-4 flex gap-1 rounded-lg bg-surface-raised p-1 bg-surface-raised">
+      <div className="mb-4 flex gap-1 rounded-lg p-1 bg-surface-raised">
         <button
           type="button"
           onClick={() => setActiveTab("single")}
           className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
             activeTab === "single"
-              ? "bg-white text-ink-inverse shadow-sm bg-surface-hover text-ink"
+              ? "shadow-sm bg-surface-hover text-ink"
               : "text-ink-faint hover:text-ink"
           }`}
         >
@@ -177,7 +177,7 @@ export function VariableCreateDrawer({
           onClick={() => setActiveTab("bulk")}
           className={`flex-1 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors inline-flex justify-center ${
             activeTab === "bulk"
-              ? "bg-white text-ink-inverse shadow-sm bg-surface-hover text-ink"
+              ? "shadow-sm bg-surface-hover text-ink"
               : "text-ink-faint hover:text-ink"
           }`}
         >

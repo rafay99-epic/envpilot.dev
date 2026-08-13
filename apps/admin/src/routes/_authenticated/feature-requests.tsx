@@ -231,9 +231,7 @@ function FeatureRequestsPage() {
     <div data-wide>
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">
-          Feature Requests
-        </h1>
+        <h1 className="text-2xl font-semibold text-ink">Feature Requests</h1>
         <div className="flex items-center gap-2">
           {requests && (
             <span className="mr-1 text-sm text-ink-subtle">
@@ -699,9 +697,7 @@ function CreatorPanel({
       <div className="flex items-center justify-between border-b border-line px-5 py-3">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-accent" />
-          <span className="text-sm font-semibold text-ink">
-            New Feature
-          </span>
+          <span className="text-sm font-semibold text-ink">New Feature</span>
           <Badge variant="success">Team</Badge>
         </div>
         <button

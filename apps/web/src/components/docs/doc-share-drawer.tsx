@@ -33,7 +33,7 @@ const TTL_OPTIONS = [
 ];
 
 const FIELD =
-  "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse outline-none placeholder:text-ink-subtle focus:border-line bg-surface text-ink placeholder:text-ink-faint";
+  "w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-line bg-surface text-ink placeholder:text-ink-faint";
 const LABEL = "mb-1.5 block text-xs font-medium text-ink-muted";
 
 interface DocShareDrawerProps {
@@ -248,7 +248,7 @@ export function DocShareDrawer({
               className={`flex-1 rounded-lg border px-3 py-2 text-left transition-colors ${
                 scope === "page"
                   ? "border-accent-line bg-accent-soft"
-                  : "border-line hover:bg-surface-hover border-line hover:bg-surface-hover"
+                  : "border-line hover:bg-surface-hover"
               }`}
             >
               <span className="flex items-center gap-1.5 text-xs font-medium text-ink">
@@ -264,7 +264,7 @@ export function DocShareDrawer({
               className={`flex-1 rounded-lg border px-3 py-2 text-left transition-colors ${
                 scope === "module"
                   ? "border-accent-line bg-accent-soft"
-                  : "border-line hover:bg-surface-hover border-line hover:bg-surface-hover"
+                  : "border-line hover:bg-surface-hover"
               }`}
             >
               <span className="flex items-center gap-1.5 text-xs font-medium text-ink">
@@ -292,13 +292,13 @@ export function DocShareDrawer({
         )}
 
         {showLinkTab && (
-          <div className="flex gap-1 rounded-lg bg-surface-raised p-1 bg-surface-raised/60">
+          <div className="flex gap-1 rounded-lg p-1 bg-surface-raised/60">
             <button
               type="button"
               onClick={() => setTab("team")}
               className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 tab === "team"
-                  ? "bg-white text-ink-inverse shadow-sm bg-surface text-ink"
+                  ? "shadow-sm bg-surface text-ink"
                   : "text-ink-subtle hover:text-ink-muted"
               }`}
             >
@@ -309,7 +309,7 @@ export function DocShareDrawer({
               onClick={() => setTab("link")}
               className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 tab === "link"
-                  ? "bg-white text-ink-inverse shadow-sm bg-surface text-ink"
+                  ? "shadow-sm bg-surface text-ink"
                   : "text-ink-subtle hover:text-ink-muted"
               }`}
             >
@@ -324,7 +324,7 @@ export function DocShareDrawer({
               <label className={LABEL}>
                 Who should read it ({selected.length} selected)
               </label>
-              <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-line p-1 border-line">
+              <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border p-1 border-line">
                 {members === undefined && (
                   <p className="px-2 py-3 text-xs text-ink-subtle">
                     Loading members…
@@ -383,7 +383,7 @@ export function DocShareDrawer({
             </p>
           </div>
         ) : !canShareExternal ? (
-          <div className="rounded-lg border border-line px-4 py-6 text-center border-line">
+          <div className="rounded-lg border px-4 py-6 text-center border-line">
             <Globe className="mx-auto mb-3 h-5 w-5 text-ink-subtle" />
             <p className="text-sm font-medium text-ink">
               Public links are a Pro feature
@@ -413,7 +413,7 @@ export function DocShareDrawer({
                   <button
                     type="button"
                     onClick={copyLink}
-                    className="shrink-0 rounded-lg border border-line px-3 text-ink-faint hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
+                    className="shrink-0 rounded-lg border px-3 border-line text-ink-muted hover:bg-surface-hover"
                     aria-label="Copy link"
                   >
                     {copied ? (
@@ -527,7 +527,7 @@ function TtlPicker({
             className={`flex-1 rounded-lg border px-3 py-1.5 text-xs transition-colors ${
               value === option.value
                 ? "border-accent-line bg-accent-soft text-accent"
-                : "border-line text-ink-faint hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
+                : "border-line text-ink-muted hover:bg-surface-hover"
             }`}
           >
             {option.label}

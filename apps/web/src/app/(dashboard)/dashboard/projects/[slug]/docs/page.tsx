@@ -116,7 +116,7 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
                 <Link
                   href={`/dashboard/projects/${slug}/docs/new`}
                   data-testid="doc-new"
-                  className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-surface-raised px-4 py-2 text-sm font-medium text-ink-inverse transition-colors hover:bg-white"
+                  className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-ink-inverse transition-colors hover:bg-ink-muted"
                 >
                   <Plus className="h-4 w-4" />
                   New Page
@@ -193,11 +193,11 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
           <div className="space-y-6">
             {groups.map((group) => (
               <section key={group.module}>
-                <h2 className="mb-2 font-mono text-xs tracking-wider text-ink-subtle uppercase text-ink-subtle">
+                <h2 className="mb-2 font-mono text-xs tracking-wider uppercase text-ink-subtle">
                   {group.module}
                 </h2>
                 {/* Rules, not a card per module — boxes inside boxes. */}
-                <AnimatedList className="divide-y divide-line border-t border-line divide-line border-line">
+                <AnimatedList className="divide-y border-t divide-line border-line">
                   {group.docs.map((doc) => (
                     <DocRow key={doc._id} doc={doc} projectSlug={slug} />
                   ))}
@@ -228,13 +228,13 @@ function DocRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-ink">{doc.title}</span>
-          <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] text-ink-subtle uppercase border-line text-ink-muted">
+          <span className="rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase border-line text-ink-muted">
             {doc.type}
           </span>
           {doc.status === "draft" && (
             <span
               data-testid="doc-draft-badge"
-              className="rounded border border-warning-line bg-warning-soft px-1.5 py-0.5 font-mono text-[10px] text-warning uppercase border-warning-line bg-warning-soft text-warning"
+              className="rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase border-warning-line bg-warning-soft text-warning"
             >
               draft
             </span>

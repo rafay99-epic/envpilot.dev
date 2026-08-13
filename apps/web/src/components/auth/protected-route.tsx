@@ -58,7 +58,7 @@ export function ProtectedRoute({
     if (!hasRequiredActions) {
       return (
         <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-          <div className="rounded-full bg-danger-soft p-4 bg-danger-soft">
+          <div className="rounded-full p-4 bg-danger-soft">
             <svg
               className="h-8 w-8 text-danger"
               fill="none"
@@ -79,7 +79,7 @@ export function ProtectedRoute({
           </p>
           <button
             onClick={() => router.back()}
-            className="mt-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover text-ink-inverse hover:bg-surface-hover"
+            className="mt-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium transition-colors text-ink-inverse hover:bg-ink-muted"
           >
             Go Back
           </button>

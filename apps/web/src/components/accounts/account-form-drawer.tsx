@@ -192,7 +192,7 @@ export function AccountFormDrawer({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="rounded-lg bg-danger-soft p-3 text-sm text-danger bg-danger-soft text-danger">
+          <div className="rounded-lg p-3 text-sm bg-danger-soft text-danger">
             {error}
           </div>
         )}
@@ -211,7 +211,7 @@ export function AccountFormDrawer({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Stripe Dashboard"
-            className="mt-1 block w-full rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+            className="mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
           />
         </div>
 
@@ -229,7 +229,7 @@ export function AccountFormDrawer({
             value={websiteUrl}
             onChange={(e) => setWebsiteUrl(e.target.value)}
             placeholder="https://dashboard.stripe.com"
-            className="mt-1 block w-full rounded-lg border border-line bg-white px-4 py-2 font-mono text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+            className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
           />
         </div>
 
@@ -252,7 +252,7 @@ export function AccountFormDrawer({
             }}
             disabled={isPrefilling}
             placeholder={isPrefilling ? "Loading…" : "user@example.com"}
-            className="mt-1 block w-full rounded-lg border border-line bg-white px-4 py-2 font-mono text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong disabled:bg-surface-raised border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
+            className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
           />
         </div>
 
@@ -275,7 +275,7 @@ export function AccountFormDrawer({
               }}
               disabled={isPrefilling}
               placeholder={isPrefilling ? "Loading…" : "••••••••"}
-              className="block w-full rounded-lg border border-line bg-white px-4 py-2 pr-10 font-mono text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong disabled:bg-surface-raised border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
+              className="block w-full rounded-lg border px-4 py-2 pr-10 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
             />
             <button
               type="button"
@@ -317,7 +317,7 @@ export function AccountFormDrawer({
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What this account is used for…"
             rows={2}
-            className="mt-1 block w-full rounded-lg border border-line bg-white px-4 py-2 text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+            className="mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
           />
         </div>
 
@@ -349,14 +349,14 @@ export function AccountFormDrawer({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
+            className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting || isPrefilling}
-            className="inline-flex items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {isSubmitting

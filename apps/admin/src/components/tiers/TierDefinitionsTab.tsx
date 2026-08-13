@@ -304,9 +304,7 @@ export function TierDefinitionsTab() {
   return (
     <section>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-ink">
-          Tier Definitions
-        </h2>
+        <h2 className="text-lg font-semibold text-ink">Tier Definitions</h2>
         <div className="flex gap-2">
           {tierDefs && tierDefs.length === 0 && (
             <Button
@@ -464,7 +462,9 @@ export function TierDefinitionsTab() {
                   )}
                 </div>
                 {form.name && (
-                  <p className="font-mono text-xs text-ink-subtle">{form.name}</p>
+                  <p className="font-mono text-xs text-ink-subtle">
+                    {form.name}
+                  </p>
                 )}
               </div>
             </div>
@@ -595,9 +595,7 @@ export function TierDefinitionsTab() {
                   </div>
                 </div>
                 {formErrors.color && (
-                  <p className="mt-1 text-xs text-danger">
-                    {formErrors.color}
-                  </p>
+                  <p className="mt-1 text-xs text-danger">{formErrors.color}</p>
                 )}
               </div>
             </fieldset>

@@ -49,7 +49,7 @@ export function DocSharesList({ docId }: { docId: Id<"docs"> }) {
   };
 
   return (
-    <section className="mt-10 border-t border-line pt-6 border-line">
+    <section className="mt-10 border-t pt-6 border-line">
       <h2 className="mb-3 font-mono text-xs tracking-wide text-ink-subtle uppercase">
         Shared with ({shares.length})
       </h2>
@@ -57,7 +57,7 @@ export function DocSharesList({ docId }: { docId: Id<"docs"> }) {
         {shares.map((share) => (
           <li
             key={share._id}
-            className="flex items-center gap-3 rounded-lg border border-line px-3 py-2.5 border-line"
+            className="flex items-center gap-3 rounded-lg border px-3 py-2.5 border-line"
           >
             {share.audience === "member" ? (
               <Users className="h-4 w-4 shrink-0 text-ink-subtle" />
@@ -92,7 +92,7 @@ export function DocSharesList({ docId }: { docId: Id<"docs"> }) {
               <button
                 type="button"
                 onClick={() => copy(share._id, share.token!)}
-                className="shrink-0 rounded p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-ink-inverse hover:bg-surface-hover hover:text-ink"
+                className="shrink-0 rounded p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-ink"
                 aria-label="Copy link"
               >
                 {copiedId === share._id ? (
