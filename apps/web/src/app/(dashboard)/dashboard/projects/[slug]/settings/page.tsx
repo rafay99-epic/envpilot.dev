@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { Settings } from "lucide-react";
+import { AlertTriangle, Loader2, Settings, Trash2 } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import { useAuthContext } from "@/components/auth";
 import {
@@ -231,7 +231,7 @@ export default function ProjectSettingsPage({
         throw new Error(data.error || "Failed to delete project");
       }
 
-      router.push("/dashboard/projects");
+      router.replace("/dashboard/projects");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsDeleting(false);
@@ -928,29 +928,63 @@ function DangerZoneProjectSettings({
 
       {/* Delete Project */}
       <TerminalCard className="border-danger-line">
-        <h2 className="text-base font-semibold text-danger">Delete Project</h2>
-        <p className="mt-2 text-sm text-ink-subtle">
-          Once you delete a project, it cannot be restored. Its variables and
-          shared accounts follow the same 7-day retention before permanent
-          deletion, including the stored secret values.
-        </p>
+        <div className="flex items-start gap-3">
+          <div className="rounded-panel border border-danger-line bg-danger-soft p-2 text-danger">
+            <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-danger">
+              Delete project permanently
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-ink-subtle">
+              This immediately removes access and permanently queues every
+              environment variable, version, account, secret file, document,
+              share, member assignment, and project-specific setting for
+              deletion. This cannot be undone.
+            </p>
+          </div>
+        </div>
 
         {showDeleteConfirm && project ? (
-          <div className="mt-4 space-y-4">
-            <p className="text-sm text-ink">
-              Type{" "}
-              <span className="font-mono font-semibold">{project.name}</span> to
-              confirm deletion:
-            </p>
+          <div
+            className="mt-5 space-y-4 rounded-panel border border-danger-line bg-danger-soft p-4"
+            aria-busy={isDeleting}
+          >
+            <div>
+              <p className="text-sm font-medium text-ink">
+                Confirm permanent deletion
+              </p>
+              <p className="mt-1 text-sm text-ink-subtle">
+                Type{" "}
+                <span className="font-mono font-semibold text-ink">
+                  {project.name}
+                </span>{" "}
+                exactly to continue.
+              </p>
+            </div>
             <TerminalInput
               type="text"
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
               placeholder={project.name}
+              aria-label="Project name confirmation"
+              autoComplete="off"
+              disabled={isDeleting}
             />
+            {isDeleting && (
+              <div
+                className="flex items-center gap-2 text-sm text-danger"
+                role="status"
+                aria-live="polite"
+              >
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Securing deletion and removing project access…
+              </div>
+            )}
             <div className="flex gap-3">
               <TerminalButton
                 variant="secondary"
+                disabled={isDeleting}
                 onClick={() => {
                   setShowDeleteConfirm(false);
                   setDeleteConfirmText("");
@@ -963,7 +997,20 @@ function DangerZoneProjectSettings({
                 onClick={handleDelete}
                 disabled={isDeleting || deleteConfirmText !== project.name}
               >
-                {isDeleting ? "Deleting..." : "Delete Project"}
+                {isDeleting ? (
+                  <>
+                    <Loader2
+                      className="h-4 w-4 animate-spin"
+                      aria-hidden="true"
+                    />
+                    Deleting project…
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    Delete permanently
+                  </>
+                )}
               </TerminalButton>
             </div>
           </div>
@@ -973,7 +1020,8 @@ function DangerZoneProjectSettings({
             onClick={() => setShowDeleteConfirm(true)}
             className="mt-4"
           >
-            Delete Project
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            Delete project
           </TerminalButton>
         )}
       </TerminalCard>
