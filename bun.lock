@@ -152,7 +152,7 @@
     },
     "apps/vscode-extension": {
       "name": "envpilot",
-      "version": "1.17.0",
+      "version": "1.17.1",
       "dependencies": {
         "@sentry/node": "^10.43.0",
         "axios": "^1.6.2",

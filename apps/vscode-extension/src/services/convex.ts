@@ -11,6 +11,8 @@ export type TokenFetcher = (args?: {
   forceRefreshToken: boolean;
 }) => Promise<string | null>;
 
+type SubscriptionErrorHandler = (error: Error) => void;
+
 /** A single active project-access scoping record for the caller. */
 export interface CallerProjectAccess {
   _id: string;
@@ -126,7 +128,8 @@ export class ConvexService {
    * events array whenever new revocations appear.
    */
   subscribeToRevocations(
-    callback: (events: RevocationEvent[]) => void
+    callback: (events: RevocationEvent[]) => void,
+    onError?: SubscriptionErrorHandler
   ): string {
     const id = `revocations-${Date.now()}`;
 
@@ -138,7 +141,8 @@ export class ConvexService {
         if (arr.length > 0) {
           callback(arr);
         }
-      }
+      },
+      onError
     );
 
     this.subscriptions.set(id, unsubscribe);
@@ -152,7 +156,8 @@ export class ConvexService {
    * old per-access-token validation subscription.
    */
   subscribeToProjectAccess(
-    callback: (records: CallerProjectAccess[]) => void
+    callback: (records: CallerProjectAccess[]) => void,
+    onError?: SubscriptionErrorHandler
   ): string {
     const id = `access-${Date.now()}`;
 
@@ -161,7 +166,8 @@ export class ConvexService {
       {},
       (records: unknown) => {
         callback((records as CallerProjectAccess[]) ?? []);
-      }
+      },
+      onError
     );
 
     this.subscriptions.set(id, unsubscribe);
@@ -185,7 +191,8 @@ export class ConvexService {
         version: number;
         updatedAt: number;
       }>
-    ) => void
+    ) => void,
+    onError?: SubscriptionErrorHandler
   ): string {
     const id = `vars-${projectId.slice(0, 8)}-${Date.now()}`;
 
@@ -203,7 +210,8 @@ export class ConvexService {
             updatedAt: number;
           }>) ?? []
         );
-      }
+      },
+      onError
     );
 
     this.subscriptions.set(id, unsubscribe);

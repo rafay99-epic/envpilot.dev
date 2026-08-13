@@ -237,15 +237,26 @@ export class RealTimeSyncService {
 
     // Identity-scoped revocation events (no access tokens passed). Match each
     // event to a linked project by projectId.
-    this.revocationSubId = this.convexService.subscribeToRevocations((events) =>
-      this.handleRevocationEvents(events, linkedProjects)
+    this.revocationSubId = this.convexService.subscribeToRevocations(
+      (events) => this.handleRevocationEvents(events, linkedProjects),
+      (error) => this.handleSubscriptionError(error)
     );
 
     // Identity-scoped set of the caller's still-active project accesses. When a
     // linked project drops out of this set, its access has ended.
-    this.accessSubId = this.convexService.subscribeToProjectAccess((records) =>
-      this.handleProjectAccessUpdate(records)
+    this.accessSubId = this.convexService.subscribeToProjectAccess(
+      (records) => this.handleProjectAccessUpdate(records),
+      (error) => this.handleSubscriptionError(error)
     );
+  }
+
+  private handleSubscriptionError(error: Error): void {
+    if (!this.desiredRunning) return;
+
+    captureError(error, { phase: "realtime-subscription" });
+    this.isRunning = false;
+    this.teardownSubscriptions();
+    this.syncService.setConnectionState("disconnected");
   }
 
   /**
