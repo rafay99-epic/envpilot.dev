@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-// Set NEXT_PUBLIC_STATUS_PAGE_URL once the Instatus subdomain is renamed —
-// the default below is the page's current address, not a permanent one.
 const STATUS_PAGE_URL =
-  process.env.NEXT_PUBLIC_STATUS_PAGE_URL || "https://abdul-86zax.instatus.com";
+  process.env.NEXT_PUBLIC_STATUS_PAGE_URL ||
+  "https://stats.uptimerobot.com/FxXv9XmG1h";
 
 type ServiceStatus = "operational" | "degraded" | "down" | "unknown";
 
@@ -42,7 +41,7 @@ const STATUS_CONFIG: Record<
 
 /**
  * Live uptime pill for the marketing footer. Reads the cached /api/status
- * proxy (Instatus) and links to the public status page.
+ * proxy (UptimeRobot) and links to the public status page.
  */
 export function StatusIndicator({
   statusUrl = "https://www.envpilot.dev/api/status",
