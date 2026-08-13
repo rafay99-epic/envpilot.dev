@@ -81,20 +81,20 @@ const STATUS_CONFIG: Record<ShareStatus, { label: string; classes: string }> = {
   active: {
     label: "Active",
     classes:
-      "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      "bg-accent-soft text-accent-hover bg-accent-soft text-accent",
   },
   burned: {
     label: "Viewed",
     classes:
-      "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+      "bg-warning-soft text-warning bg-warning-soft text-warning",
   },
   expired: {
     label: "Expired",
-    classes: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
+    classes: "bg-surface-raised text-ink-subtle bg-surface-raised text-ink-muted",
   },
   revoked: {
     label: "Revoked",
-    classes: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    classes: "bg-danger-soft text-danger bg-danger-soft text-danger",
   },
 };
 
@@ -111,33 +111,33 @@ const STATS_CONFIG = [
     key: "all" as FilterKey,
     label: "Total",
     icon: Share2,
-    color: "text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800",
+    color: "text-ink-muted bg-surface-raised",
   },
   {
     key: "active" as FilterKey,
     label: "Active",
     icon: Shield,
     color:
-      "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20",
+      "text-accent bg-accent-soft",
   },
   {
     key: "burned" as FilterKey,
     label: "Viewed",
     icon: Eye,
     color:
-      "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20",
+      "text-warning bg-warning-soft",
   },
   {
     key: "expired" as FilterKey,
     label: "Expired",
     icon: Clock,
-    color: "text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50",
+    color: "text-ink-muted bg-surface-raised/50",
   },
   {
     key: "revoked" as FilterKey,
     label: "Revoked",
     icon: X,
-    color: "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20",
+    color: "text-danger bg-danger-soft",
   },
 ] as const;
 
@@ -175,17 +175,17 @@ function EmptyState({ filter, kind }: { filter: FilterKey; kind: ShareKind }) {
   const isDocs = kind === "docs";
   return (
     <div className="px-6 py-12 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-        <Share2 className="h-6 w-6 text-zinc-400" />
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-raised">
+        <Share2 className="h-6 w-6 text-ink-muted" />
       </div>
-      <h3 className="mt-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+      <h3 className="mt-4 text-sm font-semibold text-ink">
         {filter === "all"
           ? isDocs
             ? "No shared documentation yet."
             : "No shared variables yet."
           : `No ${FILTER_OPTIONS.find((f) => f.key === filter)?.label.toLowerCase()} shares.`}
       </h3>
-      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mt-1 text-sm text-ink-muted">
         {filter === "all"
           ? isDocs
             ? "Share a page from the Documentation tab to get started."
@@ -206,13 +206,13 @@ function StatsSkeleton({ count }: { count: number }) {
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="animate-pulse rounded-lg border border-zinc-200 p-3 dark:border-zinc-800"
+          className="animate-pulse rounded-lg border border-line p-3 border-line"
         >
           <div className="flex items-center gap-2">
-            <div className="h-4 w-4 rounded bg-zinc-200 dark:bg-zinc-700" />
-            <div className="h-3 w-12 rounded bg-zinc-200 dark:bg-zinc-700" />
+            <div className="h-4 w-4 rounded bg-surface-hover" />
+            <div className="h-3 w-12 rounded bg-surface-hover" />
           </div>
-          <div className="mt-2 h-6 w-8 rounded bg-zinc-200 dark:bg-zinc-700" />
+          <div className="mt-2 h-6 w-8 rounded bg-surface-hover" />
         </div>
       ))}
     </div>
@@ -221,17 +221,17 @@ function StatsSkeleton({ count }: { count: number }) {
 
 function ShareCardSkeleton() {
   return (
-    <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+    <div className="divide-y divide-line">
       {Array.from({ length: 3 }).map((_, i) => (
         <div key={i} className="animate-pulse px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 space-y-3">
               <div className="flex items-center gap-2">
-                <div className="h-4 w-32 rounded bg-zinc-200 dark:bg-zinc-700" />
-                <div className="h-4 w-16 rounded-full bg-zinc-200 dark:bg-zinc-700" />
+                <div className="h-4 w-32 rounded bg-surface-hover" />
+                <div className="h-4 w-16 rounded-full bg-surface-hover" />
               </div>
-              <div className="h-3 w-48 rounded bg-zinc-100 dark:bg-zinc-800" />
-              <div className="h-3 w-36 rounded bg-zinc-100 dark:bg-zinc-800" />
+              <div className="h-3 w-48 rounded bg-surface-raised" />
+              <div className="h-3 w-36 rounded bg-surface-raised" />
             </div>
           </div>
         </div>
@@ -264,7 +264,7 @@ function ShareCard({
         <div className="min-w-0 flex-1">
           {/* Top row: key + badges */}
           <div className="flex flex-wrap items-center gap-2">
-            <code className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <code className="font-mono text-sm font-semibold text-ink">
               {share.variableKey}
             </code>
 
@@ -277,12 +277,12 @@ function ShareCard({
 
             {/* Mode badge */}
             {share.mode === "one_time" ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning bg-warning-soft text-warning">
                 <Flame className="h-3 w-3" />
                 One-time
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+              <span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2 py-0.5 text-xs font-medium text-info bg-info-soft text-info">
                 <Clock className="h-3 w-3" />
                 Time-limited
               </span>
@@ -297,7 +297,7 @@ function ShareCard({
 
             {/* Lock icon */}
             {share.hasPassphrase && (
-              <Lock className="h-3.5 w-3.5 text-zinc-400" />
+              <Lock className="h-3.5 w-3.5 text-ink-muted" />
             )}
           </div>
 
@@ -306,16 +306,16 @@ function ShareCard({
             {share.recipients.map((recipient) => (
               <span
                 key={recipient.email}
-                className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400"
+                className="flex items-center gap-1 text-xs text-ink-muted"
               >
                 {recipient.hasViewed ? (
-                  <Check className="h-3 w-3 text-green-500" />
+                  <Check className="h-3 w-3 text-accent" />
                 ) : (
-                  <Circle className="h-2.5 w-2.5 fill-zinc-300 text-zinc-300 dark:fill-zinc-600 dark:text-zinc-600" />
+                  <Circle className="h-2.5 w-2.5 fill-ink-muted text-ink-muted fill-ink-faint text-ink-faint" />
                 )}
                 <span>{recipient.email}</span>
                 {recipient.hasViewed && recipient.viewedAt && (
-                  <span className="text-zinc-400 dark:text-zinc-500">
+                  <span className="text-ink-subtle">
                     ({formatRelativeTime(recipient.viewedAt, now)})
                   </span>
                 )}
@@ -324,7 +324,7 @@ function ShareCard({
           </div>
 
           {/* Meta row */}
-          <p className="mt-1.5 text-xs text-zinc-400">
+          <p className="mt-1.5 text-xs text-ink-muted">
             Created {formatRelativeTime(share.createdAt, now)}
             {share.status === "active" && (
               <>
@@ -343,7 +343,7 @@ function ShareCard({
           <button
             onClick={() => onRevokeClick(share._id)}
             disabled={revokingId === share._id}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-danger-line px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger-soft disabled:opacity-50 border-danger-line text-danger hover:bg-danger-soft"
           >
             {revokingId === share._id ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -370,12 +370,12 @@ function KindSwitch({
   const tab = (key: ShareKind) =>
     `flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
       kind === key
-        ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100"
-        : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+        ? "bg-white text-ink-inverse shadow-sm bg-surface text-ink"
+        : "text-ink-subtle hover:text-ink-muted"
     }`;
 
   return (
-    <div className="flex gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800/60">
+    <div className="flex gap-1 rounded-lg bg-surface-raised p-1 bg-surface-raised/60">
       <button
         type="button"
         onClick={() => onSelect("variables")}
@@ -436,11 +436,11 @@ function DocShareCard({
           {/* Top row: target + badges */}
           <div className="flex flex-wrap items-center gap-2">
             {share.scope === "module" ? (
-              <FolderTree className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+              <FolderTree className="h-3.5 w-3.5 shrink-0 text-ink-muted" />
             ) : (
-              <FileText className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+              <FileText className="h-3.5 w-3.5 shrink-0 text-ink-muted" />
             )}
-            <span className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <span className="truncate text-sm font-semibold text-ink">
               {share.target}
             </span>
 
@@ -451,12 +451,12 @@ function DocShareCard({
 
             {/* Audience badge */}
             {share.audience === "external" ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning bg-warning-soft text-warning">
                 <Globe className="h-3 w-3" />
                 Public link
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+              <span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2 py-0.5 text-xs font-medium text-info bg-info-soft text-info">
                 <Users className="h-3 w-3" />
                 Member
               </span>
@@ -471,17 +471,17 @@ function DocShareCard({
 
             {/* Lock icon */}
             {share.hasPassphrase && (
-              <Lock className="h-3.5 w-3.5 text-zinc-400" />
+              <Lock className="h-3.5 w-3.5 text-ink-muted" />
             )}
           </div>
 
           {/* Recipient */}
-          <p className="mt-2 truncate text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 truncate text-xs text-ink-muted">
             Shared with {share.recipientName}
           </p>
 
           {/* Meta row */}
-          <p className="mt-1.5 text-xs text-zinc-400">
+          <p className="mt-1.5 text-xs text-ink-muted">
             Created {formatRelativeTime(share.createdAt, now)} by{" "}
             {share.createdByName}
             {share.status === "active" && (
@@ -501,10 +501,10 @@ function DocShareCard({
           {share.token && (
             <button
               onClick={() => copyLink(share.token!)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
             >
               {copied ? (
-                <Check className="h-3.5 w-3.5 text-green-500" />
+                <Check className="h-3.5 w-3.5 text-accent" />
               ) : (
                 <Copy className="h-3.5 w-3.5" />
               )}
@@ -518,7 +518,7 @@ function DocShareCard({
             <button
               onClick={() => onRevokeClick(share._id)}
               disabled={revokingId === share._id}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-danger-line px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger-soft disabled:opacity-50 border-danger-line text-danger hover:bg-danger-soft"
             >
               {revokingId === share._id ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -685,17 +685,17 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
   if (!project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
-          <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
+        <div className="rounded-full bg-danger-soft p-3 bg-danger-soft">
+          <AlertTriangle className="h-6 w-6 text-danger" />
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="mt-4 text-lg font-semibold text-ink">
           {projectError instanceof Error
             ? projectError.message
             : "Project not found"}
         </h2>
         <Link
           href="/dashboard/projects"
-          className="mt-6 text-sm font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300"
+          className="mt-6 text-sm font-medium text-ink-inverse hover:text-ink-muted"
         >
           Back to Projects
         </Link>
@@ -749,7 +749,7 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
           {statsConfig.map((stat) => (
             <div
               key={stat.label}
-              className={`rounded-lg border border-zinc-200 p-3 dark:border-zinc-800 ${stat.color}`}
+              className={`rounded-lg border border-line p-3 border-line ${stat.color}`}
             >
               <div className="flex items-center gap-2">
                 <stat.icon className="h-4 w-4" />
@@ -763,13 +763,13 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
 
       {/* Error Banner */}
       {revokeError && (
-        <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-900/20">
-          <p className="text-sm text-red-700 dark:text-red-400">
+        <div className="flex items-center justify-between rounded-lg border border-danger-line bg-danger-soft p-4 border-danger-line bg-danger-soft">
+          <p className="text-sm text-danger">
             {revokeError}
           </p>
           <button
             onClick={dismissError}
-            className="ml-4 shrink-0 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+            className="ml-4 shrink-0 text-danger hover:text-danger"
             aria-label="Dismiss error"
           >
             <X className="h-4 w-4" />
@@ -786,8 +786,8 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
               onClick={() => setFilter(opt.key)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 filter === opt.key
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  ? "bg-surface text-white bg-surface-raised text-ink-inverse"
+                  : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
               }`}
             >
               {opt.label}
@@ -800,14 +800,14 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
       )}
 
       {/* Share List */}
-      <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="rounded-xl border border-line bg-white border-line bg-surface">
         {isLoadingList ? (
           <ShareCardSkeleton />
         ) : isDocs ? (
           filteredDocShares.length === 0 ? (
             <EmptyState filter={filter} kind={kind} />
           ) : (
-            <AnimatedList className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            <AnimatedList className="divide-y divide-line">
               {filteredDocShares.map((share) => (
                 <DocShareCard
                   key={share._id}
@@ -822,7 +822,7 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
         ) : filteredShares.length === 0 ? (
           <EmptyState filter={filter} kind={kind} />
         ) : (
-          <AnimatedList className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <AnimatedList className="divide-y divide-line">
             {filteredShares.map((share) => (
               <ShareCard
                 key={share._id}

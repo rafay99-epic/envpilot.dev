@@ -13,26 +13,26 @@ export default function NotFound() {
         }}
       />
 
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-2xl">
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-line bg-surface/90 shadow-2xl">
         {/* Terminal header */}
-        <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
+        <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2.5">
           <div className="h-3 w-3 rounded-full bg-[#ef5350]/80" />
           <div className="h-3 w-3 rounded-full bg-[#fbbf24]/80" />
           <div className="h-3 w-3 rounded-full bg-[#22c55e]/80" />
-          <span className="ml-2 text-xs text-zinc-500">not-found</span>
+          <span className="ml-2 text-xs text-ink-subtle">not-found</span>
         </div>
 
         <div className="p-8 font-mono text-sm">
-          <p className="text-zinc-500">
-            <span className="text-green-400">$</span> curl -I /unknown-page
+          <p className="text-ink-subtle">
+            <span className="text-accent">$</span> curl -I /unknown-page
           </p>
           <div className="mt-4 space-y-1">
-            <p className="text-red-400">HTTP/1.1 404 Not Found</p>
-            <p className="text-zinc-500">Content-Type: text/html</p>
+            <p className="text-danger">HTTP/1.1 404 Not Found</p>
+            <p className="text-ink-subtle">Content-Type: text/html</p>
           </div>
-          <div className="mt-6 border-t border-zinc-700/50 pt-6">
-            <p className="text-4xl font-bold text-zinc-100">404</p>
-            <p className="mt-1 text-zinc-400">
+          <div className="mt-6 border-t border-line pt-6">
+            <p className="text-4xl font-bold text-ink">404</p>
+            <p className="mt-1 text-ink-muted">
               The page you&apos;re looking for doesn&apos;t exist or has been
               moved.
             </p>
@@ -41,13 +41,13 @@ export default function NotFound() {
           <div className="mt-6 flex gap-3">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+              className="inline-flex items-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent-soft"
             >
               Go Home
             </Link>
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+              className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink-muted"
             >
               Dashboard
             </Link>

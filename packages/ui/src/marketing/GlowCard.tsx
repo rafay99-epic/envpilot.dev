@@ -26,7 +26,7 @@ export function GlowCard({
     <div
       ref={ref}
       onMouseMove={handleMouseMove}
-      className={`group relative overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-900/40 backdrop-blur-sm transition-colors duration-300 hover:border-green-500/30 ${className}`}
+      className={`group relative overflow-hidden rounded-xl border border-line bg-surface/40 backdrop-blur-sm transition-colors duration-300 hover:border-accent-line ${className}`}
     >
       <div
         aria-hidden

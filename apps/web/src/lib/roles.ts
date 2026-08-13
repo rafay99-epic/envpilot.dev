@@ -109,21 +109,21 @@ export function roleLabel(role: string | null | undefined): string {
 export function roleBadgeColor(colorToken: string): string {
   switch (colorToken) {
     case "purple":
-      return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
+      return "bg-premium-soft text-premium bg-premium-soft text-premium";
     case "amber":
-      return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+      return "bg-warning-soft text-warning bg-warning-soft text-warning";
     case "blue":
-      return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+      return "bg-info-soft text-info bg-info-soft text-info";
     case "teal":
-      return "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400";
+      return "bg-info-soft text-info bg-info-soft text-info";
     case "green":
-      return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+      return "bg-accent-soft text-accent-hover bg-accent-soft text-accent";
     case "red":
-      return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+      return "bg-danger-soft text-danger bg-danger-soft text-danger";
     case "slate":
-      return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
+      return "bg-surface-raised text-ink-faint bg-surface-raised text-ink-muted";
     default:
-      return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400";
+      return "bg-surface-raised text-ink-faint bg-surface-raised text-ink-muted";
   }
 }
 

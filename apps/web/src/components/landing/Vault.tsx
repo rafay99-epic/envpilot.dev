@@ -54,28 +54,28 @@ export function Vault() {
             >
               <div className="flex items-baseline gap-3">
                 <span
-                  className={`${terminal.mono} text-[11px] tracking-[0.16em] text-green-400 uppercase`}
+                  className={`${terminal.mono} text-[11px] tracking-[0.16em] text-accent uppercase`}
                 >
                   {item.kind}
                 </span>
                 <span
-                  className={`${terminal.mono} ml-auto text-[13px] text-zinc-600`}
+                  className={`${terminal.mono} ml-auto text-[13px] text-ink-faint`}
                 >
                   {item.count}
                 </span>
               </div>
-              <h3 className="mt-4 font-sans text-lg font-semibold tracking-[-0.02em] text-zinc-100">
+              <h3 className="mt-4 font-sans text-lg font-semibold tracking-[-0.02em] text-ink">
                 {item.title}
               </h3>
-              <p className="mt-2.5 font-sans text-[15px] leading-relaxed text-zinc-400">
+              <p className="mt-2.5 font-sans text-[15px] leading-relaxed text-ink-muted">
                 {item.body}
               </p>
               <div
-                className={`mt-5 space-y-1 border-t ${terminal.line} pt-4 ${terminal.mono} text-[12px] text-zinc-500`}
+                className={`mt-5 space-y-1 border-t ${terminal.line} pt-4 ${terminal.mono} text-[12px] text-ink-subtle`}
               >
                 {item.keys.map((key) => (
                   <p key={key} className="truncate">
-                    <span aria-hidden className="mr-2 text-zinc-700">
+                    <span aria-hidden className="mr-2 text-ink-faint">
                       ·
                     </span>
                     {key}

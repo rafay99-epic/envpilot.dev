@@ -10,7 +10,7 @@ interface LLMActionsProps {
 }
 
 const pillClassName =
-  "inline-flex items-center gap-1.5 rounded-full border border-zinc-800 px-2.5 py-1 font-mono text-[11px] text-zinc-500 transition-colors hover:border-green-500/30 hover:text-green-400";
+  "inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-mono text-[11px] text-ink-subtle transition-colors hover:border-accent-line hover:text-accent";
 
 /**
  * Compact row of "ask an LLM" actions for a doc page: copy the raw

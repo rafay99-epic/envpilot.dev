@@ -64,7 +64,7 @@ export function TagSelector({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      <label className="block text-sm font-medium text-ink-muted">
         <span className="flex items-center gap-1.5">
           <Tag className="h-3.5 w-3.5" />
           Tags
@@ -105,8 +105,8 @@ export function TagSelector({
               disabled={disabled}
               className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 isSelected
-                  ? "ring-1 ring-offset-1 dark:ring-offset-zinc-900"
-                  : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  ? "ring-1 ring-offset-1 ring-offset-line"
+                  : "hover:bg-surface-hover"
               }`}
               style={
                 isSelected
@@ -117,8 +117,8 @@ export function TagSelector({
                     }
                   : {
                       backgroundColor: "transparent",
-                      border: "1px solid var(--color-zinc-200)",
-                      color: "var(--color-zinc-500)",
+                      border: "1px solid var(--color-line)",
+                      color: "var(--color-ink-subtle)",
                     }
               }
             >
@@ -138,7 +138,7 @@ export function TagSelector({
             type="button"
             onClick={() => setShowCreate(true)}
             disabled={disabled}
-            className="inline-flex items-center gap-1 rounded-lg border border-dashed border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-500 transition-colors hover:border-zinc-400 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-300"
+            className="inline-flex items-center gap-1 rounded-lg border border-dashed border-line px-2.5 py-1 text-xs font-medium text-ink-subtle transition-colors hover:border-line-strong hover:text-ink-faint disabled:cursor-not-allowed disabled:opacity-50 border-line-strong text-ink-muted hover:border-line-strong hover:text-ink-muted"
           >
             <Plus className="h-3 w-3" />
             New tag
@@ -148,14 +148,14 @@ export function TagSelector({
 
       {/* Inline create form */}
       {showCreate && onCreateTag && (
-        <div className="space-y-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
+        <div className="space-y-3 rounded-lg border border-line bg-surface-raised p-3 border-line bg-surface-raised/50">
           <input
             type="text"
             value={newTagName}
             onChange={(e) => setNewTagName(e.target.value)}
             placeholder="Tag name"
             maxLength={50}
-            className="w-full rounded border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+            className="w-full rounded border border-line bg-white px-2.5 py-1.5 text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none border-line-strong bg-surface-raised text-ink placeholder-ink-subtle"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -173,7 +173,7 @@ export function TagSelector({
                 onClick={() => setNewTagColor(color)}
                 className={`h-6 w-6 rounded-full border-2 transition-transform ${
                   newTagColor === color
-                    ? "scale-110 border-zinc-900 dark:border-white"
+                    ? "scale-110 border-white"
                     : "border-transparent hover:scale-105"
                 }`}
                 style={{ backgroundColor: color }}
@@ -184,7 +184,7 @@ export function TagSelector({
             <button
               type="button"
               onClick={() => setShowCreate(false)}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-ink-subtle hover:text-ink-muted"
             >
               Cancel
             </button>
@@ -192,7 +192,7 @@ export function TagSelector({
               type="button"
               onClick={handleCreate}
               disabled={!newTagName.trim() || isCreating}
-              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="rounded-lg bg-surface px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-surface-hover disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
             >
               {isCreating ? "Creating..." : "Add Tag"}
             </button>

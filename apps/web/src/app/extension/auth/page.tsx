@@ -60,44 +60,44 @@ function ExtensionAuthContent() {
         }}
       />
 
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-2xl">
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-line bg-surface/90 shadow-2xl">
         {/* Terminal header */}
-        <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
+        <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2.5">
           <div className="h-3 w-3 rounded-full bg-[#ef5350]/80" />
           <div className="h-3 w-3 rounded-full bg-[#fbbf24]/80" />
           <div className="h-3 w-3 rounded-full bg-[#22c55e]/80" />
-          <span className="ml-2 text-xs text-zinc-500">extension-auth</span>
+          <span className="ml-2 text-xs text-ink-subtle">extension-auth</span>
         </div>
 
         <div className="p-8 text-center">
           <div className="mb-6">
             {status === "loading" && (
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
-                <Terminal className="h-8 w-8 animate-pulse text-green-400" />
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-accent-soft">
+                <Terminal className="h-8 w-8 animate-pulse text-accent" />
               </div>
             )}
             {status === "success" && (
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
-                <CheckCircle className="h-8 w-8 text-green-400" />
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-accent-soft">
+                <CheckCircle className="h-8 w-8 text-accent" />
               </div>
             )}
             {status === "error" && (
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10">
-                <XCircle className="h-8 w-8 text-red-400" />
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-danger-soft">
+                <XCircle className="h-8 w-8 text-danger" />
               </div>
             )}
           </div>
 
-          <h1 className="font-mono text-xl font-bold text-zinc-100">
+          <h1 className="font-mono text-xl font-bold text-ink">
             {status === "loading" && "Authenticating..."}
             {status === "success" && "Success!"}
             {status === "error" && "Authentication Failed"}
           </h1>
 
-          <p className="mt-3 text-sm text-zinc-400">{message}</p>
+          <p className="mt-3 text-sm text-ink-muted">{message}</p>
 
           {status === "success" && (
-            <p className="mt-4 font-mono text-xs text-zinc-500">
+            <p className="mt-4 font-mono text-xs text-ink-subtle">
               Return to your editor and click &quot;Check Sign In&quot; to
               complete the connection.
             </p>
@@ -106,7 +106,7 @@ function ExtensionAuthContent() {
           {status === "error" && (
             <button
               onClick={() => window.close()}
-              className="mt-6 inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink-muted"
             >
               Close Window
             </button>
@@ -122,10 +122,10 @@ export default function ExtensionAuthPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-[#0f172a]">
-          <span className="font-mono text-sm text-green-400">
-            <span className="text-zinc-500">$</span> authenticating
+          <span className="font-mono text-sm text-accent">
+            <span className="text-ink-subtle">$</span> authenticating
             <span
-              className="inline-block w-2 bg-green-400"
+              className="inline-block w-2 bg-accent"
               style={{ animation: "blink 1s step-end infinite" }}
             >
               &nbsp;

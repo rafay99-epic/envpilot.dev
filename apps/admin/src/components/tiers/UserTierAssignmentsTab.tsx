@@ -75,14 +75,14 @@ export function UserTierAssignmentsTab() {
             d left
           </Badge>
         ) : (
-          <span className="text-zinc-500">—</span>
+          <span className="text-ink-subtle">—</span>
         ),
     },
   ];
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-zinc-100">
+      <h2 className="mb-4 text-lg font-semibold text-ink">
         User Tier Assignments
       </h2>
       <QueryState

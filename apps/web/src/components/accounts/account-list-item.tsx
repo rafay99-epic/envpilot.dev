@@ -31,10 +31,10 @@ interface AccountListItemProps {
 
 function envBadgeClasses(env: string): string {
   return env === "production"
-    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+    ? "bg-danger-soft text-danger bg-danger-soft text-danger"
     : env === "staging"
-      ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-      : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+      ? "bg-warning-soft text-warning bg-warning-soft text-warning"
+      : "bg-accent-soft text-accent-hover bg-accent-soft text-accent";
 }
 
 export function AccountListItem({
@@ -99,7 +99,7 @@ export function AccountListItem({
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              <span className="text-sm font-semibold text-ink">
                 {account.name}
               </span>
               {safeUrl && (
@@ -107,7 +107,7 @@ export function AccountListItem({
                   href={safeUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  className="inline-flex items-center gap-1 text-xs text-ink-subtle hover:text-ink"
                   title={safeUrl}
                 >
                   <ExternalLink className="h-3 w-3" />
@@ -118,8 +118,8 @@ export function AccountListItem({
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     permissionLevel === "write"
-                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                      : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                      ? "bg-warning-soft text-warning bg-warning-soft text-warning"
+                      : "bg-info-soft text-info bg-info-soft text-info"
                   }`}
                 >
                   {permissionLevel}
@@ -127,7 +127,7 @@ export function AccountListItem({
               )}
             </div>
             {account.description && (
-              <p className="mt-1 truncate text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="mt-1 truncate text-sm text-ink-muted">
                 {account.description}
               </p>
             )}
@@ -142,7 +142,7 @@ export function AccountListItem({
                   </span>
                 ))}
               </div>
-              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+              <span className="text-xs text-ink-subtle">
                 Updated {formatDate(account.updatedAt)}
               </span>
             </div>
@@ -154,7 +154,7 @@ export function AccountListItem({
             <button
               onClick={handleToggleReveal}
               disabled={isRevealing}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
               title={
                 isVisible && revealedValue
                   ? "Hide credentials"
@@ -173,7 +173,7 @@ export function AccountListItem({
           {onShare && (
             <button
               onClick={onShare}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
               title="Share account"
             >
               <Share2 className="h-4 w-4" />
@@ -182,7 +182,7 @@ export function AccountListItem({
           {canManagePermissions && onManagePermissions && (
             <button
               onClick={onManagePermissions}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
               title="Manage access permissions"
             >
               <svg
@@ -203,7 +203,7 @@ export function AccountListItem({
           {canEdit && onEdit && (
             <button
               onClick={onEdit}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
               title="Edit account"
             >
               <svg
@@ -224,7 +224,7 @@ export function AccountListItem({
           {canDelete && onDelete && (
             <button
               onClick={onDelete}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+              className="rounded-lg p-2 text-ink-muted hover:bg-danger-soft hover:text-danger hover:bg-danger-soft hover:text-danger"
               title="Delete account"
             >
               <svg
@@ -247,23 +247,23 @@ export function AccountListItem({
 
       {/* Revealed credentials */}
       {isVisible && revealedValue && (
-        <div className="mt-2 space-y-2 rounded-lg bg-zinc-100 px-3 py-2.5 dark:bg-zinc-800">
+        <div className="mt-2 space-y-2 rounded-lg bg-surface-raised px-3 py-2.5 bg-surface-raised">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <span className="block text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+              <span className="block text-[10px] font-medium uppercase tracking-wide text-ink-subtle">
                 Username
               </span>
-              <code className="block break-all font-mono text-xs text-zinc-700 dark:text-zinc-300">
+              <code className="block break-all font-mono text-xs text-ink-muted">
                 {revealedValue.username}
               </code>
             </div>
             <button
               onClick={() => handleCopy("username", revealedValue.username)}
-              className="shrink-0 rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+              className="shrink-0 rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
               title={copiedField === "username" ? "Copied!" : "Copy username"}
             >
               {copiedField === "username" ? (
-                <Check className="h-4 w-4 text-green-500" />
+                <Check className="h-4 w-4 text-accent" />
               ) : (
                 <Copy className="h-4 w-4" />
               )}
@@ -271,10 +271,10 @@ export function AccountListItem({
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <span className="block text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+              <span className="block text-[10px] font-medium uppercase tracking-wide text-ink-subtle">
                 Password
               </span>
-              <code className="block break-all font-mono text-xs text-zinc-700 dark:text-zinc-300">
+              <code className="block break-all font-mono text-xs text-ink-muted">
                 {showPassword
                   ? revealedValue.password
                   : "•".repeat(Math.min(revealedValue.password.length, 24))}
@@ -283,7 +283,7 @@ export function AccountListItem({
             <div className="flex shrink-0 items-center gap-1">
               <button
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+                className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
                 title={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (
@@ -294,11 +294,11 @@ export function AccountListItem({
               </button>
               <button
                 onClick={() => handleCopy("password", revealedValue.password)}
-                className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+                className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
                 title={copiedField === "password" ? "Copied!" : "Copy password"}
               >
                 {copiedField === "password" ? (
-                  <Check className="h-4 w-4 text-green-500" />
+                  <Check className="h-4 w-4 text-accent" />
                 ) : (
                   <Copy className="h-4 w-4" />
                 )}

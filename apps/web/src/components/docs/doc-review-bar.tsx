@@ -14,8 +14,8 @@ export function DocStatusPill({ status }: DocStatusPillProps) {
       data-status={status}
       className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase ${
         isDraft
-          ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
-          : "border-green-500/40 bg-green-500/10 text-green-400"
+          ? "border-warning-line bg-warning-soft text-warning"
+          : "border-accent-line bg-accent-soft text-accent"
       }`}
     >
       {isDraft ? "draft" : "published"}

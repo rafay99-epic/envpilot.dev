@@ -83,23 +83,23 @@ export function AccountShareDrawer({
       <div className="space-y-5">
         {/* Account label */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+          <label className="mb-1.5 block text-xs font-medium text-ink-muted">
             Account
           </label>
-          <div className="rounded-lg bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
+          <div className="rounded-lg bg-surface-raised px-3 py-2 text-sm font-semibold text-ink-inverse bg-surface-raised text-ink">
             {account.name}
           </div>
         </div>
 
         {/* Mode tabs */}
-        <div className="flex gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
+        <div className="flex gap-1 rounded-lg bg-surface-raised p-1 bg-surface-raised">
           <button
             type="button"
             onClick={() => setTab("member")}
             className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               tab === "member"
-                ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100"
-                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                ? "bg-white text-ink-inverse shadow-sm bg-surface-hover text-ink"
+                : "text-ink-faint hover:text-ink"
             }`}
           >
             <UserPlus className="h-4 w-4" />
@@ -110,8 +110,8 @@ export function AccountShareDrawer({
             onClick={() => setTab("external")}
             className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               tab === "external"
-                ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100"
-                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                ? "bg-white text-ink-inverse shadow-sm bg-surface-hover text-ink"
+                : "text-ink-faint hover:text-ink"
             }`}
           >
             <Link2 className="h-4 w-4" />
@@ -209,7 +209,7 @@ function TeamMemberMode({
       <div>
         <label
           htmlFor="account-share-member"
-          className="mb-1.5 block text-xs font-medium text-zinc-500 dark:text-zinc-400"
+          className="mb-1.5 block text-xs font-medium text-ink-muted"
         >
           Team member
         </label>
@@ -221,7 +221,7 @@ function TeamMemberMode({
             setError(null);
           }}
           disabled={members === undefined}
-          className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+          className="block w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong disabled:opacity-50 border-line bg-surface-raised text-ink"
         >
           <option value="">
             {members === undefined
@@ -240,7 +240,7 @@ function TeamMemberMode({
 
       {/* Permission */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        <label className="mb-1.5 block text-xs font-medium text-ink-muted">
           Permission
         </label>
         <div className="flex gap-2">
@@ -251,8 +251,8 @@ function TeamMemberMode({
               onClick={() => setPermission(p)}
               className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors ${
                 permission === p
-                  ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                  : "border-zinc-300 text-zinc-600 hover:border-zinc-400 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600"
+                  ? "border-line bg-surface text-white border-line bg-surface-raised text-ink-inverse"
+                  : "border-line text-ink-faint hover:border-line text-ink-muted hover:border-line-strong"
               }`}
             >
               {p}
@@ -263,7 +263,7 @@ function TeamMemberMode({
 
       {/* Expiry */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        <label className="mb-1.5 block text-xs font-medium text-ink-muted">
           Expires
         </label>
         <div className="flex flex-wrap gap-2">
@@ -274,8 +274,8 @@ function TeamMemberMode({
               onClick={() => setExpiryMs(opt.ms)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 expiryMs === opt.ms
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                  ? "bg-surface text-white bg-surface-raised text-ink-inverse"
+                  : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
               }`}
             >
               {opt.label}
@@ -285,42 +285,42 @@ function TeamMemberMode({
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="text-sm text-danger">{error}</p>
       )}
 
       <button
         type="button"
         onClick={handleGrant}
         disabled={isGranting || !selectedMember}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
       >
         {isGranting && <Loader2 className="h-4 w-4 animate-spin" />}
         {isGranting ? "Granting…" : "Grant access"}
       </button>
 
       {/* Existing grants */}
-      <div className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
-        <h3 className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+      <div className="border-t border-line pt-4 border-line">
+        <h3 className="text-xs font-medium text-ink-muted">
           Active grants ({activeGrants.length})
         </h3>
         {grants === undefined ? (
-          <p className="mt-2 text-sm text-zinc-400">Loading…</p>
+          <p className="mt-2 text-sm text-ink-muted">Loading…</p>
         ) : activeGrants.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-400 dark:text-zinc-500">
+          <p className="mt-2 text-sm text-ink-subtle">
             No team members have been granted access yet.
           </p>
         ) : (
-          <ul className="mt-2 divide-y divide-zinc-200 dark:divide-zinc-800">
+          <ul className="mt-2 divide-y divide-line">
             {activeGrants.map((g) => (
               <li
                 key={g._id}
                 className="flex items-center justify-between gap-3 py-2.5"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm text-zinc-800 dark:text-zinc-200">
+                  <p className="truncate text-sm text-ink">
                     {g.user?.name ?? g.user?.email ?? "Unknown user"}
                   </p>
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                  <p className="text-xs text-ink-subtle">
                     <span className="capitalize">{g.permission}</span>
                     {g.expiresAt
                       ? ` · expires ${new Date(g.expiresAt).toLocaleDateString()}`
@@ -331,7 +331,7 @@ function TeamMemberMode({
                   type="button"
                   onClick={() => handleRevoke(g.userId)}
                   disabled={revokingId === g.userId}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-danger-line px-2.5 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger-soft disabled:opacity-50 border-danger-line text-danger hover:bg-danger-soft"
                 >
                   {revokingId === g.userId ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -346,11 +346,11 @@ function TeamMemberMode({
         )}
       </div>
 
-      <div className="flex justify-end border-t border-zinc-200 pt-4 dark:border-zinc-800">
+      <div className="flex justify-end border-t border-line pt-4 border-line">
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
         >
           Done
         </button>

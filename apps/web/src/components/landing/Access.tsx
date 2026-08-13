@@ -66,7 +66,7 @@ const NOTES = [
 const ROWS = MATRIX.map((row) => ({
   key: row.cap,
   cells: [
-    <span key="cap" className="text-zinc-300">
+    <span key="cap" className="text-ink-muted">
       {row.cap}
     </span>,
     ...row.grants.map((granted, i) => (
@@ -74,7 +74,7 @@ const ROWS = MATRIX.map((row) => ({
         key={ROLES[i]}
         role="img"
         aria-label={granted ? "granted" : "not granted"}
-        className={granted ? "text-green-400" : "text-zinc-700"}
+        className={granted ? "text-accent" : "text-ink-faint"}
       >
         {granted ? "✓" : "·"}
       </span>
@@ -101,14 +101,14 @@ export function Access() {
           </TerminalPanel>
 
           <div className="mt-8 grid gap-x-10 gap-y-6 sm:grid-cols-2">
-            <p className="font-sans text-[15px] leading-relaxed text-zinc-400">
-              <span className="text-zinc-200">Look at the share row.</span>{" "}
+            <p className="font-sans text-[15px] leading-relaxed text-ink-muted">
+              <span className="text-ink">Look at the share row.</span>{" "}
               Developers can share a secret; editors cannot. No invented ladder
               produces that — it is the real profile, and it is editable. Roles
               are data; capabilities are code.
             </p>
-            <p className="font-sans text-[15px] leading-relaxed text-zinc-400">
-              <span className="text-zinc-200">
+            <p className="font-sans text-[15px] leading-relaxed text-ink-muted">
+              <span className="text-ink">
                 The owner column is derived,
               </span>{" "}
               never hand-written — so a capability shipped on Tuesday cannot
@@ -122,10 +122,10 @@ export function Access() {
           >
             {NOTES.map((item) => (
               <div key={item.t} className="bg-[#0B0D0C] p-6">
-                <h3 className="font-sans text-[15px] font-semibold text-zinc-100">
+                <h3 className="font-sans text-[15px] font-semibold text-ink">
                   {item.t}
                 </h3>
-                <p className="mt-2 font-sans text-[14px] leading-relaxed text-zinc-400">
+                <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-muted">
                   {item.d}
                 </p>
               </div>

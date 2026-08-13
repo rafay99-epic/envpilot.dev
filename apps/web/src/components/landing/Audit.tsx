@@ -15,9 +15,9 @@ const COLUMNS: TerminalColumn[] = [
 ];
 
 const EVENT_TONE = {
-  ok: "text-green-400",
-  warn: "text-amber-400",
-  err: "text-red-400",
+  ok: "text-accent",
+  warn: "text-warning",
+  err: "text-danger",
 } as const;
 
 const EVENTS: {
@@ -79,22 +79,22 @@ const EVENTS: {
 const ROWS = EVENTS.map((row) => ({
   key: row.time,
   cells: [
-    <span key="time" className="text-zinc-600">
+    <span key="time" className="text-ink-faint">
       {row.time}
     </span>,
-    <span key="actor" className="text-zinc-200">
+    <span key="actor" className="text-ink">
       {row.actor}
     </span>,
     <span
       key="event"
-      className={row.tone ? EVENT_TONE[row.tone] : "text-zinc-400"}
+      className={row.tone ? EVENT_TONE[row.tone] : "text-ink-muted"}
     >
       {row.event}
     </span>,
-    <span key="resource" className="text-zinc-400">
+    <span key="resource" className="text-ink-muted">
       {row.resource}
     </span>,
-    <span key="origin" className="text-zinc-600">
+    <span key="origin" className="text-ink-faint">
       {row.origin}
     </span>,
   ],
@@ -122,7 +122,7 @@ export function Audit() {
           </TerminalPanel>
 
           <p
-            className={`mt-5 ${terminal.mono} text-[12px] leading-relaxed text-zinc-500`}
+            className={`mt-5 ${terminal.mono} text-[12px] leading-relaxed text-ink-subtle`}
           >
             40+ event types · IP, user agent and location on every row · CSV and
             JSON export · retention set per plan · denials are recorded, not

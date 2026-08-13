@@ -16,7 +16,7 @@ const DocMarkdown = dynamic(
   {
     ssr: false,
     loading: () => (
-      <p className="p-4 text-sm text-zinc-500">Loading preview…</p>
+      <p className="p-4 text-sm text-ink-subtle">Loading preview…</p>
     ),
   }
 );
@@ -117,8 +117,8 @@ export function DocEditor({
                 onClick={() => setMode(value)}
                 className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
                   mode === value
-                    ? "bg-green-500/10 text-green-400"
-                    : "text-zinc-400 hover:text-zinc-100"
+                    ? "bg-accent-soft text-accent"
+                    : "text-ink-muted hover:text-ink"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -128,7 +128,7 @@ export function DocEditor({
           </div>
           {showEditor && (
             <>
-              <span className="h-4 w-px bg-zinc-700" />
+              <span className="h-4 w-px bg-surface-hover" />
               <DocEditorToolbar
                 onWrap={wrapSelection}
                 onPrefix={prefixLines}
@@ -148,27 +148,27 @@ export function DocEditor({
             title="Outline"
             className={`flex items-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition-colors ${
               showOutline
-                ? "bg-green-500/10 text-green-400"
-                : "text-zinc-400 hover:text-zinc-100"
+                ? "bg-accent-soft text-accent"
+                : "text-ink-muted hover:text-ink"
             }`}
           >
             <ListTree className="h-3.5 w-3.5" />
             Outline
           </button>
-          <span className="font-mono text-[11px] text-zinc-400">
+          <span className="font-mono text-[11px] text-ink-muted">
             {body.length.toLocaleString()} chars
           </span>
         </div>
       </div>
 
       {warnings.length > 0 && (
-        <div className="flex items-start gap-2 border-b border-amber-900/40 px-8 py-3">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="flex items-start gap-2 border-b border-warning-line px-8 py-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
           <div className="space-y-1">
             {warnings.map((warning) => (
               <p
                 key={warning}
-                className="text-xs text-amber-700 dark:text-amber-300"
+                className="text-xs text-warning"
               >
                 {warning}
               </p>
@@ -180,11 +180,11 @@ export function DocEditor({
       <div className="flex min-h-0 flex-1">
         {showOutline && (
           <nav className="slim-scrollbar w-56 shrink-0 overflow-y-auto border-r border-white/10 px-4 py-5">
-            <p className="mb-2 text-[10px] font-semibold tracking-wider text-zinc-400 uppercase">
+            <p className="mb-2 text-[10px] font-semibold tracking-wider text-ink-muted uppercase">
               Outline
             </p>
             {outline.length === 0 ? (
-              <p className="text-xs text-zinc-500">No headings yet.</p>
+              <p className="text-xs text-ink-subtle">No headings yet.</p>
             ) : (
               <ul className="space-y-0.5">
                 {outline.map((heading) => (
@@ -200,7 +200,7 @@ export function DocEditor({
                         );
                       }}
                       style={{ paddingLeft: `${(heading.level - 1) * 10}px` }}
-                      className="w-full truncate rounded px-1.5 py-1 text-left text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                      className="w-full truncate rounded px-1.5 py-1 text-left text-xs text-ink-faint hover:bg-surface-hover hover:text-ink-muted hover:bg-surface-hover hover:text-ink"
                     >
                       {heading.text}
                     </button>
@@ -237,7 +237,7 @@ export function DocEditor({
               // editor's extent, which a full-width wash never could.
               // Type metrics from wryte. `h-full` (not min-h-full) keeps it
               // exactly as tall as its pane, so it stays the single scroller.
-              className="slim-scrollbar mx-auto block h-full w-full max-w-[920px] resize-none overflow-y-auto bg-white/[0.04] px-10 py-8 font-mono text-[15px] leading-[1.85] text-zinc-200 caret-green-400 outline-none selection:bg-green-500/25 placeholder:text-zinc-600 disabled:opacity-60"
+              className="slim-scrollbar mx-auto block h-full w-full max-w-[920px] resize-none overflow-y-auto bg-white/[0.04] px-10 py-8 font-mono text-[15px] leading-[1.85] text-ink caret-accent outline-none selection:bg-accent-soft placeholder:text-ink-faint disabled:opacity-60"
               placeholder="Write the page in markdown…"
             />
           </div>
@@ -271,7 +271,7 @@ export function DocEditor({
               {body.trim().length > 0 ? (
                 <DocMarkdown body={body} />
               ) : (
-                <p className="text-sm text-zinc-500">Nothing to preview yet.</p>
+                <p className="text-sm text-ink-subtle">Nothing to preview yet.</p>
               )}
             </div>
           </div>

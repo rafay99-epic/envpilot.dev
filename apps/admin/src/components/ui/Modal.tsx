@@ -78,17 +78,17 @@ export function Modal({
         aria-labelledby={titleId}
         tabIndex={-1}
         className={cn(
-          "w-full max-w-lg rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-xl focus:outline-none",
+          "w-full max-w-lg rounded-lg border border-line bg-surface/90 shadow-xl focus:outline-none",
           className
         )}
       >
-        <div className="flex items-center justify-between border-b border-zinc-700/50 px-6 py-4">
-          <h2 id={titleId} className="text-lg font-semibold text-zinc-100">
+        <div className="flex items-center justify-between border-b border-line px-6 py-4">
+          <h2 id={titleId} className="text-lg font-semibold text-ink">
             {title}
           </h2>
           <button
             onClick={onClose}
-            className="rounded-md p-1 text-zinc-400 hover:bg-green-500/5 hover:text-green-400"
+            className="rounded-md p-1 text-ink-muted hover:bg-accent-soft hover:text-accent"
           >
             <X className="h-4 w-4" />
           </button>

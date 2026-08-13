@@ -72,16 +72,16 @@ function memberOrgRole(member: ProjectMember): OrgRole {
 function roleBadgeClasses(role: OrgRole): string {
   switch (role) {
     case "owner":
-      return "border-green-500/20 bg-green-500/10 text-green-400";
+      return "border-accent-line bg-accent-soft text-accent";
     case "project_manager":
-      return "border-amber-500/20 bg-amber-500/10 text-amber-400";
+      return "border-warning-line bg-warning-soft text-warning";
     case "team_lead":
-      return "border-blue-500/20 bg-blue-500/10 text-blue-400";
+      return "border-info-line bg-info-soft text-info";
     case "editor":
-      return "border-teal-500/20 bg-teal-500/10 text-teal-400";
+      return "border-info-line bg-info-soft text-info";
     default:
       // developer, viewer, and custom registry roles
-      return "border-zinc-500/20 bg-zinc-500/10 text-zinc-400";
+      return "border-line-strong bg-surface-hover/10 text-ink-muted";
   }
 }
 
@@ -303,7 +303,7 @@ export default function ProjectMembersPage({
   if (error && !project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <h2 className="text-lg font-semibold text-zinc-100">{error}</h2>
+        <h2 className="text-lg font-semibold text-ink">{error}</h2>
       </div>
     );
   }
@@ -313,8 +313,8 @@ export default function ProjectMembersPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-zinc-100">Project Members</h1>
-          <p className="mt-1 text-sm text-zinc-500">
+          <h1 className="text-xl font-bold text-ink">Project Members</h1>
+          <p className="mt-1 text-sm text-ink-subtle">
             Manage who has access to {project?.name}
           </p>
         </div>
@@ -322,7 +322,7 @@ export default function ProjectMembersPage({
         {canManageMembers && addableMembers.length > 0 && (
           <button
             onClick={() => setShowAddMember(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="inline-flex items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover text-ink-inverse hover:bg-surface-hover"
           >
             <svg
               className="h-4 w-4"
@@ -344,43 +344,43 @@ export default function ProjectMembersPage({
 
       {/* Messages */}
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
-          <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+        <div className="rounded-lg border border-danger-line bg-danger-soft p-4 border-danger-line bg-danger-soft">
+          <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
       {successMessage && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
-          <p className="text-sm text-green-700 dark:text-green-400">
+        <div className="rounded-lg border border-accent-line bg-accent-soft p-4 border-accent-line bg-accent-soft">
+          <p className="text-sm text-accent">
             {successMessage}
           </p>
         </div>
       )}
 
       {/* Info banner */}
-      <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
-        <p className="text-sm text-blue-400">
+      <div className="rounded-lg border border-info-line bg-info-soft p-4">
+        <p className="text-sm text-info">
           Organization owners have implicit access to all projects. What each
           member can do here follows from their organization role.
         </p>
       </div>
 
       {/* Members List */}
-      <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-          <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+      <div className="rounded-xl border border-line bg-white border-line bg-surface">
+        <div className="border-b border-line px-6 py-4 border-line">
+          <h2 className="font-semibold text-ink">
             Members ({members.length})
           </h2>
         </div>
 
         {members.length === 0 ? (
-          <div className="p-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+          <div className="p-8 text-center text-sm text-ink-muted">
             No members assigned to this project yet.
           </div>
         ) : (
           <>
             <AnimatedList
-              className="divide-y divide-zinc-100 dark:divide-zinc-800"
+              className="divide-y divide-line"
               pageKey={membersPagination.currentPage}
             >
               {membersPagination.pageItems.map((member) => {
@@ -391,17 +391,17 @@ export default function ProjectMembersPage({
                     className="flex items-center justify-between px-6 py-4"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-200 text-sm font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-raised text-sm font-medium text-ink-faint bg-surface-hover text-ink-muted">
                         {member.user.name
                           ? member.user.name.charAt(0).toUpperCase()
                           : member.user.email.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        <p className="text-sm font-medium text-ink">
                           {member.user.name || member.user.email}
                         </p>
                         {member.user.name && (
-                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          <p className="text-xs text-ink-muted">
                             {member.user.email}
                           </p>
                         )}
@@ -420,7 +420,7 @@ export default function ProjectMembersPage({
                       {/* Environment scope — env-scopeable roles only */}
                       {isEnvScopedRole(targetRole) && (
                         <span
-                          className="inline-flex items-center rounded-full border border-zinc-500/20 bg-zinc-500/10 px-2 py-0.5 text-xs font-medium text-zinc-400"
+                          className="inline-flex items-center rounded-full border border-line-strong bg-surface-hover/10 px-2 py-0.5 text-xs font-medium text-ink-muted"
                           title="Environment access"
                         >
                           {formatEnvironmentScope(member.environments)}
@@ -431,7 +431,7 @@ export default function ProjectMembersPage({
                         canManageTarget(targetRole) && (
                           <button
                             onClick={() => openScopeEditor(member)}
-                            className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                            className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
                             title="Edit environment access"
                           >
                             <svg
@@ -454,7 +454,7 @@ export default function ProjectMembersPage({
                         canManageTarget(targetRole) && (
                           <button
                             onClick={() => handleRemoveMember(member.userId)}
-                            className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                            className="rounded-lg p-1.5 text-ink-muted hover:bg-danger-soft hover:text-danger hover:bg-danger-soft hover:text-danger"
                             title="Remove from project"
                           >
                             <svg
@@ -506,7 +506,7 @@ export default function ProjectMembersPage({
         width="md"
         preventClose={isAdding}
       >
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-ink-muted">
           Assign an organization member to this project. Their abilities here
           follow from their organization role.
         </p>
@@ -514,14 +514,14 @@ export default function ProjectMembersPage({
         <form onSubmit={handleAddMember} className="mt-6 space-y-4">
           {/* User selection */}
           <div>
-            <label className="block text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            <label className="block text-sm font-medium text-ink">
               Member
             </label>
             <select
               value={selectedUserId}
               onChange={(e) => setSelectedUserId(e.target.value)}
               required
-              className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              className="mt-2 block w-full rounded-lg border border-line bg-white px-4 py-2.5 text-ink-inverse focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
             >
               <option value="">Select a member...</option>
               {addableMembers.map((m) => (
@@ -551,7 +551,7 @@ export default function ProjectMembersPage({
                 setSelectedUserId("");
                 setAddEnvScope(allEnvironments());
               }}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
             >
               Cancel
             </button>
@@ -562,7 +562,7 @@ export default function ProjectMembersPage({
                 !selectedUserId ||
                 (addEnvScopeApplies && addEnvScope.length === 0)
               }
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="inline-flex items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
             >
               {isAdding ? "Adding..." : "Add Member"}
             </button>
@@ -581,7 +581,7 @@ export default function ProjectMembersPage({
       >
         {editingScopeMember && (
           <>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="text-sm text-ink-muted">
               Limit which environments{" "}
               {editingScopeMember.user.name || editingScopeMember.user.email}{" "}
               can work in on this project. Check all environments to remove the
@@ -599,14 +599,14 @@ export default function ProjectMembersPage({
                 <button
                   type="button"
                   onClick={() => setEditingScopeMember(null)}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingScope || editEnvScope.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  className="inline-flex items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
                 >
                   {isSavingScope ? "Saving..." : "Save"}
                 </button>

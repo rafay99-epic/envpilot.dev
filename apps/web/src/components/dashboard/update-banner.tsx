@@ -56,13 +56,13 @@ export function UpdateBanner() {
 
   return (
     <div className="fixed bottom-6 right-6 z-[100]">
-      <div className="overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-xl backdrop-blur-sm">
+      <div className="overflow-hidden rounded-lg border border-line bg-surface/90 shadow-xl backdrop-blur-sm">
         {/* Terminal window header — matches TerminalWindow component */}
-        <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-3 py-1.5">
+        <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-3 py-1.5">
           <div className="h-2 w-2 rounded-full bg-[#ef5350]/80" />
           <div className="h-2 w-2 rounded-full bg-[#fbbf24]/80" />
           <div className="h-2 w-2 rounded-full bg-[#22c55e]/80" />
-          <span className="ml-1 font-mono text-[10px] text-zinc-500">
+          <span className="ml-1 font-mono text-[10px] text-ink-subtle">
             update
           </span>
         </div>
@@ -70,16 +70,16 @@ export function UpdateBanner() {
         {/* Content */}
         <div className="flex items-center gap-3 px-4 py-3">
           <div className="font-mono text-xs">
-            <span className="text-green-400">$</span>{" "}
-            <span className="text-zinc-400">new release</span>{" "}
-            <span className="rounded border border-green-500/20 bg-green-500/10 px-1.5 py-0.5 text-green-400">
+            <span className="text-accent">$</span>{" "}
+            <span className="text-ink-muted">new release</span>{" "}
+            <span className="rounded border border-accent-line bg-accent-soft px-1.5 py-0.5 text-accent">
               v{newVersion}
             </span>
           </div>
 
           <button
             onClick={() => window.location.reload()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-1.5 font-mono text-xs font-medium text-green-400 transition-colors hover:bg-green-500/20"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-accent-line bg-accent-soft px-3 py-1.5 font-mono text-xs font-medium text-accent transition-colors hover:bg-accent-soft"
           >
             <RefreshCw className="h-3 w-3" />
             refresh
@@ -90,7 +90,7 @@ export function UpdateBanner() {
               dismissedVersionRef.current = newVersion;
               setDismissed(true);
             }}
-            className="rounded-lg p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+            className="rounded-lg p-1 text-ink-subtle transition-colors hover:bg-surface-hover hover:text-ink-muted"
           >
             <X className="h-3.5 w-3.5" />
           </button>

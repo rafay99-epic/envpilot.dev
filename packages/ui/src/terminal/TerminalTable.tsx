@@ -35,8 +35,8 @@ export function TerminalTable({
                 scope="col"
                 className={`py-3 font-normal ${
                   column.align === "center"
-                    ? "px-3 text-center text-zinc-400"
-                    : "px-5 text-left tracking-[0.14em] text-zinc-600 uppercase"
+                    ? "px-3 text-center text-ink-muted"
+                    : "px-5 text-left tracking-[0.14em] text-ink-faint uppercase"
                 }`}
               >
                 {column.label}

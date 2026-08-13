@@ -84,7 +84,7 @@ export function BarChart({
                   x={PADDING.left - 6}
                   y={y + 4}
                   textAnchor="end"
-                  className="fill-zinc-500"
+                  className="fill-ink-subtle"
                   fontSize={10}
                 >
                   {formatValue(tick)}
@@ -126,7 +126,7 @@ export function BarChart({
                   x={labelX}
                   y={y - 6}
                   textAnchor="middle"
-                  className="fill-zinc-300"
+                  className="fill-ink-muted"
                   fontSize={10}
                   fontWeight={500}
                 >
@@ -139,7 +139,7 @@ export function BarChart({
                   x={labelX}
                   y={labelY}
                   textAnchor="end"
-                  className="fill-zinc-400"
+                  className="fill-ink-muted"
                   fontSize={10}
                   transform={`rotate(-45, ${labelX}, ${labelY})`}
                 >
@@ -150,7 +150,7 @@ export function BarChart({
                   x={labelX}
                   y={labelY + 4}
                   textAnchor="middle"
-                  className="fill-zinc-400"
+                  className="fill-ink-muted"
                   fontSize={10}
                 >
                   {d.label}
@@ -164,17 +164,17 @@ export function BarChart({
       {/* Hover tooltip */}
       {hovered !== null && (
         <div
-          className="pointer-events-none absolute rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs shadow-xl"
+          className="pointer-events-none absolute rounded-lg border border-line bg-surface px-3 py-1.5 text-xs shadow-xl"
           style={{
             left: `${((PADDING.left + hovered * (barWidth + barGap) + barWidth / 2) / VIEW_WIDTH) * 100}%`,
             top: 0,
             transform: "translateX(-50%)",
           }}
         >
-          <p className="font-medium text-zinc-100">
+          <p className="font-medium text-ink">
             {formatValue(data[hovered].value)}
           </p>
-          <p className="text-zinc-400">{data[hovered].label}</p>
+          <p className="text-ink-muted">{data[hovered].label}</p>
         </div>
       )}
     </div>

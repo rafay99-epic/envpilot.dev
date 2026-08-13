@@ -38,7 +38,7 @@ export function RotationVariablesTab() {
       header: "Variable",
       sortable: true,
       render: (v) => (
-        <span className="font-mono text-xs text-zinc-300">{v.key}</span>
+        <span className="font-mono text-xs text-ink-muted">{v.key}</span>
       ),
     },
     { key: "projectName", header: "Project", sortable: true },
@@ -46,7 +46,7 @@ export function RotationVariablesTab() {
       key: "rotationFrequencyDays",
       header: "Frequency",
       render: (v) => (
-        <span className="text-xs text-zinc-400">
+        <span className="text-xs text-ink-muted">
           {v.rotationFrequencyDays}d
         </span>
       ),
@@ -56,7 +56,7 @@ export function RotationVariablesTab() {
       header: "Expires At",
       sortable: true,
       render: (v) => (
-        <span className="text-xs text-zinc-400">
+        <span className="text-xs text-ink-muted">
           {new Date(v.expiresAt).toLocaleString()}
         </span>
       ),
@@ -112,8 +112,8 @@ export function RotationVariablesTab() {
               }}
               className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
                 preset.minutes < 0
-                  ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                  : "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                  ? "bg-danger-soft text-danger hover:bg-danger-soft"
+                  : "bg-info-soft text-info hover:bg-info-soft"
               }`}
             >
               {preset.label}
@@ -126,11 +126,11 @@ export function RotationVariablesTab() {
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-zinc-100">
-        <RotateCcw className="mr-2 inline h-4 w-4 text-zinc-400" />
+      <h2 className="mb-4 text-lg font-semibold text-ink">
+        <RotateCcw className="mr-2 inline h-4 w-4 text-ink-muted" />
         Rotation-Enabled Variables
       </h2>
-      <p className="mb-4 text-xs text-zinc-500">
+      <p className="mb-4 text-xs text-ink-subtle">
         Edit expiry timestamps for testing. Click a time to set it to minutes
         from now.
       </p>

@@ -69,11 +69,11 @@ export default async function DashboardLayout({
   // Check if user is banned
   if (convexUser.isBanned) {
     return (
-      <div className="dark flex min-h-screen items-center justify-center bg-[#0f172a] text-zinc-100">
-        <div className="mx-auto max-w-md rounded-lg border border-red-500/20 bg-red-950/20 p-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10">
+      <div className="dark flex min-h-screen items-center justify-center bg-[#0f172a] text-ink">
+        <div className="mx-auto max-w-md rounded-lg border border-danger-line bg-danger-soft p-8 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-danger-soft">
             <svg
-              className="h-6 w-6 text-red-400"
+              className="h-6 w-6 text-danger"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -86,18 +86,18 @@ export default async function DashboardLayout({
               />
             </svg>
           </div>
-          <h1 className="mb-2 text-xl font-semibold text-red-400">
+          <h1 className="mb-2 text-xl font-semibold text-danger">
             Account Suspended
           </h1>
-          <p className="mb-4 text-sm text-zinc-400">
+          <p className="mb-4 text-sm text-ink-muted">
             Your account has been suspended.
             {convexUser.banReason && (
-              <span className="mt-2 block text-zinc-500">
+              <span className="mt-2 block text-ink-subtle">
                 Reason: {convexUser.banReason}
               </span>
             )}
           </p>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-ink-subtle">
             If you believe this is a mistake, please contact support.
           </p>
         </div>

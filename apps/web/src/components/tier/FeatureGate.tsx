@@ -98,7 +98,7 @@ export function FeatureGate({
   if (isLoading) {
     return (
       <div className="animate-pulse">
-        <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-24" />
+        <div className="h-8 bg-surface-hover rounded w-24" />
       </div>
     );
   }
@@ -165,7 +165,7 @@ export function ProOnlyBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-0.5 font-medium rounded-full bg-linear-to-r from-purple-500 to-indigo-500 text-white ${sizeClasses[size]}`}
+      className={`inline-flex items-center gap-0.5 font-medium rounded-full bg-linear-to-r from-premium-line to-info-line text-white ${sizeClasses[size]}`}
       title={showTooltip ? tooltipText : undefined}
     >
       <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
@@ -221,7 +221,7 @@ export function LimitWarning({
 
   if (isAtLimit) {
     return (
-      <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+      <div className="flex items-center gap-2 text-sm text-danger bg-danger-soft px-3 py-2 rounded-lg">
         <svg
           className="w-4 h-4 shrink-0"
           fill="currentColor"
@@ -240,7 +240,7 @@ export function LimitWarning({
               onClick={() => {
                 window.location.href = "/api/checkout?tier=pro";
               }}
-              className="ml-1 text-purple-600 dark:text-purple-400 hover:underline font-medium"
+              className="ml-1 text-premium hover:underline font-medium"
             >
               Upgrade to Pro
             </button>
@@ -251,7 +251,7 @@ export function LimitWarning({
   }
 
   return (
-    <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-lg">
+    <div className="flex items-center gap-2 text-sm text-warning bg-warning-soft px-3 py-2 rounded-lg">
       <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
         <path
           fillRule="evenodd"

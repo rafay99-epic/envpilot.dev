@@ -40,8 +40,8 @@ export function Switch({
         s.track,
         !label && className,
         checked
-          ? "border-green-500/40 bg-green-500/30"
-          : "border-zinc-700 bg-zinc-800",
+          ? "border-accent-line bg-accent-soft"
+          : "border-line bg-surface-raised",
         disabled && "cursor-not-allowed opacity-40"
       )}
     >
@@ -49,7 +49,7 @@ export function Switch({
         className={cn(
           "ml-0.5 inline-block transform rounded-full transition-transform",
           s.thumb,
-          checked ? cn(s.travel, "bg-green-400") : "translate-x-0 bg-zinc-400"
+          checked ? cn(s.travel, "bg-accent") : "translate-x-0 bg-surface-hover"
         )}
       />
     </button>
@@ -60,7 +60,7 @@ export function Switch({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-2 text-sm text-zinc-300",
+        "inline-flex items-center gap-2 text-sm text-ink-muted",
         disabled && "opacity-60",
         className
       )}

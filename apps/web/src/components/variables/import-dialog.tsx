@@ -158,7 +158,7 @@ export function ImportDialog({
           />
         ) : result ? (
           <div className="space-y-4">
-            <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400">
+            <div className="rounded-lg border border-accent-line bg-accent-soft p-4 text-sm text-accent-hover border-accent-line bg-accent-soft text-accent">
               {result.requested ? (
                 <p>
                   Created {result.requested} pending request(s). A Project
@@ -174,7 +174,7 @@ export function ImportDialog({
             </div>
             <button
               onClick={handleClose}
-              className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="w-full rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line-strong text-ink-muted hover:bg-surface-hover"
             >
               Done
             </button>
@@ -183,7 +183,7 @@ export function ImportDialog({
           <>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                <label className="mb-1.5 block text-sm font-medium text-ink-muted">
                   Format
                 </label>
                 <select
@@ -191,7 +191,7 @@ export function ImportDialog({
                   onChange={(e) =>
                     handleFormatChange(e.target.value as FormatType)
                   }
-                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 transition-colors focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
                 >
                   {ALL_FORMATS.map((f) => (
                     <option key={f} value={f}>
@@ -201,13 +201,13 @@ export function ImportDialog({
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                <label className="mb-1.5 block text-sm font-medium text-ink-muted">
                   Target Environment
                 </label>
                 <select
                   value={environment}
                   onChange={(e) => setEnvironment(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 transition-colors focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
                 >
                   <option value="development">Development</option>
                   <option value="staging">Staging</option>
@@ -217,13 +217,13 @@ export function ImportDialog({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <label className="mb-1.5 block text-sm font-medium text-ink-muted">
                 Mode
               </label>
               <select
                 value={mode}
                 onChange={(e) => setMode(e.target.value as "merge" | "replace")}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 transition-colors focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
               >
                 <option value="merge">Merge (add/update, keep existing)</option>
                 <option value="replace">
@@ -233,11 +233,11 @@ export function ImportDialog({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <label className="mb-1.5 block text-sm font-medium text-ink-muted">
                 File or Content
               </label>
               <div className="space-y-2">
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-zinc-300 p-3 text-sm text-zinc-500 transition-colors hover:border-zinc-400 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500">
+                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-line p-3 text-sm text-ink-subtle transition-colors hover:border-line-strong text-ink-muted hover:border-line-strong">
                   <FileUp className="h-4 w-4 shrink-0" />
                   <span className="truncate">
                     {fileName || "Choose a file..."}
@@ -249,31 +249,31 @@ export function ImportDialog({
                     accept=".env,.json,.yaml,.yml,.toml"
                   />
                 </label>
-                <div className="text-center text-xs text-zinc-400 dark:text-zinc-500">
+                <div className="text-center text-xs text-ink-subtle">
                   or paste content below
                 </div>
                 <textarea
                   value={content}
                   onChange={(e) => handleContentChange(e.target.value)}
-                  className="h-32 w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 font-mono text-sm text-zinc-900 transition-colors focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                  className="h-32 w-full rounded-lg border border-line bg-surface-raised px-3 py-2 font-mono text-sm text-ink-inverse transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
                   placeholder={`Paste your ${FORMAT_LABELS[format]} content here...`}
                 />
               </div>
             </div>
 
             {parseError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-400">
+              <div className="rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger border-danger-line bg-danger-soft text-danger">
                 {parseError}
               </div>
             )}
 
             {preview && previewKeys.length > 0 && (
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
-                <p className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <div className="rounded-lg border border-line bg-surface-raised p-3 border-line bg-surface-raised">
+                <p className="mb-2 text-sm font-medium text-ink-muted">
                   Preview: {previewKeys.length} variable
                   {previewKeys.length !== 1 ? "s" : ""} found
                 </p>
-                <div className="max-h-32 space-y-0.5 overflow-y-auto font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                <div className="max-h-32 space-y-0.5 overflow-y-auto font-mono text-xs text-ink-muted">
                   {previewKeys.sort().map((key) => (
                     <div key={key} className="truncate">
                       {key}
@@ -286,7 +286,7 @@ export function ImportDialog({
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleClose}
-                className="flex-1 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className="flex-1 rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line-strong text-ink-muted hover:bg-surface-hover"
               >
                 Cancel
               </button>
@@ -295,7 +295,7 @@ export function ImportDialog({
                 disabled={
                   isImporting || !content.trim() || previewKeys.length === 0
                 }
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-surface px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
               >
                 {isImporting ? (
                   <>

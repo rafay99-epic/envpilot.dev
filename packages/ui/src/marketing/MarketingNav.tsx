@@ -44,16 +44,16 @@ export function MarketingNav({
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled || menuOpen
-          ? "border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-xl"
+          ? "border-b border-line bg-canvas/80 backdrop-blur-xl"
           : "border-b border-transparent bg-transparent"
       }`}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="group flex items-center gap-2.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md border border-green-500/30 bg-green-500/10 font-mono text-sm font-bold text-green-400 transition-shadow group-hover:shadow-[0_0_16px_rgba(34,197,94,0.4)]">
+          <span className="flex h-7 w-7 items-center justify-center rounded-md border border-accent-line bg-accent-soft font-mono text-sm font-bold text-accent transition-shadow group-hover:shadow-[0_0_16px_rgba(34,197,94,0.4)]">
             ❯
           </span>
-          <span className="font-mono text-sm font-bold tracking-tight text-zinc-100">
+          <span className="font-mono text-sm font-bold tracking-tight text-ink">
             envpilot
           </span>
         </Link>
@@ -67,11 +67,11 @@ export function MarketingNav({
                 href={item.href}
                 className={`rounded-md px-3 py-1.5 font-mono text-xs transition-colors ${
                   active
-                    ? "bg-green-500/10 text-green-400"
-                    : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200"
+                    ? "bg-accent-soft text-accent"
+                    : "text-ink-subtle hover:bg-surface-hover hover:text-ink"
                 }`}
               >
-                {active && <span className="mr-1 text-green-500">❯</span>}
+                {active && <span className="mr-1 text-accent">❯</span>}
                 {item.label}
               </Link>
             );
@@ -85,7 +85,7 @@ export function MarketingNav({
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
-          className="flex h-9 w-9 items-center justify-center rounded-md border border-zinc-800 text-zinc-400 transition-colors hover:border-green-500/30 hover:text-green-400 md:hidden"
+          className="flex h-9 w-9 items-center justify-center rounded-md border border-line text-ink-muted transition-colors hover:border-accent-line hover:text-accent md:hidden"
         >
           {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </button>
@@ -98,7 +98,7 @@ export function MarketingNav({
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="overflow-hidden border-t border-zinc-800/80 md:hidden"
+            className="overflow-hidden border-t border-line md:hidden"
           >
             <div className="space-y-1 px-4 py-4">
               {links.map((item) => (
@@ -108,15 +108,15 @@ export function MarketingNav({
                   onClick={() => setMenuOpen(false)}
                   className={`block rounded-md px-3 py-2.5 font-mono text-sm transition-colors ${
                     isActive(item.href)
-                      ? "bg-green-500/10 text-green-400"
-                      : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+                      ? "bg-accent-soft text-accent"
+                      : "text-ink-muted hover:bg-surface-hover hover:text-ink"
                   }`}
                 >
-                  <span className="mr-2 text-green-500/60">❯</span>
+                  <span className="mr-2 text-accent/60">❯</span>
                   {item.label}
                 </Link>
               ))}
-              <div className="flex items-center gap-3 border-t border-zinc-800/60 px-3 pt-4">
+              <div className="flex items-center gap-3 border-t border-line px-3 pt-4">
                 {actions}
               </div>
             </div>

@@ -78,7 +78,7 @@ function MessagesPage() {
     {
       key: "email",
       header: "Email",
-      render: (m) => <span className="text-zinc-400">{m.email}</span>,
+      render: (m) => <span className="text-ink-muted">{m.email}</span>,
     },
     { key: "subject", header: "Subject" },
     {
@@ -86,7 +86,7 @@ function MessagesPage() {
       header: "Date",
       sortable: true,
       render: (m) => (
-        <span className="text-zinc-400">{formatDateTime(m._creationTime)}</span>
+        <span className="text-ink-muted">{formatDateTime(m._creationTime)}</span>
       ),
     },
     {
@@ -129,7 +129,7 @@ function MessagesPage() {
               handleDelete(m);
             }}
           >
-            <Trash2 className="h-3.5 w-3.5 text-red-400" />
+            <Trash2 className="h-3.5 w-3.5 text-danger" />
           </Button>
         </div>
       ),
@@ -138,7 +138,7 @@ function MessagesPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
+      <h1 className="mb-6 text-2xl font-semibold text-ink">
         Contact Messages
       </h1>
 
@@ -150,7 +150,7 @@ function MessagesPage() {
           className="w-72"
         />
         {messages && (
-          <span className="text-xs text-zinc-500">
+          <span className="text-xs text-ink-subtle">
             {search.trim()
               ? `${filteredMessages?.length ?? 0} of ${messages.length} messages`
               : `${messages.length} messages`}
@@ -171,10 +171,10 @@ function MessagesPage() {
             onExpandedChange={setExpandedId}
             renderExpanded={(m) => (
               <div>
-                <p className="mb-1 font-mono text-[0.68rem] uppercase tracking-wider text-zinc-500">
+                <p className="mb-1 font-mono text-[0.68rem] uppercase tracking-wider text-ink-subtle">
                   Message
                 </p>
-                <p className="whitespace-pre-wrap text-sm text-zinc-300">
+                <p className="whitespace-pre-wrap text-sm text-ink-muted">
                   {m.message}
                 </p>
               </div>

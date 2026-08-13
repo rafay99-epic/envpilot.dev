@@ -13,21 +13,21 @@ function ShortcutRow({ shortcut }: { shortcut: ShortcutDefinition }) {
 
   return (
     <div className="flex items-center justify-between py-1.5">
-      <span className="text-sm text-zinc-300">{shortcut.description}</span>
+      <span className="text-sm text-ink-muted">{shortcut.description}</span>
       <div className="flex items-center gap-1">
         {isSequence
           ? shortcut.keys.split(" then ").map((k, i) => (
               <span key={i} className="flex items-center gap-1">
-                {i > 0 && <span className="text-xs text-zinc-600">then</span>}
-                <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-400">
+                {i > 0 && <span className="text-xs text-ink-faint">then</span>}
+                <kbd className="rounded border border-line bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-ink-muted">
                   {k.trim()}
                 </kbd>
               </span>
             ))
           : keys.map((key, i) => (
               <span key={i} className="flex items-center gap-1">
-                {i > 0 && <span className="text-xs text-zinc-600">+</span>}
-                <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-400">
+                {i > 0 && <span className="text-xs text-ink-faint">+</span>}
+                <kbd className="rounded border border-line bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-ink-muted">
                   {key === "Mod"
                     ? typeof navigator !== "undefined" &&
                       /Mac/.test(navigator.userAgent)
@@ -73,10 +73,10 @@ export function ShortcutsHelpDialog() {
           if (items.length === 0) return null;
           return (
             <div key={category.key}>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
                 {category.label}
               </h3>
-              <div className="divide-y divide-zinc-800/50">
+              <div className="divide-y divide-line">
                 {items.map((shortcut) => (
                   <ShortcutRow key={shortcut.description} shortcut={shortcut} />
                 ))}

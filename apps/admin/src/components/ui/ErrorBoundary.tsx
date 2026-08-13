@@ -32,12 +32,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 text-center">
-          <AlertTriangle className="h-10 w-10 text-amber-400" />
+          <AlertTriangle className="h-10 w-10 text-warning" />
           <div>
-            <h2 className="text-lg font-semibold text-zinc-100">
+            <h2 className="text-lg font-semibold text-ink">
               Something went wrong
             </h2>
-            <p className="mt-1 max-w-md text-sm text-zinc-500">
+            <p className="mt-1 max-w-md text-sm text-ink-subtle">
               {this.state.error?.message || "An unexpected error occurred"}
             </p>
           </div>
@@ -46,7 +46,7 @@ export class ErrorBoundary extends Component<Props, State> {
               this.setState({ hasError: false, error: null });
               window.location.reload();
             }}
-            className="flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+            className="flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent"
           >
             <RefreshCw className="h-4 w-4" />
             Reload Page

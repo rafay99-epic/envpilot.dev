@@ -11,7 +11,7 @@ import { ToastContainer } from "@/components/ui/Toast";
  */
 export function Layout() {
   return (
-    <div className="dark flex h-screen bg-[#0f172a] text-zinc-100">
+    <div className="dark flex h-screen bg-[#0f172a] text-ink">
       <Sidebar />
       <main className="relative flex-1 overflow-y-auto">
         {/* Subtle 40px grid overlay */}

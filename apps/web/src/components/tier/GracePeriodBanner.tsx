@@ -35,7 +35,7 @@ export function GracePeriodBanner({
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-amber-600/30 bg-amber-900/10 px-4 py-3 text-sm text-amber-400">
+    <div className="flex items-center gap-3 rounded-lg border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning">
       <AlertTriangle className="h-4 w-4 shrink-0" />
       <span className="flex-1">
         Your <span className="font-medium">{tier}</span> plan has expired. You
@@ -48,7 +48,7 @@ export function GracePeriodBanner({
       {paymentsEnabled && (
         <button
           onClick={handleRenew}
-          className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-green-400 transition-colors hover:text-green-300"
+          className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-accent transition-colors hover:text-accent"
         >
           Renew
           <ArrowRight className="h-3.5 w-3.5" />

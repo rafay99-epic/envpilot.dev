@@ -51,14 +51,14 @@ export function ScrollSpySidebar({
   return (
     <nav aria-label="On this page" className="hidden lg:block">
       <div className="sticky top-24">
-        <p className="mb-4 flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-zinc-600">
-          <span className="text-green-500">&#10095;</span> on this page
+        <p className="mb-4 flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-ink-faint">
+          <span className="text-accent">&#10095;</span> on this page
         </p>
         <div className="relative">
           {/* Vertical track line */}
           <div
             aria-hidden
-            className="absolute inset-y-0 left-0 w-px bg-zinc-800/70"
+            className="absolute inset-y-0 left-0 w-px bg-surface-raised/70"
           />
           <ul>
             {sections.map((s, i) => {
@@ -69,7 +69,7 @@ export function ScrollSpySidebar({
                     <motion.span
                       layoutId="scrollspy-active-segment"
                       aria-hidden
-                      className="absolute inset-y-1 left-0 w-px bg-green-400 shadow-[0_0_8px_rgba(34,197,94,0.55)]"
+                      className="absolute inset-y-1 left-0 w-px bg-accent shadow-[0_0_8px_rgba(34,197,94,0.55)]"
                       transition={{
                         type: "spring",
                         stiffness: 380,
@@ -81,15 +81,15 @@ export function ScrollSpySidebar({
                     href={`#${s.id}`}
                     className={`group flex items-baseline gap-2 py-1.5 pl-4 text-xs transition-colors duration-200 ${
                       isActive
-                        ? "text-green-400"
-                        : "text-zinc-600 hover:text-zinc-300"
+                        ? "text-accent"
+                        : "text-ink-faint hover:text-ink-muted"
                     }`}
                   >
                     <span
                       className={`font-mono text-[10px] tabular-nums transition-colors duration-200 ${
                         isActive
-                          ? "text-green-500"
-                          : "text-zinc-700 group-hover:text-zinc-500"
+                          ? "text-accent"
+                          : "text-ink-faint group-hover:text-ink-subtle"
                       }`}
                     >
                       {String(i + 1).padStart(2, "0")}

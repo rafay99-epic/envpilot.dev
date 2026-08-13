@@ -118,7 +118,7 @@ export function FeatureMatrixTab() {
   return (
     <section data-wide>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-zinc-100">
+        <h2 className="text-lg font-semibold text-ink">
           Feature Configuration Matrix
         </h2>
         {featureRegistry && featureRegistry.length > 0 && (
@@ -128,7 +128,7 @@ export function FeatureMatrixTab() {
               for (const c of allCategories) next[c] = !allCollapsed;
               setCollapsedCategories(next);
             }}
-            className="flex items-center gap-1 rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+            className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-ink-muted transition-colors hover:border-line-strong hover:text-ink-muted"
           >
             {allCollapsed ? (
               <>
@@ -144,7 +144,7 @@ export function FeatureMatrixTab() {
           </button>
         )}
       </div>
-      <p className="mb-4 text-xs text-zinc-500">
+      <p className="mb-4 text-xs text-ink-subtle">
         Configure the value of each feature per tier. Bold values are
         tier-specific overrides; gray values use the feature&apos;s default.
       </p>
@@ -176,8 +176,8 @@ export function FeatureMatrixTab() {
                   onClick={() => setActiveCategoryFilter(null)}
                   className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
                     activeCategoryFilter === null
-                      ? "bg-emerald-600/20 text-emerald-400 ring-1 ring-emerald-600/40"
-                      : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300"
+                      ? "bg-accent-soft text-accent ring-1 ring-accent-line"
+                      : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
                   }`}
                 >
                   All
@@ -192,8 +192,8 @@ export function FeatureMatrixTab() {
                     }
                     className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
                       activeCategoryFilter === cat
-                        ? "bg-emerald-600/20 text-emerald-400 ring-1 ring-emerald-600/40"
-                        : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300"
+                        ? "bg-accent-soft text-accent ring-1 ring-accent-line"
+                        : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
                     }`}
                   >
                     {cat}
@@ -203,13 +203,13 @@ export function FeatureMatrixTab() {
             </div>
 
             {(matrixSearch || activeCategoryFilter) && (
-              <p className="mb-2 text-[11px] text-zinc-500">
+              <p className="mb-2 text-[11px] text-ink-subtle">
                 Showing {filteredCount} of {registry.length} features
                 {matrixSearch && (
                   <>
                     {" "}
                     matching &ldquo;
-                    <span className="text-zinc-300">{matrixSearch}</span>
+                    <span className="text-ink-muted">{matrixSearch}</span>
                     &rdquo;
                   </>
                 )}
@@ -217,7 +217,7 @@ export function FeatureMatrixTab() {
                   <>
                     {" "}
                     in{" "}
-                    <span className="text-zinc-300">
+                    <span className="text-ink-muted">
                       {activeCategoryFilter}
                     </span>
                   </>
@@ -225,17 +225,17 @@ export function FeatureMatrixTab() {
               </p>
             )}
 
-            <div className="overflow-x-auto rounded-lg border border-zinc-800">
+            <div className="overflow-x-auto rounded-lg border border-line">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-900/95 backdrop-blur-sm">
-                    <th className="px-4 py-3 text-left font-mono text-[0.68rem] font-medium uppercase tracking-wider text-zinc-500">
+                  <tr className="sticky top-0 z-10 border-b border-line bg-surface/95 backdrop-blur-sm">
+                    <th className="px-4 py-3 text-left font-mono text-[0.68rem] font-medium uppercase tracking-wider text-ink-subtle">
                       Feature
                     </th>
                     {tierDefs!.map((td) => (
                       <th
                         key={td.name}
-                        className="px-4 py-3 text-center font-mono text-[0.68rem] font-medium uppercase tracking-wider text-zinc-500"
+                        className="px-4 py-3 text-center font-mono text-[0.68rem] font-medium uppercase tracking-wider text-ink-subtle"
                       >
                         <div className="flex items-center justify-center gap-1.5">
                           <div
@@ -346,18 +346,18 @@ function FeatureCategoryGroup({
     <>
       {/* Category header row */}
       <tr
-        className="cursor-pointer border-b border-zinc-800/50 bg-zinc-900/30 hover:bg-zinc-800/30"
+        className="cursor-pointer border-b border-line bg-surface/30 hover:bg-surface-hover/30"
         onClick={onToggle}
       >
         <td colSpan={1 + tierDefs.length} className="px-4 py-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-300">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-ink-muted">
             {collapsed ? (
               <ChevronRight className="h-3.5 w-3.5" />
             ) : (
               <ChevronDown className="h-3.5 w-3.5" />
             )}
             {category}
-            <span className="font-normal text-zinc-500">
+            <span className="font-normal text-ink-subtle">
               (
               {searchQuery
                 ? `${features.length}/${totalCount}`
@@ -375,26 +375,26 @@ function FeatureCategoryGroup({
           return (
             <tr
               key={feature._id}
-              className="border-b border-zinc-800/30 hover:bg-zinc-800/20"
+              className="border-b border-line hover:bg-surface-hover/20"
             >
               <td className="px-4 py-2.5">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-zinc-300">
+                  <span className="text-xs text-ink-muted">
                     {searchQuery
                       ? highlightMatch(feature.displayName, searchLower)
                       : feature.displayName}
                   </span>
                   {isNew && (
-                    <span className="inline-flex items-center rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-none text-blue-400 ring-1 ring-blue-500/30">
+                    <span className="inline-flex items-center rounded-full bg-info-soft px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-none text-info ring-1 ring-info-line">
                       New
                     </span>
                   )}
                 </div>
-                <div className="text-[10px] text-zinc-500">
+                <div className="text-[10px] text-ink-subtle">
                   {searchQuery
                     ? highlightMatch(feature.key, searchLower)
                     : feature.key}{" "}
-                  <span className="text-zinc-600">({feature.valueType})</span>
+                  <span className="text-ink-faint">({feature.valueType})</span>
                 </div>
               </td>
               {tierDefs.map((td) => {
@@ -454,7 +454,7 @@ function highlightMatch(text: string, query: string): ReactNode {
   return (
     <>
       {text.slice(0, idx)}
-      <span className="rounded bg-emerald-500/20 text-emerald-300">
+      <span className="rounded bg-accent-soft text-accent">
         {text.slice(idx, idx + query.length)}
       </span>
       {text.slice(idx + query.length)}
@@ -483,7 +483,7 @@ function BooleanCell({
   return (
     <div
       className={`flex items-center justify-center rounded-full p-0.5 ${
-        hasOverride ? "ring-1 ring-emerald-600/40" : ""
+        hasOverride ? "ring-1 ring-accent-line" : ""
       }`}
     >
       <Switch
@@ -609,18 +609,18 @@ function NumericCell({
         }}
         className={`w-16 rounded border px-2 py-1 text-center text-xs transition-all ${
           hasOverride
-            ? "border-emerald-600/50 bg-zinc-800 font-semibold text-zinc-100"
-            : "border-zinc-700 bg-zinc-900 text-zinc-400"
-        } focus:border-emerald-500 focus:outline-none disabled:opacity-50`}
+            ? "border-accent-line bg-surface-raised font-semibold text-ink"
+            : "border-line bg-surface text-ink-muted"
+        } focus:border-accent-line focus:outline-none disabled:opacity-50`}
       />
-      <label className="flex items-center gap-0.5 text-[10px] text-zinc-500">
+      <label className="flex items-center gap-0.5 text-[10px] text-ink-subtle">
         <input
           type="checkbox"
           checked={unlimited}
           disabled={saving}
           aria-label="Unlimited"
           onChange={(e) => toggleUnlimited(e.target.checked)}
-          className="h-3 w-3 rounded border-zinc-600 bg-zinc-800"
+          className="h-3 w-3 rounded border-line-strong bg-surface-raised"
         />
         ∞
       </label>

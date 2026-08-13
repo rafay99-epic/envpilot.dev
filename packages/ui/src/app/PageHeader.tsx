@@ -31,14 +31,14 @@ export function PageHeader({
         <div className="flex items-center gap-2.5">
           {leading ??
             (Icon ? (
-              <Icon className="h-5 w-5 shrink-0 text-green-500/70" />
+              <Icon className="h-5 w-5 shrink-0 text-accent/70" />
             ) : null)}
-          <h1 className="truncate text-2xl leading-none font-bold text-zinc-100">
+          <h1 className="truncate text-2xl leading-none font-bold text-ink">
             {title}
           </h1>
         </div>
         {description ? (
-          <p className="mt-2 max-w-2xl text-sm text-zinc-400">{description}</p>
+          <p className="mt-2 max-w-2xl text-sm text-ink-muted">{description}</p>
         ) : null}
       </div>
       {actions ? (

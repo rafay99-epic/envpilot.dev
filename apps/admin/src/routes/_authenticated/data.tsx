@@ -203,7 +203,7 @@ function DataBrowserPage() {
 
   return (
     <div data-wide>
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
+      <h1 className="mb-6 text-2xl font-semibold text-ink">
         Data Browser
       </h1>
 
@@ -227,7 +227,7 @@ function DataBrowserPage() {
                 onChange={setSearch}
                 placeholder="Filter loaded rows..."
               />
-              <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
                 filters loaded rows only
               </span>
             </div>
@@ -269,7 +269,7 @@ function DataBrowserPage() {
 
       {/* Row count summary */}
       {table && rows && (
-        <p className="mb-3 font-mono text-xs uppercase tracking-wider text-zinc-500">
+        <p className="mb-3 font-mono text-xs uppercase tracking-wider text-ink-subtle">
           {search.trim()
             ? `${displayRows.length} of ${rows.length} loaded rows match filter`
             : `${rows.length} rows loaded`}
@@ -295,46 +295,46 @@ function DataBrowserPage() {
         >
           {() => (
             <>
-              <div className="max-h-[calc(100vh-280px)] overflow-auto rounded-lg border border-zinc-700/50">
+              <div className="max-h-[calc(100vh-280px)] overflow-auto rounded-lg border border-line">
                 <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-900">
+                  <thead className="sticky top-0 z-10 border-b border-line bg-surface">
                     <tr>
                       {visibleKeys.map((key) => (
                         <th
                           key={key}
-                          className="cursor-pointer select-none whitespace-nowrap px-3 py-2.5 font-mono text-[0.68rem] font-medium uppercase tracking-wider text-zinc-500 hover:text-zinc-300"
+                          className="cursor-pointer select-none whitespace-nowrap px-3 py-2.5 font-mono text-[0.68rem] font-medium uppercase tracking-wider text-ink-subtle hover:text-ink-muted"
                           onClick={() => handleSort(key)}
                         >
                           <span className="inline-flex items-center gap-1">
                             {key}
                             {sortKey === key &&
                               (sortDir === "asc" ? (
-                                <ChevronUp className="h-3 w-3 text-green-400" />
+                                <ChevronUp className="h-3 w-3 text-accent" />
                               ) : (
-                                <ChevronDown className="h-3 w-3 text-green-400" />
+                                <ChevronDown className="h-3 w-3 text-accent" />
                               ))}
                           </span>
                         </th>
                       ))}
-                      <th className="sticky right-0 w-10 bg-zinc-900 px-2 py-2.5" />
+                      <th className="sticky right-0 w-10 bg-surface px-2 py-2.5" />
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/50">
+                  <tbody className="divide-y divide-line">
                     {displayRows.map((row, i) => (
                       <tr
                         key={(row._id as string) ?? i}
-                        className="cursor-pointer transition-colors hover:bg-green-500/5"
+                        className="cursor-pointer transition-colors hover:bg-accent-soft"
                         onClick={() => setEditRow(row)}
                       >
                         {visibleKeys.map((key) => (
                           <td
                             key={key}
-                            className="max-w-[240px] whitespace-nowrap px-3 py-2 text-sm text-zinc-300"
+                            className="max-w-[240px] whitespace-nowrap px-3 py-2 text-sm text-ink-muted"
                           >
                             <CellValue value={row[key]} fieldKey={key} />
                           </td>
                         ))}
-                        <td className="sticky right-0 bg-zinc-950 px-2 py-2">
+                        <td className="sticky right-0 bg-canvas px-2 py-2">
                           <KebabMenu items={getRowActions(row)} />
                         </td>
                       </tr>
@@ -394,16 +394,16 @@ function ColumnPicker({
     <>
       {/* Backdrop to close */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute left-0 top-full z-50 mt-1 max-h-64 w-56 overflow-y-auto rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+      <div className="absolute left-0 top-full z-50 mt-1 max-h-64 w-56 overflow-y-auto rounded-md border border-line bg-surface py-1 shadow-xl">
         {sorted.map((key) => (
-          <div key={key} className="px-3 py-1.5 hover:bg-zinc-800">
+          <div key={key} className="px-3 py-1.5 hover:bg-surface-hover">
             <Switch
               id={`col-${key}`}
               size="sm"
               checked={!hiddenColumns.has(key)}
               onChange={() => onToggle(key)}
               label={key}
-              className={cn(hiddenColumns.has(key) && "text-zinc-500")}
+              className={cn(hiddenColumns.has(key) && "text-ink-subtle")}
             />
           </div>
         ))}

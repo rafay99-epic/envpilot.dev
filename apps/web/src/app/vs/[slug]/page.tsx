@@ -67,8 +67,8 @@ export default async function ComparisonPage({ params }: PageProps) {
         eyebrow="comparison"
         title={
           <>
-            Envpilot <span className="text-zinc-600">vs</span>{" "}
-            <span className="text-green-400">{comparison.name}</span>
+            Envpilot <span className="text-ink-faint">vs</span>{" "}
+            <span className="text-accent">{comparison.name}</span>
           </>
         }
         description={comparison.intro[0]}
@@ -80,7 +80,7 @@ export default async function ComparisonPage({ params }: PageProps) {
       <section className="relative py-16">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <Reveal>
-            <p className="font-mono text-sm leading-relaxed text-zinc-400">
+            <p className="font-mono text-sm leading-relaxed text-ink-muted">
               {comparison.intro[1]}
             </p>
           </Reveal>
@@ -94,23 +94,23 @@ export default async function ComparisonPage({ params }: PageProps) {
             eyebrow="side by side"
             title={
               <>
-                Feature <span className="text-green-400">comparison</span>
+                Feature <span className="text-accent">comparison</span>
               </>
             }
             description="The honest version — including where they're ahead."
           />
           <Reveal className="mt-10">
-            <div className="overflow-x-auto rounded-xl border border-zinc-800">
+            <div className="overflow-x-auto rounded-xl border border-line">
               <table className="w-full min-w-[640px] border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-zinc-800 bg-zinc-900/60">
-                    <th className="px-5 py-3.5 font-mono text-xs font-semibold uppercase tracking-widest text-zinc-500">
+                  <tr className="border-b border-line bg-surface/60">
+                    <th className="px-5 py-3.5 font-mono text-xs font-semibold uppercase tracking-widest text-ink-subtle">
                       Feature
                     </th>
-                    <th className="px-5 py-3.5 font-mono text-xs font-semibold uppercase tracking-widest text-green-400">
+                    <th className="px-5 py-3.5 font-mono text-xs font-semibold uppercase tracking-widest text-accent">
                       Envpilot
                     </th>
-                    <th className="px-5 py-3.5 font-mono text-xs font-semibold uppercase tracking-widest text-zinc-400">
+                    <th className="px-5 py-3.5 font-mono text-xs font-semibold uppercase tracking-widest text-ink-muted">
                       {comparison.name}
                     </th>
                   </tr>
@@ -119,17 +119,17 @@ export default async function ComparisonPage({ params }: PageProps) {
                   {comparison.rows.map((row, i) => (
                     <tr
                       key={row.feature}
-                      className={`border-b border-zinc-800/60 last:border-0 ${
-                        i % 2 === 1 ? "bg-zinc-900/20" : ""
+                      className={`border-b border-line last:border-0 ${
+                        i % 2 === 1 ? "bg-surface/20" : ""
                       }`}
                     >
-                      <td className="px-5 py-4 font-mono text-xs font-semibold text-zinc-300">
+                      <td className="px-5 py-4 font-mono text-xs font-semibold text-ink-muted">
                         {row.feature}
                       </td>
-                      <td className="px-5 py-4 font-mono text-xs leading-relaxed text-zinc-400">
+                      <td className="px-5 py-4 font-mono text-xs leading-relaxed text-ink-muted">
                         {row.envpilot}
                       </td>
-                      <td className="px-5 py-4 font-mono text-xs leading-relaxed text-zinc-500">
+                      <td className="px-5 py-4 font-mono text-xs leading-relaxed text-ink-subtle">
                         {row.competitor}
                       </td>
                     </tr>
@@ -149,17 +149,17 @@ export default async function ComparisonPage({ params }: PageProps) {
           <div className="grid gap-6 md:grid-cols-2">
             <Reveal>
               <GlowCard className="h-full p-7">
-                <h2 className="flex items-center gap-2 font-sans text-lg font-bold tracking-tight text-zinc-100">
-                  <Check className="h-5 w-5 text-green-400" />
+                <h2 className="flex items-center gap-2 font-sans text-lg font-bold tracking-tight text-ink">
+                  <Check className="h-5 w-5 text-accent" />
                   Choose Envpilot if…
                 </h2>
                 <ul className="mt-5 space-y-3">
                   {comparison.chooseEnvpilot.map((item) => (
                     <li
                       key={item}
-                      className="flex items-start gap-2.5 font-mono text-xs leading-relaxed text-zinc-400"
+                      className="flex items-start gap-2.5 font-mono text-xs leading-relaxed text-ink-muted"
                     >
-                      <span aria-hidden className="mt-0.5 text-green-500">
+                      <span aria-hidden className="mt-0.5 text-accent">
                         ❯
                       </span>
                       {item}
@@ -170,17 +170,17 @@ export default async function ComparisonPage({ params }: PageProps) {
             </Reveal>
             <Reveal delay={0.1}>
               <GlowCard className="h-full p-7">
-                <h2 className="flex items-center gap-2 font-sans text-lg font-bold tracking-tight text-zinc-100">
-                  <Scale className="h-5 w-5 text-zinc-500" />
+                <h2 className="flex items-center gap-2 font-sans text-lg font-bold tracking-tight text-ink">
+                  <Scale className="h-5 w-5 text-ink-subtle" />
                   Choose {comparison.name} if…
                 </h2>
                 <ul className="mt-5 space-y-3">
                   {comparison.chooseCompetitor.map((item) => (
                     <li
                       key={item}
-                      className="flex items-start gap-2.5 font-mono text-xs leading-relaxed text-zinc-500"
+                      className="flex items-start gap-2.5 font-mono text-xs leading-relaxed text-ink-subtle"
                     >
-                      <span aria-hidden className="mt-0.5 text-zinc-600">
+                      <span aria-hidden className="mt-0.5 text-ink-faint">
                         ❯
                       </span>
                       {item}
@@ -202,21 +202,21 @@ export default async function ComparisonPage({ params }: PageProps) {
             eyebrow="faq"
             title={
               <>
-                Common <span className="text-green-400">questions</span>
+                Common <span className="text-accent">questions</span>
               </>
             }
           />
           <div className="mt-10 space-y-4">
             {comparison.faq.map(({ q, a }) => (
               <Reveal key={q}>
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
-                  <h3 className="flex items-start gap-2.5 font-sans text-sm font-bold tracking-tight text-zinc-100">
-                    <span aria-hidden className="font-mono text-green-400">
+                <div className="rounded-xl border border-line bg-surface/40 p-6">
+                  <h3 className="flex items-start gap-2.5 font-sans text-sm font-bold tracking-tight text-ink">
+                    <span aria-hidden className="font-mono text-accent">
                       ❯
                     </span>
                     {q}
                   </h3>
-                  <p className="mt-2.5 pl-6 font-mono text-xs leading-relaxed text-zinc-500">
+                  <p className="mt-2.5 pl-6 font-mono text-xs leading-relaxed text-ink-subtle">
                     {a}
                   </p>
                 </div>
@@ -232,35 +232,35 @@ export default async function ComparisonPage({ params }: PageProps) {
       <section className="relative py-20">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
           <Reveal>
-            <h2 className="font-sans text-2xl font-bold tracking-tight text-zinc-100 [text-wrap:balance] sm:text-3xl">
-              Try Envpilot <span className="text-green-400">free</span>
+            <h2 className="font-sans text-2xl font-bold tracking-tight text-ink [text-wrap:balance] sm:text-3xl">
+              Try Envpilot <span className="text-accent">free</span>
             </h2>
-            <p className="mx-auto mt-3 max-w-xl font-mono text-sm leading-relaxed text-zinc-500">
+            <p className="mx-auto mt-3 max-w-xl font-mono text-sm leading-relaxed text-ink-subtle">
               Import your .env files and invite the team in minutes. No credit
               card required.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <Link
                 href="/sign-up"
-                className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-6 py-3 font-mono text-xs font-semibold text-zinc-950 shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] transition-shadow hover:shadow-[0_0_55px_-8px_rgba(34,197,94,0.8)]"
+                className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 font-mono text-xs font-semibold text-ink-inverse shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] transition-shadow hover:shadow-[0_0_55px_-8px_rgba(34,197,94,0.8)]"
               >
                 Get started free
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
               <Link
                 href="/pricing"
-                className="rounded-lg border border-zinc-800 px-6 py-3 font-mono text-xs text-zinc-400 transition-colors hover:border-green-500/30 hover:text-green-400"
+                className="rounded-lg border border-line px-6 py-3 font-mono text-xs text-ink-muted transition-colors hover:border-accent-line hover:text-accent"
               >
                 See pricing
               </Link>
             </div>
-            <p className="mt-10 font-mono text-xs text-zinc-600">
+            <p className="mt-10 font-mono text-xs text-ink-faint">
               More comparisons:{" "}
               {others.map((c, i) => (
                 <span key={c.slug}>
                   <Link
                     href={`/vs/${c.slug}`}
-                    className="text-zinc-500 underline-offset-4 transition-colors hover:text-green-400 hover:underline"
+                    className="text-ink-subtle underline-offset-4 transition-colors hover:text-accent hover:underline"
                   >
                     {c.title}
                   </Link>

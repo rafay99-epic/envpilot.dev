@@ -97,7 +97,7 @@ export default function NewDocPage({ params }: NewDocPageProps) {
   if (isLoadingProject) return <TerminalLoading fullPage />;
   if (!project) {
     return (
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="text-sm text-ink-muted">
         Project not found.
       </p>
     );
@@ -112,15 +112,15 @@ export default function NewDocPage({ params }: NewDocPageProps) {
       <div className="mx-auto max-w-2xl space-y-6">
         <Link
           href={`/dashboard/projects/${slug}/docs`}
-          className="inline-flex items-center gap-1.5 text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-zinc-100"
+          className="inline-flex items-center gap-1.5 text-sm text-ink-subtle transition-colors hover:text-ink"
         >
           <ArrowLeft className="h-4 w-4" />
           Documentation
         </Link>
 
         <div className="flex items-center gap-2">
-          <BookText className="h-6 w-6 text-zinc-400" />
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+          <BookText className="h-6 w-6 text-ink-muted" />
+          <h1 className="text-2xl font-bold text-ink">
             New page
           </h1>
         </div>
@@ -128,14 +128,14 @@ export default function NewDocPage({ params }: NewDocPageProps) {
         {blocked && (
           <p
             data-testid="doc-new-blocked"
-            className="border-l-2 border-amber-500/60 py-1 pl-3 text-xs text-amber-700 dark:text-amber-400"
+            className="border-l-2 border-warning-line py-1 pl-3 text-xs text-warning"
           >
             {blocked}
           </p>
         )}
 
         {error && (
-          <p className="border-l-2 border-red-500/60 py-1 pl-3 text-xs text-red-700 dark:text-red-400">
+          <p className="border-l-2 border-danger-line py-1 pl-3 text-xs text-danger">
             {error}
           </p>
         )}
@@ -144,7 +144,7 @@ export default function NewDocPage({ params }: NewDocPageProps) {
           <div>
             <label
               htmlFor="doc-title"
-              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              className="block text-sm font-medium text-ink-muted"
             >
               Title
             </label>
@@ -155,14 +155,14 @@ export default function NewDocPage({ params }: NewDocPageProps) {
               onChange={(e) => setTitle(e.target.value)}
               maxLength={200}
               placeholder="Charge a wallet"
-              className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              className="mt-1.5 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse outline-none focus:border-line bg-surface text-ink"
             />
           </div>
 
           <div>
             <label
               htmlFor="doc-module"
-              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              className="block text-sm font-medium text-ink-muted"
             >
               Module
             </label>
@@ -174,21 +174,21 @@ export default function NewDocPage({ params }: NewDocPageProps) {
               maxLength={100}
               list="doc-known-modules"
               placeholder="E-Commerce Platform"
-              className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              className="mt-1.5 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse outline-none focus:border-line bg-surface text-ink"
             />
             <datalist id="doc-known-modules">
               {knownModules.map((name) => (
                 <option key={name} value={name} />
               ))}
             </datalist>
-            <p className="mt-1.5 text-xs text-zinc-500">
+            <p className="mt-1.5 text-xs text-ink-subtle">
               Groups pages in the sidebar. Reuse an existing name to keep a
               feature&apos;s pages together.
             </p>
           </div>
 
           <div>
-            <span className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <span className="block text-sm font-medium text-ink-muted">
               Type
             </span>
             <div className="mt-1.5 flex gap-2">
@@ -201,15 +201,15 @@ export default function NewDocPage({ params }: NewDocPageProps) {
                   onClick={() => setType(value)}
                   className={`rounded-lg border px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                     type === value
-                      ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                      : "border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      ? "border-line bg-surface text-white border-line bg-surface-raised text-ink-inverse"
+                      : "border-line text-ink-faint hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
                   }`}
                 >
                   {value}
                 </button>
               ))}
             </div>
-            <p className="mt-1.5 text-xs text-zinc-500">
+            <p className="mt-1.5 text-xs text-ink-subtle">
               {type === "api"
                 ? "Starts from an endpoint template: request, response, errors. Name the base-URL variable — never paste its value."
                 : "Starts from a short prose template."}
@@ -219,10 +219,10 @@ export default function NewDocPage({ params }: NewDocPageProps) {
           <div>
             <label
               htmlFor="doc-pr"
-              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              className="block text-sm font-medium text-ink-muted"
             >
               Pull request URL{" "}
-              <span className="font-normal text-zinc-500">(optional)</span>
+              <span className="font-normal text-ink-subtle">(optional)</span>
             </label>
             <input
               id="doc-pr"
@@ -230,7 +230,7 @@ export default function NewDocPage({ params }: NewDocPageProps) {
               value={prUrl}
               onChange={(e) => setPrUrl(e.target.value)}
               placeholder="https://github.com/org/repo/pull/123"
-              className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              className="mt-1.5 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse outline-none focus:border-line bg-surface text-ink"
             />
           </div>
 
@@ -239,13 +239,13 @@ export default function NewDocPage({ params }: NewDocPageProps) {
               type="submit"
               data-testid="doc-create-submit"
               disabled={!canSubmit}
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
             >
               {isSaving ? "Creating…" : "Create draft"}
             </button>
             <Link
               href={`/dashboard/projects/${slug}/docs`}
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-faint transition-colors hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
             >
               Cancel
             </Link>

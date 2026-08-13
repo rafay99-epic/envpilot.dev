@@ -18,7 +18,7 @@ export function Select({
       {label && (
         <label
           htmlFor={id}
-          className="mb-1.5 block text-sm font-medium text-zinc-300"
+          className="mb-1.5 block text-sm font-medium text-ink-muted"
         >
           {label}
         </label>
@@ -26,7 +26,7 @@ export function Select({
       <select
         id={id}
         className={cn(
-          "w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30",
+          "w-full rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line",
           className
         )}
         {...props}

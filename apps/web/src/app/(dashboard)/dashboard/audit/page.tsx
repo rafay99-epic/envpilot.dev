@@ -111,10 +111,10 @@ const actionCategories = [
 ];
 
 const severityColors: Record<string, string> = {
-  info: "text-blue-400",
-  warning: "text-amber-400",
-  error: "text-red-400",
-  critical: "text-red-500 font-bold",
+  info: "text-info",
+  warning: "text-warning",
+  error: "text-danger",
+  critical: "text-danger font-bold",
 };
 
 const dateRangeMs: Record<string, number> = {
@@ -285,68 +285,68 @@ function AuditPageContent() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <TerminalCard>
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/10">
-              <Activity className="h-4 w-4 text-blue-400" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-info-soft">
+              <Activity className="h-4 w-4 text-info" />
             </div>
             <div>
-              <p className="text-xs text-zinc-500">Total Events</p>
+              <p className="text-xs text-ink-subtle">Total Events</p>
               {summary ? (
-                <p className="text-lg font-bold text-zinc-100">
+                <p className="text-lg font-bold text-ink">
                   {summary.totalEvents.toLocaleString()}
                 </p>
               ) : (
-                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-zinc-800" />
+                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-surface-raised" />
               )}
             </div>
           </div>
         </TerminalCard>
         <TerminalCard>
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/10">
-              <AlertTriangle className="h-4 w-4 text-amber-400" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-warning-soft">
+              <AlertTriangle className="h-4 w-4 text-warning" />
             </div>
             <div>
-              <p className="text-xs text-zinc-500">Security Events</p>
+              <p className="text-xs text-ink-subtle">Security Events</p>
               {summary ? (
-                <p className="text-lg font-bold text-zinc-100">
+                <p className="text-lg font-bold text-ink">
                   {summary.securityEventCount}
                 </p>
               ) : (
-                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-zinc-800" />
+                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-surface-raised" />
               )}
             </div>
           </div>
         </TerminalCard>
         <TerminalCard>
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500/10">
-              <Lock className="h-4 w-4 text-red-400" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-danger-soft">
+              <Lock className="h-4 w-4 text-danger" />
             </div>
             <div>
-              <p className="text-xs text-zinc-500">Sensitive Access</p>
+              <p className="text-xs text-ink-subtle">Sensitive Access</p>
               {summary ? (
-                <p className="text-lg font-bold text-zinc-100">
+                <p className="text-lg font-bold text-ink">
                   {summary.sensitiveAccessCount}
                 </p>
               ) : (
-                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-zinc-800" />
+                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-surface-raised" />
               )}
             </div>
           </div>
         </TerminalCard>
         <TerminalCard>
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
-              <Shield className="h-4 w-4 text-green-400" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft">
+              <Shield className="h-4 w-4 text-accent" />
             </div>
             <div>
-              <p className="text-xs text-zinc-500">Period</p>
+              <p className="text-xs text-ink-subtle">Period</p>
               {summary ? (
-                <p className="text-lg font-bold text-zinc-100">
+                <p className="text-lg font-bold text-ink">
                   {summary.periodDays}d
                 </p>
               ) : (
-                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-zinc-800" />
+                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-surface-raised" />
               )}
             </div>
           </div>
@@ -356,7 +356,7 @@ function AuditPageContent() {
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
           <TerminalInput
             type="text"
             placeholder="Search by user, action, or resource..."
@@ -389,15 +389,15 @@ function AuditPageContent() {
       {/* Audit Logs */}
       {isLoading ? (
         <TerminalWindow title="audit-log">
-          <div className="divide-y divide-zinc-800/50">
+          <div className="divide-y divide-line">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="flex items-start gap-3 px-5 py-3">
-                <div className="h-3 w-32 animate-pulse rounded bg-zinc-800" />
+                <div className="h-3 w-32 animate-pulse rounded bg-surface-raised" />
                 <div className="min-w-0 flex-1 space-y-1.5">
-                  <div className="h-3 w-56 animate-pulse rounded bg-zinc-800" />
+                  <div className="h-3 w-56 animate-pulse rounded bg-surface-raised" />
                   <div className="flex gap-3">
-                    <div className="h-3 w-28 animate-pulse rounded bg-zinc-800/40" />
-                    <div className="h-3 w-20 animate-pulse rounded bg-zinc-800/40" />
+                    <div className="h-3 w-28 animate-pulse rounded bg-surface-raised/40" />
+                    <div className="h-3 w-20 animate-pulse rounded bg-surface-raised/40" />
                   </div>
                 </div>
               </div>
@@ -416,14 +416,14 @@ function AuditPageContent() {
               }
             />
           ) : (
-            <AnimatedList className="divide-y divide-zinc-800/50">
+            <AnimatedList className="divide-y divide-line">
               {filteredLogs.map((log) => (
                 <AuditLogRow key={log._id} log={log} />
               ))}
             </AnimatedList>
           )}
           {(logsStatus === "CanLoadMore" || logsStatus === "LoadingMore") && (
-            <div className="flex justify-center border-t border-zinc-800/50 px-5 py-4">
+            <div className="flex justify-center border-t border-line px-5 py-4">
               <TerminalButton
                 variant="secondary"
                 onClick={() => loadMoreLogs(PAGE_SIZE)}
@@ -447,14 +447,14 @@ function AuditPageContent() {
       {/* Compliance Info */}
       <TerminalCard>
         <div className="flex items-start gap-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
-            <Shield className="h-4 w-4 text-green-400" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft">
+            <Shield className="h-4 w-4 text-accent" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-zinc-100">
+            <h3 className="text-sm font-semibold text-ink">
               Compliance & Security
             </h3>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="mt-1 text-sm text-ink-subtle">
               All audit logs are retained for 90 days on the free tier and 365
               days on the pro tier. Logs include IP addresses and user agents
               for security analysis.
@@ -484,7 +484,7 @@ function AuditLogRow({ log }: { log: AuditLogData }) {
   const actionLabel = actionLabels[log.action] || log.action;
   const time = new Date(log.createdAt).toLocaleString();
   const severityClass =
-    severityColors[log.severity ?? "info"] ?? "text-zinc-500";
+    severityColors[log.severity ?? "info"] ?? "text-ink-subtle";
 
   // Extract useful details from parsed JSON. Backend call sites store the
   // resource identifier under different names per resource type: `key`
@@ -503,22 +503,22 @@ function AuditLogRow({ log }: { log: AuditLogData }) {
     : null;
 
   return (
-    <div className="flex items-start gap-3 px-5 py-3 font-mono text-xs transition-colors hover:bg-green-500/5">
-      <span className="shrink-0 whitespace-nowrap text-zinc-600">[{time}]</span>
+    <div className="flex items-start gap-3 px-5 py-3 font-mono text-xs transition-colors hover:bg-accent-soft">
+      <span className="shrink-0 whitespace-nowrap text-ink-faint">[{time}]</span>
       <div className="min-w-0 flex-1">
-        <p className="text-zinc-300">
-          <span className="text-green-400">{log.userName}</span>{" "}
+        <p className="text-ink-muted">
+          <span className="text-accent">{log.userName}</span>{" "}
           <span className={severityClass}>{actionLabel}</span>
           {detailText && (
             <>
               {" "}
-              <code className="rounded bg-zinc-800 px-1 text-amber-400">
+              <code className="rounded bg-surface-raised px-1 text-warning">
                 {detailText}
               </code>
             </>
           )}
         </p>
-        <div className="mt-0.5 flex items-center gap-3 text-zinc-600">
+        <div className="mt-0.5 flex items-center gap-3 text-ink-faint">
           <span>{log.userEmail}</span>
           {log.ipAddress && <span>{log.ipAddress}</span>}
           {log.severity && log.severity !== "info" && (

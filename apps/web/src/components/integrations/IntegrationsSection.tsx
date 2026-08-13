@@ -139,15 +139,15 @@ function ProviderMark({ provider }: { provider: Provider }) {
 
 function ProviderLoadingRows() {
   return (
-    <div className="divide-y divide-zinc-800 border-y border-zinc-800">
+    <div className="divide-y divide-line border-y border-line">
       {["slack", "discord"].map((provider) => (
         <div key={provider} className="flex items-center gap-3 py-4">
-          <div className="h-9 w-9 animate-pulse rounded-full bg-zinc-800" />
+          <div className="h-9 w-9 animate-pulse rounded-full bg-surface-raised" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 w-24 animate-pulse rounded bg-zinc-800" />
-            <div className="h-3 w-56 animate-pulse rounded bg-zinc-800/70" />
+            <div className="h-4 w-24 animate-pulse rounded bg-surface-raised" />
+            <div className="h-3 w-56 animate-pulse rounded bg-surface-raised/70" />
           </div>
-          <div className="h-9 w-28 animate-pulse rounded-lg bg-zinc-800" />
+          <div className="h-9 w-28 animate-pulse rounded-lg bg-surface-raised" />
         </div>
       ))}
     </div>
@@ -156,13 +156,13 @@ function ProviderLoadingRows() {
 
 function DestinationLoadingRows() {
   return (
-    <div className="divide-y divide-zinc-800 border-y border-zinc-800">
+    <div className="divide-y divide-line border-y border-line">
       {[1, 2].map((row) => (
         <div key={row} className="flex items-center gap-3 py-4">
-          <div className="h-9 w-9 animate-pulse rounded-full bg-zinc-800" />
+          <div className="h-9 w-9 animate-pulse rounded-full bg-surface-raised" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 w-36 animate-pulse rounded bg-zinc-800" />
-            <div className="h-3 w-64 animate-pulse rounded bg-zinc-800/70" />
+            <div className="h-4 w-36 animate-pulse rounded bg-surface-raised" />
+            <div className="h-3 w-64 animate-pulse rounded bg-surface-raised/70" />
           </div>
         </div>
       ))}
@@ -458,11 +458,11 @@ export function IntegrationsSection({
         <div className="mb-5">
           <h2
             id="connect-notifications-heading"
-            className="text-base font-semibold text-zinc-100"
+            className="text-base font-semibold text-ink"
           >
             Connect a channel
           </h2>
-          <p className="mt-1 text-sm leading-6 text-zinc-500">
+          <p className="mt-1 text-sm leading-6 text-ink-subtle">
             Choose a provider, select a channel there, and return here. Secret
             values are never included in notifications.
           </p>
@@ -477,8 +477,8 @@ export function IntegrationsSection({
           {providerState.status === "loading" ? (
             <ProviderLoadingRows />
           ) : providerState.status === "error" ? (
-            <div className="flex items-center justify-between gap-4 border-y border-zinc-800 py-4">
-              <p className="text-sm text-zinc-400">
+            <div className="flex items-center justify-between gap-4 border-y border-line py-4">
+              <p className="text-sm text-ink-muted">
                 Connection options are temporarily unavailable.
               </p>
               <TerminalButton variant="secondary" onClick={loadProviders}>
@@ -486,7 +486,7 @@ export function IntegrationsSection({
               </TerminalButton>
             </div>
           ) : (
-            <div className="divide-y divide-zinc-800 border-y border-zinc-800">
+            <div className="divide-y divide-line border-y border-line">
               {(["slack", "discord"] as const).map((provider) => {
                 const available = providerState[provider];
                 const connecting = connectingProvider === provider;
@@ -497,10 +497,10 @@ export function IntegrationsSection({
                   >
                     <ProviderMark provider={provider} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-zinc-100">
+                      <p className="text-sm font-medium text-ink">
                         {providerName(provider)}
                       </p>
-                      <p className="mt-0.5 text-sm text-zinc-500">
+                      <p className="mt-0.5 text-sm text-ink-subtle">
                         {available
                           ? `Choose a ${providerName(provider)} channel to receive updates.`
                           : "Connection is unavailable on this deployment."}
@@ -534,7 +534,7 @@ export function IntegrationsSection({
                 setManualError(null);
               }}
               data-testid="add-webhook-manually"
-              className="inline-flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-300"
+              className="inline-flex items-center gap-2 text-sm text-ink-subtle transition-colors hover:text-ink-muted"
             >
               {showAdvanced ? (
                 <ChevronUp className="h-4 w-4" />
@@ -548,14 +548,14 @@ export function IntegrationsSection({
           {showAdvanced && (
             <div
               data-testid="manual-webhook-form"
-              className="mt-4 border-t border-zinc-800 pt-5"
+              className="mt-4 border-t border-line pt-5"
             >
-              <p className="mb-5 text-sm text-zinc-500">
+              <p className="mb-5 text-sm text-ink-subtle">
                 Use a provider webhook URL only when OAuth installation is not
                 available. Most teams should use the connect buttons above.
               </p>
               <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
-                <label className="space-y-1.5 text-sm font-medium text-zinc-300">
+                <label className="space-y-1.5 text-sm font-medium text-ink-muted">
                   Provider
                   <TerminalSelect
                     value={manualType}
@@ -569,7 +569,7 @@ export function IntegrationsSection({
                     <option value="discord">Discord</option>
                   </TerminalSelect>
                 </label>
-                <label className="space-y-1.5 text-sm font-medium text-zinc-300">
+                <label className="space-y-1.5 text-sm font-medium text-ink-muted">
                   Webhook URL
                   <TerminalInput
                     type="url"
@@ -594,7 +594,7 @@ export function IntegrationsSection({
               <div className="mt-5">
                 <label
                   htmlFor="manual-project-routing"
-                  className="text-sm font-medium text-zinc-300"
+                  className="text-sm font-medium text-ink-muted"
                 >
                   Project routing
                 </label>
@@ -625,7 +625,7 @@ export function IntegrationsSection({
               </div>
 
               {manualError && (
-                <p className="mt-3 text-sm text-red-400" role="alert">
+                <p className="mt-3 text-sm text-danger" role="alert">
                   {manualError}
                 </p>
               )}
@@ -654,11 +654,11 @@ export function IntegrationsSection({
         <div className="mb-5">
           <h2
             id="connected-destinations-heading"
-            className="text-base font-semibold text-zinc-100"
+            className="text-base font-semibold text-ink"
           >
             Connected destinations
           </h2>
-          <p className="mt-1 text-sm leading-6 text-zinc-500">
+          <p className="mt-1 text-sm leading-6 text-ink-subtle">
             Route all organization activity or selected projects to each
             channel. Connect the same provider again for another channel.
           </p>
@@ -667,14 +667,14 @@ export function IntegrationsSection({
         {webhooks === undefined ? (
           <DestinationLoadingRows />
         ) : webhooks.length === 0 ? (
-          <div className="border-y border-dashed border-zinc-800 py-8 text-center">
-            <p className="text-sm text-zinc-400">No channels connected yet.</p>
-            <p className="mt-1 text-xs text-zinc-600">
+          <div className="border-y border-dashed border-line py-8 text-center">
+            <p className="text-sm text-ink-muted">No channels connected yet.</p>
+            <p className="mt-1 text-xs text-ink-faint">
               Slack or Discord will ask you which channel to use.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-zinc-800 border-y border-zinc-800">
+          <div className="divide-y divide-line border-y border-line">
             {(webhooks as WebhookRow[]).map((hook) => {
               const editing = editingId === hook._id;
               const deleting = deletingId === hook._id;
@@ -691,7 +691,7 @@ export function IntegrationsSection({
                     <ProviderMark provider={hook.type} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-medium text-zinc-100">
+                        <p className="truncate text-sm font-medium text-ink">
                           {hook.channel ?? hook.name}
                         </p>
                         <TerminalBadge
@@ -702,12 +702,12 @@ export function IntegrationsSection({
                         <span
                           className={`text-xs ${
                             deliveryBlockedByPlan
-                              ? "text-zinc-500"
+                              ? "text-ink-subtle"
                               : !hook.enabled
-                                ? "text-zinc-500"
+                                ? "text-ink-subtle"
                                 : unhealthy
-                                  ? "text-amber-400"
-                                  : "text-green-400"
+                                  ? "text-warning"
+                                  : "text-accent"
                           }`}
                         >
                           {deliveryBlockedByPlan
@@ -719,7 +719,7 @@ export function IntegrationsSection({
                                 : "Active"}
                         </span>
                       </div>
-                      <p className="mt-1 truncate text-xs text-zinc-500">
+                      <p className="mt-1 truncate text-xs text-ink-subtle">
                         {hook.source === "manual" && `${hook.urlPreview} · `}
                         {projectScopeLabel(hook.projectIds, projects)} ·{" "}
                         {hook.eventGroups.join(", ")}
@@ -729,7 +729,7 @@ export function IntegrationsSection({
                       </p>
                       {hook.lastStatus !== null &&
                         (hook.lastStatus < 200 || hook.lastStatus >= 300) && (
-                          <p className="mt-1 text-xs text-amber-400">
+                          <p className="mt-1 text-xs text-warning">
                             {hook.lastStatus === 429
                               ? "Slack or Discord is rate-limiting delivery; retry is automatic."
                               : "The last delivery failed; retry is automatic."}
@@ -740,7 +740,7 @@ export function IntegrationsSection({
                       <button
                         type="button"
                         onClick={() => openEditor(hook)}
-                        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+                        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
                       >
                         <Settings2 className="h-3.5 w-3.5" />
                         Manage
@@ -752,7 +752,7 @@ export function IntegrationsSection({
                           togglingId === hook._id ||
                           (!hook.enabled && deliveryBlockedByPlan)
                         }
-                        className="rounded-md px-2 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
+                        className="rounded-md px-2 py-1.5 text-xs text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink disabled:opacity-50"
                       >
                         {togglingId === hook._id
                           ? "Saving..."
@@ -768,7 +768,7 @@ export function IntegrationsSection({
                           !hook.enabled ||
                           deliveryBlockedByPlan
                         }
-                        className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-green-400 disabled:opacity-40"
+                        className="rounded-md p-1.5 text-ink-subtle transition-colors hover:bg-surface-hover hover:text-accent disabled:opacity-40"
                         title="Send test message"
                       >
                         {testingId === hook._id ? (
@@ -780,7 +780,7 @@ export function IntegrationsSection({
                       <button
                         type="button"
                         onClick={() => setDeletingId(hook._id)}
-                        className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400"
+                        className="rounded-md p-1.5 text-ink-subtle transition-colors hover:bg-surface-hover hover:text-danger"
                         title="Disconnect destination"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -789,17 +789,17 @@ export function IntegrationsSection({
                   </div>
 
                   {editing && (
-                    <div className="mt-4 border-t border-zinc-800 pt-4">
+                    <div className="mt-4 border-t border-line pt-4">
                       <div className="grid gap-6 md:grid-cols-2">
                         <fieldset>
-                          <legend className="text-sm font-medium text-zinc-300">
+                          <legend className="text-sm font-medium text-ink-muted">
                             Events
                           </legend>
                           <div className="mt-3 space-y-2.5">
                             {EVENT_GROUPS.map((group) => (
                               <label
                                 key={group.key}
-                                className="flex cursor-pointer items-start gap-2.5 text-sm text-zinc-300"
+                                className="flex cursor-pointer items-start gap-2.5 text-sm text-ink-muted"
                               >
                                 <input
                                   type="checkbox"
@@ -809,11 +809,11 @@ export function IntegrationsSection({
                                       toggleGroup(current, group.key)
                                     )
                                   }
-                                  className="mt-0.5 accent-green-500"
+                                  className="mt-0.5 accent-accent"
                                 />
                                 <span>
                                   {group.label}
-                                  <span className="block text-xs text-zinc-600">
+                                  <span className="block text-xs text-ink-faint">
                                     {group.hint}
                                   </span>
                                 </span>
@@ -823,7 +823,7 @@ export function IntegrationsSection({
                         </fieldset>
 
                         <fieldset>
-                          <legend className="text-sm font-medium text-zinc-300">
+                          <legend className="text-sm font-medium text-ink-muted">
                             Projects
                           </legend>
                           <label
@@ -880,9 +880,9 @@ export function IntegrationsSection({
                     <div
                       role="dialog"
                       aria-label={`Disconnect ${hook.channel ?? hook.name}`}
-                      className="mt-4 flex flex-col gap-3 border-t border-red-500/20 pt-4 sm:flex-row sm:items-center sm:justify-between"
+                      className="mt-4 flex flex-col gap-3 border-t border-danger-line pt-4 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <p className="text-sm text-red-300">
+                      <p className="text-sm text-danger">
                         Disconnect this destination? New notifications stop
                         immediately.
                       </p>
@@ -929,31 +929,31 @@ function ProjectChecklist({
 }) {
   if (projects === undefined) {
     return (
-      <p className="mt-3 inline-flex items-center gap-2 text-xs text-zinc-500">
+      <p className="mt-3 inline-flex items-center gap-2 text-xs text-ink-subtle">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
         Loading projects...
       </p>
     );
   }
   if (projects.length === 0) {
-    return <p className="mt-3 text-xs text-zinc-500">No active projects.</p>;
+    return <p className="mt-3 text-xs text-ink-subtle">No active projects.</p>;
   }
   return (
     <div className="mt-3 max-h-40 space-y-2 overflow-y-auto pr-2">
       {projects.map((project) => (
         <label
           key={project._id}
-          className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300"
+          className="flex cursor-pointer items-center gap-2 text-sm text-ink-muted"
         >
           <input
             type="checkbox"
             checked={selected.includes(project._id)}
             onChange={() => onToggle(project._id)}
-            className="accent-green-500"
+            className="accent-accent"
           />
           <span className="truncate">{project.name}</span>
           {selected.includes(project._id) && (
-            <Check className="ml-auto h-3.5 w-3.5 text-green-400" />
+            <Check className="ml-auto h-3.5 w-3.5 text-accent" />
           )}
         </label>
       ))}

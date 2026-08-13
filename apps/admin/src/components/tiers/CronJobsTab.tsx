@@ -28,7 +28,7 @@ export function CronJobsTab() {
       key: "function",
       header: "Function",
       render: (c) => (
-        <span className="font-mono text-xs text-zinc-400">{c.function}</span>
+        <span className="font-mono text-xs text-ink-muted">{c.function}</span>
       ),
     },
     { key: "interval", header: "Interval" },
@@ -63,11 +63,11 @@ export function CronJobsTab() {
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-zinc-100">
-        <Timer className="mr-2 inline h-4 w-4 text-zinc-400" />
+      <h2 className="mb-4 text-lg font-semibold text-ink">
+        <Timer className="mr-2 inline h-4 w-4 text-ink-muted" />
         Cron Jobs
       </h2>
-      <p className="mb-4 text-xs text-zinc-500">
+      <p className="mb-4 text-xs text-ink-subtle">
         Crons run on a fixed schedule. Pausing makes the handler skip all work —
         the cron still fires but does nothing.
       </p>

@@ -75,7 +75,7 @@ function SectionLinks({
   activeSlug: string;
 }) {
   return (
-    <ul className="mt-1 space-y-0.5 border-l border-zinc-800/70 pl-3">
+    <ul className="mt-1 space-y-0.5 border-l border-line pl-3">
       {section.items.map((item) => {
         const active = item.slug === activeSlug;
         return (
@@ -83,7 +83,7 @@ function SectionLinks({
             {active && (
               <span
                 aria-hidden
-                className="absolute -left-[13px] top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-green-400"
+                className="absolute -left-[13px] top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-accent"
               />
             )}
             <Link
@@ -91,8 +91,8 @@ function SectionLinks({
               aria-current={active ? "page" : undefined}
               className={`block rounded-lg px-3 py-1.5 text-sm transition-colors ${
                 active
-                  ? "bg-green-500/5 text-green-400"
-                  : "text-zinc-500 hover:bg-zinc-900/60 hover:text-zinc-200"
+                  ? "bg-accent-soft text-accent"
+                  : "text-ink-subtle hover:bg-surface-hover/60 hover:text-ink"
               }`}
             >
               {item.title}
@@ -132,9 +132,9 @@ export function DocsSidebar({
 
           <Link
             href="/"
-            className="mt-4 flex items-center gap-2 px-3 font-mono text-[11px] tracking-widest text-green-400"
+            className="mt-4 flex items-center gap-2 px-3 font-mono text-[11px] tracking-widest text-accent"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-green-400 [animation:pulse-glow_2.4s_ease-in-out_infinite]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-accent [animation:pulse-glow_2.4s_ease-in-out_infinite]" />
             {"// documentation"}
           </Link>
 
@@ -147,7 +147,7 @@ export function DocsSidebar({
                   open={section.slug === activeSection}
                   className="group"
                 >
-                  <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-medium uppercase tracking-widest text-zinc-500 transition-colors marker:content-none hover:text-zinc-300 [&::-webkit-details-marker]:hidden">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-medium uppercase tracking-widest text-ink-subtle transition-colors marker:content-none hover:text-ink-muted [&::-webkit-details-marker]:hidden">
                     <ChevronRight className="h-3 w-3 shrink-0 transition-transform group-open:rotate-90" />
                     <Icon className="h-3.5 w-3.5 shrink-0" />
                     <span className="font-mono">{section.label}</span>
@@ -158,8 +158,8 @@ export function DocsSidebar({
             })}
           </div>
 
-          <div className="mt-8 border-t border-zinc-800/60 pt-4">
-            <p className="px-3 font-mono text-[10px] tracking-widest text-zinc-600">
+          <div className="mt-8 border-t border-line pt-4">
+            <p className="px-3 font-mono text-[10px] tracking-widest text-ink-faint">
               {"// resources"}
             </p>
             <ul className="mt-2 space-y-0.5">
@@ -169,7 +169,7 @@ export function DocsSidebar({
                     href={resource.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-zinc-600 transition-colors hover:text-green-400"
+                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-ink-faint transition-colors hover:text-accent"
                   >
                     <ExternalLink className="h-3 w-3 shrink-0" />
                     {resource.label}
@@ -195,8 +195,8 @@ export function DocsSidebar({
                 href={`/${section.items[0].slug}`}
                 className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors ${
                   active
-                    ? "border-green-500/30 bg-green-500/10 text-green-400"
-                    : "border-zinc-800 bg-zinc-900/40 text-zinc-500 hover:border-zinc-700 hover:text-zinc-200"
+                    ? "border-accent-line bg-accent-soft text-accent"
+                    : "border-line bg-surface/40 text-ink-subtle hover:border-line hover:text-ink"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -219,8 +219,8 @@ export function DocsSidebar({
                   aria-current={active ? "page" : undefined}
                   className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
                     active
-                      ? "bg-green-500/10 text-green-400"
-                      : "text-zinc-500 hover:text-zinc-200"
+                      ? "bg-accent-soft text-accent"
+                      : "text-ink-subtle hover:text-ink"
                   }`}
                 >
                   {item.title}

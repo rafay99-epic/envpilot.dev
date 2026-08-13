@@ -21,15 +21,15 @@ export function EmptyState({
   return (
     <div className="flex flex-col items-center justify-center px-5 py-10 text-center">
       {command ? (
-        <p className="font-mono text-sm text-zinc-500">
-          <span className="text-green-400">$</span> {command}
+        <p className="font-mono text-sm text-ink-subtle">
+          <span className="text-accent">$</span> {command}
         </p>
       ) : (
-        icon && <div className="mb-3 text-zinc-600">{icon}</div>
+        icon && <div className="mb-3 text-ink-faint">{icon}</div>
       )}
-      <p className="mt-2 text-sm text-zinc-400">{title}</p>
+      <p className="mt-2 text-sm text-ink-muted">{title}</p>
       {description && (
-        <p className="mt-1 text-xs text-zinc-500">{description}</p>
+        <p className="mt-1 text-xs text-ink-subtle">{description}</p>
       )}
       {action && (
         <div className="mt-4">

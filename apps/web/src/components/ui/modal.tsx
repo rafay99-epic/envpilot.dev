@@ -62,17 +62,17 @@ export function Modal({
           role="dialog"
           aria-modal="true"
           aria-label={title}
-          className={`relative w-full ${sizeClasses[size]} transform overflow-hidden rounded-xl bg-white shadow-xl transition-all dark:bg-zinc-900`}
+          className={`relative w-full ${sizeClasses[size]} transform overflow-hidden rounded-xl bg-white shadow-xl transition-all bg-surface`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          <div className="flex items-center justify-between border-b border-line px-6 py-4 border-line">
+            <h2 className="text-lg font-semibold text-ink">
               {title}
             </h2>
             <button
               onClick={onClose}
-              className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="rounded-lg p-1 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
             >
               <svg
                 className="h-5 w-5"

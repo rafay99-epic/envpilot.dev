@@ -192,9 +192,9 @@ export default function NewProjectPage() {
   if (!canCreateProject) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
+        <div className="rounded-full bg-danger-soft p-3 bg-danger-soft">
           <svg
-            className="h-6 w-6 text-red-600 dark:text-red-400"
+            className="h-6 w-6 text-danger"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -207,15 +207,15 @@ export default function NewProjectPage() {
             />
           </svg>
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="mt-4 text-lg font-semibold text-ink">
           Access Denied
         </h2>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-2 text-sm text-ink-muted">
           You do not have permission to create projects.
         </p>
         <Link
           href="/dashboard/projects"
-          className="mt-6 text-sm font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300"
+          className="mt-6 text-sm font-medium text-ink-inverse hover:text-ink-muted"
         >
           Back to Projects
         </Link>
@@ -229,7 +229,7 @@ export default function NewProjectPage() {
       <div className="flex items-center gap-4">
         <Link
           href="/dashboard/projects"
-          className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          className="rounded-lg p-2 text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
         >
           <svg
             className="h-5 w-5"
@@ -264,8 +264,8 @@ export default function NewProjectPage() {
         )}
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
-          <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+        <div className="rounded-lg border border-danger-line bg-danger-soft p-4 border-danger-line bg-danger-soft">
+          <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
@@ -273,8 +273,8 @@ export default function NewProjectPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Left: Template Selector */}
         <div className="lg:col-span-3">
-          <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          <div className="rounded-xl border border-line bg-white p-4 border-line bg-surface">
+            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-ink-muted">
               Choose a template
             </p>
             <TemplateSelector
@@ -291,15 +291,15 @@ export default function NewProjectPage() {
           <div className="lg:sticky lg:top-6">
             <form
               onSubmit={handleSubmit}
-              className="space-y-5 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+              className="space-y-5 rounded-xl border border-line bg-white p-4 border-line bg-surface"
             >
-              <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs font-medium uppercase tracking-wider text-ink-muted">
                 Project Details
               </p>
 
               {/* Template Badge */}
               {selectedTemplate && (
-                <div className="flex items-center gap-2.5 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800/50">
+                <div className="flex items-center gap-2.5 rounded-lg border border-line bg-surface-raised px-3 py-2 border-line bg-surface-raised/50">
                   <div
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded"
                     style={{
@@ -312,10 +312,10 @@ export default function NewProjectPage() {
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-zinc-900 dark:text-zinc-100">
+                    <p className="truncate text-xs font-medium text-ink">
                       {selectedTemplate.name}
                     </p>
-                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                    <p className="text-[10px] text-ink-muted">
                       {selectedTemplate.variables.length} variables included
                     </p>
                   </div>
@@ -323,7 +323,7 @@ export default function NewProjectPage() {
               )}
 
               {/* Preview */}
-              <div className="flex items-center gap-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/50">
+              <div className="flex items-center gap-3 rounded-lg bg-surface-raised p-3 bg-surface-raised/50">
                 <div
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
                   style={{
@@ -338,10 +338,10 @@ export default function NewProjectPage() {
                   />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                  <p className="truncate text-sm font-semibold text-ink">
                     {formData.name || "Project Name"}
                   </p>
-                  <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                  <p className="truncate text-xs text-ink-muted">
                     {formData.slug || "project-slug"}
                   </p>
                 </div>
@@ -351,7 +351,7 @@ export default function NewProjectPage() {
               <div>
                 <label
                   htmlFor="name"
-                  className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                  className="block text-xs font-medium text-ink-muted"
                 >
                   Project Name
                 </label>
@@ -360,7 +360,7 @@ export default function NewProjectPage() {
                   id="name"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+                  className="mt-1 block w-full rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
                   placeholder="My Awesome Project"
                   required
                 />
@@ -370,12 +370,12 @@ export default function NewProjectPage() {
               <div>
                 <label
                   htmlFor="slug"
-                  className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                  className="block text-xs font-medium text-ink-muted"
                 >
                   Slug
                 </label>
-                <div className="mt-1 flex rounded-lg border border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800">
-                  <span className="flex items-center px-2.5 text-xs text-zinc-500 dark:text-zinc-400">
+                <div className="mt-1 flex rounded-lg border border-line bg-white border-line bg-surface-raised">
+                  <span className="flex items-center px-2.5 text-xs text-ink-muted">
                     /projects/
                   </span>
                   <input
@@ -383,7 +383,7 @@ export default function NewProjectPage() {
                     id="slug"
                     value={formData.slug}
                     onChange={(e) => handleSlugChange(e.target.value)}
-                    className="block w-full rounded-r-lg border-0 bg-transparent px-0 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-0 dark:text-zinc-100 dark:placeholder-zinc-500"
+                    className="block w-full rounded-r-lg border-0 bg-transparent px-0 py-1.5 text-sm text-ink-inverse placeholder-ink-muted focus:outline-none focus:ring-0 text-ink placeholder-ink-subtle"
                     placeholder="my-awesome-project"
                     required
                   />
@@ -394,9 +394,9 @@ export default function NewProjectPage() {
               <div>
                 <label
                   htmlFor="description"
-                  className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                  className="block text-xs font-medium text-ink-muted"
                 >
-                  Description <span className="text-zinc-400">(optional)</span>
+                  Description <span className="text-ink-muted">(optional)</span>
                 </label>
                 <textarea
                   id="description"
@@ -408,17 +408,17 @@ export default function NewProjectPage() {
                     }))
                   }
                   rows={2}
-                  className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+                  className="mt-1 block w-full rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
                   placeholder="A brief description..."
                 />
               </div>
 
               {/* Icon & Color -- hidden when using framework logo */}
               {isFrameworkIcon(formData.icon) ? (
-                <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800/50">
+                <div className="flex items-center justify-between rounded-lg border border-line bg-surface-raised px-3 py-2 border-line bg-surface-raised/50">
                   <div className="flex items-center gap-2">
                     <ProjectIcon icon={formData.icon} size={18} />
-                    <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                    <span className="text-xs text-ink-muted">
                       Using{" "}
                       {PROJECT_TYPES[parseFrameworkType(formData.icon)!]
                         ?.label ?? "framework"}{" "}
@@ -434,7 +434,7 @@ export default function NewProjectPage() {
                         color: DEFAULT_PROJECT_COLOR,
                       }))
                     }
-                    className="text-[10px] font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                    className="text-[10px] font-medium text-ink-subtle hover:text-ink"
                   >
                     Switch to custom icon
                   </button>
@@ -443,7 +443,7 @@ export default function NewProjectPage() {
                 <>
                   {/* Icon */}
                   <div>
-                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    <label className="block text-xs font-medium text-ink-muted">
                       Icon
                     </label>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -456,8 +456,8 @@ export default function NewProjectPage() {
                           }
                           className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
                             formData.icon === icon
-                              ? "bg-zinc-900 dark:bg-zinc-100"
-                              : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+                              ? "bg-surface-raised"
+                              : "bg-surface-raised hover:bg-surface-hover"
                           }`}
                         >
                           <ProjectIcon
@@ -465,8 +465,8 @@ export default function NewProjectPage() {
                             size={14}
                             className={
                               formData.icon === icon
-                                ? "text-white dark:text-zinc-900"
-                                : "text-zinc-600 dark:text-zinc-400"
+                                ? "text-ink-inverse"
+                                : "text-ink-muted"
                             }
                           />
                         </button>
@@ -476,7 +476,7 @@ export default function NewProjectPage() {
 
                   {/* Color */}
                   <div>
-                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    <label className="block text-xs font-medium text-ink-muted">
                       Color
                     </label>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -489,7 +489,7 @@ export default function NewProjectPage() {
                           }
                           className={`h-7 w-7 rounded-lg transition-all ${
                             formData.color === color
-                              ? "ring-2 ring-zinc-900 ring-offset-1 dark:ring-zinc-100"
+                              ? "ring-2 ring-line ring-offset-1 ring-line"
                               : ""
                           }`}
                           style={{ backgroundColor: color }}
@@ -509,7 +509,7 @@ export default function NewProjectPage() {
               <div className="flex items-center gap-2 pt-2">
                 <Link
                   href="/dashboard/projects"
-                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
                 >
                   Cancel
                 </Link>
@@ -521,11 +521,11 @@ export default function NewProjectPage() {
                     !formData.slug ||
                     !hasSelection
                   }
-                  className="ml-auto flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  className="ml-auto flex items-center gap-1.5 rounded-lg bg-surface px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
                 >
                   {isSubmitting ? (
                     <>
-                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent dark:border-zinc-900 dark:border-t-transparent" />
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />
                       Creating...
                     </>
                   ) : (

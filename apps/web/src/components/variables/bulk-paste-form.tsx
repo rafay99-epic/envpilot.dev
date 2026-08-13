@@ -143,7 +143,7 @@ export function BulkPasteForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {submitError && (
-        <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+        <div className="rounded-lg bg-danger-soft p-3 text-sm text-danger bg-danger-soft text-danger">
           {submitError}
         </div>
       )}
@@ -152,7 +152,7 @@ export function BulkPasteForm({
       <div>
         <label
           htmlFor="env-paste"
-          className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          className="block text-sm font-medium text-ink-muted"
         >
           Paste .env contents
         </label>
@@ -163,14 +163,14 @@ export function BulkPasteForm({
           onChange={(e) => handleTextChange(e.target.value)}
           placeholder={`# Paste your .env file here\nDATABASE_URL=postgres://localhost:5432/mydb\nAPI_KEY=sk-1234567890\nNEXT_PUBLIC_APP_URL=http://localhost:3000`}
           rows={8}
-          className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 font-mono text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+          className="mt-1 block w-full rounded-lg border border-line bg-white px-4 py-3 font-mono text-sm text-ink-inverse placeholder-ink-muted focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
           disabled={isSubmitting}
         />
         {rawText.trim() && (
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 text-xs text-ink-muted">
             {entries.length} variable{entries.length !== 1 ? "s" : ""} parsed
             {errors.length > 0 && (
-              <span className="text-amber-600 dark:text-amber-400">
+              <span className="text-warning">
                 {" "}
                 · {errors.length} error{errors.length !== 1 ? "s" : ""}
               </span>
@@ -181,21 +181,21 @@ export function BulkPasteForm({
 
       {/* Parse errors */}
       {errors.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/40 dark:bg-amber-900/20">
-          <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+        <div className="rounded-lg border border-warning-line bg-warning-soft p-3 border-warning-line bg-warning-soft">
+          <p className="text-xs font-medium text-warning">
             Parse warnings:
           </p>
           <ul className="mt-1 space-y-0.5">
             {errors.slice(0, 5).map((err, i) => (
               <li
                 key={i}
-                className="text-xs text-amber-600 dark:text-amber-400"
+                className="text-xs text-warning"
               >
                 Line {err.line}: {err.reason}
               </li>
             ))}
             {errors.length > 5 && (
-              <li className="text-xs text-amber-600 dark:text-amber-400">
+              <li className="text-xs text-warning">
                 ...and {errors.length - 5} more
               </li>
             )}
@@ -205,10 +205,10 @@ export function BulkPasteForm({
 
       {/* Environments */}
       <div>
-        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Environments <span className="text-red-500">*</span>
+        <label className="block text-sm font-medium text-ink-muted">
+          Environments <span className="text-danger">*</span>
         </label>
-        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="mt-0.5 text-xs text-ink-muted">
           Applied to all variables
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -236,9 +236,9 @@ export function BulkPasteForm({
             disabled={isSubmitting}
             className="h-4 w-4"
           />
-          <span className="text-sm text-zinc-700 dark:text-zinc-300">
+          <span className="text-sm text-ink-muted">
             Mark all as sensitive{" "}
-            <span className="text-zinc-400">(masks values by default)</span>
+            <span className="text-ink-muted">(masks values by default)</span>
           </span>
         </label>
       </div>
@@ -257,21 +257,21 @@ export function BulkPasteForm({
       {/* Preview list */}
       {entries.length > 0 && (
         <div>
-          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label className="block text-sm font-medium text-ink-muted">
             Preview ({entries.length})
           </label>
-          <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+          <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg border border-line p-2 border-line">
             {entries.map((entry) => (
               <div
                 key={entry.key}
-                className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-surface-hover"
               >
                 <div className="min-w-0 flex-1">
-                  <span className="font-mono font-medium text-zinc-900 dark:text-zinc-100">
+                  <span className="font-mono font-medium text-ink">
                     {entry.key}
                   </span>
-                  <span className="mx-1.5 text-zinc-400">=</span>
-                  <span className="truncate font-mono text-zinc-500 dark:text-zinc-400">
+                  <span className="mx-1.5 text-ink-muted">=</span>
+                  <span className="truncate font-mono text-ink-muted">
                     {isSensitive
                       ? "••••••••"
                       : entry.value.length > 40
@@ -283,7 +283,7 @@ export function BulkPasteForm({
                   type="button"
                   onClick={() => handleRemoveEntry(entry.key)}
                   disabled={isSubmitting}
-                  className="ml-2 shrink-0 rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+                  className="ml-2 shrink-0 rounded p-1 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"
                 >
                   <svg
                     className="h-3.5 w-3.5"
@@ -307,17 +307,17 @@ export function BulkPasteForm({
 
       {/* Progress */}
       {progress && (
-        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
+        <div className="rounded-lg border border-line bg-surface-raised p-3 border-line bg-surface-raised">
           <div className="flex items-center gap-2">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-zinc-600 dark:border-t-zinc-300" />
-            <span className="text-sm text-zinc-700 dark:text-zinc-300">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-line" />
+            <span className="text-sm text-ink-muted">
               Creating {progress.completed}/{progress.total}...
             </span>
           </div>
           {progress.failures.length > 0 && (
             <div className="mt-2 space-y-1">
               {progress.failures.map((f, i) => (
-                <p key={i} className="text-xs text-red-600 dark:text-red-400">
+                <p key={i} className="text-xs text-danger">
                   {f.key}: {f.error}
                 </p>
               ))}
@@ -332,14 +332,14 @@ export function BulkPasteForm({
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="rounded-lg px-4 py-2 text-sm font-medium text-ink-faint hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting || entries.length === 0}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          className="rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
         >
           {isSubmitting
             ? `Creating ${progress?.completed ?? 0}/${progress?.total ?? 0}...`

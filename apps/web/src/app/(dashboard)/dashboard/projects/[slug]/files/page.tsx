@@ -186,7 +186,7 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
   if (isLoadingProject) return <TerminalLoading fullPage />;
   if (!project) {
     return (
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="text-sm text-ink-muted">
         Project not found.
       </p>
     );
@@ -214,21 +214,21 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
         </div>
 
         {notice && (
-          <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/40 dark:bg-green-900/20">
-            <p className="text-sm text-green-700 dark:text-green-400">
+          <div className="rounded-lg border border-accent-line bg-accent-soft p-4 border-accent-line bg-accent-soft">
+            <p className="text-sm text-accent">
               {notice}
             </p>
           </div>
         )}
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-900/20">
-            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+          <div className="rounded-lg border border-danger-line bg-danger-soft p-4 border-danger-line bg-danger-soft">
+            <p className="text-sm text-danger">{error}</p>
           </div>
         )}
 
         {/* Environment filter */}
         <div className="flex flex-wrap items-center gap-4">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label className="text-sm font-medium text-ink-muted">
             Environment:
           </label>
           <div className="flex flex-wrap gap-2">
@@ -236,8 +236,8 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
               onClick={() => setSelectedEnvironment("all")}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 selectedEnvironment === "all"
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  ? "bg-surface text-white bg-surface-raised text-ink-inverse"
+                  : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
               }`}
             >
               All
@@ -248,8 +248,8 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
                 onClick={() => setSelectedEnvironment(env)}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                   selectedEnvironment === env
-                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    ? "bg-surface text-white bg-surface-raised text-ink-inverse"
+                    : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
                 }`}
               >
                 {env}
@@ -259,13 +259,13 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
         </div>
 
         {/* List */}
-        <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex flex-col gap-3 border-b border-zinc-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-zinc-800">
+        <div className="rounded-xl border border-line bg-white border-line bg-surface">
+          <div className="flex flex-col gap-3 border-b border-line px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 border-line">
             <div>
-              <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+              <h2 className="font-semibold text-ink">
                 Files
               </h2>
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 text-sm text-ink-muted">
                 {filteredFiles.length} file
                 {filteredFiles.length !== 1 ? "s" : ""}
                 {selectedEnvironment !== "all" && ` in ${selectedEnvironment}`}
@@ -280,7 +280,7 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
                     ? `Secret file limit reached (${quota.current}/${quota.limit}) across this organization. Upgrade to add more.`
                     : undefined
                 }
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:justify-start dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:justify-start bg-surface-raised text-ink-inverse hover:bg-surface-hover"
               >
                 <Plus className="h-4 w-4" />
                 Add File
@@ -288,25 +288,25 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
             )}
           </div>
 
-          <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <div className="divide-y divide-line">
             {isLoadingFiles ? (
               <TerminalLoading />
             ) : filteredFiles.length === 0 ? (
               <div className="px-4 py-12 text-center sm:px-6">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-                  <FileKey className="h-6 w-6 text-zinc-400" />
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-raised">
+                  <FileKey className="h-6 w-6 text-ink-muted" />
                 </div>
-                <h3 className="mt-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                <h3 className="mt-4 text-sm font-semibold text-ink">
                   No secret files yet
                 </h3>
-                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                <p className="mt-1 text-sm text-ink-muted">
                   {canCreate
                     ? "Upload a keystore or an SSH key and every clone of this project can build without asking anyone for it."
                     : "No secret files available for this environment."}
                 </p>
               </div>
             ) : (
-              <AnimatedList className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <AnimatedList className="divide-y divide-line">
                 {filteredFiles.map((file) => (
                   <FileListItem
                     key={file._id}

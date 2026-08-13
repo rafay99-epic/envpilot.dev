@@ -245,9 +245,9 @@ export default function ProjectSettingsPage({
   if (error && !project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="rounded-full bg-red-500/10 p-3">
+        <div className="rounded-full bg-danger-soft p-3">
           <svg
-            className="h-6 w-6 text-red-400"
+            className="h-6 w-6 text-danger"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -260,7 +260,7 @@ export default function ProjectSettingsPage({
             />
           </svg>
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-zinc-100">{error}</h2>
+        <h2 className="mt-4 text-lg font-semibold text-ink">{error}</h2>
       </div>
     );
   }
@@ -268,9 +268,9 @@ export default function ProjectSettingsPage({
   if (!canUpdateProject) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="rounded-full bg-red-500/10 p-3">
+        <div className="rounded-full bg-danger-soft p-3">
           <svg
-            className="h-6 w-6 text-red-400"
+            className="h-6 w-6 text-danger"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -283,10 +283,10 @@ export default function ProjectSettingsPage({
             />
           </svg>
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-zinc-100">
+        <h2 className="mt-4 text-lg font-semibold text-ink">
           Access Denied
         </h2>
-        <p className="mt-2 text-sm text-zinc-500">
+        <p className="mt-2 text-sm text-ink-subtle">
           You do not have permission to manage project settings.
         </p>
       </div>
@@ -303,7 +303,7 @@ export default function ProjectSettingsPage({
       />
 
       {/* Tabs */}
-      <div className="border-b border-zinc-800">
+      <div className="border-b border-line">
         <nav className="-mb-px flex space-x-6">
           {tabs.map((tab) => (
             <button
@@ -311,8 +311,8 @@ export default function ProjectSettingsPage({
               onClick={() => setActiveTab(tab.id)}
               className={`border-b-2 py-3 text-sm font-medium transition-colors ${
                 activeTab === tab.id
-                  ? "border-green-400 text-green-400"
-                  : "border-transparent text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+                  ? "border-accent-line text-accent"
+                  : "border-transparent text-ink-subtle hover:border-line-strong hover:text-ink-muted"
               }`}
             >
               {tab.label}
@@ -411,25 +411,25 @@ function GeneralProjectSettings({
   return (
     <div className="space-y-6">
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-          <p className="text-sm text-red-400">{error}</p>
+        <div className="rounded-lg border border-danger-line bg-danger-soft p-4">
+          <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
       {successMessage && (
-        <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
-          <p className="text-sm text-green-400">{successMessage}</p>
+        <div className="rounded-lg border border-accent-line bg-accent-soft p-4">
+          <p className="text-sm text-accent">{successMessage}</p>
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         <TerminalCard>
-          <h2 className="text-base font-semibold text-zinc-100">Profile</h2>
+          <h2 className="text-base font-semibold text-ink">Profile</h2>
 
           <div className="mt-6 space-y-6">
             {/* Preview */}
-            <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+            <div className="rounded-lg border border-line bg-surface-raised/50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-ink-subtle">
                 Preview
               </p>
               <div className="mt-3 flex items-center gap-4">
@@ -447,17 +447,17 @@ function GeneralProjectSettings({
                   />
                 </div>
                 <div>
-                  <p className="font-semibold text-zinc-100">
+                  <p className="font-semibold text-ink">
                     {formData.name || "Project Name"}
                   </p>
-                  <p className="text-sm text-zinc-500">{project.slug}</p>
+                  <p className="text-sm text-ink-subtle">{project.slug}</p>
                 </div>
               </div>
             </div>
 
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
+              <label className="block text-sm font-medium text-ink-muted">
                 Project Name
               </label>
               <TerminalInput
@@ -474,8 +474,8 @@ function GeneralProjectSettings({
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
-                Description <span className="text-zinc-500">(optional)</span>
+              <label className="block text-sm font-medium text-ink-muted">
+                Description <span className="text-ink-subtle">(optional)</span>
               </label>
               <textarea
                 value={formData.description}
@@ -486,24 +486,24 @@ function GeneralProjectSettings({
                   }))
                 }
                 rows={3}
-                className="mt-1 w-full resize-none rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
+                className="mt-1 w-full resize-none rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink placeholder-ink-subtle focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
                 placeholder="A brief description of your project..."
               />
             </div>
 
             {/* Icon Mode Toggle */}
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
+              <label className="block text-sm font-medium text-ink-muted">
                 Icon
               </label>
-              <div className="mt-2 mb-3 flex gap-1 rounded-lg bg-zinc-800 p-1">
+              <div className="mt-2 mb-3 flex gap-1 rounded-lg bg-surface-raised p-1">
                 <button
                   type="button"
                   onClick={() => handleIconModeSwitch("framework")}
                   className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                     iconMode === "framework"
-                      ? "bg-zinc-700 text-zinc-100"
-                      : "text-zinc-400 hover:text-zinc-300"
+                      ? "bg-surface-hover text-ink"
+                      : "text-ink-muted hover:text-ink-muted"
                   }`}
                 >
                   Framework Logo
@@ -513,8 +513,8 @@ function GeneralProjectSettings({
                   onClick={() => handleIconModeSwitch("custom")}
                   className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                     iconMode === "custom"
-                      ? "bg-zinc-700 text-zinc-100"
-                      : "text-zinc-400 hover:text-zinc-300"
+                      ? "bg-surface-hover text-ink"
+                      : "text-ink-muted hover:text-ink-muted"
                   }`}
                 >
                   Custom Icon
@@ -537,14 +537,14 @@ function GeneralProjectSettings({
                         }
                         className={`flex flex-col items-center gap-1.5 rounded-lg p-2 transition-all ${
                           isSelected
-                            ? "bg-green-500/20 ring-1 ring-green-500/50"
-                            : "bg-zinc-800 hover:bg-zinc-700"
+                            ? "bg-accent-soft ring-1 ring-accent-line"
+                            : "bg-surface-raised hover:bg-surface-hover"
                         }`}
                       >
                         <FrameworkLogo projectType={type} size={20} />
                         <span
                           className={`truncate text-[10px] ${
-                            isSelected ? "text-green-400" : "text-zinc-400"
+                            isSelected ? "text-accent" : "text-ink-muted"
                           }`}
                         >
                           {PROJECT_TYPES[type]?.label}
@@ -562,8 +562,8 @@ function GeneralProjectSettings({
                       onClick={() => setFormData((prev) => ({ ...prev, icon }))}
                       className={`flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
                         formData.icon === icon
-                          ? "bg-green-500/20 ring-1 ring-green-500/50"
-                          : "bg-zinc-800 hover:bg-zinc-700"
+                          ? "bg-accent-soft ring-1 ring-accent-line"
+                          : "bg-surface-raised hover:bg-surface-hover"
                       }`}
                     >
                       <ProjectIcon
@@ -571,8 +571,8 @@ function GeneralProjectSettings({
                         size={18}
                         className={
                           formData.icon === icon
-                            ? "text-green-400"
-                            : "text-zinc-400"
+                            ? "text-accent"
+                            : "text-ink-muted"
                         }
                       />
                     </button>
@@ -584,7 +584,7 @@ function GeneralProjectSettings({
             {/* Color -- hidden when using framework logo */}
             {!isFrameworkIcon(formData.icon) && (
               <div>
-                <label className="block text-sm font-medium text-zinc-300">
+                <label className="block text-sm font-medium text-ink-muted">
                   Background Color
                 </label>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -597,7 +597,7 @@ function GeneralProjectSettings({
                       }
                       className={`h-8 w-8 rounded-lg transition-all ${
                         formData.color === color
-                          ? "ring-2 ring-green-400 ring-offset-2 ring-offset-zinc-900"
+                          ? "ring-2 ring-accent-line ring-offset-2 ring-offset-line"
                           : ""
                       }`}
                       style={{ backgroundColor: color }}
@@ -717,18 +717,18 @@ function VscodeSyncSectionInner({
 
   return (
     <TerminalCard>
-      <h2 className="text-base font-semibold text-zinc-100">VS Code Sync</h2>
+      <h2 className="text-base font-semibold text-ink">VS Code Sync</h2>
 
       {sectionError && (
-        <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-          <p className="text-sm text-red-400">{sectionError}</p>
+        <div className="mt-4 rounded-lg border border-danger-line bg-danger-soft p-4">
+          <p className="text-sm text-danger">{sectionError}</p>
         </div>
       )}
 
-      <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-5 py-4">
+      <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-line bg-surface-raised/50 px-5 py-4">
         <div>
-          <p className="text-sm font-medium text-zinc-100">Unsync on close</p>
-          <p className="mt-0.5 text-xs text-zinc-500">
+          <p className="text-sm font-medium text-ink">Unsync on close</p>
+          <p className="mt-0.5 text-xs text-ink-subtle">
             When VS Code closes, synced .env files for this project are removed
             from the developer&apos;s machine. Hand-edited files are never
             deleted.
@@ -741,7 +741,7 @@ function VscodeSyncSectionInner({
           onClick={handleToggle}
           disabled={isSaving}
           className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-            enabled ? "bg-green-500" : "bg-zinc-600"
+            enabled ? "bg-accent" : "bg-surface-hover"
           } ${isSaving ? "opacity-50" : ""}`}
         >
           <span
@@ -753,19 +753,19 @@ function VscodeSyncSectionInner({
       </div>
 
       <div className="mt-6">
-        <p className="text-sm font-medium text-zinc-300">Member overrides</p>
-        <p className="mt-0.5 text-xs text-zinc-500">
+        <p className="text-sm font-medium text-ink-muted">Member overrides</p>
+        <p className="mt-0.5 text-xs text-ink-subtle">
           Override the project default for individual members.
         </p>
 
         {membersLoading ? (
-          <p className="mt-3 text-xs text-zinc-600">Loading members...</p>
+          <p className="mt-3 text-xs text-ink-faint">Loading members...</p>
         ) : members.length === 0 ? (
-          <p className="mt-3 text-xs text-zinc-600">
+          <p className="mt-3 text-xs text-ink-faint">
             No members assigned to this project.
           </p>
         ) : (
-          <ul className="mt-3 divide-y divide-zinc-800">
+          <ul className="mt-3 divide-y divide-line">
             {members.map((member) => {
               const memberName =
                 member.user?.name || member.user?.email || "Unknown member";
@@ -776,10 +776,10 @@ function VscodeSyncSectionInner({
                   className="flex items-center justify-between gap-3 py-3"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-zinc-100">
+                    <p className="truncate text-sm text-ink">
                       {memberName}
                     </p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-ink-subtle">
                       {resolved ? "unsyncs" : "keeps files"}
                     </p>
                   </div>
@@ -854,17 +854,17 @@ function DangerZoneProjectSettings({
     <div className="space-y-6">
       {/* Transfer Project */}
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">
+        <h2 className="text-base font-semibold text-ink">
           Transfer Project
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-ink-subtle">
           Move this project and all its environment variables to another
           organization.
         </p>
 
         <div className="mt-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-zinc-300">
+            <label className="block text-sm font-medium text-ink-muted">
               Target Organization
             </label>
             <TerminalSelect
@@ -880,15 +880,15 @@ function DangerZoneProjectSettings({
               ))}
             </TerminalSelect>
             {userOrgs.length === 0 && (
-              <p className="mt-1 text-xs text-zinc-600">
+              <p className="mt-1 text-xs text-ink-faint">
                 You need to be a member of another organization to transfer.
               </p>
             )}
           </div>
 
           {showTransferConfirm && targetOrgId ? (
-            <div className="space-y-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
-              <p className="text-sm text-zinc-100">
+            <div className="space-y-4 rounded-lg border border-warning-line bg-warning-soft p-4">
+              <p className="text-sm text-ink">
                 Type{" "}
                 <span className="font-mono font-semibold">{project.name}</span>{" "}
                 to confirm transfer:
@@ -933,9 +933,9 @@ function DangerZoneProjectSettings({
       </TerminalCard>
 
       {/* Delete Project */}
-      <TerminalCard className="border-red-500/30">
-        <h2 className="text-base font-semibold text-red-400">Delete Project</h2>
-        <p className="mt-2 text-sm text-zinc-500">
+      <TerminalCard className="border-danger-line">
+        <h2 className="text-base font-semibold text-danger">Delete Project</h2>
+        <p className="mt-2 text-sm text-ink-subtle">
           Once you delete a project, it cannot be restored. Its variables and
           shared accounts follow the same 7-day retention before permanent
           deletion, including the stored secret values.
@@ -943,7 +943,7 @@ function DangerZoneProjectSettings({
 
         {showDeleteConfirm && project ? (
           <div className="mt-4 space-y-4">
-            <p className="text-sm text-zinc-100">
+            <p className="text-sm text-ink">
               Type{" "}
               <span className="font-mono font-semibold">{project.name}</span> to
               confirm deletion:

@@ -9,15 +9,15 @@ const buttonVariants = cva(
       variant: {
         // primary — green tint
         default:
-          "border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20",
+          "border-accent-line bg-accent-soft text-accent hover:bg-accent-soft",
         // danger — red tint
         destructive:
-          "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20",
+          "border-danger-line bg-danger-soft text-danger hover:bg-danger-soft",
         // secondary — zinc outline
         outline:
-          "border-zinc-700 bg-transparent text-zinc-400 hover:border-zinc-600 hover:text-zinc-300",
+          "border-line bg-transparent text-ink-muted hover:border-line-strong hover:text-ink-muted",
         ghost:
-          "border-transparent text-zinc-400 hover:bg-green-500/5 hover:text-green-400",
+          "border-transparent text-ink-muted hover:bg-accent-soft hover:text-accent",
       },
       size: {
         sm: "h-8 px-3 text-xs",

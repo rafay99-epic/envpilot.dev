@@ -103,9 +103,9 @@ function UsersPage() {
       sortable: true,
       render: (row) =>
         row.lastActiveAt ? (
-          <span className="text-zinc-400">{timeAgo(row.lastActiveAt)}</span>
+          <span className="text-ink-muted">{timeAgo(row.lastActiveAt)}</span>
         ) : (
-          <span className="text-zinc-600">Never</span>
+          <span className="text-ink-faint">Never</span>
         ),
     },
     {
@@ -131,7 +131,7 @@ function UsersPage() {
               handleUnban(row._id);
             }}
           >
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+            <ShieldCheck className="h-3.5 w-3.5 text-accent" />
             <span className="text-xs">Unban</span>
           </Button>
         ) : (
@@ -146,7 +146,7 @@ function UsersPage() {
               });
             }}
           >
-            <ShieldBan className="h-3.5 w-3.5 text-red-400" />
+            <ShieldBan className="h-3.5 w-3.5 text-danger" />
             <span className="text-xs">Ban</span>
           </Button>
         ),
@@ -155,7 +155,7 @@ function UsersPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">Users</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-ink">Users</h1>
 
       <div className="mb-4">
         <SearchInput
@@ -167,7 +167,7 @@ function UsersPage() {
       </div>
 
       {users && (
-        <p className="mb-3 text-xs text-zinc-500">
+        <p className="mb-3 text-xs text-ink-subtle">
           {search.trim()
             ? `${filteredUsers?.length ?? 0} of ${users.length} users match`
             : `${users.length} users`}
@@ -189,7 +189,7 @@ function UsersPage() {
         title={`Ban ${banModal?.name ?? "User"}`}
       >
         <div className="space-y-4">
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-ink-muted">
             This will prevent the user from accessing the platform. Provide a
             reason for the ban.
           </p>

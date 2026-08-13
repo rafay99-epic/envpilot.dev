@@ -38,7 +38,7 @@ export function ProtectedRoute({
     return (
       fallback ?? (
         <div className="flex min-h-screen items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-900" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-line border-t-line" />
         </div>
       )
     );
@@ -58,9 +58,9 @@ export function ProtectedRoute({
     if (!hasRequiredActions) {
       return (
         <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-          <div className="rounded-full bg-red-100 p-4 dark:bg-red-900/20">
+          <div className="rounded-full bg-danger-soft p-4 bg-danger-soft">
             <svg
-              className="h-8 w-8 text-red-600 dark:text-red-400"
+              className="h-8 w-8 text-danger"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -73,15 +73,15 @@ export function ProtectedRoute({
               />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+          <h2 className="text-xl font-semibold text-ink">
             Access Denied
           </h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-ink-muted">
             You don&apos;t have permission to view this page.
           </p>
           <button
             onClick={() => router.back()}
-            className="mt-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="mt-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover text-ink-inverse hover:bg-surface-hover"
           >
             Go Back
           </button>

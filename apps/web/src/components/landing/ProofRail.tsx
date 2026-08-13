@@ -36,9 +36,9 @@ export function ProofRail() {
               href={item.href}
               target={external ? "_blank" : undefined}
               rel={external ? "noopener noreferrer" : undefined}
-              className={`${terminal.mono} text-[12px] text-zinc-500 transition-colors hover:text-zinc-200`}
+              className={`${terminal.mono} text-[12px] text-ink-subtle transition-colors hover:text-ink`}
             >
-              <span className="text-green-400/80">{item.strong}</span>{" "}
+              <span className="text-accent/80">{item.strong}</span>{" "}
               {item.label}
             </a>
           );

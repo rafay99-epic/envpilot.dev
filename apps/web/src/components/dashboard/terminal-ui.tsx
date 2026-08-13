@@ -11,13 +11,13 @@ export function TerminalWindow({
 }) {
   return (
     <div
-      className={`flex flex-col overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-xl ${className}`}
+      className={`flex flex-col overflow-hidden rounded-lg border border-line bg-surface/90 shadow-xl ${className}`}
     >
-      <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
+      <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2.5">
         <div className="h-3 w-3 rounded-full bg-[#ef5350]/80" />
         <div className="h-3 w-3 rounded-full bg-[#fbbf24]/80" />
         <div className="h-3 w-3 rounded-full bg-[#22c55e]/80" />
-        <span className="ml-2 text-xs text-zinc-500">{title}</span>
+        <span className="ml-2 text-xs text-ink-subtle">{title}</span>
       </div>
       <div className="flex-1">{children}</div>
     </div>
@@ -33,7 +33,7 @@ export function TerminalCard({
 }) {
   return (
     <div
-      className={`rounded-lg border border-zinc-700/50 bg-zinc-900/90 p-6 ${className}`}
+      className={`rounded-lg border border-line bg-surface/90 p-6 ${className}`}
     >
       {children}
     </div>
@@ -46,7 +46,7 @@ export function TerminalInput({
 }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30 ${className}`}
+      className={`w-full rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink placeholder-ink-subtle focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line ${className}`}
       {...props}
     />
   );
@@ -59,7 +59,7 @@ export function TerminalSelect({
 }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30 ${className}`}
+      className={`rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line ${className}`}
       {...props}
     >
       {children}
@@ -71,10 +71,10 @@ type ButtonVariant = "primary" | "secondary" | "danger";
 
 const buttonVariants: Record<ButtonVariant, string> = {
   primary:
-    "border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20",
+    "border-accent-line bg-accent-soft text-accent hover:bg-accent-soft",
   secondary:
-    "border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300",
-  danger: "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20",
+    "border-line text-ink-muted hover:border-line-strong hover:text-ink-muted",
+  danger: "border-danger-line bg-danger-soft text-danger hover:bg-danger-soft",
 };
 
 export function TerminalButton({
@@ -129,12 +129,12 @@ export function TerminalBadge({
   className?: string;
 }) {
   const colors = {
-    green: "bg-green-500/10 text-green-400 border-green-500/20",
-    amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    red: "bg-red-500/10 text-red-400 border-red-500/20",
-    zinc: "bg-zinc-800 text-zinc-400 border-zinc-700",
-    blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    purple: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    green: "bg-accent-soft text-accent border-accent-line",
+    amber: "bg-warning-soft text-warning border-warning-line",
+    red: "bg-danger-soft text-danger border-danger-line",
+    zinc: "bg-surface-raised text-ink-muted border-line",
+    blue: "bg-info-soft text-info border-info-line",
+    purple: "bg-premium-soft text-premium border-premium-line",
   };
 
   return (
@@ -157,10 +157,10 @@ export function TerminalEmptyState({
 }) {
   return (
     <div className="px-5 py-10 text-center">
-      <p className="font-mono text-sm text-zinc-500">
-        <span className="text-green-400">$</span> {command}
+      <p className="font-mono text-sm text-ink-subtle">
+        <span className="text-accent">$</span> {command}
       </p>
-      <p className="mt-2 text-sm text-zinc-400">{message}</p>
+      <p className="mt-2 text-sm text-ink-muted">{message}</p>
       {action && (
         <div className="mt-4">
           {action.href ? (
@@ -187,10 +187,10 @@ export function TerminalLoading({ fullPage = false }: { fullPage?: boolean }) {
           : "flex items-center justify-center py-8"
       }
     >
-      <span className="font-mono text-sm text-green-400">
-        <span className="text-zinc-500">$</span> loading
+      <span className="font-mono text-sm text-accent">
+        <span className="text-ink-subtle">$</span> loading
         <span
-          className="inline-block w-2 bg-green-400"
+          className="inline-block w-2 bg-accent"
           style={{ animation: "blink 1s step-end infinite" }}
         >
           &nbsp;

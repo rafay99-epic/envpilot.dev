@@ -64,13 +64,13 @@ const CATEGORIES: { value: Category; label: string; icon: React.ReactNode }[] =
   ];
 
 const PRIORITIES: { value: Priority; label: string; dot: string }[] = [
-  { value: "low", label: "Low", dot: "bg-zinc-400" },
-  { value: "medium", label: "Medium", dot: "bg-amber-400" },
-  { value: "high", label: "High", dot: "bg-red-400" },
+  { value: "low", label: "Low", dot: "bg-surface-hover" },
+  { value: "medium", label: "Medium", dot: "bg-warning" },
+  { value: "high", label: "High", dot: "bg-danger" },
 ];
 
 const INPUT_CLASSES =
-  "w-full rounded-lg border border-zinc-800 bg-zinc-900/60 px-3.5 py-2.5 font-mono text-sm text-zinc-200 placeholder-zinc-600 transition-colors focus:border-green-500/40 focus:outline-none focus:ring-2 focus:ring-green-500/20";
+  "w-full rounded-lg border border-line bg-surface/60 px-3.5 py-2.5 font-mono text-sm text-ink placeholder-ink-faint transition-colors focus:border-accent-line focus:outline-none focus:ring-2 focus:ring-accent-line";
 
 const QUICK_LINKS = [
   { href: "/docs", label: "Documentation" },
@@ -125,8 +125,8 @@ export default function SupportPage() {
               <Stagger className="sticky top-24 space-y-5">
                 <StaggerItem>
                   <GlowCard className="p-5">
-                    <div className="flex items-center gap-2 font-sans text-sm font-semibold text-zinc-100">
-                      <LifeBuoy className="h-4 w-4 text-green-400" />
+                    <div className="flex items-center gap-2 font-sans text-sm font-semibold text-ink">
+                      <LifeBuoy className="h-4 w-4 text-accent" />
                       Quick links
                     </div>
                     <ul className="mt-4 space-y-3">
@@ -134,9 +134,9 @@ export default function SupportPage() {
                         <li key={link.href}>
                           <Link
                             href={link.href}
-                            className="flex items-center gap-2 text-xs text-zinc-500 transition-colors hover:text-green-400"
+                            className="flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-accent"
                           >
-                            <span className="text-green-500">❯</span>
+                            <span className="text-accent">❯</span>
                             {link.label}
                           </Link>
                         </li>
@@ -147,12 +147,12 @@ export default function SupportPage() {
 
                 <StaggerItem>
                   <GlowCard className="p-5">
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-600">
+                    <p className="text-[10px] uppercase tracking-widest text-ink-faint">
                       response time
                     </p>
-                    <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                    <p className="mt-2 text-sm leading-relaxed text-ink-muted">
                       We typically respond to support tickets within{" "}
-                      <span className="text-green-400">24 hours</span> on
+                      <span className="text-accent">24 hours</span> on
                       business days.
                     </p>
                   </GlowCard>
@@ -160,12 +160,12 @@ export default function SupportPage() {
 
                 <StaggerItem>
                   <GlowCard className="p-5">
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-600">
+                    <p className="text-[10px] uppercase tracking-widest text-ink-faint">
                       email us directly
                     </p>
                     <a
                       href="mailto:support@envpilot.dev"
-                      className="mt-2 block text-sm text-green-400 underline-offset-4 hover:underline"
+                      className="mt-2 block text-sm text-accent underline-offset-4 hover:underline"
                     >
                       support@envpilot.dev
                     </a>
@@ -180,17 +180,17 @@ export default function SupportPage() {
                 {isSubmitted ? (
                   <TerminalFrame title="support — ticket submitted" glow>
                     <div className="px-2 py-10 text-center">
-                      <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-green-500/30 bg-green-500/10 shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)]">
-                        <CheckCircle className="h-7 w-7 text-green-400" />
+                      <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-accent-line bg-accent-soft shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)]">
+                        <CheckCircle className="h-7 w-7 text-accent" />
                       </span>
-                      <h2 className="mt-5 font-sans text-xl font-bold tracking-tight text-zinc-100">
+                      <h2 className="mt-5 font-sans text-xl font-bold tracking-tight text-ink">
                         Ticket submitted
                       </h2>
-                      <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-zinc-400">
-                        <span className="text-green-400">$</span> echo
+                      <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-muted">
+                        <span className="text-accent">$</span> echo
                         &quot;We&apos;ve received your support request and will
                         get back to you at{" "}
-                        <span className="text-green-400">{email}</span>{" "}
+                        <span className="text-accent">{email}</span>{" "}
                         shortly.&quot;
                       </p>
                       <button
@@ -203,7 +203,7 @@ export default function SupportPage() {
                           setSubject("");
                           setMessage("");
                         }}
-                        className="mt-7 rounded-lg border border-zinc-800 px-5 py-2.5 text-xs text-zinc-400 transition-colors hover:border-green-500/30 hover:text-zinc-200"
+                        className="mt-7 rounded-lg border border-line px-5 py-2.5 text-xs text-ink-muted transition-colors hover:border-accent-line hover:text-ink"
                       >
                         Submit another ticket
                       </button>
@@ -213,7 +213,7 @@ export default function SupportPage() {
                   <TerminalFrame title="support — new-ticket.sh" glow>
                     <form onSubmit={handleSubmit} className="space-y-6 py-1">
                       {error && (
-                        <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-xs text-red-400">
+                        <div className="flex items-center gap-2 rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-xs text-danger">
                           <AlertTriangle className="h-4 w-4 shrink-0" />
                           {error}
                         </div>
@@ -224,9 +224,9 @@ export default function SupportPage() {
                         <div>
                           <label
                             htmlFor="support-name"
-                            className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500"
+                            className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-subtle"
                           >
-                            <span className="text-green-500">❯</span> Name
+                            <span className="text-accent">❯</span> Name
                           </label>
                           <input
                             id="support-name"
@@ -244,9 +244,9 @@ export default function SupportPage() {
                         <div>
                           <label
                             htmlFor="support-email"
-                            className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500"
+                            className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-subtle"
                           >
-                            <span className="text-green-500">❯</span> Email
+                            <span className="text-accent">❯</span> Email
                           </label>
                           <input
                             id="support-email"
@@ -265,8 +265,8 @@ export default function SupportPage() {
 
                       {/* Category */}
                       <div>
-                        <label className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500">
-                          <span className="text-green-500">❯</span> Category
+                        <label className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-subtle">
+                          <span className="text-accent">❯</span> Category
                         </label>
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                           {CATEGORIES.map((cat) => (
@@ -277,8 +277,8 @@ export default function SupportPage() {
                               aria-pressed={category === cat.value}
                               className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs transition-all ${
                                 category === cat.value
-                                  ? "border-green-500/40 bg-green-500/10 text-green-400 shadow-[0_0_24px_-8px_rgba(34,197,94,0.45)]"
-                                  : "border-zinc-800 bg-zinc-900/40 text-zinc-500 hover:border-green-500/30 hover:text-zinc-300"
+                                  ? "border-accent-line bg-accent-soft text-accent shadow-[0_0_24px_-8px_rgba(34,197,94,0.45)]"
+                                  : "border-line bg-surface/40 text-ink-subtle hover:border-accent-line hover:text-ink-muted"
                               }`}
                             >
                               {cat.icon}
@@ -290,8 +290,8 @@ export default function SupportPage() {
 
                       {/* Priority */}
                       <div>
-                        <label className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500">
-                          <span className="text-green-500">❯</span> Priority
+                        <label className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-subtle">
+                          <span className="text-accent">❯</span> Priority
                         </label>
                         <div className="grid grid-cols-3 gap-2">
                           {PRIORITIES.map((p) => (
@@ -302,8 +302,8 @@ export default function SupportPage() {
                               aria-pressed={priority === p.value}
                               className={`flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-xs transition-all ${
                                 priority === p.value
-                                  ? "border-green-500/40 bg-green-500/10 text-green-400 shadow-[0_0_24px_-8px_rgba(34,197,94,0.45)]"
-                                  : "border-zinc-800 bg-zinc-900/40 text-zinc-500 hover:border-green-500/30 hover:text-zinc-300"
+                                  ? "border-accent-line bg-accent-soft text-accent shadow-[0_0_24px_-8px_rgba(34,197,94,0.45)]"
+                                  : "border-line bg-surface/40 text-ink-subtle hover:border-accent-line hover:text-ink-muted"
                               }`}
                             >
                               <span
@@ -319,9 +319,9 @@ export default function SupportPage() {
                       <div>
                         <label
                           htmlFor="support-subject"
-                          className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500"
+                          className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-subtle"
                         >
-                          <span className="text-green-500">❯</span> Subject
+                          <span className="text-accent">❯</span> Subject
                         </label>
                         <input
                           id="support-subject"
@@ -340,9 +340,9 @@ export default function SupportPage() {
                       <div>
                         <label
                           htmlFor="support-message"
-                          className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500"
+                          className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-subtle"
                         >
-                          <span className="text-green-500">❯</span> Message
+                          <span className="text-accent">❯</span> Message
                         </label>
                         <textarea
                           id="support-message"
@@ -355,7 +355,7 @@ export default function SupportPage() {
                           placeholder="Please describe the issue in detail. Include steps to reproduce, expected behavior, and any error messages you see."
                           className={`${INPUT_CLASSES} resize-y`}
                         />
-                        <p className="mt-1 text-right text-[10px] text-zinc-700">
+                        <p className="mt-1 text-right text-[10px] text-ink-faint">
                           {message.length}/5000
                         </p>
                       </div>
@@ -364,7 +364,7 @@ export default function SupportPage() {
                       <button
                         type="submit"
                         disabled={isSubmitting}
-                        className="rounded-lg bg-green-500 px-6 py-2.5 text-sm font-semibold text-zinc-950 shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] transition-shadow hover:shadow-[0_0_60px_-8px_rgba(34,197,94,0.8)] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-ink-inverse shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] transition-shadow hover:shadow-[0_0_60px_-8px_rgba(34,197,94,0.8)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {isSubmitting ? (
                           <span className="flex items-center gap-2">

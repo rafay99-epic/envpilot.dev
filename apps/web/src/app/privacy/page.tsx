@@ -37,8 +37,8 @@ export default function PrivacyPolicyPage() {
   return (
     <MarketingShell>
       <PageHero eyebrow="privacy" title="Privacy Policy" align="left">
-        <span className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 font-mono text-xs text-zinc-400">
-          <span className="text-green-500">&#10095;</span>
+        <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/60 px-3 py-1.5 font-mono text-xs text-ink-muted">
+          <span className="text-accent">&#10095;</span>
           Effective: March 10, 2026 &middot; Last updated: August 2, 2026
         </span>
       </PageHero>
@@ -52,7 +52,7 @@ export default function PrivacyPolicyPage() {
           <ScrollSpySidebar sections={SECTIONS} />
 
           {/* Main content — fully server-rendered */}
-          <div className="min-w-0 font-mono text-sm leading-relaxed text-zinc-400">
+          <div className="min-w-0 font-mono text-sm leading-relaxed text-ink-muted">
             <Section id="introduction" n={1} title="Introduction">
               <p>
                 Envpilot (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or
@@ -77,7 +77,7 @@ export default function PrivacyPolicyPage() {
                 inquiries, contact us at{" "}
                 <a
                   href="mailto:privacy@envpilot.dev"
-                  className="text-green-400 hover:underline"
+                  className="text-accent hover:underline"
                 >
                   privacy@envpilot.dev
                 </a>
@@ -295,57 +295,57 @@ export default function PrivacyPolicyPage() {
                 We share personal data with the following service providers,
                 each bound by data processing agreements:
               </p>
-              <div className="mt-4 overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/30">
+              <div className="mt-4 overflow-x-auto rounded-xl border border-line bg-surface/30">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                      <th className="px-4 py-3 font-sans font-semibold text-zinc-200">
+                    <tr className="border-b border-line bg-surface/50">
+                      <th className="px-4 py-3 font-sans font-semibold text-ink">
                         Provider
                       </th>
-                      <th className="px-4 py-3 font-sans font-semibold text-zinc-200">
+                      <th className="px-4 py-3 font-sans font-semibold text-ink">
                         Purpose
                       </th>
-                      <th className="px-4 py-3 font-sans font-semibold text-zinc-200">
+                      <th className="px-4 py-3 font-sans font-semibold text-ink">
                         Data Shared
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/50">
+                  <tbody className="divide-y divide-line">
                     <tr>
-                      <td className="px-4 py-3 text-green-400">WorkOS</td>
+                      <td className="px-4 py-3 text-accent">WorkOS</td>
                       <td className="px-4 py-3">Auth, encrypted vault</td>
                       <td className="px-4 py-3">
                         Email, name, tokens, encrypted secrets
                       </td>
                     </tr>
                     <tr>
-                      <td className="px-4 py-3 text-green-400">Convex</td>
+                      <td className="px-4 py-3 text-accent">Convex</td>
                       <td className="px-4 py-3">Real-time database</td>
                       <td className="px-4 py-3">
                         Account metadata, project data, audit logs
                       </td>
                     </tr>
                     <tr>
-                      <td className="px-4 py-3 text-green-400">Polar.sh</td>
+                      <td className="px-4 py-3 text-accent">Polar.sh</td>
                       <td className="px-4 py-3">Payment processing</td>
                       <td className="px-4 py-3">
                         Email, billing address, payment method
                       </td>
                     </tr>
                     <tr>
-                      <td className="px-4 py-3 text-green-400">Resend</td>
+                      <td className="px-4 py-3 text-accent">Resend</td>
                       <td className="px-4 py-3">Transactional email</td>
                       <td className="px-4 py-3">
                         Recipient email, invitation details
                       </td>
                     </tr>
                     <tr>
-                      <td className="px-4 py-3 text-green-400">Vercel</td>
+                      <td className="px-4 py-3 text-accent">Vercel</td>
                       <td className="px-4 py-3">Application hosting</td>
                       <td className="px-4 py-3">Server logs, IP addresses</td>
                     </tr>
                     <tr>
-                      <td className="px-4 py-3 text-green-400">Slack</td>
+                      <td className="px-4 py-3 text-accent">Slack</td>
                       <td className="px-4 py-3">
                         User-configured channel notifications
                       </td>
@@ -354,7 +354,7 @@ export default function PrivacyPolicyPage() {
                       </td>
                     </tr>
                     <tr>
-                      <td className="px-4 py-3 text-green-400">Discord</td>
+                      <td className="px-4 py-3 text-accent">Discord</td>
                       <td className="px-4 py-3">
                         User-configured channel notifications
                       </td>
@@ -458,27 +458,27 @@ export default function PrivacyPolicyPage() {
                 We use only strictly necessary cookies required for the Service
                 to function:
               </p>
-              <div className="mt-4 overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/30">
+              <div className="mt-4 overflow-x-auto rounded-xl border border-line bg-surface/30">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                      <th className="px-4 py-3 font-sans font-semibold text-zinc-200">
+                    <tr className="border-b border-line bg-surface/50">
+                      <th className="px-4 py-3 font-sans font-semibold text-ink">
                         Cookie
                       </th>
-                      <th className="px-4 py-3 font-sans font-semibold text-zinc-200">
+                      <th className="px-4 py-3 font-sans font-semibold text-ink">
                         Purpose
                       </th>
-                      <th className="px-4 py-3 font-sans font-semibold text-zinc-200">
+                      <th className="px-4 py-3 font-sans font-semibold text-ink">
                         Type
                       </th>
-                      <th className="px-4 py-3 font-sans font-semibold text-zinc-200">
+                      <th className="px-4 py-3 font-sans font-semibold text-ink">
                         Duration
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td className="px-4 py-3 text-green-400">wos-session</td>
+                      <td className="px-4 py-3 text-accent">wos-session</td>
                       <td className="px-4 py-3">Auth session</td>
                       <td className="px-4 py-3">
                         Strictly necessary, HTTP-only, Secure
@@ -498,7 +498,7 @@ export default function PrivacyPolicyPage() {
             </Section>
 
             <Section id="data-retention" n={11} title="Data Retention">
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
+              <div className="rounded-xl border border-line bg-surface/30 p-5">
                 <ul className="space-y-2 pl-4">
                   <Li>
                     <Term>Account data:</Term> retained for account duration.
@@ -536,7 +536,7 @@ export default function PrivacyPolicyPage() {
 
             <Section id="your-rights" n={12} title="Your Rights">
               <Subsection title="12.1 GDPR Rights (EEA/UK)">
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
+                <div className="rounded-xl border border-line bg-surface/30 p-5">
                   <p>You have the right to:</p>
                   <ul className="mt-2 space-y-1 pl-4">
                     <Li>
@@ -622,7 +622,7 @@ export default function PrivacyPolicyPage() {
                   Contact us at{" "}
                   <a
                     href="mailto:privacy@envpilot.dev"
-                    className="text-green-400 hover:underline"
+                    className="text-accent hover:underline"
                   >
                     privacy@envpilot.dev
                   </a>
@@ -674,9 +674,9 @@ export default function PrivacyPolicyPage() {
                 For questions, concerns, or requests related to this Privacy
                 Policy or your personal data:
               </p>
-              <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
-                <p className="flex items-center gap-2 text-zinc-200">
-                  <span className="text-green-500">&#10095;</span>
+              <div className="mt-4 rounded-xl border border-line bg-surface/30 p-5">
+                <p className="flex items-center gap-2 text-ink">
+                  <span className="text-accent">&#10095;</span>
                   <strong className="font-semibold">
                     Envpilot Privacy Team
                   </strong>
@@ -685,7 +685,7 @@ export default function PrivacyPolicyPage() {
                   Email:{" "}
                   <a
                     href="mailto:privacy@envpilot.dev"
-                    className="text-green-400 hover:underline"
+                    className="text-accent hover:underline"
                   >
                     privacy@envpilot.dev
                   </a>
@@ -713,14 +713,14 @@ function Section({
   return (
     <section
       id={id}
-      className="scroll-mt-24 border-b border-zinc-800/60 py-10 first:pt-0 last:border-b-0"
+      className="scroll-mt-24 border-b border-line py-10 first:pt-0 last:border-b-0"
     >
       <Reveal>
         <div className="flex items-baseline gap-3">
-          <span className="font-mono text-xs tracking-widest text-green-500">
+          <span className="font-mono text-xs tracking-widest text-accent">
             &sect; {String(n).padStart(2, "0")}
           </span>
-          <h2 className="font-sans text-xl font-semibold tracking-tight text-zinc-100">
+          <h2 className="font-sans text-xl font-semibold tracking-tight text-ink">
             {title}
           </h2>
         </div>
@@ -739,7 +739,7 @@ function Subsection({
 }) {
   return (
     <div className="mt-6">
-      <h3 className="font-sans text-sm font-semibold text-zinc-200">{title}</h3>
+      <h3 className="font-sans text-sm font-semibold text-ink">{title}</h3>
       <div className="mt-2">{children}</div>
     </div>
   );
@@ -748,7 +748,7 @@ function Subsection({
 /** List item with a green caret marker. */
 function Li({ children }: { children: React.ReactNode }) {
   return (
-    <li className="text-zinc-400 before:mr-2 before:text-green-500 before:content-['\276F']">
+    <li className="text-ink-muted before:mr-2 before:text-accent before:content-['\276F']">
       {children}
     </li>
   );
@@ -756,5 +756,5 @@ function Li({ children }: { children: React.ReactNode }) {
 
 /** Emphasized key term inside legal prose. */
 function Term({ children }: { children: React.ReactNode }) {
-  return <strong className="font-semibold text-zinc-200">{children}</strong>;
+  return <strong className="font-semibold text-ink">{children}</strong>;
 }

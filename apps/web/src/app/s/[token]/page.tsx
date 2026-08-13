@@ -281,15 +281,15 @@ export default function ShareViewerPage() {
   return (
     <div className="w-full max-w-md">
       {/* Terminal-style card */}
-      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+      <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
         {/* Title bar */}
-        <div className="flex items-center gap-2 border-b border-zinc-800 bg-zinc-900/80 px-4 py-3">
+        <div className="flex items-center gap-2 border-b border-line bg-surface/80 px-4 py-3">
           <div className="flex gap-1.5">
-            <div className="h-3 w-3 rounded-full bg-red-500/80" />
-            <div className="h-3 w-3 rounded-full bg-yellow-500/80" />
-            <div className="h-3 w-3 rounded-full bg-green-500/80" />
+            <div className="h-3 w-3 rounded-full bg-danger-soft" />
+            <div className="h-3 w-3 rounded-full bg-warning-soft" />
+            <div className="h-3 w-3 rounded-full bg-accent-soft" />
           </div>
-          <span className="ml-2 font-mono text-xs text-zinc-500">
+          <span className="ml-2 font-mono text-xs text-ink-subtle">
             {step === "email" && "secret-share"}
             {step === "otp" && "verify-identity"}
             {step === "passphrase" && "enter-passphrase"}
@@ -304,12 +304,12 @@ export default function ShareViewerPage() {
           {step === "email" && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-green-500" />
-                <h2 className="font-mono text-sm font-semibold text-zinc-100">
+                <Shield className="h-5 w-5 text-accent" />
+                <h2 className="font-mono text-sm font-semibold text-ink">
                   A secret has been shared with you
                 </h2>
               </div>
-              <p className="text-sm text-zinc-400">
+              <p className="text-sm text-ink-muted">
                 Enter your email to verify access.
               </p>
               <div className="space-y-3">
@@ -327,13 +327,13 @@ export default function ShareViewerPage() {
                   }
                   disabled={verifyEmail.isPending}
                   placeholder="your@email.com"
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  className="w-full rounded-lg border border-line bg-surface-raised px-3 py-2.5 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
                   autoFocus
                 />
                 <button
                   onClick={handleVerifyEmail}
                   disabled={!email.trim() || verifyEmail.isPending}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {verifyEmail.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -343,7 +343,7 @@ export default function ShareViewerPage() {
                   Verify Email
                 </button>
               </div>
-              <p className="text-xs text-zinc-600">
+              <p className="text-xs text-ink-faint">
                 Your email must match the recipient list.
               </p>
             </div>
@@ -353,14 +353,14 @@ export default function ShareViewerPage() {
           {step === "otp" && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <KeyRound className="h-5 w-5 text-green-500" />
-                <h2 className="font-mono text-sm font-semibold text-zinc-100">
+                <KeyRound className="h-5 w-5 text-accent" />
+                <h2 className="font-mono text-sm font-semibold text-ink">
                   Verify your identity
                 </h2>
               </div>
-              <p className="text-sm text-zinc-400">
+              <p className="text-sm text-ink-muted">
                 A 6-digit code was sent to{" "}
-                <span className="text-zinc-200">{maskedEmail}</span>
+                <span className="text-ink">{maskedEmail}</span>
               </p>
               <div className="space-y-3">
                 <input
@@ -379,14 +379,14 @@ export default function ShareViewerPage() {
                   }
                   disabled={verifyOtp.isPending}
                   placeholder="000000"
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-center font-mono text-2xl tracking-[0.3em] text-zinc-100 placeholder:text-zinc-700 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  className="w-full rounded-lg border border-line bg-surface-raised px-3 py-2.5 text-center font-mono text-2xl tracking-[0.3em] text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
                   maxLength={6}
                   autoFocus
                 />
                 <button
                   onClick={handleVerifyOtp}
                   disabled={otp.length !== 6 || verifyOtp.isPending}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {verifyOtp.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -396,12 +396,12 @@ export default function ShareViewerPage() {
                 </button>
               </div>
               {errorMessage && (
-                <p className="text-xs text-red-400">{errorMessage}</p>
+                <p className="text-xs text-danger">{errorMessage}</p>
               )}
-              <div className="flex items-center justify-between text-xs text-zinc-500">
+              <div className="flex items-center justify-between text-xs text-ink-subtle">
                 <span>
                   Code expires in{" "}
-                  <span className={otpCountdown < 60 ? "text-amber-400" : ""}>
+                  <span className={otpCountdown < 60 ? "text-warning" : ""}>
                     {formatCountdown(otpCountdown)}
                   </span>
                 </span>
@@ -409,7 +409,7 @@ export default function ShareViewerPage() {
                   <button
                     onClick={handleResendOtp}
                     disabled={verifyEmail.isPending}
-                    className="flex items-center gap-1 text-green-400 hover:text-green-300 disabled:opacity-50"
+                    className="flex items-center gap-1 text-accent hover:text-accent disabled:opacity-50"
                   >
                     {verifyEmail.isPending ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
@@ -427,12 +427,12 @@ export default function ShareViewerPage() {
           {step === "passphrase" && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <Lock className="h-5 w-5 text-green-500" />
-                <h2 className="font-mono text-sm font-semibold text-zinc-100">
+                <Lock className="h-5 w-5 text-accent" />
+                <h2 className="font-mono text-sm font-semibold text-ink">
                   Enter passphrase
                 </h2>
               </div>
-              <p className="text-sm text-zinc-400">
+              <p className="text-sm text-ink-muted">
                 This secret is protected with an additional passphrase.
               </p>
               <div className="space-y-3">
@@ -449,19 +449,19 @@ export default function ShareViewerPage() {
                     handleDecryptWithPassphrase()
                   }
                   placeholder="Enter passphrase"
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  className="w-full rounded-lg border border-line bg-surface-raised px-3 py-2.5 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
                   autoFocus
                 />
                 <button
                   onClick={handleDecryptWithPassphrase}
                   disabled={!passphrase}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Decrypt
                 </button>
               </div>
               {errorMessage && (
-                <p className="text-xs text-red-400">{errorMessage}</p>
+                <p className="text-xs text-danger">{errorMessage}</p>
               )}
             </div>
           )}
@@ -479,19 +479,19 @@ export default function ShareViewerPage() {
                 return (
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <Eye className="h-5 w-5 text-green-500" />
-                      <h2 className="font-mono text-sm font-semibold text-zinc-100">
+                      <Eye className="h-5 w-5 text-accent" />
+                      <h2 className="font-mono text-sm font-semibold text-ink">
                         Account revealed
                       </h2>
                     </div>
 
-                    <div className="space-y-3 rounded-lg bg-zinc-800 p-3">
+                    <div className="space-y-3 rounded-lg bg-surface-raised p-3">
                       {/* Name */}
                       <div>
-                        <span className="block text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                        <span className="block text-[10px] font-medium uppercase tracking-wide text-ink-subtle">
                           Account
                         </span>
-                        <span className="font-mono text-sm text-zinc-100">
+                        <span className="font-mono text-sm text-ink">
                           {accountPayload.name}
                         </span>
                       </div>
@@ -499,10 +499,10 @@ export default function ShareViewerPage() {
                       {/* URL — plain text, never a clickable link */}
                       {accountPayload.url && (
                         <div>
-                          <span className="block text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                          <span className="block text-[10px] font-medium uppercase tracking-wide text-ink-subtle">
                             URL
                           </span>
-                          <span className="block break-all font-mono text-sm text-zinc-300">
+                          <span className="block break-all font-mono text-sm text-ink-muted">
                             {accountPayload.url}
                           </span>
                         </div>
@@ -511,10 +511,10 @@ export default function ShareViewerPage() {
                       {/* Username */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <span className="block text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                          <span className="block text-[10px] font-medium uppercase tracking-wide text-ink-subtle">
                             Username
                           </span>
-                          <code className="block break-all font-mono text-sm text-green-400">
+                          <code className="block break-all font-mono text-sm text-accent">
                             {accountPayload.username}
                           </code>
                         </div>
@@ -522,7 +522,7 @@ export default function ShareViewerPage() {
                           onClick={() =>
                             handleCopyField("username", accountPayload.username)
                           }
-                          className="shrink-0 rounded-md bg-zinc-700 px-2 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-600"
+                          className="shrink-0 rounded-md bg-surface-hover px-2 py-1 text-xs font-medium text-ink-muted hover:bg-surface-hover"
                         >
                           {copiedField === "username" ? (
                             <span className="flex items-center gap-1">
@@ -539,10 +539,10 @@ export default function ShareViewerPage() {
                       {/* Password */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <span className="block text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                          <span className="block text-[10px] font-medium uppercase tracking-wide text-ink-subtle">
                             Password
                           </span>
-                          <code className="block break-all font-mono text-sm text-green-400">
+                          <code className="block break-all font-mono text-sm text-accent">
                             {showAccountPassword
                               ? accountPayload.password
                               : "•".repeat(
@@ -555,7 +555,7 @@ export default function ShareViewerPage() {
                             onClick={() =>
                               setShowAccountPassword((prev) => !prev)
                             }
-                            className="rounded-md bg-zinc-700 p-1.5 text-zinc-300 hover:bg-zinc-600"
+                            className="rounded-md bg-surface-hover p-1.5 text-ink-muted hover:bg-surface-hover"
                             title={
                               showAccountPassword
                                 ? "Hide password"
@@ -575,7 +575,7 @@ export default function ShareViewerPage() {
                                 accountPayload.password
                               )
                             }
-                            className="rounded-md bg-zinc-700 px-2 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-600"
+                            className="rounded-md bg-surface-hover px-2 py-1 text-xs font-medium text-ink-muted hover:bg-surface-hover"
                           >
                             {copiedField === "password" ? (
                               <span className="flex items-center gap-1">
@@ -591,9 +591,9 @@ export default function ShareViewerPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-2 rounded-lg bg-amber-900/20 px-3 py-2">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-                      <p className="text-xs text-amber-400">
+                    <div className="flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                      <p className="text-xs text-warning">
                         {shareMode === "one_time"
                           ? "These credentials have been permanently destroyed. Close this tab when done."
                           : "These credentials remain accessible from this link until it expires. Close this tab when done."}
@@ -615,28 +615,28 @@ export default function ShareViewerPage() {
               return (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <Eye className="h-5 w-5 text-green-500" />
-                    <h2 className="font-mono text-sm font-semibold text-zinc-100">
+                    <Eye className="h-5 w-5 text-accent" />
+                    <h2 className="font-mono text-sm font-semibold text-ink">
                       Secret revealed
                     </h2>
                   </div>
                   <div className="relative">
-                    <div className="max-h-48 overflow-auto rounded-lg bg-zinc-800 p-3">
+                    <div className="max-h-48 overflow-auto rounded-lg bg-surface-raised p-3">
                       {secretKey ? (
                         <code className="break-all font-mono text-sm">
-                          <span className="text-blue-400">{secretKey}</span>
-                          <span className="text-zinc-500">=</span>
-                          <span className="text-green-400">{secretValue}</span>
+                          <span className="text-info">{secretKey}</span>
+                          <span className="text-ink-subtle">=</span>
+                          <span className="text-accent">{secretValue}</span>
                         </code>
                       ) : (
-                        <code className="break-all font-mono text-sm text-green-400">
+                        <code className="break-all font-mono text-sm text-accent">
                           {decryptedSecret}
                         </code>
                       )}
                     </div>
                     <button
                       onClick={handleCopy}
-                      className="absolute right-2 top-2 rounded-md bg-zinc-700 px-2 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-600"
+                      className="absolute right-2 top-2 rounded-md bg-surface-hover px-2 py-1 text-xs font-medium text-ink-muted hover:bg-surface-hover"
                     >
                       {copied ? (
                         <span className="flex items-center gap-1">
@@ -649,9 +649,9 @@ export default function ShareViewerPage() {
                       )}
                     </button>
                   </div>
-                  <div className="flex items-start gap-2 rounded-lg bg-amber-900/20 px-3 py-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-                    <p className="text-xs text-amber-400">
+                  <div className="flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                    <p className="text-xs text-warning">
                       {shareMode === "one_time"
                         ? "This secret has been permanently destroyed. Close this tab when done."
                         : "This secret remains accessible from this link until it expires. Close this tab when done."}
@@ -665,12 +665,12 @@ export default function ShareViewerPage() {
           {step === "error" && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-red-400" />
-                <h2 className="font-mono text-sm font-semibold text-zinc-100">
+                <AlertTriangle className="h-5 w-5 text-danger" />
+                <h2 className="font-mono text-sm font-semibold text-ink">
                   Cannot access secret
                 </h2>
               </div>
-              <p className="text-sm text-zinc-400">{errorMessage}</p>
+              <p className="text-sm text-ink-muted">{errorMessage}</p>
             </div>
           )}
         </div>

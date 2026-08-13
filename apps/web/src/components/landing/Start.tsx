@@ -27,16 +27,16 @@ export function Start() {
         >
           {FAQ_ITEMS.map((item) => (
             <details key={item.question} className="group py-4">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-sans text-[16px] font-medium text-zinc-200 [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-sans text-[16px] font-medium text-ink [&::-webkit-details-marker]:hidden">
                 {item.question}
                 <span
                   aria-hidden
-                  className={`${terminal.mono} text-zinc-600 transition-transform group-open:rotate-45`}
+                  className={`${terminal.mono} text-ink-faint transition-transform group-open:rotate-45`}
                 >
                   +
                 </span>
               </summary>
-              <p className="mt-3 max-w-2xl font-sans text-[16px] leading-relaxed text-zinc-400">
+              <p className="mt-3 max-w-2xl font-sans text-[16px] leading-relaxed text-ink-muted">
                 {item.answer}
               </p>
             </details>
@@ -44,31 +44,31 @@ export function Start() {
         </div>
         <Link
           href="/faq"
-          className={`mt-6 inline-block ${terminal.mono} text-[13px] text-zinc-500 transition-colors hover:text-green-400`}
+          className={`mt-6 inline-block ${terminal.mono} text-[13px] text-ink-subtle transition-colors hover:text-accent`}
         >
           → more questions answered
         </Link>
 
         <div className="mt-24 grid gap-10 lg:grid-cols-2 lg:items-center">
           <div>
-            <h2 className="max-w-md font-sans text-[clamp(2rem,4.5vw,3rem)] leading-[1.02] font-semibold tracking-[-0.035em] text-zinc-100">
+            <h2 className="max-w-md font-sans text-[clamp(2rem,4.5vw,3rem)] leading-[1.02] font-semibold tracking-[-0.035em] text-ink">
               Three commands and you&apos;ll never paste one again.
             </h2>
             <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
               <Link
                 href="/sign-up"
-                className="inline-flex items-center rounded-md bg-green-500 px-6 py-3 font-sans text-[15px] font-semibold text-[#08090A] shadow-[0_0_32px_-10px_rgba(34,197,94,0.9)] transition-colors hover:bg-green-400"
+                className="inline-flex items-center rounded-md bg-accent px-6 py-3 font-sans text-[15px] font-semibold text-[#08090A] shadow-[0_0_32px_-10px_rgba(34,197,94,0.9)] transition-colors hover:bg-accent"
               >
                 Start free
               </Link>
               <Link
                 href={SITE_URLS.docs}
-                className="inline-flex items-center rounded-md px-6 py-3 font-sans text-[15px] text-zinc-300 ring-1 ring-white/[0.08] transition-colors hover:text-zinc-100 hover:ring-white/20"
+                className="inline-flex items-center rounded-md px-6 py-3 font-sans text-[15px] text-ink-muted ring-1 ring-white/[0.08] transition-colors hover:text-ink hover:ring-white/20"
               >
                 Read the docs
               </Link>
             </div>
-            <p className={`mt-6 ${terminal.mono} text-[12px] text-zinc-600`}>
+            <p className={`mt-6 ${terminal.mono} text-[12px] text-ink-faint`}>
               free plan · no card · MIT licensed · self-host any time
             </p>
           </div>
@@ -76,17 +76,17 @@ export function Start() {
           <TerminalPanel title="bash — first run">
             <div className={`${terminal.mono} text-[13px] leading-[1.95]`}>
               {FIRST_RUN.map((line) => (
-                <p key={line} className="text-zinc-200">
-                  <span aria-hidden className="mr-2 text-green-400">
+                <p key={line} className="text-ink">
+                  <span aria-hidden className="mr-2 text-accent">
                     ❯
                   </span>
                   {line}
                 </p>
               ))}
-              <p className="mt-1 text-green-400">
+              <p className="mt-1 text-accent">
                 ✓ backend-api / development linked
               </p>
-              <p className="text-zinc-600">
+              <p className="text-ink-faint">
                 run anything with `envpilot run -- …`
               </p>
             </div>

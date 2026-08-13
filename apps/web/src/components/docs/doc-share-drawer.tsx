@@ -33,9 +33,9 @@ const TTL_OPTIONS = [
 ];
 
 const FIELD =
-  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-500 focus:border-green-500/60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-600";
+  "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse outline-none placeholder:text-ink-subtle focus:border-line bg-surface text-ink placeholder:text-ink-faint";
 const LABEL =
-  "mb-1.5 block text-xs font-medium text-zinc-500 dark:text-zinc-400";
+  "mb-1.5 block text-xs font-medium text-ink-muted";
 
 interface DocShareDrawerProps {
   isOpen: boolean;
@@ -248,14 +248,14 @@ export function DocShareDrawer({
               onClick={() => setScope("page")}
               className={`flex-1 rounded-lg border px-3 py-2 text-left transition-colors ${
                 scope === "page"
-                  ? "border-green-500/60 bg-green-500/10"
-                  : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  ? "border-accent-line bg-accent-soft"
+                  : "border-line hover:bg-surface-hover border-line hover:bg-surface-hover"
               }`}
             >
-              <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-800 dark:text-zinc-200">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-ink">
                 <FileText className="h-3.5 w-3.5" /> This page
               </span>
-              <span className="mt-0.5 block truncate text-[11px] text-zinc-500">
+              <span className="mt-0.5 block truncate text-[11px] text-ink-subtle">
                 {docTitle}
               </span>
             </button>
@@ -264,20 +264,20 @@ export function DocShareDrawer({
               onClick={() => setScope("module")}
               className={`flex-1 rounded-lg border px-3 py-2 text-left transition-colors ${
                 scope === "module"
-                  ? "border-green-500/60 bg-green-500/10"
-                  : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  ? "border-accent-line bg-accent-soft"
+                  : "border-line hover:bg-surface-hover border-line hover:bg-surface-hover"
               }`}
             >
-              <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-800 dark:text-zinc-200">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-ink">
                 <FolderOpen className="h-3.5 w-3.5" /> Whole module
               </span>
-              <span className="mt-0.5 block truncate text-[11px] text-zinc-500">
+              <span className="mt-0.5 block truncate text-[11px] text-ink-subtle">
                 {docModule}
               </span>
             </button>
           </div>
           {scope === "module" && (
-            <p className="mt-2 text-[11px] text-zinc-500">
+            <p className="mt-2 text-[11px] text-ink-subtle">
               Every published page in {docModule}, as one share and one email —
               including pages published into it later.
             </p>
@@ -285,7 +285,7 @@ export function DocShareDrawer({
         </div>
 
         {!isPublished && scope === "page" && (
-          <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+          <p className="rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning">
             This page is a draft. Publish it first — sharing an unreviewed page
             is deliberately not possible. You can still share the module, which
             covers its published pages.
@@ -293,14 +293,14 @@ export function DocShareDrawer({
         )}
 
         {showLinkTab && (
-          <div className="flex gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800/60">
+          <div className="flex gap-1 rounded-lg bg-surface-raised p-1 bg-surface-raised/60">
             <button
               type="button"
               onClick={() => setTab("team")}
               className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 tab === "team"
-                  ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+                  ? "bg-white text-ink-inverse shadow-sm bg-surface text-ink"
+                  : "text-ink-subtle hover:text-ink-muted"
               }`}
             >
               <Users className="h-3.5 w-3.5" /> Team
@@ -310,8 +310,8 @@ export function DocShareDrawer({
               onClick={() => setTab("link")}
               className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 tab === "link"
-                  ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+                  ? "bg-white text-ink-inverse shadow-sm bg-surface text-ink"
+                  : "text-ink-subtle hover:text-ink-muted"
               }`}
             >
               <Globe className="h-3.5 w-3.5" /> Public link
@@ -325,33 +325,33 @@ export function DocShareDrawer({
               <label className={LABEL}>
                 Who should read it ({selected.length} selected)
               </label>
-              <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 p-1 dark:border-zinc-800">
+              <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-line p-1 border-line">
                 {members === undefined && (
-                  <p className="px-2 py-3 text-xs text-zinc-500">
+                  <p className="px-2 py-3 text-xs text-ink-subtle">
                     Loading members…
                   </p>
                 )}
                 {members !== undefined && candidates.length === 0 && (
-                  <p className="px-2 py-3 text-xs text-zinc-500">
+                  <p className="px-2 py-3 text-xs text-ink-subtle">
                     Nobody else is in this organization yet.
                   </p>
                 )}
                 {candidates.map((member) => (
                   <label
                     key={member.userId}
-                    className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                    className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-surface-hover/60"
                   >
                     <input
                       type="checkbox"
                       checked={selected.includes(member.userId)}
                       onChange={() => toggle(member.userId)}
-                      className="h-3.5 w-3.5 accent-green-600"
+                      className="h-3.5 w-3.5 accent-accent-hover"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-zinc-800 dark:text-zinc-200">
+                      <span className="block truncate text-sm text-ink">
                         {member.user.name || member.user.email}
                       </span>
-                      <span className="block truncate text-[11px] text-zinc-500">
+                      <span className="block truncate text-[11px] text-ink-subtle">
                         {member.user.email}
                       </span>
                     </span>
@@ -371,31 +371,31 @@ export function DocShareDrawer({
                 selected.length === 0 ||
                 isBusy
               }
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isBusy && <Loader2 className="h-4 w-4 animate-spin" />}
               Share with {selected.length || ""}{" "}
               {selected.length === 1 ? "person" : "people"}
             </button>
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-[11px] text-ink-subtle">
               {scope === "module"
                 ? `Each person gets read access to ${docModule} — not the rest of the project.`
                 : "Each person gets read access to this one page — not the project."}
             </p>
           </div>
         ) : !canShareExternal ? (
-          <div className="rounded-lg border border-zinc-200 px-4 py-6 text-center dark:border-zinc-800">
-            <Globe className="mx-auto mb-3 h-5 w-5 text-zinc-500" />
-            <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+          <div className="rounded-lg border border-line px-4 py-6 text-center border-line">
+            <Globe className="mx-auto mb-3 h-5 w-5 text-ink-subtle" />
+            <p className="text-sm font-medium text-ink">
               Public links are a Pro feature
             </p>
-            <p className="mt-1.5 text-xs text-zinc-500">
+            <p className="mt-1.5 text-xs text-ink-subtle">
               Share a published page with someone outside your organization
               through an expiring link, optionally behind a passphrase.
             </p>
             <Link
               href="/dashboard/usage"
-              className="mt-4 inline-block rounded-lg bg-green-600 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-500"
+              className="mt-4 inline-block rounded-lg bg-accent px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent"
             >
               View plans
             </Link>
@@ -414,11 +414,11 @@ export function DocShareDrawer({
                   <button
                     type="button"
                     onClick={copyLink}
-                    className="shrink-0 rounded-lg border border-zinc-300 px-3 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    className="shrink-0 rounded-lg border border-line px-3 text-ink-faint hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
                     aria-label="Copy link"
                   >
                     {copied ? (
-                      <Check className="h-4 w-4 text-green-500" />
+                      <Check className="h-4 w-4 text-accent" />
                     ) : (
                       <Copy className="h-4 w-4" />
                     )}
@@ -427,7 +427,7 @@ export function DocShareDrawer({
                 <button
                   type="button"
                   onClick={() => setLinkUrl(null)}
-                  className="mt-3 text-xs text-zinc-500 underline underline-offset-2 hover:text-zinc-700 dark:hover:text-zinc-300"
+                  className="mt-3 text-xs text-ink-subtle underline underline-offset-2 hover:text-ink-muted"
                 >
                   Create another link
                 </button>
@@ -446,14 +446,14 @@ export function DocShareDrawer({
                   />
                 </div>
                 <div>
-                  <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-ink-muted">
                     <input
                       type="checkbox"
                       checked={usePassphrase}
                       onChange={(event) =>
                         setUsePassphrase(event.target.checked)
                       }
-                      className="h-3.5 w-3.5 accent-green-600"
+                      className="h-3.5 w-3.5 accent-accent-hover"
                     />
                     <Lock className="h-3.5 w-3.5" />
                     Require a passphrase
@@ -468,7 +468,7 @@ export function DocShareDrawer({
                         autoComplete="new-password"
                         className={`${FIELD} mt-2`}
                       />
-                      <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                      <p className="mt-1.5 text-[11px] text-warning">
                         Give this to the reader yourself. It is deliberately
                         never included in the email.
                       </p>
@@ -480,12 +480,12 @@ export function DocShareDrawer({
                   type="button"
                   onClick={submitLink}
                   disabled={(scope === "page" && !isPublished) || isBusy}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {isBusy && <Loader2 className="h-4 w-4 animate-spin" />}
                   Create public link
                 </button>
-                <p className="text-[11px] text-zinc-500">
+                <p className="text-[11px] text-ink-subtle">
                   Anyone holding the link can read this page until it expires or
                   you revoke it. It is never indexed by search engines.
                 </p>
@@ -495,12 +495,12 @@ export function DocShareDrawer({
         )}
 
         {error && (
-          <p className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+          <p className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">
             {error}
           </p>
         )}
         {notice && (
-          <p className="rounded-lg border border-green-500/30 bg-green-500/5 px-3 py-2 text-xs text-green-600 dark:text-green-400">
+          <p className="rounded-lg border border-accent-line bg-accent-soft px-3 py-2 text-xs text-accent">
             {notice}
           </p>
         )}
@@ -527,8 +527,8 @@ function TtlPicker({
             onClick={() => onChange(option.value)}
             className={`flex-1 rounded-lg border px-3 py-1.5 text-xs transition-colors ${
               value === option.value
-                ? "border-green-500/60 bg-green-500/10 text-green-600 dark:text-green-400"
-                : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                ? "border-accent-line bg-accent-soft text-accent"
+                : "border-line text-ink-faint hover:bg-surface-hover border-line text-ink-muted hover:bg-surface-hover"
             }`}
           >
             {option.label}

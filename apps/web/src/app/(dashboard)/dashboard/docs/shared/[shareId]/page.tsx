@@ -77,20 +77,20 @@ export default function SharedDocReaderPage({
   if (shared.status !== "ok") {
     return (
       <div className="mx-auto max-w-md pt-16">
-        <div className="rounded-xl border border-zinc-800 p-8 text-center">
-          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-amber-500/10">
-            <AlertTriangle className="h-5 w-5 text-amber-400" />
+        <div className="rounded-xl border border-line p-8 text-center">
+          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-warning-soft">
+            <AlertTriangle className="h-5 w-5 text-warning" />
           </div>
-          <h1 className="mb-2 text-lg font-semibold text-zinc-100">
+          <h1 className="mb-2 text-lg font-semibold text-ink">
             This is no longer shared with you
           </h1>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-ink-muted">
             The share may have expired or been revoked, or the page may have
             been returned to draft.
           </p>
           <Link
             href="/dashboard/docs/shared"
-            className="mt-5 inline-block text-xs text-green-500 hover:underline"
+            className="mt-5 inline-block text-xs text-accent hover:underline"
           >
             Back to shared documentation
           </Link>
@@ -106,27 +106,27 @@ export default function SharedDocReaderPage({
       <div className="space-y-5 pt-6">
         <Link
           href="/dashboard/docs/shared"
-          className="inline-flex items-center gap-1.5 text-sm text-zinc-500 transition-colors hover:text-zinc-100"
+          className="inline-flex items-center gap-1.5 text-sm text-ink-subtle transition-colors hover:text-ink"
         >
           <ArrowLeft className="h-4 w-4" />
           Shared with me
         </Link>
 
         <div>
-          <p className="font-mono text-xs tracking-wide text-zinc-500 uppercase">
+          <p className="font-mono text-xs tracking-wide text-ink-subtle uppercase">
             {module.projectName}
           </p>
-          <h1 className="mt-1.5 text-2xl font-bold text-zinc-100">
+          <h1 className="mt-1.5 text-2xl font-bold text-ink">
             {module.module}
           </h1>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-ink-subtle">
             Shared by {module.sharedByName} · access expires{" "}
             {new Date(module.expiresAt).toLocaleDateString()}
           </p>
         </div>
 
         {module.note && (
-          <p className="border-l-2 border-green-500/40 pl-3 text-sm text-zinc-300 italic">
+          <p className="border-l-2 border-accent-line pl-3 text-sm text-ink-muted italic">
             {module.note}
           </p>
         )}
@@ -134,7 +134,7 @@ export default function SharedDocReaderPage({
         {module.pages.length === 0 ? (
           // Not an error: a module whose pages are all drafts today is empty
           // and will fill in on its own as they are published.
-          <p className="rounded-xl border border-zinc-800 px-6 py-12 text-center text-sm text-zinc-500">
+          <p className="rounded-xl border border-line px-6 py-12 text-center text-sm text-ink-subtle">
             No published pages in this module yet.
           </p>
         ) : (
@@ -144,16 +144,16 @@ export default function SharedDocReaderPage({
                 <button
                   type="button"
                   onClick={() => setOpenSlug(page.slug)}
-                  className="block w-full rounded-xl border border-zinc-800 px-4 py-3.5 text-left transition-colors hover:border-zinc-700 hover:bg-zinc-900/40"
+                  className="block w-full rounded-xl border border-line px-4 py-3.5 text-left transition-colors hover:border-line hover:bg-surface-hover/40"
                 >
                   <div className="flex items-start gap-3">
-                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-zinc-600" />
+                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-ink-faint" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-zinc-100">
+                      <p className="truncate text-sm font-medium text-ink">
                         {page.title}
                       </p>
                       {page.excerpt && (
-                        <p className="mt-1 line-clamp-2 text-xs text-zinc-500">
+                        <p className="mt-1 line-clamp-2 text-xs text-ink-subtle">
                           {page.excerpt}
                         </p>
                       )}
@@ -180,25 +180,25 @@ export default function SharedDocReaderPage({
             ? setOpenSlug(undefined)
             : router.push("/dashboard/docs/shared")
         }
-        className="inline-flex items-center gap-1.5 text-sm text-zinc-500 transition-colors hover:text-zinc-100"
+        className="inline-flex items-center gap-1.5 text-sm text-ink-subtle transition-colors hover:text-ink"
       >
         <ArrowLeft className="h-4 w-4" />
         {openSlug && moduleName ? moduleName : "Shared with me"}
       </button>
 
       <div>
-        <p className="font-mono text-xs tracking-wide text-zinc-500 uppercase">
+        <p className="font-mono text-xs tracking-wide text-ink-subtle uppercase">
           {doc.projectName} · {doc.module}
         </p>
-        <h1 className="mt-1.5 text-2xl font-bold text-zinc-100">{doc.title}</h1>
-        <p className="mt-1 text-xs text-zinc-500">
+        <h1 className="mt-1.5 text-2xl font-bold text-ink">{doc.title}</h1>
+        <p className="mt-1 text-xs text-ink-subtle">
           Written by {doc.authorName} · shared by {doc.sharedByName} · access
           expires {new Date(doc.expiresAt).toLocaleDateString()}
         </p>
       </div>
 
       {doc.note && !openSlug && (
-        <p className="border-l-2 border-green-500/40 pl-3 text-sm text-zinc-300 italic">
+        <p className="border-l-2 border-accent-line pl-3 text-sm text-ink-muted italic">
           {doc.note}
         </p>
       )}

@@ -22,8 +22,8 @@ export function TagFilter({
 
   return (
     <>
-      <span className="mx-2 text-zinc-300 dark:text-zinc-600">|</span>
-      <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      <span className="mx-2 text-ink-faint">|</span>
+      <label className="text-sm font-medium text-ink-muted">
         Tags:
       </label>
       <div className="flex flex-wrap gap-1.5">
@@ -31,8 +31,8 @@ export function TagFilter({
           onClick={onClearAll}
           className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
             !hasSelection
-              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-              : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              ? "bg-surface text-white bg-surface-raised text-ink-inverse"
+              : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
           }`}
         >
           All
@@ -50,7 +50,7 @@ export function TagFilter({
               className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 isSelected
                   ? "text-white"
-                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
               }`}
               style={isSelected ? { backgroundColor: safeColor } : undefined}
             >

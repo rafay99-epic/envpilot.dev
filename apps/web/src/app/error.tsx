@@ -54,8 +54,8 @@ export default function Error({
     // Show a minimal loading state while auto-retrying
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0f172a]">
-        <div className="font-mono text-sm text-zinc-500">
-          <span className="text-green-400">$</span> retrying...
+        <div className="font-mono text-sm text-ink-subtle">
+          <span className="text-accent">$</span> retrying...
         </div>
       </div>
     );
@@ -73,26 +73,26 @@ export default function Error({
         }}
       />
 
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-2xl">
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-line bg-surface/90 shadow-2xl">
         {/* Terminal header */}
-        <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
+        <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2.5">
           <div className="h-3 w-3 rounded-full bg-[#ef5350]/80" />
           <div className="h-3 w-3 rounded-full bg-[#fbbf24]/80" />
           <div className="h-3 w-3 rounded-full bg-[#22c55e]/80" />
-          <span className="ml-2 text-xs text-zinc-500">error</span>
+          <span className="ml-2 text-xs text-ink-subtle">error</span>
         </div>
 
         <div className="p-8 font-mono text-sm">
-          <p className="text-red-400">
+          <p className="text-danger">
             ERROR: Something went wrong [exit code 1]
           </p>
-          <p className="mt-2 text-zinc-400">
+          <p className="mt-2 text-ink-muted">
             An unexpected error occurred. Please try again or contact support if
             the problem persists.
           </p>
 
           {error.digest && (
-            <p className="mt-4 text-xs text-zinc-600">
+            <p className="mt-4 text-xs text-ink-faint">
               Error ID: {error.digest}
             </p>
           )}
@@ -100,13 +100,13 @@ export default function Error({
           <div className="mt-6 flex gap-3">
             <button
               onClick={() => reset()}
-              className="inline-flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+              className="inline-flex items-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent-soft"
             >
               Try Again
             </button>
             <Link
               href="/"
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+              className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink-muted"
             >
               Go Home
             </Link>

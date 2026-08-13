@@ -19,7 +19,7 @@ function AuthGate() {
 
   if (isLoading || (user && whoami === undefined)) {
     return (
-      <div className="min-h-screen bg-zinc-950">
+      <div className="min-h-screen bg-canvas">
         <TerminalLoading label="authenticating" fullPage />
       </div>
     );

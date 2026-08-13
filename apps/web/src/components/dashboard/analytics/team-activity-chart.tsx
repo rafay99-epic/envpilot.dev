@@ -32,15 +32,15 @@ export function TeamActivityChart({ users }: TeamActivityChartProps) {
 
   return (
     <TerminalWindow title="team-activity">
-      <div className="border-b border-zinc-700/50 px-5 py-2.5">
-        <span className="font-mono text-xs text-zinc-500">
-          <span className="text-green-400">$</span> envpilot analytics --team
+      <div className="border-b border-line px-5 py-2.5">
+        <span className="font-mono text-xs text-ink-subtle">
+          <span className="text-accent">$</span> envpilot analytics --team
           --top=5
         </span>
       </div>
       <div className="p-5">
         {data.length === 0 ? (
-          <p className="text-center text-xs text-zinc-600 font-mono py-8">
+          <p className="text-center text-xs text-ink-faint font-mono py-8">
             No team activity data
           </p>
         ) : (

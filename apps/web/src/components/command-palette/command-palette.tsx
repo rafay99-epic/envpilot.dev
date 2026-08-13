@@ -21,9 +21,9 @@ const ENV_FILTERS = ["all", ...ENVIRONMENTS] as const;
 type EnvFilter = (typeof ENV_FILTERS)[number];
 
 const ENV_COLORS: Record<string, string> = {
-  development: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  staging: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  production: "bg-green-500/10 text-green-400 border-green-500/20",
+  development: "bg-info-soft text-info border-info-line",
+  staging: "bg-warning-soft text-warning border-warning-line",
+  production: "bg-accent-soft text-accent border-accent-line",
 };
 
 export function CommandPalette() {
@@ -244,39 +244,39 @@ export function CommandPalette() {
             transition={{ duration: 0.15 }}
             className="relative mx-4 mt-[15vh] sm:mx-auto sm:max-w-2xl"
           >
-            <div className="overflow-hidden rounded-xl border border-zinc-700/50 bg-zinc-900 shadow-2xl">
+            <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
               {/* Search Input */}
-              <div className="flex items-center gap-3 border-b border-zinc-700/50 px-4 py-3">
-                <Search className="h-5 w-5 shrink-0 text-zinc-500" />
+              <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+                <Search className="h-5 w-5 shrink-0 text-ink-subtle" />
                 <input
                   ref={inputRef}
                   type="text"
                   value={searchTerm}
                   onChange={(e) => handleSearch(e.target.value)}
                   placeholder="Search variables across all projects..."
-                  className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-500 outline-none"
+                  className="flex-1 bg-transparent text-sm text-ink placeholder-ink-subtle outline-none"
                 />
-                <kbd className="hidden shrink-0 rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 sm:inline-block">
+                <kbd className="hidden shrink-0 rounded border border-line bg-surface-raised px-1.5 py-0.5 text-[10px] font-medium text-ink-subtle sm:inline-block">
                   ESC
                 </kbd>
                 <button
                   onClick={() => closePalette()}
-                  className="rounded p-0.5 text-zinc-500 hover:text-zinc-300 sm:hidden"
+                  className="rounded p-0.5 text-ink-subtle hover:text-ink-muted sm:hidden"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
 
               {/* Environment Filter Chips */}
-              <div className="flex flex-wrap gap-1.5 border-b border-zinc-700/50 px-4 py-2">
+              <div className="flex flex-wrap gap-1.5 border-b border-line px-4 py-2">
                 {ENV_FILTERS.map((env) => (
                   <button
                     key={env}
                     onClick={() => handleFilterChange(env)}
                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
                       envFilter === env
-                        ? "bg-green-500/10 text-green-400 border border-green-500/30"
-                        : "text-zinc-500 hover:text-zinc-300 border border-zinc-700/50 hover:border-zinc-600"
+                        ? "bg-accent-soft text-accent border border-accent-line"
+                        : "text-ink-subtle hover:text-ink-muted border border-line hover:border-line-strong"
                     }`}
                   >
                     {env}
@@ -285,7 +285,7 @@ export function CommandPalette() {
                 {/* Tag filter chips */}
                 {availableTags.length > 0 && (
                   <>
-                    <span className="mx-1 self-center text-zinc-700">|</span>
+                    <span className="mx-1 self-center text-ink-faint">|</span>
                     {availableTags.map((tag) => {
                       const isSelected = tagFilter.includes(tag._id);
                       return (
@@ -302,7 +302,7 @@ export function CommandPalette() {
                           className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
                             isSelected
                               ? "text-white"
-                              : "text-zinc-500 hover:text-zinc-300 border-zinc-700/50 hover:border-zinc-600"
+                              : "text-ink-subtle hover:text-ink-muted border-line hover:border-line-strong"
                           }`}
                           style={
                             isSelected
@@ -328,17 +328,17 @@ export function CommandPalette() {
                 className="max-h-[50vh] overflow-y-auto sm:max-h-[400px]"
               >
                 {searchTerm.length < 2 ? (
-                  <div className="px-4 py-8 text-center text-sm text-zinc-500">
+                  <div className="px-4 py-8 text-center text-sm text-ink-subtle">
                     Type at least 2 characters to search...
                   </div>
                 ) : isLoading ? (
-                  <div className="px-4 py-8 text-center text-sm text-zinc-500">
+                  <div className="px-4 py-8 text-center text-sm text-ink-subtle">
                     <span className="inline-block animate-pulse">
                       Searching...
                     </span>
                   </div>
                 ) : filteredResults.length === 0 && visibleDocs.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-zinc-500">
+                  <div className="px-4 py-8 text-center text-sm text-ink-subtle">
                     Nothing found for &ldquo;{searchTerm}&rdquo;
                   </div>
                 ) : (
@@ -348,8 +348,8 @@ export function CommandPalette() {
                       onClick={() => navigateToResult(result)}
                       className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
                         index === clampedIndex
-                          ? "bg-green-500/10"
-                          : "hover:bg-zinc-800/50"
+                          ? "bg-accent-soft"
+                          : "hover:bg-surface-hover/50"
                       }`}
                     >
                       {/* Project color dot */}
@@ -363,18 +363,18 @@ export function CommandPalette() {
                       <div className="min-w-0 flex-1">
                         {/* Variable key */}
                         <div className="flex items-center gap-2">
-                          <span className="truncate font-mono text-sm font-medium text-zinc-100">
+                          <span className="truncate font-mono text-sm font-medium text-ink">
                             {result.key}
                           </span>
                           {result.isSensitive && (
-                            <Lock className="h-3 w-3 shrink-0 text-amber-500" />
+                            <Lock className="h-3 w-3 shrink-0 text-warning" />
                           )}
                         </div>
 
                         {/* Project + Org */}
-                        <p className="mt-0.5 truncate text-xs text-zinc-500">
+                        <p className="mt-0.5 truncate text-xs text-ink-subtle">
                           {result.projectName}
-                          <span className="mx-1.5 text-zinc-700">/</span>
+                          <span className="mx-1.5 text-ink-faint">/</span>
                           {result.organizationName}
                         </p>
 
@@ -388,7 +388,7 @@ export function CommandPalette() {
                                 key={env}
                                 className={`inline-block rounded-full border px-1.5 py-0 text-[10px] font-medium ${
                                   ENV_COLORS[env] ||
-                                  "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+                                  "bg-surface-hover/10 text-ink-muted border-line-strong"
                                 }`}
                               >
                                 {env}
@@ -414,7 +414,7 @@ export function CommandPalette() {
                     body is loaded when the page opens. */}
                 {visibleDocs.length > 0 && (
                   <>
-                    <div className="border-t border-zinc-700/50 px-4 pt-3 pb-1 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
+                    <div className="border-t border-line px-4 pt-3 pb-1 font-mono text-[10px] tracking-wider text-ink-faint uppercase">
                       Documentation
                     </div>
                     {visibleDocs.map((doc, index) => (
@@ -424,8 +424,8 @@ export function CommandPalette() {
                         onClick={() => navigateToDoc(doc)}
                         className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
                           filteredResults.length + index === clampedIndex
-                            ? "bg-green-500/10"
-                            : "hover:bg-zinc-800/50"
+                            ? "bg-accent-soft"
+                            : "hover:bg-surface-hover/50"
                         }`}
                       >
                         <div
@@ -435,12 +435,12 @@ export function CommandPalette() {
                           }}
                         />
                         <div className="min-w-0 flex-1">
-                          <span className="truncate text-sm font-medium text-zinc-100">
+                          <span className="truncate text-sm font-medium text-ink">
                             {doc.title}
                           </span>
-                          <p className="mt-0.5 truncate text-xs text-zinc-500">
+                          <p className="mt-0.5 truncate text-xs text-ink-subtle">
                             {doc.projectName}
-                            <span className="mx-1.5 text-zinc-700">/</span>
+                            <span className="mx-1.5 text-ink-faint">/</span>
                             {doc.module}
                           </p>
                         </div>
@@ -452,26 +452,26 @@ export function CommandPalette() {
 
               {/* Footer */}
               {(filteredResults.length > 0 || visibleDocs.length > 0) && (
-                <div className="flex items-center gap-4 border-t border-zinc-700/50 px-4 py-2 text-[10px] text-zinc-600">
+                <div className="flex items-center gap-4 border-t border-line px-4 py-2 text-[10px] text-ink-faint">
                   <span>
-                    <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1 py-0.5 font-mono">
+                    <kbd className="rounded border border-line bg-surface-raised px-1 py-0.5 font-mono">
                       ↑↓
                     </kbd>{" "}
                     navigate
                   </span>
                   <span>
-                    <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1 py-0.5 font-mono">
+                    <kbd className="rounded border border-line bg-surface-raised px-1 py-0.5 font-mono">
                       ↵
                     </kbd>{" "}
                     open
                   </span>
                   <span>
-                    <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1 py-0.5 font-mono">
+                    <kbd className="rounded border border-line bg-surface-raised px-1 py-0.5 font-mono">
                       esc
                     </kbd>{" "}
                     close
                   </span>
-                  <span className="ml-auto text-zinc-600">
+                  <span className="ml-auto text-ink-faint">
                     {navCount} result{navCount !== 1 ? "s" : ""}
                   </span>
                 </div>

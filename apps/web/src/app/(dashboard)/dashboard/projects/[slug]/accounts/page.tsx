@@ -224,17 +224,17 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
   if (!project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
-          <KeyRound className="h-6 w-6 text-red-600 dark:text-red-400" />
+        <div className="rounded-full bg-danger-soft p-3 bg-danger-soft">
+          <KeyRound className="h-6 w-6 text-danger" />
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="mt-4 text-lg font-semibold text-ink">
           {projectError instanceof Error
             ? projectError.message
             : "Project not found"}
         </h2>
         <Link
           href="/dashboard/projects"
-          className="mt-6 text-sm font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300"
+          className="mt-6 text-sm font-medium text-ink-inverse hover:text-ink-muted"
         >
           Back to Projects
         </Link>
@@ -262,21 +262,21 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
         </div>
 
         {notice && (
-          <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/40 dark:bg-green-900/20">
-            <p className="text-sm text-green-700 dark:text-green-400">
+          <div className="rounded-lg border border-accent-line bg-accent-soft p-4 border-accent-line bg-accent-soft">
+            <p className="text-sm text-accent">
               {notice}
             </p>
           </div>
         )}
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-900/20">
-            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+          <div className="rounded-lg border border-danger-line bg-danger-soft p-4 border-danger-line bg-danger-soft">
+            <p className="text-sm text-danger">{error}</p>
           </div>
         )}
 
         {/* Environment filter */}
         <div className="flex flex-wrap items-center gap-4">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label className="text-sm font-medium text-ink-muted">
             Environment:
           </label>
           <div className="flex gap-2">
@@ -284,8 +284,8 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
               onClick={() => setSelectedEnvironment("all")}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 selectedEnvironment === "all"
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  ? "bg-surface text-white bg-surface-raised text-ink-inverse"
+                  : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
               }`}
             >
               All
@@ -296,8 +296,8 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
                 onClick={() => setSelectedEnvironment(env)}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                   selectedEnvironment === env
-                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    ? "bg-surface text-white bg-surface-raised text-ink-inverse"
+                    : "bg-surface-raised text-ink-faint hover:bg-surface-hover text-ink-muted hover:bg-surface-hover"
                 }`}
               >
                 {env}
@@ -307,13 +307,13 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
         </div>
 
         {/* List */}
-        <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+        <div className="rounded-xl border border-line bg-white border-line bg-surface">
+          <div className="flex items-center justify-between border-b border-line px-6 py-4 border-line">
             <div>
-              <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+              <h2 className="font-semibold text-ink">
                 Accounts
               </h2>
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 text-sm text-ink-muted">
                 {filteredAccounts.length} account
                 {filteredAccounts.length !== 1 ? "s" : ""}
                 {selectedEnvironment !== "all" && ` in ${selectedEnvironment}`}
@@ -328,7 +328,7 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
                     ? "Account limit reached. Upgrade to add more."
                     : undefined
                 }
-                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                className="flex items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 bg-surface-raised text-ink-inverse hover:bg-surface-hover"
               >
                 <svg
                   className="h-4 w-4"
@@ -348,25 +348,25 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
             )}
           </div>
 
-          <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <div className="divide-y divide-line">
             {isLoadingAccounts ? (
               <TerminalLoading />
             ) : filteredAccounts.length === 0 ? (
               <div className="px-6 py-12 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-                  <KeyRound className="h-6 w-6 text-zinc-400" />
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-raised">
+                  <KeyRound className="h-6 w-6 text-ink-muted" />
                 </div>
-                <h3 className="mt-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                <h3 className="mt-4 text-sm font-semibold text-ink">
                   No accounts yet
                 </h3>
-                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                <p className="mt-1 text-sm text-ink-muted">
                   {canCreate
                     ? "Add your first shared account to get started."
                     : "No accounts available for this environment."}
                 </p>
               </div>
             ) : (
-              <AnimatedList className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <AnimatedList className="divide-y divide-line">
                 {filteredAccounts.map((account) => (
                   <AccountListItem
                     key={account._id}

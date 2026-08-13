@@ -75,13 +75,13 @@ function NavActions() {
     <>
       <a
         href={`${SITE_URLS.www}/sign-in`}
-        className="text-xs text-zinc-500 transition-colors hover:text-green-400"
+        className="text-xs text-ink-subtle transition-colors hover:text-accent"
       >
         sign-in
       </a>
       <a
         href={`${SITE_URLS.www}/sign-up`}
-        className="rounded border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 transition-all hover:bg-green-500/20"
+        className="rounded border border-accent-line bg-accent-soft px-3 py-1.5 text-xs text-accent transition-all hover:bg-accent-soft"
       >
         get-started
       </a>

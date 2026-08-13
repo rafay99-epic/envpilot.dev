@@ -19,8 +19,8 @@ export default function SharedDocsPage() {
   return (
     <div className="space-y-5 pt-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Shared with me</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="text-2xl font-bold text-ink">Shared with me</h1>
+        <p className="mt-1 text-sm text-ink-subtle">
           Pages and modules teammates have shared with you directly.
         </p>
       </div>
@@ -28,10 +28,10 @@ export default function SharedDocsPage() {
       {shares === undefined ? (
         <TerminalLoading />
       ) : shares.length === 0 ? (
-        <div className="rounded-xl border border-zinc-800 px-6 py-14 text-center">
-          <Inbox className="mx-auto mb-3 h-6 w-6 text-zinc-600" />
-          <p className="text-sm text-zinc-400">Nothing shared with you yet.</p>
-          <p className="mt-1 text-xs text-zinc-600">
+        <div className="rounded-xl border border-line px-6 py-14 text-center">
+          <Inbox className="mx-auto mb-3 h-6 w-6 text-ink-faint" />
+          <p className="text-sm text-ink-muted">Nothing shared with you yet.</p>
+          <p className="mt-1 text-xs text-ink-faint">
             When someone shares a page, it shows up here until it expires.
           </p>
         </div>
@@ -44,19 +44,19 @@ export default function SharedDocsPage() {
                 // normal project access it redirects itself to the real page,
                 // which keeps that lookup off this list's read budget.
                 href={`/dashboard/docs/shared/${share._id}`}
-                className="block rounded-xl border border-zinc-800 px-4 py-3.5 transition-colors hover:border-zinc-700 hover:bg-zinc-900/40"
+                className="block rounded-xl border border-line px-4 py-3.5 transition-colors hover:border-line hover:bg-surface-hover/40"
               >
                 <div className="flex items-start gap-3">
                   {share.scope === "module" ? (
-                    <FolderOpen className="mt-0.5 h-4 w-4 shrink-0 text-zinc-600" />
+                    <FolderOpen className="mt-0.5 h-4 w-4 shrink-0 text-ink-faint" />
                   ) : (
-                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-zinc-600" />
+                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-ink-faint" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-zinc-100">
+                    <p className="truncate text-sm font-medium text-ink">
                       {share.title}
                     </p>
-                    <p className="mt-0.5 truncate text-xs text-zinc-500">
+                    <p className="mt-0.5 truncate text-xs text-ink-subtle">
                       {share.projectName}
                       {share.scope === "module"
                         ? ` · ${share.pageCount} ${share.pageCount === 1 ? "page" : "pages"}`
@@ -64,17 +64,17 @@ export default function SharedDocsPage() {
                       · shared by {share.sharedByName}
                     </p>
                     {share.note && (
-                      <p className="mt-2 border-l-2 border-green-500/40 pl-2.5 text-xs text-zinc-400 italic">
+                      <p className="mt-2 border-l-2 border-accent-line pl-2.5 text-xs text-ink-muted italic">
                         {share.note}
                       </p>
                     )}
                     {share.excerpt && !share.note && (
-                      <p className="mt-1.5 line-clamp-2 text-xs text-zinc-500">
+                      <p className="mt-1.5 line-clamp-2 text-xs text-ink-subtle">
                         {share.excerpt}
                       </p>
                     )}
                   </div>
-                  <span className="shrink-0 font-mono text-[11px] text-zinc-600">
+                  <span className="shrink-0 font-mono text-[11px] text-ink-faint">
                     expires {new Date(share.expiresAt).toLocaleDateString()}
                   </span>
                 </div>

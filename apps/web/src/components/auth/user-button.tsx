@@ -29,7 +29,7 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
     return (
       <Link
         href="/sign-in"
-        className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+        className="rounded-lg border border-accent-line bg-accent-soft px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent-soft"
       >
         Sign In
       </Link>
@@ -44,7 +44,7 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
     <div className="relative" ref={menuRef}>
       {/* Impersonation Banner */}
       {isImpersonating && impersonator && (
-        <div className="absolute -top-8 right-0 rounded-md bg-amber-500/10 px-2 py-1 text-xs text-amber-400">
+        <div className="absolute -top-8 right-0 rounded-md bg-warning-soft px-2 py-1 text-xs text-warning">
           Viewing as {user.email}
         </div>
       )}
@@ -52,7 +52,7 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
       {/* User Avatar Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex w-full items-center gap-3 rounded-lg p-1.5 transition-colors hover:bg-zinc-800 ${collapsed ? "justify-center" : ""}`}
+        className={`flex w-full items-center gap-3 rounded-lg p-1.5 transition-colors hover:bg-surface-hover ${collapsed ? "justify-center" : ""}`}
         aria-label="User menu"
         title={collapsed ? `${user.firstName} ${user.lastName}` : undefined}
       >
@@ -62,19 +62,19 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
             alt={`${user.firstName ?? "User"}'s avatar`}
             width={32}
             height={32}
-            className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-zinc-700"
+            className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-line"
           />
         ) : (
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500/10 text-sm font-medium text-green-400 ring-2 ring-zinc-700">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-medium text-accent ring-2 ring-line">
             {initials}
           </div>
         )}
         {!collapsed && (
           <div className="min-w-0 flex-1 text-left">
-            <p className="truncate text-sm font-medium text-zinc-200">
+            <p className="truncate text-sm font-medium text-ink">
               {user.firstName} {user.lastName}
             </p>
-            <p className="truncate text-xs text-zinc-500">{user.email}</p>
+            <p className="truncate text-xs text-ink-subtle">{user.email}</p>
           </div>
         )}
       </button>
@@ -82,23 +82,23 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
       {/* Dropdown Menu — opens upward in sidebar, downward when collapsed (mobile header) */}
       {isOpen && (
         <div
-          className={`absolute z-50 w-64 overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900 shadow-2xl ${
+          className={`absolute z-50 w-64 overflow-hidden rounded-lg border border-line bg-surface shadow-2xl ${
             collapsed ? "right-0 top-full mt-2" : "bottom-full left-0 mb-2"
           }`}
         >
           {/* User Info */}
-          <div className="border-b border-zinc-700/50 px-4 py-3">
-            <p className="text-sm font-medium text-zinc-100">
+          <div className="border-b border-line px-4 py-3">
+            <p className="text-sm font-medium text-ink">
               {user.firstName} {user.lastName}
             </p>
-            <p className="text-xs text-zinc-500">{user.email}</p>
+            <p className="text-xs text-ink-subtle">{user.email}</p>
             {organization && (
-              <p className="mt-1 text-xs text-zinc-500 capitalize">
+              <p className="mt-1 text-xs text-ink-subtle capitalize">
                 {organization.name}
               </p>
             )}
             {user.role && (
-              <span className="mt-2 inline-block rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400">
+              <span className="mt-2 inline-block rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent">
                 {roleLabel(user.role)}
               </span>
             )}
@@ -108,7 +108,7 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
           <div className="py-1">
             <Link
               href="/dashboard"
-              className="flex items-center gap-2.5 px-4 py-2 text-sm text-zinc-400 transition-colors hover:bg-green-500/5 hover:text-green-400"
+              className="flex items-center gap-2.5 px-4 py-2 text-sm text-ink-muted transition-colors hover:bg-accent-soft hover:text-accent"
               onClick={() => setIsOpen(false)}
             >
               <LayoutDashboard className="h-4 w-4" />
@@ -116,7 +116,7 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
             </Link>
             <Link
               href="/dashboard/settings"
-              className="flex items-center gap-2.5 px-4 py-2 text-sm text-zinc-400 transition-colors hover:bg-green-500/5 hover:text-green-400"
+              className="flex items-center gap-2.5 px-4 py-2 text-sm text-ink-muted transition-colors hover:bg-accent-soft hover:text-accent"
               onClick={() => setIsOpen(false)}
             >
               <Settings className="h-4 w-4" />
@@ -125,13 +125,13 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
           </div>
 
           {/* Sign Out */}
-          <div className="border-t border-zinc-700/50 py-1">
+          <div className="border-t border-line py-1">
             <button
               onClick={() => {
                 setIsOpen(false);
                 signOut();
               }}
-              className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-[#ef5350] transition-colors hover:bg-red-500/5"
+              className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-[#ef5350] transition-colors hover:bg-danger-soft"
             >
               <LogOut className="h-4 w-4" />
               Sign out

@@ -97,7 +97,7 @@ export default function SettingsPage() {
       />
 
       {/* Tabs */}
-      <div className="border-b border-zinc-800">
+      <div className="border-b border-line">
         <nav className="-mb-px flex space-x-6">
           {tabs.map((tab) => (
             <button
@@ -105,8 +105,8 @@ export default function SettingsPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`border-b-2 py-3 text-sm font-medium transition-colors ${
                 activeTab === tab.id
-                  ? "border-green-400 text-green-400"
-                  : "border-transparent text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+                  ? "border-accent-line text-accent"
+                  : "border-transparent text-ink-subtle hover:border-line-strong hover:text-ink-muted"
               }`}
             >
               {tab.label}
@@ -201,15 +201,15 @@ function GeneralSettings({
   return (
     <div className="space-y-6">
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">Profile</h2>
-        <p className="mt-1 text-sm text-zinc-500">Your personal information</p>
+        <h2 className="text-base font-semibold text-ink">Profile</h2>
+        <p className="mt-1 text-sm text-ink-subtle">Your personal information</p>
 
         <div className="mt-6 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label
                 htmlFor="firstName"
-                className="block text-sm font-medium text-zinc-300"
+                className="block text-sm font-medium text-ink-muted"
               >
                 First Name
               </label>
@@ -224,7 +224,7 @@ function GeneralSettings({
             <div>
               <label
                 htmlFor="lastName"
-                className="block text-sm font-medium text-zinc-300"
+                className="block text-sm font-medium text-ink-muted"
               >
                 Last Name
               </label>
@@ -241,7 +241,7 @@ function GeneralSettings({
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-zinc-300"
+              className="block text-sm font-medium text-ink-muted"
             >
               Email
             </label>
@@ -250,9 +250,9 @@ function GeneralSettings({
               id="email"
               value={user?.email || ""}
               disabled
-              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-500"
+              className="mt-1 w-full rounded-lg border border-line bg-surface-raised/50 px-3 py-2 text-sm text-ink-subtle"
             />
-            <p className="mt-1 text-xs text-zinc-600">
+            <p className="mt-1 text-xs text-ink-faint">
               Email cannot be changed. Contact support if you need to update it.
             </p>
           </div>
@@ -261,7 +261,7 @@ function GeneralSettings({
         <div className="mt-6 flex items-center justify-end gap-3">
           {saveMessage && (
             <p
-              className={`text-sm ${saveMessage.type === "success" ? "text-green-400" : "text-red-400"}`}
+              className={`text-sm ${saveMessage.type === "success" ? "text-accent" : "text-danger"}`}
             >
               {saveMessage.text}
             </p>
@@ -277,21 +277,21 @@ function GeneralSettings({
 
       {/* Connected Account */}
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">
+        <h2 className="text-base font-semibold text-ink">
           Connected Account
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-ink-subtle">
           Your authentication provider
         </p>
 
-        <div className="mt-6 flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+        <div className="mt-6 flex items-center justify-between rounded-lg border border-line bg-surface-raised/50 p-4">
           <div className="flex items-center gap-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-700/50">
-              <Lock className="h-4 w-4 text-zinc-400" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-hover/50">
+              <Lock className="h-4 w-4 text-ink-muted" />
             </div>
             <div>
-              <p className="text-sm font-medium text-zinc-100">{user?.email}</p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-sm font-medium text-ink">{user?.email}</p>
+              <p className="text-xs text-ink-subtle">
                 Member since{" "}
                 {user?.createdAt
                   ? new Date(user.createdAt).toLocaleDateString("en-US", {
@@ -308,10 +308,10 @@ function GeneralSettings({
 
       {/* Quick Links */}
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">
+        <h2 className="text-base font-semibold text-ink">
           Help &amp; Resources
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-ink-subtle">
           Common questions and documentation
         </p>
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -319,36 +319,36 @@ function GeneralSettings({
             href="/faq"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2.5 rounded-lg border border-zinc-700/50 bg-zinc-800/30 px-3 py-2.5 text-sm text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+            className="flex items-center gap-2.5 rounded-lg border border-line bg-surface-raised/30 px-3 py-2.5 text-sm text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
           >
-            <ExternalLink className="h-3.5 w-3.5 text-green-400" />
+            <ExternalLink className="h-3.5 w-3.5 text-accent" />
             FAQ &amp; How It Works
           </a>
           <a
             href="/terms#billing"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2.5 rounded-lg border border-zinc-700/50 bg-zinc-800/30 px-3 py-2.5 text-sm text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+            className="flex items-center gap-2.5 rounded-lg border border-line bg-surface-raised/30 px-3 py-2.5 text-sm text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
           >
-            <ExternalLink className="h-3.5 w-3.5 text-green-400" />
+            <ExternalLink className="h-3.5 w-3.5 text-accent" />
             Billing Terms
           </a>
           <a
             href="/privacy"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2.5 rounded-lg border border-zinc-700/50 bg-zinc-800/30 px-3 py-2.5 text-sm text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+            className="flex items-center gap-2.5 rounded-lg border border-line bg-surface-raised/30 px-3 py-2.5 text-sm text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
           >
-            <ExternalLink className="h-3.5 w-3.5 text-green-400" />
+            <ExternalLink className="h-3.5 w-3.5 text-accent" />
             Privacy Policy
           </a>
           <a
             href="/support"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2.5 rounded-lg border border-zinc-700/50 bg-zinc-800/30 px-3 py-2.5 text-sm text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+            className="flex items-center gap-2.5 rounded-lg border border-line bg-surface-raised/30 px-3 py-2.5 text-sm text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
           >
-            <ExternalLink className="h-3.5 w-3.5 text-green-400" />
+            <ExternalLink className="h-3.5 w-3.5 text-accent" />
             Contact Support
           </a>
         </div>
@@ -430,35 +430,35 @@ function NotificationSettings() {
       label: "Variable changes",
       description: "When variables you have access to are modified",
       icon: Variable,
-      activeColor: "text-blue-400",
+      activeColor: "text-info",
     },
     {
       key: "memberUpdates",
       label: "Team updates",
       description: "When members join or leave your organization",
       icon: Users,
-      activeColor: "text-purple-400",
+      activeColor: "text-premium",
     },
     {
       key: "accessRequests",
       label: "Access requests",
       description: "When someone requests access to variables",
       icon: KeyRound,
-      activeColor: "text-amber-400",
+      activeColor: "text-warning",
     },
     {
       key: "securityAlerts",
       label: "Security alerts",
       description: "Session revocations and suspicious activity",
       icon: ShieldAlert,
-      activeColor: "text-red-400",
+      activeColor: "text-danger",
     },
     {
       key: "rotationReminders",
       label: "Rotation reminders",
       description: "When secrets are approaching expiry",
       icon: RotateCcw,
-      activeColor: "text-orange-400",
+      activeColor: "text-warning",
     },
   ];
 
@@ -470,7 +470,7 @@ function NotificationSettings() {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="h-16 animate-pulse rounded-lg bg-zinc-800/50"
+                className="h-16 animate-pulse rounded-lg bg-surface-raised/50"
               />
             ))}
           </div>
@@ -482,10 +482,10 @@ function NotificationSettings() {
   return (
     <div className="space-y-6">
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">
+        <h2 className="text-base font-semibold text-ink">
           Email Notifications
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-ink-subtle">
           Choose which email notifications you receive
         </p>
 
@@ -494,24 +494,24 @@ function NotificationSettings() {
             ({ key, label, description, icon: Icon, activeColor }) => (
               <div
                 key={key}
-                className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-5 py-4"
+                className="flex items-center justify-between rounded-lg border border-line bg-surface-raised/50 px-5 py-4"
               >
                 <div className="flex items-center gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-700/40">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-hover/40">
                     <Icon
-                      className={`h-5 w-5 ${prefs[key] ? activeColor : "text-zinc-500"}`}
+                      className={`h-5 w-5 ${prefs[key] ? activeColor : "text-ink-subtle"}`}
                     />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-zinc-100">{label}</p>
-                    <p className="text-xs text-zinc-500">{description}</p>
+                    <p className="text-sm font-medium text-ink">{label}</p>
+                    <p className="text-xs text-ink-subtle">{description}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => handleToggle(key)}
                   disabled={savingKey === key}
                   className={`relative h-6 w-11 rounded-full transition-colors ${
-                    prefs[key] ? "bg-green-500" : "bg-zinc-600"
+                    prefs[key] ? "bg-accent" : "bg-surface-hover"
                   } ${savingKey === key ? "opacity-50" : ""}`}
                 >
                   <span
@@ -537,10 +537,10 @@ function IntegrationsSettings() {
   return (
     <div className="space-y-6" id="integrations">
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">
+        <h2 className="text-base font-semibold text-ink">
           IDE Extensions
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-ink-subtle">
           Install extensions to sync variables to your local environment
         </p>
 
@@ -898,13 +898,13 @@ function IntegrationsSettings() {
           />
         </div>
 
-        <p className="mt-4 text-xs text-zinc-500">
+        <p className="mt-4 text-xs text-ink-subtle">
           Available on{" "}
           <a
             href="https://open-vsx.org/extension/envpilot/envpilot"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-zinc-400 underline decoration-zinc-600 underline-offset-2 transition-colors hover:text-zinc-300"
+            className="text-ink-muted underline decoration-ink-faint underline-offset-2 transition-colors hover:text-ink-muted"
           >
             Open VSX Registry
           </a>{" "}
@@ -916,8 +916,8 @@ function IntegrationsSettings() {
       <TerminalCard>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-zinc-100">CLI Tool</h2>
-            <p className="mt-1 text-sm text-zinc-500">
+            <h2 className="text-base font-semibold text-ink">CLI Tool</h2>
+            <p className="mt-1 text-sm text-ink-subtle">
               Manage variables from your terminal
             </p>
           </div>
@@ -925,7 +925,7 @@ function IntegrationsSettings() {
             href="https://www.npmjs.com/package/@envpilot/cli"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs text-zinc-500 transition-colors hover:text-zinc-300"
+            className="flex items-center gap-1.5 text-xs text-ink-subtle transition-colors hover:text-ink-muted"
           >
             View on npm
             <ExternalLink className="h-3 w-3" />
@@ -960,7 +960,7 @@ function IntegrationCard({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-accent-line bg-accent-soft px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent-soft"
     >
       Install
       <ExternalLink className="h-3 w-3" />
@@ -970,12 +970,12 @@ function IntegrationCard({
   );
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+    <div className="flex items-center justify-between rounded-lg border border-line bg-surface-raised/50 p-4">
       <div className="flex items-center gap-4">
-        <div className="text-zinc-400">{icon}</div>
+        <div className="text-ink-muted">{icon}</div>
         <div>
-          <p className="text-sm font-medium text-zinc-100">{name}</p>
-          <p className="text-xs text-zinc-500">{description}</p>
+          <p className="text-sm font-medium text-ink">{name}</p>
+          <p className="text-xs text-ink-subtle">{description}</p>
         </div>
       </div>
       {button}
@@ -996,18 +996,18 @@ function CliInstallCommand() {
   return (
     <TerminalWindow title="terminal" className="mt-6">
       <div className="flex items-center justify-between p-4 font-mono text-sm">
-        <code className="text-green-400">
-          <span className="text-zinc-500">$</span> {command}
+        <code className="text-accent">
+          <span className="text-ink-subtle">$</span> {command}
         </code>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-zinc-700 hover:text-zinc-300"
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-ink-subtle transition-colors hover:bg-surface-hover hover:text-ink-muted"
           title="Copy to clipboard"
         >
           {copied ? (
             <>
-              <Check className="h-3.5 w-3.5 text-green-400" />
-              <span className="text-green-400">Copied</span>
+              <Check className="h-3.5 w-3.5 text-accent" />
+              <span className="text-accent">Copied</span>
             </>
           ) : (
             <>
@@ -1084,24 +1084,24 @@ function SecuritySettings() {
   return (
     <div className="space-y-6">
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">
+        <h2 className="text-base font-semibold text-ink">
           Browser Session
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-ink-subtle">
           Your current browser session
         </p>
 
         <div className="mt-6">
-          <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-line bg-surface-raised/50 p-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
-                <Shield className="h-4 w-4 text-green-400" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft">
+                <Shield className="h-4 w-4 text-accent" />
               </div>
               <div>
-                <p className="text-sm font-medium text-zinc-100">
+                <p className="text-sm font-medium text-ink">
                   Current Session
                 </p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-ink-subtle">
                   This device &middot; Active now
                 </p>
               </div>
@@ -1112,10 +1112,10 @@ function SecuritySettings() {
       </TerminalCard>
 
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">
+        <h2 className="text-base font-semibold text-ink">
           CLI & Extension Sessions
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-ink-subtle">
           Active sessions from CLI and IDE extensions
         </p>
 
@@ -1125,13 +1125,13 @@ function SecuritySettings() {
               {[1, 2].map((i) => (
                 <div
                   key={i}
-                  className="h-16 animate-pulse rounded-lg bg-zinc-800/50"
+                  className="h-16 animate-pulse rounded-lg bg-surface-raised/50"
                 />
               ))}
             </>
           ) : allSessions.length === 0 ? (
-            <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-6 text-center">
-              <p className="text-sm text-zinc-500">
+            <div className="rounded-lg border border-line bg-surface-raised/50 p-6 text-center">
+              <p className="text-sm text-ink-subtle">
                 No active CLI or extension sessions
               </p>
             </div>
@@ -1139,21 +1139,21 @@ function SecuritySettings() {
             allSessions.map((session) => (
               <div
                 key={session.id}
-                className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4"
+                className="flex items-center justify-between rounded-lg border border-line bg-surface-raised/50 p-4"
               >
                 <div className="flex items-center gap-4">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-700/50">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-hover/50">
                     {session.type === "cli" ? (
-                      <Terminal className="h-4 w-4 text-zinc-400" />
+                      <Terminal className="h-4 w-4 text-ink-muted" />
                     ) : (
-                      <Monitor className="h-4 w-4 text-zinc-400" />
+                      <Monitor className="h-4 w-4 text-ink-muted" />
                     )}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-zinc-100">
+                    <p className="text-sm font-medium text-ink">
                       {session.deviceName}
                     </p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-ink-subtle">
                       {session.lastUsedAt
                         ? `Last used ${formatRelativeTime(session.lastUsedAt)}`
                         : `Created ${formatRelativeTime(session.createdAt)}`}
@@ -1180,7 +1180,7 @@ function SecuritySettings() {
               {isRevoking ? "Revoking..." : "Revoke All Sessions"}
             </TerminalButton>
             {revokeMessage && (
-              <p className="text-sm text-green-400">{revokeMessage}</p>
+              <p className="text-sm text-accent">{revokeMessage}</p>
             )}
           </div>
         )}
@@ -1354,21 +1354,21 @@ function CustomizationSettings() {
       <TerminalCard>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-500/10">
-              <Keyboard className="h-4 w-4 text-purple-400" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-premium-soft">
+              <Keyboard className="h-4 w-4 text-premium" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-zinc-100">
+              <h2 className="text-base font-semibold text-ink">
                 Keyboard Shortcuts
               </h2>
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-ink-subtle">
                 Customize shortcuts to match your workflow
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {saveMessage && (
-              <span className="text-xs text-green-400">{saveMessage}</span>
+              <span className="text-xs text-accent">{saveMessage}</span>
             )}
             {hasCustomBindings && (
               <TerminalButton
@@ -1392,7 +1392,7 @@ function CustomizationSettings() {
 
             return (
               <div key={category.key}>
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
                   {category.label}
                 </h3>
                 <div className="space-y-1">
@@ -1405,16 +1405,16 @@ function CustomizationSettings() {
                         key={id}
                         className={`flex items-center justify-between rounded-lg border px-4 py-3 transition-colors ${
                           isEditing
-                            ? "border-purple-500/50 bg-purple-500/5"
-                            : "border-zinc-700/50 bg-zinc-800/50"
+                            ? "border-premium-line bg-premium-soft"
+                            : "border-line bg-surface-raised/50"
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <span className="text-sm text-zinc-300">
+                          <span className="text-sm text-ink-muted">
                             {def.description}
                           </span>
                           {isCustomized && !isEditing && (
-                            <span className="rounded-full bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-400">
+                            <span className="rounded-full bg-premium-soft px-1.5 py-0.5 text-[10px] font-medium text-premium">
                               custom
                             </span>
                           )}
@@ -1428,25 +1428,25 @@ function CustomizationSettings() {
                               tabIndex={0}
                               autoFocus
                             >
-                              <div className="flex items-center rounded border border-purple-500/30 bg-zinc-900 px-3 py-1.5">
+                              <div className="flex items-center rounded border border-premium-line bg-surface px-3 py-1.5">
                                 {isRecordingSequence && sequenceStep === 1 ? (
-                                  <span className="font-mono text-xs text-amber-400">
+                                  <span className="font-mono text-xs text-warning">
                                     {recordedKeys[0]} then ...
                                   </span>
                                 ) : (
-                                  <span className="font-mono text-xs text-zinc-500">
+                                  <span className="font-mono text-xs text-ink-subtle">
                                     Press keys...
                                   </span>
                                 )}
                               </div>
                               {error && (
-                                <span className="text-xs text-red-400">
+                                <span className="text-xs text-danger">
                                   {error}
                                 </span>
                               )}
                               <button
                                 onClick={cancelEditing}
-                                className="rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-700 hover:text-zinc-300"
+                                className="rounded p-1 text-ink-subtle transition-colors hover:bg-surface-hover hover:text-ink-muted"
                               >
                                 <X className="h-3.5 w-3.5" />
                               </button>
@@ -1456,7 +1456,7 @@ function CustomizationSettings() {
                               <ShortcutKeyDisplay keys={def.keys} />
                               <button
                                 onClick={() => startEditing(id)}
-                                className="rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-700 hover:text-zinc-300"
+                                className="rounded p-1 text-ink-faint transition-colors hover:bg-surface-hover hover:text-ink-muted"
                                 title="Edit shortcut"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -1464,7 +1464,7 @@ function CustomizationSettings() {
                               {isCustomized && (
                                 <button
                                   onClick={() => handleRemoveBinding(id)}
-                                  className="rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-700 hover:text-amber-400"
+                                  className="rounded p-1 text-ink-faint transition-colors hover:bg-surface-hover hover:text-warning"
                                   title="Reset to default"
                                 >
                                   <RotateCcw className="h-3.5 w-3.5" />
@@ -1482,12 +1482,12 @@ function CustomizationSettings() {
           })}
         </div>
 
-        <div className="mt-6 rounded-lg border border-zinc-700/50 bg-zinc-800/30 p-4">
-          <p className="text-xs text-zinc-500">
+        <div className="mt-6 rounded-lg border border-line bg-surface-raised/30 p-4">
+          <p className="text-xs text-ink-subtle">
             Click the pencil icon to edit a shortcut. Press a key combination to
             set it, or press a single letter followed by another key for a
             sequence (e.g., G then P). Press{" "}
-            <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1 font-mono text-[10px]">
+            <kbd className="rounded border border-line bg-surface-raised px-1 font-mono text-[10px]">
               Esc
             </kbd>{" "}
             to cancel. Your shortcuts sync across all your devices.
@@ -1506,8 +1506,8 @@ function ShortcutKeyDisplay({ keys }: { keys: string }) {
       <div className="flex items-center gap-1">
         {keys.split(" then ").map((k, i) => (
           <span key={i} className="flex items-center gap-1">
-            {i > 0 && <span className="text-[10px] text-zinc-600">then</span>}
-            <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-400">
+            {i > 0 && <span className="text-[10px] text-ink-faint">then</span>}
+            <kbd className="rounded border border-line bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-ink-muted">
               {k.trim()}
             </kbd>
           </span>
@@ -1520,8 +1520,8 @@ function ShortcutKeyDisplay({ keys }: { keys: string }) {
     <div className="flex items-center gap-1">
       {keys.split("+").map((key, i) => (
         <span key={i} className="flex items-center gap-1">
-          {i > 0 && <span className="text-[10px] text-zinc-600">+</span>}
-          <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-400">
+          {i > 0 && <span className="text-[10px] text-ink-faint">+</span>}
+          <kbd className="rounded border border-line bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-ink-muted">
             {key.trim() === "Mod"
               ? typeof navigator !== "undefined" &&
                 /Mac/.test(navigator.userAgent)
@@ -1699,7 +1699,7 @@ function BillingSettings({
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="h-16 animate-pulse rounded-lg bg-zinc-800/50"
+                className="h-16 animate-pulse rounded-lg bg-surface-raised/50"
               />
             ))}
           </div>
@@ -1717,7 +1717,7 @@ function BillingSettings({
   return (
     <div className="space-y-6">
       {alreadyProNotice && (
-        <div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3 text-sm text-green-300">
+        <div className="flex items-center gap-3 rounded-lg border border-accent-line bg-accent-soft px-4 py-3 text-sm text-accent">
           <Check className="h-4 w-4 shrink-0" />
           You&apos;re already on the Pro plan. Your subscription is active.
         </div>
@@ -1726,14 +1726,14 @@ function BillingSettings({
       {/* Subscription Details */}
       <TerminalCard>
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
-            <CreditCard className="h-4 w-4 text-green-400" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft">
+            <CreditCard className="h-4 w-4 text-accent" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-zinc-100">
+            <h2 className="text-base font-semibold text-ink">
               Subscription
             </h2>
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-ink-subtle">
               Your current plan and billing details
             </p>
           </div>
@@ -1741,9 +1741,9 @@ function BillingSettings({
 
         <div className="mt-6 space-y-4">
           {/* Plan & Status */}
-          <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-line bg-surface-raised/50 p-4">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-zinc-100">Plan</span>
+              <span className="text-sm font-medium text-ink">Plan</span>
               <TierBadge tier={subscription?.tier ?? "free"} />
             </div>
             {sub && (
@@ -1757,14 +1757,14 @@ function BillingSettings({
           {sub ? (
             <>
               {/* Last/Current Period */}
-              <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+              <div className="flex items-center justify-between rounded-lg border border-line bg-surface-raised/50 p-4">
                 <div className="flex items-center gap-3">
-                  <Calendar className="h-4 w-4 text-zinc-400" />
-                  <span className="text-sm text-zinc-300">
+                  <Calendar className="h-4 w-4 text-ink-muted" />
+                  <span className="text-sm text-ink-muted">
                     {isRevoked ? "Last billing period" : "Current period"}
                   </span>
                 </div>
-                <span className="text-sm text-zinc-400">
+                <span className="text-sm text-ink-muted">
                   {formatDate(sub.currentPeriodStart)} &mdash;{" "}
                   {formatDate(sub.currentPeriodEnd)}
                 </span>
@@ -1773,14 +1773,14 @@ function BillingSettings({
               {/* Status-specific notices */}
               {isRevoked ? (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/5 p-4">
-                    <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
-                    <span className="text-sm text-red-300">
+                  <div className="flex items-center gap-3 rounded-lg border border-danger-line bg-danger-soft p-4">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-danger" />
+                    <span className="text-sm text-danger">
                       Your subscription has ended. You are now on the Free plan.
                     </span>
                   </div>
-                  <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4 text-center">
-                    <p className="text-sm text-zinc-400 mb-3">
+                  <div className="rounded-lg border border-line bg-surface-raised/50 p-4 text-center">
+                    <p className="text-sm text-ink-muted mb-3">
                       {paymentsEnabled
                         ? "Resubscribe to unlock Pro features again."
                         : "Subscriptions are currently unavailable."}
@@ -1790,7 +1790,7 @@ function BillingSettings({
                         onClick={() => {
                           window.location.href = "/api/checkout?tier=pro";
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-accent-line bg-accent-soft px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent-soft"
                       >
                         Resubscribe to Pro
                         <ExternalLink className="h-3 w-3" />
@@ -1799,29 +1799,29 @@ function BillingSettings({
                   </div>
                 </div>
               ) : isCancelingAtEnd ? (
-                <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
-                  <span className="text-sm text-amber-300">
+                <div className="flex items-center gap-3 rounded-lg border border-warning-line bg-warning-soft p-4">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
+                  <span className="text-sm text-warning">
                     Cancels at end of period ({formatDate(sub.currentPeriodEnd)}
                     ). You retain Pro access until then.
                   </span>
                 </div>
               ) : isActive ? (
-                <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+                <div className="flex items-center justify-between rounded-lg border border-line bg-surface-raised/50 p-4">
                   <div className="flex items-center gap-3">
-                    <Receipt className="h-4 w-4 text-zinc-400" />
-                    <span className="text-sm text-zinc-300">
+                    <Receipt className="h-4 w-4 text-ink-muted" />
+                    <span className="text-sm text-ink-muted">
                       Next billing date
                     </span>
                   </div>
-                  <span className="text-sm text-zinc-400">
+                  <span className="text-sm text-ink-muted">
                     {formatDate(sub.currentPeriodEnd)}
                   </span>
                 </div>
               ) : sub.status === "past_due" ? (
-                <div className="flex items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/5 p-4">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
-                  <span className="text-sm text-red-300">
+                <div className="flex items-center gap-3 rounded-lg border border-danger-line bg-danger-soft p-4">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-danger" />
+                  <span className="text-sm text-danger">
                     Payment failed. Please update your payment method to avoid
                     losing access.
                   </span>
@@ -1829,8 +1829,8 @@ function BillingSettings({
               ) : null}
             </>
           ) : (
-            <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-6 text-center">
-              <p className="text-sm text-zinc-400">
+            <div className="rounded-lg border border-line bg-surface-raised/50 p-6 text-center">
+              <p className="text-sm text-ink-muted">
                 {paymentsEnabled
                   ? "You're on the Free plan. Upgrade to unlock more features."
                   : "You're on the Free plan."}
@@ -1840,7 +1840,7 @@ function BillingSettings({
                   onClick={() => {
                     window.location.href = "/api/checkout?tier=pro";
                   }}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-accent-line bg-accent-soft px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent-soft"
                 >
                   Upgrade to Pro
                   <ExternalLink className="h-3 w-3" />
@@ -1856,8 +1856,8 @@ function BillingSettings({
         <div
           className={`rounded-lg border p-4 text-sm ${
             cancelMessage.type === "success"
-              ? "border-green-500/30 bg-green-500/5 text-green-400"
-              : "border-red-500/30 bg-red-500/5 text-red-400"
+              ? "border-accent-line bg-accent-soft text-accent"
+              : "border-danger-line bg-danger-soft text-danger"
           }`}
         >
           {cancelMessage.text}
@@ -1866,22 +1866,22 @@ function BillingSettings({
 
       {/* Actions */}
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">
+        <h2 className="text-base font-semibold text-ink">
           Billing Actions
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-ink-subtle">
           Manage your payment methods, invoices, and subscription
         </p>
 
         <div className="mt-6 space-y-3">
           {hasBillingCustomer && (
             <>
-              <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+              <div className="flex items-center justify-between rounded-lg border border-line bg-surface-raised/50 p-4">
                 <div>
-                  <p className="text-sm font-medium text-zinc-100">
+                  <p className="text-sm font-medium text-ink">
                     Manage Billing
                   </p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-ink-subtle">
                     Update payment methods and billing details
                   </p>
                 </div>
@@ -1896,12 +1896,12 @@ function BillingSettings({
                 </TerminalButton>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+              <div className="flex items-center justify-between rounded-lg border border-line bg-surface-raised/50 p-4">
                 <div>
-                  <p className="text-sm font-medium text-zinc-100">
+                  <p className="text-sm font-medium text-ink">
                     View Invoices & Receipts
                   </p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-ink-subtle">
                     Access your billing history and download receipts
                   </p>
                 </div>
@@ -1920,12 +1920,12 @@ function BillingSettings({
           )}
 
           {isActive && !isCancelingAtEnd && (
-            <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+            <div className="flex items-center justify-between rounded-lg border border-line bg-surface-raised/50 p-4">
               <div>
-                <p className="text-sm font-medium text-zinc-100">
+                <p className="text-sm font-medium text-ink">
                   Cancel Subscription
                 </p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-ink-subtle">
                   Cancel at the end of your current billing period
                 </p>
               </div>
@@ -1939,8 +1939,8 @@ function BillingSettings({
           )}
 
           {!hasBillingCustomer && !isActive && (
-            <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-6 text-center">
-              <p className="text-sm text-zinc-500">
+            <div className="rounded-lg border border-line bg-surface-raised/50 p-6 text-center">
+              <p className="text-sm text-ink-subtle">
                 No billing actions available on the Free plan.
               </p>
             </div>
@@ -1948,7 +1948,7 @@ function BillingSettings({
         </div>
 
         {portalMutation.isError && (
-          <p className="mt-3 text-sm text-red-400">
+          <p className="mt-3 text-sm text-danger">
             {portalMutation.error instanceof Error
               ? portalMutation.error.message
               : "Failed to open billing portal"}
@@ -1960,31 +1960,31 @@ function BillingSettings({
       {showCancelConfirm && sub && (
         <TerminalCard>
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/10">
-              <AlertTriangle className="h-4 w-4 text-amber-400" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-warning-soft">
+              <AlertTriangle className="h-4 w-4 text-warning" />
             </div>
-            <h2 className="text-base font-semibold text-zinc-100">
+            <h2 className="text-base font-semibold text-ink">
               Confirm Cancellation
             </h2>
           </div>
 
-          <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-            <ul className="space-y-2 text-sm text-zinc-300">
+          <div className="mt-4 rounded-lg border border-warning-line bg-warning-soft p-4">
+            <ul className="space-y-2 text-sm text-ink-muted">
               <li className="flex items-start gap-2">
-                <span className="mt-0.5 text-amber-400">&bull;</span>
+                <span className="mt-0.5 text-warning">&bull;</span>
                 Your Pro access continues until{" "}
                 {formatDate(sub.currentPeriodEnd)}
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-0.5 text-amber-400">&bull;</span>
+                <span className="mt-0.5 text-warning">&bull;</span>
                 After that, a 7-day grace period begins
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-0.5 text-amber-400">&bull;</span>
+                <span className="mt-0.5 text-warning">&bull;</span>
                 No refund for the current billing period
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-0.5 text-amber-400">&bull;</span>
+                <span className="mt-0.5 text-warning">&bull;</span>
                 Your data is never deleted
               </li>
             </ul>
@@ -1994,16 +1994,16 @@ function BillingSettings({
             <div>
               <label
                 htmlFor="cancelReason"
-                className="block text-sm font-medium text-zinc-300"
+                className="block text-sm font-medium text-ink-muted"
               >
-                Reason for canceling <span className="text-red-400">*</span>
+                Reason for canceling <span className="text-danger">*</span>
               </label>
               <select
                 id="cancelReason"
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 required
-                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100"
+                className="mt-1 w-full rounded-lg border border-line bg-surface-raised/50 px-3 py-2 text-sm text-ink"
               >
                 <option value="">Select a reason (required)</option>
                 {CANCEL_REASONS.map((r) => (
@@ -2017,7 +2017,7 @@ function BillingSettings({
             <div>
               <label
                 htmlFor="cancelComment"
-                className="block text-sm font-medium text-zinc-300"
+                className="block text-sm font-medium text-ink-muted"
               >
                 Additional feedback (optional)
               </label>
@@ -2026,7 +2026,7 @@ function BillingSettings({
                 value={cancelComment}
                 onChange={(e) => setCancelComment(e.target.value)}
                 rows={3}
-                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600"
+                className="mt-1 w-full rounded-lg border border-line bg-surface-raised/50 px-3 py-2 text-sm text-ink placeholder:text-ink-faint"
                 placeholder="Tell us how we can improve..."
               />
             </div>
@@ -2060,27 +2060,27 @@ function BillingSettings({
 
       {/* Quick Links */}
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">Quick Links</h2>
+        <h2 className="text-base font-semibold text-ink">Quick Links</h2>
         <div className="mt-4 space-y-2">
           <Link
             href="/faq#plans-billing"
-            className="flex items-center gap-2 rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-4 py-3 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+            className="flex items-center gap-2 rounded-lg border border-line bg-surface-raised/50 px-4 py-3 text-sm text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
           >
-            <ExternalLink className="h-3.5 w-3.5 text-zinc-500" />
+            <ExternalLink className="h-3.5 w-3.5 text-ink-subtle" />
             Billing FAQ
           </Link>
           <Link
             href="/terms#billing"
-            className="flex items-center gap-2 rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-4 py-3 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+            className="flex items-center gap-2 rounded-lg border border-line bg-surface-raised/50 px-4 py-3 text-sm text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
           >
-            <ExternalLink className="h-3.5 w-3.5 text-zinc-500" />
+            <ExternalLink className="h-3.5 w-3.5 text-ink-subtle" />
             Terms of Service &mdash; Billing
           </Link>
           <Link
             href="/privacy"
-            className="flex items-center gap-2 rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-4 py-3 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+            className="flex items-center gap-2 rounded-lg border border-line bg-surface-raised/50 px-4 py-3 text-sm text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
           >
-            <ExternalLink className="h-3.5 w-3.5 text-zinc-500" />
+            <ExternalLink className="h-3.5 w-3.5 text-ink-subtle" />
             Privacy Policy
           </Link>
         </div>

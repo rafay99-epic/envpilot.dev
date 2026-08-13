@@ -38,21 +38,21 @@ export function PageHero({
       >
         <motion.span
           variants={fadeUp}
-          className="inline-flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/5 px-3 py-1 font-mono text-[11px] tracking-widest text-green-400"
+          className="inline-flex items-center gap-2 rounded-full border border-accent-line bg-accent-soft px-3 py-1 font-mono text-[11px] tracking-widest text-accent"
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-green-400 [animation:pulse-glow_2.4s_ease-in-out_infinite]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-accent [animation:pulse-glow_2.4s_ease-in-out_infinite]" />
           {`// ${eyebrow}`}
         </motion.span>
         <motion.h1
           variants={fadeUp}
-          className="mt-5 font-sans text-4xl font-bold tracking-tight text-zinc-100 md:text-6xl"
+          className="mt-5 font-sans text-4xl font-bold tracking-tight text-ink md:text-6xl"
         >
           {title}
         </motion.h1>
         {description && (
           <motion.p
             variants={fadeUp}
-            className="mt-5 max-w-2xl font-mono text-sm leading-relaxed text-zinc-500 md:text-base"
+            className="mt-5 max-w-2xl font-mono text-sm leading-relaxed text-ink-subtle md:text-base"
           >
             {description}
           </motion.p>

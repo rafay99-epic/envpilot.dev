@@ -70,13 +70,13 @@ function TiersPage() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-100">
+        <h1 className="text-2xl font-semibold text-ink">
           Tiers & Features
         </h1>
 
-        <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5">
-          <Shield className="h-4 w-4 text-zinc-400" />
-          <span className="text-sm text-zinc-300">Tier Enforcement</span>
+        <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5">
+          <Shield className="h-4 w-4 text-ink-muted" />
+          <span className="text-sm text-ink-muted">Tier Enforcement</span>
           <Switch
             checked={tierEnforcement}
             disabled={settings === undefined}
@@ -95,7 +95,7 @@ function TiersPage() {
             }}
           />
           <span
-            className={`text-xs font-medium ${tierEnforcement ? "text-emerald-400" : "text-zinc-500"}`}
+            className={`text-xs font-medium ${tierEnforcement ? "text-accent" : "text-ink-subtle"}`}
           >
             {tierEnforcement ? "Active" : "Disabled"}
           </span>
@@ -106,7 +106,7 @@ function TiersPage() {
       <div
         role="tablist"
         aria-label="Tiers & Features sections"
-        className="mb-6 flex flex-wrap gap-1 border-b border-zinc-800"
+        className="mb-6 flex flex-wrap gap-1 border-b border-line"
       >
         {TABS.map((tab, i) => {
           const selected = tab.id === activeTab;
@@ -122,8 +122,8 @@ function TiersPage() {
               onKeyDown={(e) => onTabKeyDown(e, i)}
               className={`-mb-px border-b-2 px-3 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
                 selected
-                  ? "border-green-500 text-green-400"
-                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+                  ? "border-accent-line text-accent"
+                  : "border-transparent text-ink-subtle hover:text-ink-muted"
               }`}
             >
               {tab.label}

@@ -160,14 +160,14 @@ export function VariableCreateDrawer({
         )}
 
       {/* Tab switcher */}
-      <div className="mb-4 flex gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
+      <div className="mb-4 flex gap-1 rounded-lg bg-surface-raised p-1 bg-surface-raised">
         <button
           type="button"
           onClick={() => setActiveTab("single")}
           className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
             activeTab === "single"
-              ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100"
-              : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+              ? "bg-white text-ink-inverse shadow-sm bg-surface-hover text-ink"
+              : "text-ink-faint hover:text-ink"
           }`}
         >
           Single
@@ -177,8 +177,8 @@ export function VariableCreateDrawer({
           onClick={() => setActiveTab("bulk")}
           className={`flex-1 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors inline-flex justify-center ${
             activeTab === "bulk"
-              ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100"
-              : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+              ? "bg-white text-ink-inverse shadow-sm bg-surface-hover text-ink"
+              : "text-ink-faint hover:text-ink"
           }`}
         >
           Bulk Paste

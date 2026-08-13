@@ -130,7 +130,7 @@ function WebTrafficPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-100">Web Traffic</h1>
+        <h1 className="text-2xl font-semibold text-ink">Web Traffic</h1>
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -142,7 +142,7 @@ function WebTrafficPage() {
           >
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
           </Button>
-          <div className="flex rounded-md border border-zinc-700 bg-zinc-800">
+          <div className="flex rounded-md border border-line bg-surface-raised">
             {ranges.map((r) => (
               <button
                 key={r.key}
@@ -150,8 +150,8 @@ function WebTrafficPage() {
                 className={cn(
                   "px-3 py-1.5 text-sm font-medium transition-colors",
                   range === r.key
-                    ? "bg-green-500/20 text-green-400"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    ? "bg-accent-soft text-accent"
+                    : "text-ink-muted hover:text-ink"
                 )}
               >
                 {r.label}
@@ -207,8 +207,8 @@ function WebTrafficPage() {
                     icon={
                       <div className="relative">
                         <Eye className="h-5 w-5" />
-                        <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-green-400 ring-2 ring-zinc-900">
-                          <span className="absolute inset-0 animate-ping rounded-full bg-green-400 opacity-75" />
+                        <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-line">
+                          <span className="absolute inset-0 animate-ping rounded-full bg-accent opacity-75" />
                         </span>
                       </div>
                     }
@@ -250,12 +250,12 @@ function WebTrafficPage() {
                 {shareUrl && (
                   <Card className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Globe className="h-5 w-5 text-green-400" />
+                      <Globe className="h-5 w-5 text-accent" />
                       <div>
-                        <h2 className="text-sm font-medium text-zinc-200">
+                        <h2 className="text-sm font-medium text-ink">
                           Detailed Analytics
                         </h2>
-                        <p className="text-xs text-zinc-500">
+                        <p className="text-xs text-ink-subtle">
                           View the full Umami analytics dashboard
                         </p>
                       </div>

@@ -61,21 +61,21 @@ export function EnvironmentScopeSelector({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-zinc-900 dark:text-zinc-100">
+      <label className="block text-sm font-medium text-ink">
         Environment access
       </label>
-      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+      <p className="mt-1 text-xs text-ink-muted">
         {helperText} A variable is visible only when all of its environments
         fall within this scope.
       </p>
-      <div className="mt-2 space-y-1 rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+      <div className="mt-2 space-y-1 rounded-lg border border-line p-2 border-line">
         {ENVIRONMENTS.map((env) => (
           <label
             key={env}
             className={`flex items-center gap-3 rounded-md px-2 py-1.5 ${
               disabled
                 ? "cursor-not-allowed opacity-50"
-                : "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                : "cursor-pointer hover:bg-surface-hover"
             }`}
           >
             <input
@@ -85,14 +85,14 @@ export function EnvironmentScopeSelector({
               onChange={(e) => toggle(env, e.target.checked)}
               className="h-4 w-4"
             />
-            <span className="text-sm capitalize text-zinc-900 dark:text-zinc-100">
+            <span className="text-sm capitalize text-ink">
               {env}
             </span>
           </label>
         ))}
       </div>
       {selected.length === 0 && (
-        <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+        <p className="mt-1.5 text-xs text-warning">
           Select at least one environment, or check all for unrestricted access.
         </p>
       )}

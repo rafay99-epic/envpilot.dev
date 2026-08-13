@@ -147,19 +147,19 @@ export function DrawerPanel({
             ref={panelRef}
             tabIndex={-1}
           >
-            <div className="flex h-full flex-col bg-white shadow-xl dark:bg-zinc-900">
+            <div className="flex h-full flex-col bg-white shadow-xl bg-surface">
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+              <div className="flex items-center justify-between border-b border-line px-6 py-4 border-line">
                 <h2
                   id="drawer-title"
-                  className="text-lg font-semibold text-zinc-900 dark:text-zinc-100"
+                  className="text-lg font-semibold text-ink"
                 >
                   {title}
                 </h2>
                 <button
                   onClick={safeClose}
                   disabled={preventClose}
-                  className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                  className="rounded-lg p-1 text-ink-muted hover:bg-surface-hover hover:text-ink-faint disabled:cursor-not-allowed disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
                 >
                   <svg
                     className="h-5 w-5"

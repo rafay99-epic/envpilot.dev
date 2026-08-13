@@ -138,41 +138,41 @@ const ENV_META: Record<
 > = {
   development: {
     short: "DEV",
-    dot: "bg-blue-400",
-    text: "text-blue-400",
-    activeBg: "bg-blue-500/10 border-blue-500/20 text-blue-400",
+    dot: "bg-info",
+    text: "text-info",
+    activeBg: "bg-info-soft border-info-line text-info",
   },
   staging: {
     short: "STG",
-    dot: "bg-amber-400",
-    text: "text-amber-400",
-    activeBg: "bg-amber-500/10 border-amber-500/20 text-amber-400",
+    dot: "bg-warning",
+    text: "text-warning",
+    activeBg: "bg-warning-soft border-warning-line text-warning",
   },
   production: {
     short: "PRD",
-    dot: "bg-red-400",
-    text: "text-red-400",
-    activeBg: "bg-red-500/10 border-red-500/20 text-red-400",
+    dot: "bg-danger",
+    text: "text-danger",
+    activeBg: "bg-danger-soft border-danger-line text-danger",
   },
 };
 
 const STATUS_CFG = {
   matching: {
     icon: CheckCircle2,
-    color: "text-green-500",
-    gutter: "border-l-green-500/50",
+    color: "text-accent",
+    gutter: "border-l-accent-line",
     badge: "green" as const,
   },
   changed: {
     icon: AlertTriangle,
-    color: "text-amber-500",
-    gutter: "border-l-amber-500/50",
+    color: "text-warning",
+    gutter: "border-l-warning-line",
     badge: "amber" as const,
   },
   missing: {
     icon: XCircle,
-    color: "text-red-500",
-    gutter: "border-l-red-500/50",
+    color: "text-danger",
+    gutter: "border-l-danger-line",
     badge: "red" as const,
   },
 };
@@ -723,22 +723,22 @@ export default function EnvironmentDiffPage({
         <div className="flex items-center gap-3">
           <Link
             href={`/dashboard/projects/${project.slug}`}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-700 text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="font-mono">
-            <p className="text-xs text-zinc-500">
-              <span className="text-green-400">$</span> envpilot diff --project{" "}
-              <span className="text-zinc-300">{project.name}</span>
+            <p className="text-xs text-ink-subtle">
+              <span className="text-accent">$</span> envpilot diff --project{" "}
+              <span className="text-ink-muted">{project.name}</span>
             </p>
             <div className="mt-0.5 flex items-center gap-2">
-              <GitCompareArrows className="h-4 w-4 text-green-400" />
-              <h1 className="text-lg font-bold text-zinc-100">
+              <GitCompareArrows className="h-4 w-4 text-accent" />
+              <h1 className="text-lg font-bold text-ink">
                 Environment Diff
               </h1>
               {elapsedMs !== null && !isLoadingVars && (
-                <span className="text-xs text-zinc-600">({elapsedMs}ms)</span>
+                <span className="text-xs text-ink-faint">({elapsedMs}ms)</span>
               )}
             </div>
           </div>
@@ -764,9 +764,9 @@ export default function EnvironmentDiffPage({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
                     transition={{ duration: 0.12 }}
-                    className="absolute right-0 top-full z-20 mt-1 w-64 rounded-lg border border-zinc-700 bg-zinc-900 p-1 font-mono text-xs shadow-xl"
+                    className="absolute right-0 top-full z-20 mt-1 w-64 rounded-lg border border-line bg-surface p-1 font-mono text-xs shadow-xl"
                   >
-                    <div className="border-b border-zinc-800 px-3 py-1.5 text-[10px] uppercase tracking-wider text-zinc-600">
+                    <div className="border-b border-line px-3 py-1.5 text-[10px] uppercase tracking-wider text-ink-faint">
                       Per environment
                     </div>
                     {selectedEnvs.map((env) => (
@@ -776,7 +776,7 @@ export default function EnvironmentDiffPage({
                           setExportOpen(false);
                           exportEnvFile(env);
                         }}
-                        className="flex w-full items-center justify-between rounded px-3 py-1.5 text-left text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+                        className="flex w-full items-center justify-between rounded px-3 py-1.5 text-left text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
                       >
                         <span className="flex items-center gap-2">
                           <span
@@ -784,10 +784,10 @@ export default function EnvironmentDiffPage({
                           />
                           {`${env}.env`}
                         </span>
-                        <Download className="h-3 w-3 text-zinc-600" />
+                        <Download className="h-3 w-3 text-ink-faint" />
                       </button>
                     ))}
-                    <div className="mt-1 border-t border-zinc-800 px-3 py-1.5 text-[10px] uppercase tracking-wider text-zinc-600">
+                    <div className="mt-1 border-t border-line px-3 py-1.5 text-[10px] uppercase tracking-wider text-ink-faint">
                       Diff report
                     </div>
                     <button
@@ -795,20 +795,20 @@ export default function EnvironmentDiffPage({
                         setExportOpen(false);
                         exportDiffJSON();
                       }}
-                      className="flex w-full items-center justify-between rounded px-3 py-1.5 text-left text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+                      className="flex w-full items-center justify-between rounded px-3 py-1.5 text-left text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
                     >
                       <span>diff.json</span>
-                      <Download className="h-3 w-3 text-zinc-600" />
+                      <Download className="h-3 w-3 text-ink-faint" />
                     </button>
                     <button
                       onClick={() => {
                         setExportOpen(false);
                         exportDiffMarkdown();
                       }}
-                      className="flex w-full items-center justify-between rounded px-3 py-1.5 text-left text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+                      className="flex w-full items-center justify-between rounded px-3 py-1.5 text-left text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
                     >
                       <span>diff.md</span>
-                      <Download className="h-3 w-3 text-zinc-600" />
+                      <Download className="h-3 w-3 text-ink-faint" />
                     </button>
                   </motion.div>
                 )}
@@ -832,7 +832,7 @@ export default function EnvironmentDiffPage({
 
       {/* Environment Toggles */}
       <div className="flex flex-wrap items-center gap-2 font-mono text-sm">
-        <span className="text-zinc-600">--env</span>
+        <span className="text-ink-faint">--env</span>
         {ENVIRONMENTS.map((env) => {
           const isOn = selectedEnvs.includes(env);
           const meta = ENV_META[env];
@@ -843,11 +843,11 @@ export default function EnvironmentDiffPage({
               className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
                 isOn
                   ? meta.activeBg
-                  : "border-zinc-800 text-zinc-600 hover:border-zinc-700 hover:text-zinc-400"
+                  : "border-line text-ink-faint hover:border-line hover:text-ink-muted"
               }`}
             >
               <span
-                className={`h-1.5 w-1.5 rounded-full ${isOn ? meta.dot : "bg-zinc-700"}`}
+                className={`h-1.5 w-1.5 rounded-full ${isOn ? meta.dot : "bg-surface-hover"}`}
               />
               {meta.short}
             </button>
@@ -858,8 +858,8 @@ export default function EnvironmentDiffPage({
       {isLoadingVars && <TerminalLoading />}
 
       {error && project && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 font-mono text-sm text-red-400">
-          <span className="text-red-500">error:</span> {error}
+        <div className="rounded-lg border border-danger-line bg-danger-soft px-4 py-3 font-mono text-sm text-danger">
+          <span className="text-danger">error:</span> {error}
         </div>
       )}
 
@@ -884,8 +884,8 @@ export default function EnvironmentDiffPage({
                           active
                             ? cfg
                               ? cfg.color
-                              : "text-zinc-100"
-                            : "text-zinc-600 hover:text-zinc-400"
+                              : "text-ink"
+                            : "text-ink-faint hover:text-ink-muted"
                         }`}
                       >
                         {cfg && <cfg.icon className="h-3.5 w-3.5" />}
@@ -899,10 +899,10 @@ export default function EnvironmentDiffPage({
               </div>
 
               {summary.total > 0 && (
-                <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                <div className="flex h-1.5 overflow-hidden rounded-full bg-surface-raised">
                   {summary.matching > 0 && (
                     <motion.div
-                      className="bg-green-500"
+                      className="bg-accent"
                       initial={{ width: 0 }}
                       animate={{
                         width: `${(summary.matching / summary.total) * 100}%`,
@@ -916,7 +916,7 @@ export default function EnvironmentDiffPage({
                   )}
                   {summary.changed > 0 && (
                     <motion.div
-                      className="bg-amber-500"
+                      className="bg-warning"
                       initial={{ width: 0 }}
                       animate={{
                         width: `${(summary.changed / summary.total) * 100}%`,
@@ -930,7 +930,7 @@ export default function EnvironmentDiffPage({
                   )}
                   {summary.missing > 0 && (
                     <motion.div
-                      className="bg-red-500"
+                      className="bg-danger"
                       initial={{ width: 0 }}
                       animate={{
                         width: `${(summary.missing / summary.total) * 100}%`,
@@ -948,17 +948,17 @@ export default function EnvironmentDiffPage({
               {/* Search + sort + sensitive controls */}
               <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
+                  <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" />
                   <input
                     type="text"
                     placeholder="grep variables..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900 py-2 pl-9 pr-4 font-mono text-sm text-zinc-100 placeholder-zinc-600 focus:border-green-500/30 focus:outline-none focus:ring-1 focus:ring-green-500/20"
+                    className="w-full rounded-lg border border-line bg-surface py-2 pl-9 pr-4 font-mono text-sm text-ink placeholder-ink-faint focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+                <div className="flex flex-wrap items-center gap-1 rounded-lg border border-line bg-surface/50 p-1">
                   <SortChip
                     active={sortMode === "status"}
                     onClick={() => setSortMode("status")}
@@ -989,8 +989,8 @@ export default function EnvironmentDiffPage({
                   onClick={() => setSensitiveOnly((s) => !s)}
                   className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-mono text-xs transition-colors ${
                     sensitiveOnly
-                      ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
-                      : "border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
+                      ? "border-warning-line bg-warning-soft text-warning"
+                      : "border-line text-ink-subtle hover:border-line hover:text-ink-muted"
                   }`}
                   title="Show only variables marked sensitive"
                 >
@@ -1004,7 +1004,7 @@ export default function EnvironmentDiffPage({
                 sensitiveOnly ||
                 searchQuery ||
                 sortMode !== "status") && (
-                <div className="flex items-center gap-2 font-mono text-[11px] text-zinc-600">
+                <div className="flex items-center gap-2 font-mono text-[11px] text-ink-faint">
                   <span>
                     Showing {filteredRows.length} of {summary.total}
                   </span>
@@ -1015,7 +1015,7 @@ export default function EnvironmentDiffPage({
                         setSensitiveOnly(false);
                         setSearchQuery("");
                       }}
-                      className="text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+                      className="text-ink-subtle underline-offset-2 hover:text-ink-muted hover:underline"
                     >
                       reset filters
                     </button>
@@ -1048,7 +1048,7 @@ export default function EnvironmentDiffPage({
             ) : (
               <div>
                 {/* Desktop column header w/ per-column actions */}
-                <div className="hidden border-b border-zinc-800/50 bg-zinc-800/20 px-4 py-2 font-mono text-[11px] uppercase tracking-wider text-zinc-600 lg:flex">
+                <div className="hidden border-b border-line bg-surface-raised/20 px-4 py-2 font-mono text-[11px] uppercase tracking-wider text-ink-faint lg:flex">
                   <div className="w-7 shrink-0" />
                   <div className="min-w-[160px] flex-1">Key</div>
                   {selectedEnvs.map((env) => (
@@ -1064,7 +1064,7 @@ export default function EnvironmentDiffPage({
                       </span>
                       <button
                         onClick={() => copyColumn(env)}
-                        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-ink-subtle transition-colors hover:bg-surface-hover hover:text-ink"
                         title={`Reveal & copy all ${env} values as a .env block`}
                       >
                         <Copy className="h-3 w-3" />
@@ -1075,7 +1075,7 @@ export default function EnvironmentDiffPage({
                 </div>
 
                 <motion.div
-                  className="divide-y divide-zinc-800/30"
+                  className="divide-y divide-line"
                   variants={staggerContainer}
                   initial="hidden"
                   animate="visible"
@@ -1138,7 +1138,7 @@ export default function EnvironmentDiffPage({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             transition={{ duration: 0.18 }}
-            className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 font-mono text-xs text-zinc-200 shadow-xl"
+            className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-line bg-surface px-4 py-2 font-mono text-xs text-ink shadow-xl"
           >
             {toast}
           </motion.div>
@@ -1166,8 +1166,8 @@ function SortChip({
       onClick={onClick}
       className={`flex items-center gap-1 rounded px-2 py-1 font-mono text-[11px] transition-colors ${
         active
-          ? "bg-zinc-800 text-zinc-100"
-          : "text-zinc-500 hover:text-zinc-300"
+          ? "bg-surface-raised text-ink"
+          : "text-ink-subtle hover:text-ink-muted"
       }`}
     >
       {icon}
@@ -1263,7 +1263,7 @@ function DiffRowItem({
     <div className={`border-l-2 ${cfg.gutter}`}>
       {/* ── Desktop Row ── */}
       <div
-        className="hidden cursor-pointer items-center px-4 py-2 transition-colors hover:bg-zinc-800/20 lg:flex"
+        className="hidden cursor-pointer items-center px-4 py-2 transition-colors hover:bg-surface-hover/20 lg:flex"
         onClick={onToggleExpand}
       >
         {/* Chevron */}
@@ -1273,21 +1273,21 @@ function DiffRowItem({
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
             <ChevronRight
-              className={`h-3.5 w-3.5 ${isExpanded ? "text-zinc-500" : "text-zinc-600"}`}
+              className={`h-3.5 w-3.5 ${isExpanded ? "text-ink-subtle" : "text-ink-faint"}`}
             />
           </motion.div>
         </div>
 
         {/* Key */}
         <div className="flex min-w-[160px] flex-1 flex-wrap items-center gap-2">
-          <code className="font-mono text-sm font-medium text-zinc-200">
+          <code className="font-mono text-sm font-medium text-ink">
             {row.key}
           </code>
-          {row.isSensitive && <Lock className="h-3 w-3 text-amber-500/60" />}
+          {row.isSensitive && <Lock className="h-3 w-3 text-warning/60" />}
           <TerminalBadge color={cfg.badge}>{effectiveStatus}</TerminalBadge>
           {contentMatch && (
             <span
-              className="flex items-center gap-1 rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-400"
+              className="flex items-center gap-1 rounded border border-accent-line bg-accent-soft px-1.5 py-0.5 font-mono text-[10px] text-accent"
               title="Vault refs differ but the actual decrypted values match"
             >
               <Sparkles className="h-2.5 w-2.5" />
@@ -1309,24 +1309,24 @@ function DiffRowItem({
               key={env}
               className={`group/cell flex min-w-[180px] flex-1 items-center gap-1 overflow-hidden rounded px-2 py-1 ${
                 !slot
-                  ? "border border-dashed border-red-500/20"
+                  ? "border border-dashed border-danger-line"
                   : isDiff
-                    ? "bg-amber-500/10"
+                    ? "bg-warning-soft"
                     : ""
               }`}
             >
               {!slot ? (
-                <span className="font-mono text-xs text-red-500/50">
+                <span className="font-mono text-xs text-danger/50">
                   — not set
                 </span>
               ) : isRevealing ? (
-                <span className="flex items-center gap-1 font-mono text-xs text-zinc-500">
-                  <span className="h-3 w-3 animate-spin rounded-full border border-zinc-600 border-t-zinc-400" />
+                <span className="flex items-center gap-1 font-mono text-xs text-ink-subtle">
+                  <span className="h-3 w-3 animate-spin rounded-full border border-line-strong border-t-line-strong" />
                 </span>
               ) : revealed ? (
                 <>
                   <code
-                    className="block min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs text-green-400"
+                    className="block min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs text-accent"
                     title={revealed}
                   >
                     {revealed}
@@ -1336,11 +1336,11 @@ function DiffRowItem({
                       e.stopPropagation();
                       onCopy(revealed, slot.vaultRef);
                     }}
-                    className="shrink-0 rounded p-0.5 text-zinc-600 opacity-0 transition-opacity hover:text-zinc-200 group-hover/cell:opacity-100"
+                    className="shrink-0 rounded p-0.5 text-ink-faint opacity-0 transition-opacity hover:text-ink group-hover/cell:opacity-100"
                     title="Copy value"
                   >
                     {copiedRef === slot.vaultRef ? (
-                      <Check className="h-3 w-3 text-green-500" />
+                      <Check className="h-3 w-3 text-accent" />
                     ) : (
                       <Copy className="h-3 w-3" />
                     )}
@@ -1365,7 +1365,7 @@ function DiffRowItem({
 
       {/* ── Mobile Row ── */}
       <div
-        className="flex cursor-pointer flex-col px-4 py-3 transition-colors hover:bg-zinc-800/20 lg:hidden"
+        className="flex cursor-pointer flex-col px-4 py-3 transition-colors hover:bg-surface-hover/20 lg:hidden"
         onClick={onToggleExpand}
       >
         <div className="flex flex-wrap items-center gap-2">
@@ -1374,16 +1374,16 @@ function DiffRowItem({
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
             <ChevronRight
-              className={`h-3.5 w-3.5 ${isExpanded ? "text-zinc-500" : "text-zinc-600"}`}
+              className={`h-3.5 w-3.5 ${isExpanded ? "text-ink-subtle" : "text-ink-faint"}`}
             />
           </motion.div>
-          <code className="font-mono text-sm font-medium text-zinc-200">
+          <code className="font-mono text-sm font-medium text-ink">
             {row.key}
           </code>
-          {row.isSensitive && <Lock className="h-3 w-3 text-amber-500/60" />}
+          {row.isSensitive && <Lock className="h-3 w-3 text-warning/60" />}
           <TerminalBadge color={cfg.badge}>{effectiveStatus}</TerminalBadge>
           {contentMatch && (
-            <span className="flex items-center gap-1 rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-400">
+            <span className="flex items-center gap-1 rounded border border-accent-line bg-accent-soft px-1.5 py-0.5 font-mono text-[10px] text-accent">
               <Sparkles className="h-2.5 w-2.5" />
               content match
             </span>
@@ -1398,13 +1398,13 @@ function DiffRowItem({
             return (
               <span
                 key={env}
-                className={`flex items-center gap-1 font-mono text-[10px] ${slot ? meta.text : "text-zinc-700"}`}
+                className={`flex items-center gap-1 font-mono text-[10px] ${slot ? meta.text : "text-ink-faint"}`}
               >
                 <span
-                  className={`h-1.5 w-1.5 rounded-full ${slot ? meta.dot : "bg-zinc-800"}`}
+                  className={`h-1.5 w-1.5 rounded-full ${slot ? meta.dot : "bg-surface-raised"}`}
                 />
                 {meta.short}
-                {!slot && <span className="text-red-500/50">✗</span>}
+                {!slot && <span className="text-danger/50">✗</span>}
               </span>
             );
           })}
@@ -1421,9 +1421,9 @@ function DiffRowItem({
             exit="exit"
             className="overflow-hidden"
           >
-            <div className="border-t border-zinc-800/30 bg-zinc-900/50 px-4 py-3 lg:ml-7">
+            <div className="border-t border-line bg-surface/50 px-4 py-3 lg:ml-7">
               {row.description && (
-                <p className="mb-3 font-mono text-xs text-zinc-500">
+                <p className="mb-3 font-mono text-xs text-ink-subtle">
                   # {row.description}
                 </p>
               )}
@@ -1452,10 +1452,10 @@ function DiffRowItem({
                       }}
                       className={`rounded-lg border p-3 ${
                         !slot
-                          ? "border-dashed border-red-500/20 bg-red-500/5"
+                          ? "border-dashed border-danger-line bg-danger-soft"
                           : isDiff
-                            ? "border-amber-500/30 bg-amber-500/5"
-                            : "border-zinc-800 bg-zinc-900/80"
+                            ? "border-warning-line bg-warning-soft"
+                            : "border-line bg-surface/80"
                       }`}
                     >
                       {/* Env label */}
@@ -1469,7 +1469,7 @@ function DiffRowItem({
                           {env}
                         </span>
                         {slot && (
-                          <span className="font-mono text-[10px] text-zinc-600">
+                          <span className="font-mono text-[10px] text-ink-faint">
                             v{slot.variable.version} ·{" "}
                             {formatDate(slot.variable.updatedAt)}
                           </span>
@@ -1481,8 +1481,8 @@ function DiffRowItem({
                         {!slot ? (
                           <div className="space-y-2">
                             <div className="flex items-center gap-2 px-2 py-1.5">
-                              <XCircle className="h-3 w-3 text-red-500/60" />
-                              <span className="font-mono text-xs text-red-400/60">
+                              <XCircle className="h-3 w-3 text-danger/60" />
+                              <span className="font-mono text-xs text-danger/60">
                                 not defined in this environment
                               </span>
                             </div>
@@ -1501,7 +1501,7 @@ function DiffRowItem({
                           </div>
                         ) : revealed ? (
                           <div className="group/val relative">
-                            <pre className="block max-h-48 overflow-auto rounded bg-zinc-800 px-2 py-1.5 font-mono text-xs text-green-400">
+                            <pre className="block max-h-48 overflow-auto rounded bg-surface-raised px-2 py-1.5 font-mono text-xs text-accent">
                               <code className="break-all whitespace-pre-wrap">
                                 {revealed}
                               </code>
@@ -1511,16 +1511,16 @@ function DiffRowItem({
                                 e.stopPropagation();
                                 onCopy(revealed, slot.vaultRef);
                               }}
-                              className="absolute right-1 top-1 rounded bg-zinc-900/80 p-0.5 text-zinc-400 opacity-0 transition-opacity hover:text-zinc-100 group-hover/val:opacity-100"
+                              className="absolute right-1 top-1 rounded bg-surface/80 p-0.5 text-ink-muted opacity-0 transition-opacity hover:text-ink group-hover/val:opacity-100"
                               title="Copy"
                             >
                               {copiedRef === slot.vaultRef ? (
-                                <Check className="h-3 w-3 text-green-500" />
+                                <Check className="h-3 w-3 text-accent" />
                               ) : (
                                 <Copy className="h-3 w-3" />
                               )}
                             </button>
-                            <div className="mt-1 font-mono text-[10px] text-zinc-600">
+                            <div className="mt-1 font-mono text-[10px] text-ink-faint">
                               {revealed.length} chars
                             </div>
                           </div>
@@ -1531,11 +1531,11 @@ function DiffRowItem({
                               onRevealRef(slot.vaultRef);
                             }}
                             disabled={isRevealing}
-                            className="flex w-full items-center gap-2 rounded bg-zinc-800/50 px-2 py-1.5 font-mono text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:opacity-50"
+                            className="flex w-full items-center gap-2 rounded bg-surface-raised/50 px-2 py-1.5 font-mono text-xs text-ink-subtle transition-colors hover:bg-surface-hover hover:text-ink-muted disabled:opacity-50"
                           >
                             {isRevealing ? (
                               <>
-                                <span className="h-3 w-3 animate-spin rounded-full border border-zinc-600 border-t-zinc-300" />
+                                <span className="h-3 w-3 animate-spin rounded-full border border-line-strong border-t-line" />
                                 decrypting...
                               </>
                             ) : (
@@ -1559,7 +1559,7 @@ function DiffRowItem({
                     e.stopPropagation();
                     onRevealRow();
                   }}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 font-mono text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 font-mono text-xs text-ink-muted transition-colors hover:border-line hover:text-ink"
                 >
                   <Eye className="h-3 w-3" />
                   Reveal all values
@@ -1615,11 +1615,11 @@ function SyncFromButton({
           onRevealRef(sourceSlot.vaultRef);
         }}
         disabled={isRevealing}
-        className="flex w-full items-center justify-center gap-1.5 rounded border border-zinc-700/50 bg-zinc-900 px-2 py-1.5 font-mono text-[11px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-1.5 rounded border border-line bg-surface px-2 py-1.5 font-mono text-[11px] text-ink-muted transition-colors hover:border-line-strong hover:text-ink disabled:opacity-50"
         title={`Reveal ${sourceEnv} value to copy it`}
       >
         {isRevealing ? (
-          <span className="h-3 w-3 animate-spin rounded-full border border-zinc-600 border-t-zinc-300" />
+          <span className="h-3 w-3 animate-spin rounded-full border border-line-strong border-t-line" />
         ) : (
           <Eye className="h-3 w-3" />
         )}
@@ -1642,8 +1642,8 @@ function SyncFromButton({
       }}
       className={`flex w-full items-center justify-center gap-1.5 rounded border px-2 py-1.5 font-mono text-[11px] transition-colors ${
         justCopied
-          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-          : "border-zinc-700/50 bg-zinc-900 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100"
+          ? "border-accent-line bg-accent-soft text-accent"
+          : "border-line bg-surface text-ink-muted hover:border-line-strong hover:text-ink"
       }`}
       title={`Copy ${sourceEnv} value of ${row.key} so you can paste it into ${targetEnv}`}
     >

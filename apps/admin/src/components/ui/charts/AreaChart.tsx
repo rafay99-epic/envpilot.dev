@@ -85,7 +85,7 @@ export function AreaChart({
                     s.color ?? CHART_COLORS[i % CHART_COLORS.length],
                 }}
               />
-              <span className="text-zinc-400">
+              <span className="text-ink-muted">
                 {s.label ?? `Series ${i + 1}`}
               </span>
             </div>
@@ -137,7 +137,7 @@ export function AreaChart({
                   x={PADDING.left - 6}
                   y={y + 4}
                   textAnchor="end"
-                  className="fill-zinc-500"
+                  className="fill-ink-subtle"
                   fontSize={10}
                 >
                   {formatValue(tick)}
@@ -156,7 +156,7 @@ export function AreaChart({
               x={x}
               y={PADDING.top + chartH + 16}
               textAnchor="middle"
-              className="fill-zinc-500"
+              className="fill-ink-subtle"
               fontSize={9}
             >
               {label}
@@ -235,14 +235,14 @@ export function AreaChart({
       {/* Tooltip */}
       {hoveredIdx !== null && (
         <div
-          className="pointer-events-none absolute rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs shadow-xl"
+          className="pointer-events-none absolute rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-xl"
           style={{
             left: `${((PADDING.left + (labels.length > 1 ? hoveredIdx * xStep : chartW / 2)) / VIEW_WIDTH) * 100}%`,
             top: 8,
             transform: "translateX(-50%)",
           }}
         >
-          <p className="mb-1 font-medium text-zinc-300">{labels[hoveredIdx]}</p>
+          <p className="mb-1 font-medium text-ink-muted">{labels[hoveredIdx]}</p>
           {series.map((s, si) => (
             <div key={si} className="flex items-center gap-1.5">
               <div
@@ -252,10 +252,10 @@ export function AreaChart({
                     s.color ?? CHART_COLORS[si % CHART_COLORS.length],
                 }}
               />
-              <span className="text-zinc-400">
+              <span className="text-ink-muted">
                 {s.label ?? `Series ${si + 1}`}:
               </span>
-              <span className="font-medium text-zinc-100">
+              <span className="font-medium text-ink">
                 {formatValue(s.data[hoveredIdx]?.value ?? 0)}
               </span>
             </div>

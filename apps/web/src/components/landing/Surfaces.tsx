@@ -96,20 +96,20 @@ const SURFACES: Surface[] = [
 ];
 
 const TONES: Record<Tone, string> = {
-  cmd: "text-zinc-200",
-  ok: "text-green-400",
-  dim: "text-zinc-500",
-  val: "text-zinc-400",
+  cmd: "text-ink",
+  ok: "text-accent",
+  dim: "text-ink-subtle",
+  val: "text-ink-muted",
 };
 
 function SurfacePanel({ surface }: { surface: Surface }) {
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)] lg:items-center">
       <div>
-        <p className="font-sans text-[17px] leading-relaxed text-zinc-300">
+        <p className="font-sans text-[17px] leading-relaxed text-ink-muted">
           {surface.body}
         </p>
-        <p className={`mt-5 ${terminal.mono} text-[12px] text-zinc-500`}>
+        <p className={`mt-5 ${terminal.mono} text-[12px] text-ink-subtle`}>
           {surface.note}
         </p>
       </div>

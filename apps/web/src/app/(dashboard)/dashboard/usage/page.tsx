@@ -56,10 +56,10 @@ function UsagePageContent() {
   if (!organization) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="font-mono text-sm text-zinc-500">
-          <span className="text-green-400">$</span> envpilot usage
+        <p className="font-mono text-sm text-ink-subtle">
+          <span className="text-accent">$</span> envpilot usage
         </p>
-        <p className="mt-2 text-sm text-zinc-400">
+        <p className="mt-2 text-sm text-ink-muted">
           No active organization. Create or join one to view usage.
         </p>
       </div>
@@ -70,10 +70,10 @@ function UsagePageContent() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="font-mono text-lg font-semibold text-zinc-100">
-            <span className="text-green-400">$</span> envpilot usage
+          <h1 className="font-mono text-lg font-semibold text-ink">
+            <span className="text-accent">$</span> envpilot usage
           </h1>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-ink-subtle">
             Your plan, resource usage, and feature availability
           </p>
         </div>
@@ -159,10 +159,10 @@ function UsagePageContent() {
     <div className="space-y-4">
       {/* Page Header */}
       <div>
-        <h1 className="font-mono text-lg font-semibold text-zinc-100">
-          <span className="text-green-400">$</span> envpilot usage
+        <h1 className="font-mono text-lg font-semibold text-ink">
+          <span className="text-accent">$</span> envpilot usage
         </h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-ink-subtle">
           Your plan, resource usage, and feature availability
         </p>
       </div>

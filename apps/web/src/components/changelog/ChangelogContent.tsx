@@ -22,32 +22,32 @@ const TYPE_CONFIG: Record<
 > = {
   feature: {
     label: "feature",
-    badge: "border-green-500/30 bg-green-500/10 text-green-400",
-    node: "bg-green-400 shadow-[0_0_12px_rgba(34,197,94,0.6)]",
+    badge: "border-accent-line bg-accent-soft text-accent",
+    node: "bg-accent shadow-[0_0_12px_rgba(34,197,94,0.6)]",
     prefix: "+",
   },
   fix: {
     label: "fix",
-    badge: "border-amber-500/30 bg-amber-500/10 text-amber-400",
-    node: "bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.5)]",
+    badge: "border-warning-line bg-warning-soft text-warning",
+    node: "bg-warning shadow-[0_0_12px_rgba(251,191,36,0.5)]",
     prefix: "!",
   },
   improvement: {
     label: "improvement",
-    badge: "border-zinc-700 bg-zinc-800/60 text-zinc-400",
-    node: "bg-zinc-500",
+    badge: "border-line bg-surface-raised/60 text-ink-muted",
+    node: "bg-surface-hover",
     prefix: "~",
   },
   security: {
     label: "security",
-    badge: "border-zinc-700 bg-zinc-800/60 text-zinc-400",
-    node: "bg-zinc-500",
+    badge: "border-line bg-surface-raised/60 text-ink-muted",
+    node: "bg-surface-hover",
     prefix: "#",
   },
   breaking: {
     label: "breaking",
-    badge: "border-zinc-700 bg-zinc-800/60 text-zinc-400",
-    node: "bg-zinc-500",
+    badge: "border-line bg-surface-raised/60 text-ink-muted",
+    node: "bg-surface-hover",
     prefix: "!!",
   },
 };
@@ -89,8 +89,8 @@ export function ChangelogContent({
     <>
       {/* Filter pills */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 font-mono text-xs text-zinc-600">
-          <span className="text-green-500">❯</span> --filter
+        <span className="mr-1 font-mono text-xs text-ink-faint">
+          <span className="text-accent">❯</span> --filter
         </span>
         <FilterPill
           active={selectedType === null}
@@ -106,7 +106,7 @@ export function ChangelogContent({
               active={selectedType === type}
               onClick={() => setSelectedType(type)}
             >
-              <span className="text-green-500">{config.prefix}</span>{" "}
+              <span className="text-accent">{config.prefix}</span>{" "}
               {config.label}
             </FilterPill>
           );
@@ -120,7 +120,7 @@ export function ChangelogContent({
             {/* Left rail */}
             <div
               aria-hidden
-              className="absolute left-[7px] top-3 bottom-3 hidden w-px bg-gradient-to-b from-green-500/40 via-zinc-800 to-zinc-800 md:block"
+              className="absolute left-[7px] top-3 bottom-3 hidden w-px bg-gradient-to-b from-accent-line via-line to-line md:block"
             />
 
             <Stagger className="space-y-10">
@@ -139,12 +139,12 @@ export function ChangelogContent({
             </Stagger>
           </div>
         ) : (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-12 text-center">
-            <p className="font-mono text-sm text-zinc-500">
-              <span className="text-green-500">❯</span> envpilot changelog
+          <div className="rounded-xl border border-line bg-surface/40 p-12 text-center">
+            <p className="font-mono text-sm text-ink-subtle">
+              <span className="text-accent">❯</span> envpilot changelog
               --filter {selectedType ?? "all"}
             </p>
-            <p className="mt-2 font-mono text-xs text-zinc-600">
+            <p className="mt-2 font-mono text-xs text-ink-faint">
               {selectedType
                 ? `No ${TYPE_CONFIG[selectedType].label} updates found.`
                 : "No updates yet. Check back soon."}
@@ -170,8 +170,8 @@ function FilterPill({
       onClick={onClick}
       className={`rounded-lg border px-3 py-1.5 font-mono text-xs transition-all ${
         active
-          ? "border-green-500/40 bg-green-500/10 text-green-400 shadow-[0_0_16px_-4px_rgba(34,197,94,0.4)]"
-          : "border-zinc-800 text-zinc-500 hover:border-green-500/30 hover:text-zinc-300"
+          ? "border-accent-line bg-accent-soft text-accent shadow-[0_0_16px_-4px_rgba(34,197,94,0.4)]"
+          : "border-line text-ink-subtle hover:border-accent-line hover:text-ink-muted"
       }`}
     >
       {children}
@@ -208,13 +208,13 @@ function ChangelogEntryCard({
       {/* Timeline node */}
       <span
         aria-hidden
-        className={`absolute left-0 top-7 hidden h-[15px] w-[15px] rounded-full border-2 border-zinc-950 md:block ${primaryConfig.node}`}
+        className={`absolute left-0 top-7 hidden h-[15px] w-[15px] rounded-full border-2 border-line md:block ${primaryConfig.node}`}
       />
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 backdrop-blur-sm transition-colors duration-300 hover:border-green-500/30">
+      <div className="rounded-xl border border-line bg-surface/40 p-6 backdrop-blur-sm transition-colors duration-300 hover:border-accent-line">
         {/* Meta row */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-zinc-800 bg-zinc-950/60 px-2.5 py-0.5 font-mono text-[10px] tracking-wide text-zinc-400">
+          <span className="rounded-full border border-line bg-canvas/60 px-2.5 py-0.5 font-mono text-[10px] tracking-wide text-ink-muted">
             v{version.replace(/^v/i, "")}
           </span>
           {entryTypes.map((t) => {
@@ -228,21 +228,21 @@ function ChangelogEntryCard({
               </span>
             );
           })}
-          <time className="ml-auto font-mono text-xs text-zinc-600">
+          <time className="ml-auto font-mono text-xs text-ink-faint">
             {formattedDate}
           </time>
         </div>
 
         {/* Title */}
-        <h2 className="mt-4 flex items-start gap-2 font-sans text-xl font-bold tracking-tight text-zinc-100">
-          <span aria-hidden className="mt-0.5 font-mono text-green-500">
+        <h2 className="mt-4 flex items-start gap-2 font-sans text-xl font-bold tracking-tight text-ink">
+          <span aria-hidden className="mt-0.5 font-mono text-accent">
             ❯
           </span>
           {title}
         </h2>
 
         {/* Markdown Content */}
-        <div className="mt-4 font-mono text-sm leading-relaxed text-zinc-400 [&_a]:text-green-400 [&_a]:hover:underline [&_code]:rounded [&_code]:bg-zinc-800 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_code]:text-green-400 [&_h3]:mt-4 [&_h3]:font-sans [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_h4]:mt-3 [&_h4]:font-sans [&_h4]:font-medium [&_h4]:text-zinc-300 [&_li]:ml-4 [&_li]:list-disc [&_p]:mt-2 [&_ul]:mt-2 [&_ul]:space-y-1">
+        <div className="mt-4 font-mono text-sm leading-relaxed text-ink-muted [&_a]:text-accent [&_a]:hover:underline [&_code]:rounded [&_code]:bg-surface-raised [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_code]:text-accent [&_h3]:mt-4 [&_h3]:font-sans [&_h3]:font-semibold [&_h3]:text-ink [&_h4]:mt-3 [&_h4]:font-sans [&_h4]:font-medium [&_h4]:text-ink-muted [&_li]:ml-4 [&_li]:list-disc [&_p]:mt-2 [&_ul]:mt-2 [&_ul]:space-y-1">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
         </div>
       </div>

@@ -62,18 +62,18 @@ export function Intro() {
 
       <div className={`${terminal.shell} relative pt-20 pb-16 sm:pt-28`}>
         <p
-          className={`${terminal.mono} text-[12px] tracking-[0.18em] text-zinc-600 uppercase`}
+          className={`${terminal.mono} text-[12px] tracking-[0.18em] text-ink-faint uppercase`}
         >
           envpilot — secret infrastructure for small teams
         </p>
 
-        <h1 className="mt-7 max-w-4xl font-sans text-[clamp(2.5rem,7vw,4.5rem)] leading-[0.98] font-semibold tracking-[-0.04em] text-zinc-100 [text-wrap:balance]">
+        <h1 className="mt-7 max-w-4xl font-sans text-[clamp(2.5rem,7vw,4.5rem)] leading-[0.98] font-semibold tracking-[-0.04em] text-ink [text-wrap:balance]">
           Nobody should have to ask
           <br className="hidden sm:block" /> for the{" "}
-          <span className="text-green-400">.env</span> file.
+          <span className="text-accent">.env</span> file.
         </h1>
 
-        <p className="mt-7 max-w-2xl font-sans text-[19px] leading-relaxed text-zinc-400">
+        <p className="mt-7 max-w-2xl font-sans text-[19px] leading-relaxed text-ink-muted">
           A .env file is a secret with no owner, no expiry, and no memory of who
           read it. Envpilot gives every secret your team shares all three —
           variables, files, and logins alike — then hands them to your terminal,
@@ -83,7 +83,7 @@ export function Intro() {
         <div className="mt-10 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
           <Link
             href="/sign-up"
-            className="inline-flex items-center rounded-md bg-green-500 px-6 py-3 font-sans text-[15px] font-semibold text-[#08090A] shadow-[0_0_32px_-10px_rgba(34,197,94,0.9)] transition-colors hover:bg-green-400"
+            className="inline-flex items-center rounded-md bg-accent px-6 py-3 font-sans text-[15px] font-semibold text-[#08090A] shadow-[0_0_32px_-10px_rgba(34,197,94,0.9)] transition-colors hover:bg-accent"
           >
             Start free
           </Link>

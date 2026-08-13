@@ -112,27 +112,27 @@ export default function CheckoutSuccessPage() {
         <TerminalWindow title="checkout — error">
           <div className="space-y-6 py-4">
             <div className="flex flex-col items-center space-y-4 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-red-500/30 bg-red-500/10">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-danger-line bg-danger-soft">
                 <AlertTriangle
-                  className="h-8 w-8 text-red-400"
+                  className="h-8 w-8 text-danger"
                   strokeWidth={2}
                 />
               </div>
               <div className="space-y-2">
-                <h1 className="font-mono text-2xl font-bold text-red-400">
+                <h1 className="font-mono text-2xl font-bold text-danger">
                   Checkout Failed
                 </h1>
-                <p className="font-mono text-sm text-zinc-400">
+                <p className="font-mono text-sm text-ink-muted">
                   {errorParam || errorMessage || "Something went wrong"}
                 </p>
               </div>
             </div>
 
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-              <p className="font-mono text-xs text-zinc-500">
+            <div className="rounded-lg border border-line bg-surface/50 p-4">
+              <p className="font-mono text-xs text-ink-subtle">
                 $ troubleshoot --help
               </p>
-              <ul className="mt-3 space-y-2 font-mono text-sm text-zinc-400">
+              <ul className="mt-3 space-y-2 font-mono text-sm text-ink-muted">
                 <li>
                   &bull; If your payment was charged, it will be automatically
                   refunded
@@ -142,7 +142,7 @@ export default function CheckoutSuccessPage() {
                   &bull; Contact support if the issue persists:{" "}
                   <a
                     href="/support"
-                    className="text-green-400 underline hover:text-green-300"
+                    className="text-accent underline hover:text-accent"
                   >
                     /support
                   </a>
@@ -153,14 +153,14 @@ export default function CheckoutSuccessPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => router.push("/pricing")}
-                className="group flex flex-1 items-center justify-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-6 py-3 font-mono text-sm font-medium text-green-400 transition-all hover:border-green-500/50 hover:bg-green-500/20"
+                className="group flex flex-1 items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-6 py-3 font-mono text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
               >
                 <RefreshCw className="h-4 w-4" />
                 Try Again
               </button>
               <button
                 onClick={() => router.push("/dashboard")}
-                className="group flex flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/50 px-6 py-3 font-mono text-sm font-medium text-zinc-300 transition-all hover:border-zinc-600 hover:bg-zinc-800"
+                className="group flex flex-1 items-center justify-center gap-2 rounded-lg border border-line bg-surface-raised/50 px-6 py-3 font-mono text-sm font-medium text-ink-muted transition-all hover:border-line-strong hover:bg-surface-hover"
               >
                 Dashboard
                 <ArrowRight className="h-4 w-4" />
@@ -179,7 +179,7 @@ export default function CheckoutSuccessPage() {
         <TerminalWindow title="processing — syncing subscription">
           <div className="space-y-4 py-8">
             <TerminalLoading />
-            <p className="text-center font-mono text-sm text-zinc-400">
+            <p className="text-center font-mono text-sm text-ink-muted">
               Activating your subscription...
             </p>
           </div>
@@ -195,50 +195,50 @@ export default function CheckoutSuccessPage() {
         <div className="space-y-6 py-4">
           {/* Success Header */}
           <div className="flex flex-col items-center space-y-4 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-green-500/30 bg-green-500/10">
-              <Check className="h-8 w-8 text-green-400" strokeWidth={3} />
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-accent-line bg-accent-soft">
+              <Check className="h-8 w-8 text-accent" strokeWidth={3} />
             </div>
 
             <div className="space-y-2">
-              <h1 className="font-mono text-2xl font-bold text-green-400">
+              <h1 className="font-mono text-2xl font-bold text-accent">
                 Payment Successful
               </h1>
-              <p className="font-mono text-sm text-zinc-400">
+              <p className="font-mono text-sm text-ink-muted">
                 Your subscription has been activated
               </p>
             </div>
           </div>
 
           {/* Upgrade Badge */}
-          <div className="mx-auto flex max-w-sm items-center justify-center gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-6 py-4">
-            <Crown className="h-6 w-6 text-amber-400" />
+          <div className="mx-auto flex max-w-sm items-center justify-center gap-3 rounded-lg border border-warning-line bg-warning-soft px-6 py-4">
+            <Crown className="h-6 w-6 text-warning" />
             <div>
-              <p className="font-mono text-lg font-semibold text-amber-400">
+              <p className="font-mono text-lg font-semibold text-warning">
                 Your upgrade is active
               </p>
-              <p className="font-mono text-xs text-zinc-500">
+              <p className="font-mono text-xs text-ink-subtle">
                 All plan features are now unlocked
               </p>
             </div>
-            <Sparkles className="h-5 w-5 text-amber-400/60" />
+            <Sparkles className="h-5 w-5 text-warning/60" />
           </div>
 
           {/* What's Included */}
-          <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <p className="font-mono text-xs uppercase tracking-wider text-zinc-500">
+          <div className="space-y-2 rounded-lg border border-line bg-surface/50 p-4">
+            <p className="font-mono text-xs uppercase tracking-wider text-ink-subtle">
               $ cat plan-features.txt
             </p>
-            <div className="mt-3 flex items-center gap-2 font-mono text-sm text-zinc-300">
-              <Check className="h-3.5 w-3.5 shrink-0 text-green-400" />
+            <div className="mt-3 flex items-center gap-2 font-mono text-sm text-ink-muted">
+              <Check className="h-3.5 w-3.5 shrink-0 text-accent" />
               All plan features are now unlocked.
             </div>
           </div>
 
           {/* Checkout Reference */}
           {checkoutId && (
-            <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
-              <p className="font-mono text-xs text-zinc-600">
-                <span className="text-zinc-500">checkout_id:</span> {checkoutId}
+            <div className="rounded border border-line bg-canvas p-3">
+              <p className="font-mono text-xs text-ink-faint">
+                <span className="text-ink-subtle">checkout_id:</span> {checkoutId}
               </p>
             </div>
           )}
@@ -246,7 +246,7 @@ export default function CheckoutSuccessPage() {
           {/* CTA Button */}
           <button
             onClick={() => router.push("/dashboard")}
-            className="group flex w-full items-center justify-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-6 py-3 font-mono text-sm font-medium text-green-400 transition-all hover:border-green-500/50 hover:bg-green-500/20"
+            className="group flex w-full items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-6 py-3 font-mono text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
           >
             Continue to Dashboard
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />

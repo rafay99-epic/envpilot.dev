@@ -54,14 +54,14 @@ export function QueryState<T>({
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center px-5 py-10 text-center">
-        <p className="font-mono text-sm text-red-400">
-          <span className="text-zinc-500">$</span> error
+        <p className="font-mono text-sm text-danger">
+          <span className="text-ink-subtle">$</span> error
         </p>
-        <p className="mt-2 max-w-md text-sm text-zinc-400">{error}</p>
+        <p className="mt-2 max-w-md text-sm text-ink-muted">{error}</p>
         {onRetry && (
           <button
             onClick={onRetry}
-            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink-muted"
           >
             <span aria-hidden>↻</span> Retry
           </button>
@@ -73,17 +73,17 @@ export function QueryState<T>({
   if (notConfigured) {
     return (
       <div className="flex flex-col items-center justify-center px-5 py-10 text-center">
-        <p className="font-mono text-sm text-amber-400">
-          <span className="text-zinc-500">$</span> echo ${notConfigured.envVar}
+        <p className="font-mono text-sm text-warning">
+          <span className="text-ink-subtle">$</span> echo ${notConfigured.envVar}
         </p>
-        <p className="mt-2 max-w-md text-sm text-zinc-400">
-          <span className="font-mono text-amber-400">
+        <p className="mt-2 max-w-md text-sm text-ink-muted">
+          <span className="font-mono text-warning">
             {notConfigured.envVar}
           </span>{" "}
           is not configured.
         </p>
         {notConfigured.hint && (
-          <p className="mt-1 max-w-md text-xs text-zinc-500">
+          <p className="mt-1 max-w-md text-xs text-ink-subtle">
             {notConfigured.hint}
           </p>
         )}
