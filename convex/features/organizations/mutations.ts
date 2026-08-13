@@ -17,6 +17,37 @@ import {
 import { createAuditLog } from "../../lib/audit";
 import { internal } from "../../_generated/api";
 
+function validateOrganizationInput(args: {
+  name?: string;
+  slug?: string;
+  description?: string;
+}) {
+  if (args.name !== undefined) {
+    const name = args.name.trim();
+    if (!name) throw new ConvexError("Organization name is required.");
+    if (name.length > 100) {
+      throw new ConvexError(
+        "Organization name must be 100 characters or less."
+      );
+    }
+  }
+  if (args.slug !== undefined) {
+    if (!args.slug || args.slug.length > 50) {
+      throw new ConvexError("Organization slug must be 1 to 50 characters.");
+    }
+    if (!/^[a-z0-9-]+$/.test(args.slug)) {
+      throw new ConvexError(
+        "Organization slug must contain only lowercase letters, numbers, and hyphens."
+      );
+    }
+  }
+  if (args.description !== undefined && args.description.length > 500) {
+    throw new ConvexError(
+      "Organization description must be 500 characters or less."
+    );
+  }
+}
+
 // ==========================================
 // MUTATIONS
 // ==========================================
@@ -32,8 +63,10 @@ export const create = mutation({
     logoUrl: v.optional(v.string()),
     workosOrgId: v.optional(v.string()),
   },
+  returns: v.id("organizations"),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
+    validateOrganizationInput(args);
 
     // Rate limit: prevent excessive org creation
     await rateLimiter.limit(ctx, "orgCreate", {
@@ -60,7 +93,7 @@ export const create = mutation({
     const orgLimit = orgResolved.value as number | null;
 
     if (orgLimit !== null && userMemberships.length >= orgLimit) {
-      throw new Error(
+      throw new ConvexError(
         `Organization limit reached (${userMemberships.length}/${orgLimit}). Upgrade your tier for more organizations.`
       );
     }
@@ -71,7 +104,7 @@ export const create = mutation({
       .first();
 
     if (existingOrg) {
-      throw new Error("Organization slug already exists");
+      throw new ConvexError("Organization slug already exists");
     }
 
     const organizationId = await ctx.db.insert("organizations", {

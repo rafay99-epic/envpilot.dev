@@ -233,7 +233,7 @@ export const addMember = mutation({
 
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
-      throw new Error("Project not found");
+      throw new ConvexError("Project not found");
     }
 
     // Verify target user is an org member
@@ -245,7 +245,7 @@ export const addMember = mutation({
       .first();
 
     if (!targetOrgMembership) {
-      throw new Error("Target user is not a member of the organization");
+      throw new ConvexError("Target user is not a member of the organization");
     }
 
     // Owners don't need project assignments (implicit access) — no-op
@@ -270,11 +270,11 @@ export const addMember = mutation({
       .first();
 
     if (existing) {
-      throw new Error("User is already a member of this project");
+      throw new ConvexError("User is already a member of this project");
     }
 
     if (args.environments && args.environments.length === 0) {
-      throw new Error(
+      throw new ConvexError(
         "Environment scope cannot be empty — omit it to allow all environments"
       );
     }
@@ -343,7 +343,7 @@ export const removeMember = mutation({
 
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
-      throw new Error("Project not found");
+      throw new ConvexError("Project not found");
     }
 
     const membership = await ctx.db
@@ -354,7 +354,7 @@ export const removeMember = mutation({
       .first();
 
     if (!membership) {
-      throw new Error("User is not a member of this project");
+      throw new ConvexError("User is not a member of this project");
     }
 
     // Hierarchy: can only remove users whose org role is strictly below your
@@ -483,11 +483,11 @@ export const setMemberEnvironments = mutation({
 
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
-      throw new Error("Project not found");
+      throw new ConvexError("Project not found");
     }
 
     if (args.environments && args.environments.length === 0) {
-      throw new Error(
+      throw new ConvexError(
         "Environment scope cannot be empty — omit it to allow all environments"
       );
     }
@@ -500,7 +500,7 @@ export const setMemberEnvironments = mutation({
       .first();
 
     if (!targetOrgMembership) {
-      throw new Error("Target user is not a member of the organization");
+      throw new ConvexError("Target user is not a member of the organization");
     }
 
     // Environment scopes only constrain developers — everyone else always
@@ -531,7 +531,7 @@ export const setMemberEnvironments = mutation({
       .first();
 
     if (!membership) {
-      throw new Error("User is not a member of this project");
+      throw new ConvexError("User is not a member of this project");
     }
 
     const previousScope = membership.environments;

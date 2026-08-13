@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAuthContext } from "@/components/auth";
+import { useConvexUser, useProjectBySlug, useProjectVariables } from "@/hooks";
 import {
   TerminalWindow,
   TerminalLoading,
@@ -308,12 +309,14 @@ export default function EnvironmentDiffPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = use(params);
-  const { organization } = useAuthContext();
-
-  const [project, setProject] = useState<Project | null>(null);
-  const [variables, setVariables] = useState<Variable[]>([]);
-  const [isLoadingProject, setIsLoadingProject] = useState(true);
-  const [isLoadingVars, setIsLoadingVars] = useState(false);
+  const { organization, user } = useAuthContext();
+  const { convexUserId } = useConvexUser(user?.id);
+  const liveProject = useProjectBySlug(organization?.id, slug);
+  const project = liveProject as Project | null | undefined;
+  const liveVariables = useProjectVariables(liveProject?._id, convexUserId);
+  const variables = (liveVariables ?? []) as Variable[];
+  const isLoadingProject = liveProject === undefined;
+  const isLoadingVars = !!liveProject && liveVariables === undefined;
   const [error, setError] = useState<string | null>(null);
 
   const [selectedEnvs, setSelectedEnvs] = useState<string[]>([
@@ -337,50 +340,12 @@ export default function EnvironmentDiffPage({
 
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
 
-  // Fetch project
+  const loadStartedAt = useRef(performance.now());
   useEffect(() => {
-    if (!organization?.id) {
-      setIsLoadingProject(false);
-      return;
+    if (liveVariables !== undefined && elapsedMs === null) {
+      setElapsedMs(Math.round(performance.now() - loadStartedAt.current));
     }
-    (async () => {
-      try {
-        const res = await fetch(
-          `/api/projects?organizationId=${organization.id}`
-        );
-        const data = await res.json();
-        const found = data.projects?.find((p: Project) => p.slug === slug);
-        if (found) setProject(found);
-        else setError("Project not found");
-      } catch {
-        setError("Failed to load project");
-      } finally {
-        setIsLoadingProject(false);
-      }
-    })();
-  }, [organization?.id, slug]);
-
-  // Fetch ALL variables once
-  useEffect(() => {
-    if (!project) return;
-    setIsLoadingVars(true);
-    const t0 = performance.now();
-    (async () => {
-      try {
-        const res = await fetch(`/api/variables?projectId=${project._id}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to fetch variables");
-        setVariables(data.variables || []);
-        setElapsedMs(Math.round(performance.now() - t0));
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch variables"
-        );
-      } finally {
-        setIsLoadingVars(false);
-      }
-    })();
-  }, [project]);
+  }, [elapsedMs, liveVariables]);
 
   // Click-outside for export menu
   useEffect(() => {
@@ -714,7 +679,15 @@ export default function EnvironmentDiffPage({
       />
     );
   }
-  if (!project) return null;
+  if (!project) {
+    return (
+      <TerminalEmptyState
+        command="envpilot diff --project not-found"
+        message="Project not found or you do not have access."
+        action={{ label: "Back to Projects", href: "/dashboard/projects" }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">

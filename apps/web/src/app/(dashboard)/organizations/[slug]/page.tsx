@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
@@ -10,6 +10,7 @@ import { Building2 } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
+import { useOrganizationBySlug, useOrganizationMemberCount } from "@/hooks";
 import {
   normalizeOrgRole,
   roleLabel,
@@ -19,17 +20,6 @@ import {
   roleLevel,
 } from "@/lib/roles";
 
-interface Organization {
-  _id: string;
-  name: string;
-  slug: string;
-  description?: string;
-  logoUrl?: string;
-  role: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
 export default function OrganizationPage({
   params,
 }: {
@@ -37,10 +27,8 @@ export default function OrganizationPage({
 }) {
   const { slug } = use(params);
   const router = useRouter();
-  const [organization, setOrganization] = useState<Organization | null>(null);
-  const [memberCount, setMemberCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const organization = useOrganizationBySlug(slug);
+  const memberCount = useOrganizationMemberCount(organization?._id) ?? 0;
 
   const tierData = useQuery(
     api.features.featureRegistry.queries.getResolvedFeatures,
@@ -51,52 +39,20 @@ export default function OrganizationPage({
   const orgTier = (tierData?.tierName as string) ?? "free";
 
   useEffect(() => {
-    async function fetchOrganization() {
-      try {
-        const [orgRes, membersRes] = await Promise.all([
-          fetch(`/api/organizations/${slug}`),
-          fetch(`/api/organizations/${slug}/members`),
-        ]);
+    if (organization?._id) setActiveOrganizationCookie(organization._id);
+  }, [organization?._id]);
 
-        if (!orgRes.ok) {
-          if (orgRes.status === 404) {
-            throw new Error("Organization not found");
-          }
-          if (orgRes.status === 403) {
-            throw new Error("You do not have access to this organization");
-          }
-          throw new Error("Failed to fetch organization");
-        }
-
-        const orgData = await orgRes.json();
-        setOrganization(orgData.organization);
-        setActiveOrganizationCookie(orgData.organization._id);
-
-        if (membersRes.ok) {
-          const membersData = await membersRes.json();
-          setMemberCount(membersData.members?.length || 0);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchOrganization();
-  }, [slug]);
-
-  if (isLoading) {
+  if (organization === undefined) {
     return <TerminalLoading fullPage />;
   }
 
-  if (error || !organization) {
+  if (!organization) {
     return (
       <div className="space-y-8">
         <div className="rounded-xl border p-6 border-danger-line bg-danger-soft">
           <h3 className="font-semibold text-danger">Error</h3>
           <p className="mt-1 text-sm text-danger">
-            {error || "Organization not found"}
+            Organization not found or you do not have access.
           </p>
           <Link
             href="/organizations"
