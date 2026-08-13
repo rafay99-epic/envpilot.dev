@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@envpilot/ui/theme.css";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 

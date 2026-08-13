@@ -1,0 +1,63 @@
+/* The design tokens for every Envpilot surface — web, admin, blog, docs.
+   This is the only file in the monorepo where a color is written down.
+
+   Tailwind generates utilities from each namespace, so `--color-surface`
+   yields bg-surface / text-surface / border-surface / ring-surface, and
+   `--radius-panel` yields rounded-panel.
+
+   Plain @theme, not @theme inline: these are literal values, and keeping
+   them as variables leaves every token overridable under a selector (a
+   light theme, a second brand) without touching a single component. */
+
+@theme {
+  /* NOTE: `--color-*: initial` (which deletes Tailwind's default palette so
+     bg-zinc-900 stops compiling) is added in the final migration commit,
+     once every package is off the raw palette. Adding it earlier would
+     silently unstyle everything that has not been migrated yet. */
+
+  /* Surfaces */
+  --color-canvas: #09090b;
+  --color-surface: #0b0d0c;
+  --color-surface-raised: #111312;
+  --color-surface-hover: #16181a;
+  --color-chrome: #08090a;
+  --color-overlay: rgb(0 0 0 / 0.6);
+
+  /* Lines */
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-line-strong: rgb(255 255 255 / 0.14);
+
+  /* Ink. Four steps replace the eight undocumented greys that were in use:
+     faint is decorative only — it fails body-text contrast on `surface`. */
+  --color-ink: #f4f4f5;
+  --color-ink-muted: #a1a1aa;
+  --color-ink-subtle: #71717a;
+  --color-ink-faint: #52525b;
+  --color-ink-inverse: #0a0a0a;
+
+  /* Accent + status, each with a soft fill for badges and a line for borders */
+  --color-accent: #22c55e;
+  --color-accent-hover: #16a34a;
+  --color-accent-soft: rgb(34 197 94 / 0.1);
+  --color-accent-line: rgb(34 197 94 / 0.3);
+  --color-warning: #fbbf24;
+  --color-warning-soft: rgb(251 191 36 / 0.1);
+  --color-warning-line: rgb(251 191 36 / 0.3);
+  --color-danger: #ef5350;
+  --color-danger-soft: rgb(239 83 80 / 0.1);
+  --color-danger-line: rgb(239 83 80 / 0.3);
+  --color-info: #60a5fa;
+  --color-info-soft: rgb(96 165 250 / 0.1);
+  --color-info-line: rgb(96 165 250 / 0.3);
+
+  /* Data viz */
+  --color-chart-1: #22c55e;
+  --color-chart-2: #60a5fa;
+  --color-chart-3: #fbbf24;
+  --color-chart-4: #a78bfa;
+  --color-chart-5: #ef5350;
+
+  /* Shape — the panel identity, so no component re-types it */
+  --radius-panel: 0.5rem;
+  --shadow-panel: inset 0 1px 0 rgb(255 255 255 / 0.055);
+}

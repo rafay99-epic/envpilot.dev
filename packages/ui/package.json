@@ -9,7 +9,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./docs": "./src/docs/index.ts",
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./theme.css": "./src/theme.css"
   },
   "//sideEffects": "Components and helpers only — no import-time side effects. Declared so a bundler may drop unused exports instead of pulling the marketing bundle (framer-motion et al) into any chunk that touches this package.",
   "sideEffects": [

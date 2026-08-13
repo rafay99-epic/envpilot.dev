@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@envpilot/ui/theme.css";
 @import "@envpilot/ui/styles.css";
 @source "../../../../packages/ui/src";
 
