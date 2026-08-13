@@ -1,0 +1,65 @@
+name: Envpilot environment smoke test
+
+run-name: Envpilot smoke — ${{ inputs.environment }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Envpilot environment to validate
+        required: true
+        type: choice
+        default: development
+        options:
+          - development
+          - production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: envpilot-smoke-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Validate ${{ inputs.environment }} pull
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment == 'production' && 'Production' || 'development' }}
+    steps:
+      - name: Pull development variables
+        id: pull-development
+        if: inputs.environment == 'development'
+        uses: rafay99-epic/envpilot-action@v1
+        with:
+          token: ${{ secrets.ENVPILOT_DEV_TOKEN }}
+          environment: development
+
+      - name: Pull production variables
+        id: pull-production
+        if: inputs.environment == 'production'
+        uses: rafay99-epic/envpilot-action@v1
+        with:
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
+
+      - name: Verify required variables
+        env:
+          PULLED_COUNT: ${{ steps.pull-development.outputs.count || steps.pull-production.outputs.count }}
+        run: |
+          missing=""
+          for name in NEXT_PUBLIC_CONVEX_URL WORKOS_CLIENT_ID; do
+            [ -z "${!name:-}" ] && missing="$missing $name"
+          done
+
+          if [ -n "$missing" ]; then
+            echo "::error::Envpilot did not provide:$missing"
+            exit 1
+          fi
+
+          if ! [[ "$PULLED_COUNT" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Envpilot returned an invalid variable count."
+            exit 1
+          fi
+
+          echo "Envpilot ${PULLED_COUNT}-variable pull validated; no deployment ran."

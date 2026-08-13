@@ -19,6 +19,11 @@ on:
       updated:
         description: Whether the formula was updated
         value: ${{ jobs.deploy.outputs.updated }}
+    secrets:
+      ENVPILOT_TOKEN:
+        required: false
+      ENVPILOT_PROD_TOKEN:
+        required: false
   # Manual retry when a previous automated push failed — the release gets
   # created without it, so you can dispatch this independently to catch up.
   workflow_dispatch:
@@ -39,6 +44,7 @@ jobs:
   deploy:
     name: Update Homebrew formula
     runs-on: ubuntu-latest
+    environment: Production
     outputs:
       updated: ${{ steps.push.outputs.updated }}
     steps:
@@ -58,22 +64,24 @@ jobs:
 
       - name: Checkout main repo (for the update script)
         uses: actions/checkout@v4
+
+      - uses: ./.github/actions/load-env
         with:
-          path: repo
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
+          required: HOMEBREW_TAP_PAT
 
       - name: Clone the public homebrew-apps tap
-        env:
-          GH_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
         run: |
           git clone "https://github.com/rafay99-epic/homebrew-apps.git" /tmp/homebrew-apps
           cd /tmp/homebrew-apps
-          git remote set-url origin "https://x-access-token:${GH_TAP_TOKEN}@github.com/rafay99-epic/homebrew-apps.git"
+          git remote set-url origin "https://x-access-token:${HOMEBREW_TAP_PAT}@github.com/rafay99-epic/homebrew-apps.git"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Generate and write formula
         run: |
-          repo/apps/cli/scripts/update-homebrew-formula.sh \
+          apps/cli/scripts/update-homebrew-formula.sh \
             "$VERSION" \
             --tap-dir /tmp/homebrew-apps
 

@@ -1,0 +1,50 @@
+name: Load Envpilot environment
+description: Pull job variables from Envpilot and fail if required keys are missing.
+
+inputs:
+  token:
+    description: Envpilot API key with the GitHub Action surface.
+    required: true
+  environment:
+    description: Envpilot environment to pull.
+    required: false
+    default: production
+  required:
+    description: Newline-separated variable names that must be present.
+    required: false
+    default: ""
+
+outputs:
+  count:
+    description: Number of variables pulled from Envpilot.
+    value: ${{ steps.pull.outputs.count }}
+
+runs:
+  using: composite
+  steps:
+    - name: Pull variables from Envpilot
+      id: pull
+      uses: rafay99-epic/envpilot-action@v1
+      with:
+        token: ${{ inputs.token }}
+        environment: ${{ inputs.environment }}
+
+    - name: Verify required variables
+      shell: bash
+      env:
+        REQUIRED_VARIABLES: ${{ inputs.required }}
+      run: |
+        missing=""
+        while IFS= read -r name; do
+          [ -z "$name" ] && continue
+          if [ -z "${!name:-}" ]; then
+            missing="$missing $name"
+          fi
+        done <<< "$REQUIRED_VARIABLES"
+
+        if [ -n "$missing" ]; then
+          echo "::error::Envpilot did not provide:$missing"
+          exit 1
+        fi
+
+        echo "Envpilot provided ${{ steps.pull.outputs.count }} variables."

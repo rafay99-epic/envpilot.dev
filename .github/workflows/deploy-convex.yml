@@ -6,6 +6,11 @@ name: Deploy Convex
 
 on:
   workflow_call:
+    secrets:
+      ENVPILOT_TOKEN:
+        required: false
+      ENVPILOT_PROD_TOKEN:
+        required: false
   workflow_dispatch:
 
 permissions:
@@ -19,14 +24,17 @@ jobs:
   deploy:
     name: Deploy to Convex
     runs-on: ubuntu-latest
-    environment: production
+    environment: Production
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
+          required: CONVEX_DEPLOY_KEY
       - uses: ./.github/actions/setup
       - name: Deploy Convex functions
         run: bunx convex deploy
-        env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
 
       # Feature-registry + tier-override seeds MUST follow every deploy so a
       # release that introduces a new gated feature (e.g. cicd_service_tokens)
@@ -49,5 +57,3 @@ jobs:
             bunx convex run features/admin/migrations:run \
               "$(jq -cn --arg name "$migration" '{name: $name}')"
           done
-        env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}

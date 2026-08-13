@@ -196,6 +196,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.any == 'true'
     runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'Production' || 'development' }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -218,6 +219,27 @@ jobs:
           V=8.30.1
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${V}/gitleaks_${V}_linux_x64.tar.gz" | tar xz -C /tmp gitleaks
           /tmp/gitleaks dir . --config .gitleaks.toml --max-target-megabytes 4 --redact --no-banner
+      - name: Load development variables from Envpilot
+        if: |
+          github.event_name == 'pull_request' &&
+          github.actor != 'dependabot[bot]' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_DEV_TOKEN }}
+          environment: development
+          required: |
+            NEXT_PUBLIC_CONVEX_URL
+            WORKOS_CLIENT_ID
+      - name: Load production variables from Envpilot
+        if: github.ref == 'refs/heads/main'
+        uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
+          required: |
+            NEXT_PUBLIC_CONVEX_URL
+            WORKOS_CLIENT_ID
       - name: Cache Turborepo
         uses: actions/cache@v4
         with:
@@ -302,46 +324,47 @@ jobs:
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.outputs.any == 'true'
     runs-on: ubuntu-latest
+    environment: development
     timeout-minutes: 30
     env:
-      # Real values override the workflow-level CI stubs (job env wins).
-      NEXT_PUBLIC_CONVEX_URL: ${{ secrets.E2E_CONVEX_URL }}
-      WORKOS_API_KEY: ${{ secrets.E2E_WORKOS_API_KEY }}
-      WORKOS_CLIENT_ID: ${{ secrets.E2E_WORKOS_CLIENT_ID }}
-      WORKOS_COOKIE_PASSWORD: ${{ secrets.E2E_WORKOS_COOKIE_PASSWORD }}
       NEXT_PUBLIC_APP_URL: http://localhost:3000
       WORKOS_REDIRECT_URI: http://localhost:3000/callback
-      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_DEV_TOKEN }}
+          environment: development
+          required: |
+            CONVEX_DEPLOY_KEY
+            NEXT_PUBLIC_CONVEX_URL
+            WORKOS_API_KEY
+            WORKOS_CLIENT_ID
+            WORKOS_COOKIE_PASSWORD
+            E2E_TEST_EMAIL
+            E2E_TEST_PASSWORD
       - uses: ./.github/actions/setup
-
       # A gate that silently skips is fake safety: the authenticated specs
       # self-skip without credentials and the suite would go green having
-      # tested nothing. Fail loudly instead until the secrets exist.
-      - name: Verify e2e secrets are configured
-        env:
-          E2E_CONVEX_DEPLOY_KEY: ${{ secrets.E2E_CONVEX_DEPLOY_KEY }}
+      # tested nothing. Fail loudly instead until the variables exist.
+      - name: Verify e2e variables are configured
         run: |
           missing=""
-          [ -z "$E2E_CONVEX_DEPLOY_KEY" ] && missing="$missing E2E_CONVEX_DEPLOY_KEY"
-          [ -z "$NEXT_PUBLIC_CONVEX_URL" ] && missing="$missing E2E_CONVEX_URL"
-          [ -z "$WORKOS_API_KEY" ] && missing="$missing E2E_WORKOS_API_KEY"
-          [ -z "$WORKOS_CLIENT_ID" ] && missing="$missing E2E_WORKOS_CLIENT_ID"
-          [ -z "$WORKOS_COOKIE_PASSWORD" ] && missing="$missing E2E_WORKOS_COOKIE_PASSWORD"
+          [ -z "$CONVEX_DEPLOY_KEY" ] && missing="$missing CONVEX_DEPLOY_KEY"
+          [ -z "$NEXT_PUBLIC_CONVEX_URL" ] && missing="$missing NEXT_PUBLIC_CONVEX_URL"
+          [ -z "$WORKOS_API_KEY" ] && missing="$missing WORKOS_API_KEY"
+          [ -z "$WORKOS_CLIENT_ID" ] && missing="$missing WORKOS_CLIENT_ID"
+          [ -z "$WORKOS_COOKIE_PASSWORD" ] && missing="$missing WORKOS_COOKIE_PASSWORD"
           [ -z "$E2E_TEST_EMAIL" ] && missing="$missing E2E_TEST_EMAIL"
           [ -z "$E2E_TEST_PASSWORD" ] && missing="$missing E2E_TEST_PASSWORD"
           if [ -n "$missing" ]; then
-            echo "::error::E2E gate cannot run — missing repo secrets:$missing. Deploys are blocked until they are configured (isolated e2e Convex deployment + WorkOS test account)."
+            echo "::error::E2E gate cannot run — missing Envpilot variables:$missing. Deploys are blocked until they are configured (isolated e2e Convex deployment + WorkOS test account)."
             exit 1
           fi
-          echo "All e2e secrets present ✓"
+          echo "All e2e variables present ✓"
 
       - name: Push convex functions to the e2e deployment
         run: bunx convex deploy --yes
-        env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.E2E_CONVEX_DEPLOY_KEY }}
 
       # The suite runs parallel workers against per-worker fixture projects
       # (support.ts getWorkerProjectSlug). Free-tier caps (max_projects: 3,
@@ -351,8 +374,6 @@ jobs:
       - name: Ensure the e2e account is on the pro tier
         run: |
           bunx convex run features/admin/e2e:ensureE2EUserPro "{\"email\": \"$E2E_TEST_EMAIL\"}"
-        env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.E2E_CONVEX_DEPLOY_KEY }}
 
       - name: Install Playwright browsers
         working-directory: apps/web
@@ -398,11 +419,20 @@ jobs:
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.outputs.run_cli == 'true'
     runs-on: ubuntu-latest
+    environment: Production
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
+          required: |
+            WORKOS_CLIENT_ID
+            NEXT_PUBLIC_CONVEX_URL
       - uses: ./.github/actions/setup
       - name: Build CLI
-        run: bunx turbo build --filter=@envpilot/cli
+        working-directory: apps/cli
+        run: bun run build
       - name: Pack CLI tarball
         working-directory: apps/cli
         run: npm pack
@@ -423,11 +453,21 @@ jobs:
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.outputs.run_extension == 'true'
     runs-on: ubuntu-latest
+    environment: Production
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
+          required: |
+            ENVPILOT_SERVER_URL
+            WORKOS_CLIENT_ID
+            NEXT_PUBLIC_CONVEX_URL
       - uses: ./.github/actions/setup
       - name: Build extension
-        run: bunx turbo build --filter=envpilot
+        working-directory: apps/vscode-extension
+        run: bun run build
       - name: Package VSIX
         working-directory: apps/vscode-extension
         run: bunx @vscode/vsce package --no-dependencies
@@ -489,10 +529,7 @@ jobs:
     uses: ./.github/workflows/deploy-vercel.yml
     with:
       app: web
-    secrets:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
+    secrets: inherit
 
   deploy-admin:
     name: Deploy admin (Vercel)
@@ -505,10 +542,7 @@ jobs:
     uses: ./.github/workflows/deploy-vercel.yml
     with:
       app: admin
-    secrets:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
+    secrets: inherit
 
   deploy-blog:
     name: Deploy blog (Vercel)
@@ -522,10 +556,7 @@ jobs:
     uses: ./.github/workflows/deploy-vercel.yml
     with:
       app: blog
-    secrets:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_BLOG }}
+    secrets: inherit
 
   deploy-docs:
     name: Deploy docs (Vercel)
@@ -539,10 +570,7 @@ jobs:
     uses: ./.github/workflows/deploy-vercel.yml
     with:
       app: docs
-    secrets:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DOCS }}
+    secrets: inherit
 
   deploy-cli:
     name: Deploy CLI

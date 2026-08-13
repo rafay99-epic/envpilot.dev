@@ -180,9 +180,11 @@ Only the built surface is ever published: `action.yml`, `dist/index.js`
 - **Ordering is STRICT — backend first**: when convex/ changed in the same
   merge, `publish-action` requires `deploy-convex` (same rule as
   CLI/extension: never ship a client before the backend contract it calls).
-- **Secret**: publishing needs the `ACTION_PUBLISH_TOKEN` GitHub Actions
-  secret — a fine-grained PAT with Contents read/write on the public repo
-  ONLY. The job fails loudly with instructions if it is missing.
+- **Secret**: publishing needs `ACTION_PUBLISH_TOKEN` in Envpilot — a
+  fine-grained PAT with Contents read/write on the public repo ONLY. The
+  workflow uses the `ENVPILOT_PROD_TOKEN` bootstrap secret from the
+  `Production` GitHub Environment and fails loudly if the publish token is
+  missing from the pulled environment.
 - **Backend counterpart**: CI/CD service tokens (`convex/features/cicd/`) —
   read-only, SHA-256-hash-stored, project+environment scoped, pro-gated
   (`cicd_service_tokens`), managed in Project → Settings → CI/CD Tokens.
@@ -318,9 +320,26 @@ went public and Actions became free for it; do not re-add config there.
   downstream `needs.e2e.result` condition accepts `skipped` OR `success`.
   The local Playwright run is the gate of record (see the testing policy).
 - **Manual control**: `workflow_dispatch` on `ci.yml`, or on an individual
-  `deploy-*.yml` to retry one surface.
+  `deploy-*.yml` to retry one surface. Dispatch `envpilot-smoke.yml` with
+  `development` or `production` to validate that Environment's bootstrap key
+  and required variables without checking out code or running any build or
+  deployment.
 - **Adding a surface**: one path rule in the `changes` job, one output, one
   `if:`-gated job block.
+- **Deployment variables come from Envpilot**: deployment jobs call the
+  published `rafay99-epic/envpilot-action@v1` through
+  `.github/actions/load-env`. GitHub Environment secrets are the bootstrap:
+  `Production` holds `ENVPILOT_PROD_TOKEN`, while `development` holds
+  `ENVPILOT_DEV_TOKEN`. Main jobs pull Envpilot's production environment;
+  same-repository PR jobs pull development. Fork PRs receive neither secret
+  and compile with the literal CI stubs. GitHub's generated `GITHUB_TOKEN`
+  remains built in. Keep production credentials, publish tokens, service
+  identifiers, and Sentry DSNs in Envpilot rather than duplicating them in
+  GitHub.
+- **PR scope labels**: `.github/workflows/pr-labeler.yml` uses the official
+  `actions/labeler` action with `.github/labeler.yml`. It runs as
+  `pull_request_target` without checking out or executing PR code, so fork PRs
+  can be labeled safely. Keep its path taxonomy in sync when adding a surface.
 
 ## Architecture
 
