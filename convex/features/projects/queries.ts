@@ -172,12 +172,15 @@ export const _getBySlug = internalQuery({
   handler: async (ctx, args) => {
     const project = await ctx.db
       .query("projects")
-      .withIndex("by_org_and_slug", (q) =>
-        q.eq("organizationId", args.organizationId).eq("slug", args.slug)
+      .withIndex("by_org_slug_deleted", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("slug", args.slug)
+          .eq("deletedAt", undefined)
       )
       .first();
 
-    if (!project || project.deletedAt) return null;
+    if (!project) return null;
     return project;
   },
 });

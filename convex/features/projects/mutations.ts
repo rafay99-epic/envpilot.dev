@@ -111,12 +111,15 @@ export const create = mutation({
 
     const existingProject = await ctx.db
       .query("projects")
-      .withIndex("by_org_and_slug", (q) =>
-        q.eq("organizationId", args.organizationId).eq("slug", args.slug)
+      .withIndex("by_org_slug_deleted", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("slug", args.slug)
+          .eq("deletedAt", undefined)
       )
       .first();
 
-    if (existingProject && !existingProject.deletedAt) {
+    if (existingProject) {
       throw new ConvexError("Project slug already exists in this organization");
     }
 
@@ -306,134 +309,19 @@ export const remove = mutation({
     );
 
     const now = Date.now();
-    const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
 
-    // Soft-delete the project
+    // Capture intent in one cheap transaction. The scheduled cascade is
+    // atomic with this patch, so a successful response always has durable
+    // cleanup work behind it. Project reads reject deletedAt immediately.
     await ctx.db.patch(args.projectId, {
       deletedAt: now,
       updatedAt: now,
+      deletionStage: "variables",
+      deletionCursor: undefined,
+      deletionLeaseUntil: undefined,
+      deletionAttempts: 0,
+      deletionStartedBy: actor._id,
     });
-
-    // Soft-delete all variables
-    const variables = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
-
-    for (const variable of variables) {
-      await ctx.db.patch(variable._id, {
-        deletedAt: now,
-        updatedAt: now,
-      });
-    }
-
-    // NOTE: variableVersions rows are intentionally NOT hard-deleted here.
-    // The soft-deleted variables above now flow through the daily vault-GC
-    // sweep (convex/vaultGc.ts), which purges each variable's version history,
-    // permission grants, Vault objects, and row together once the 7-day
-    // retention window elapses. Keeping version rows means a project restored
-    // within the window keeps its full variable history.
-
-    // Deactivate variable permissions for each variable
-    let deactivatedPermissions = 0;
-    for (const variable of variables) {
-      const permissions = await ctx.db
-        .query("variablePermissions")
-        .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
-        .collect()
-        .then((rows) => rows.filter((doc) => doc.isActive === true));
-      for (const perm of permissions) {
-        await ctx.db.patch(perm._id, {
-          isActive: false,
-          revokedAt: now,
-          revokedBy: actor._id,
-        });
-        deactivatedPermissions++;
-      }
-    }
-
-    // Soft-delete shared accounts + deactivate their grants (mirrors the
-    // variable cascade above). Previously the project delete never touched
-    // projectAccounts at all, leaking them. The soft-deleted accounts now flow
-    // through the daily vault-GC sweep (convex/vaultGc.ts) alongside variables.
-    const accounts = await ctx.db
-      .query("projectAccounts")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
-
-    let deactivatedAccountPermissions = 0;
-    for (const account of accounts) {
-      await ctx.db.patch(account._id, {
-        deletedAt: now,
-        updatedAt: now,
-      });
-
-      const accountPermissions = await ctx.db
-        .query("accountPermissions")
-        .withIndex("by_account", (q) => q.eq("accountId", account._id))
-        .collect()
-        .then((rows) => rows.filter((doc) => doc.isActive === true));
-      for (const perm of accountPermissions) {
-        await ctx.db.patch(perm._id, {
-          isActive: false,
-          revokedAt: now,
-          revokedBy: actor._id,
-        });
-        deactivatedAccountPermissions++;
-      }
-    }
-
-    // Delete project members
-    const projectMembers = await ctx.db
-      .query("projectMembers")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect();
-    for (const member of projectMembers) {
-      await ctx.db.delete(member._id);
-    }
-
-    // Revoke project access tokens
-    let revokedTokens = 0;
-    const accessTokens = await ctx.db
-      .query("projectAccess")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.isActive === true));
-    for (const token of accessTokens) {
-      await ctx.db.patch(token._id, { isActive: false });
-      await ctx.db.insert("permissionRevocationEvents", {
-        accessToken: token.accessToken,
-        projectId: args.projectId,
-        userId: token.userId,
-        reason: "Project deleted",
-        revokedBy: actor._id,
-        revokedAt: now,
-        acknowledged: false,
-        expiresAt: revocationExpiresAt,
-      });
-      revokedTokens++;
-    }
-
-    // Cancel pending variable requests
-    let canceledRequests = 0;
-    const pendingRequests = await ctx.db
-      .query("environmentVariableRequests")
-      .withIndex("by_project_and_status", (q) =>
-        q.eq("projectId", args.projectId).eq("status", "pending")
-      )
-      .collect();
-    for (const req of pendingRequests) {
-      await ctx.db.patch(req._id, {
-        status: "canceled",
-        reviewReason: "Project deleted",
-        reviewedBy: actor._id,
-        reviewedAt: now,
-        updatedAt: now,
-      });
-      canceledRequests++;
-    }
 
     await ctx.db.insert("auditLogs", {
       organizationId: project.organizationId,
@@ -441,16 +329,17 @@ export const remove = mutation({
       userId: actor._id,
       action: "project.deleted",
       details: JSON.stringify({
-        variablesDeleted: variables.length,
-        permissionsDeactivated: deactivatedPermissions,
-        accountsDeleted: accounts.length,
-        accountPermissionsDeactivated: deactivatedAccountPermissions,
-        membersRemoved: projectMembers.length,
-        tokensRevoked: revokedTokens,
-        requestsCanceled: canceledRequests,
+        cleanup: "queued",
+        name: project.name,
       }),
       createdAt: now,
     });
+
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.projects.deletion.processDeletion,
+      { projectId: args.projectId }
+    );
 
     return args.projectId;
   },

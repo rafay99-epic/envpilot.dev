@@ -194,8 +194,16 @@ test.describe("project lifecycle", () => {
       { timeout: 20_000 }
     );
     const projectSlug = page.url().split("/dashboard/projects/")[1];
+    const uniqueKey = `E2E_PROJECT_DELETE_${Date.now()}`;
 
     try {
+      // Exercise deletion against real project-owned secret data rather than
+      // only proving that an empty project can disappear from the list.
+      await createVariable(page, {
+        key: uniqueKey,
+        value: `delete-me-${Date.now()}`,
+      });
+
       // ── Appears in the projects list ──
       await page.goto("/dashboard/projects", {
         waitUntil: "domcontentloaded",
@@ -285,14 +293,13 @@ test.describe("project lifecycle", () => {
         { timeout: 20_000 }
       );
 
-      // ── Delete via the danger-zone ConfirmDialog, asserting the 7-day
-      // retention disclosure copy shipped alongside vault GC (PR #80) ──
+      // ── Delete via the danger-zone confirmation ──
       const dangerTab = page.getByRole("button", { name: "Danger Zone" });
       await expect(dangerTab).toBeVisible({ timeout: 10_000 });
       await dangerTab.click();
 
       await expect(
-        page.getByText(/7-day retention before permanent deletion/i)
+        page.getByText(/permanently queues every environment variable/i)
       ).toBeVisible({ timeout: 10_000 });
 
       // Retried as a unit: the confirm-text input only exists once the
@@ -304,7 +311,7 @@ test.describe("project lifecycle", () => {
       // if it's already open — keep a retry safe after a slow-but-successful
       // step.
       const deleteProjectButton = page.getByRole("button", {
-        name: "Delete Project",
+        name: "Delete project",
         exact: true,
       });
       const deleteConfirmInput = page.locator(
@@ -318,8 +325,30 @@ test.describe("project lifecycle", () => {
           await deleteProjectButton.click();
           await expect(deleteConfirmInput).toBeVisible({ timeout: 5_000 });
         }
+        const permanentDeleteButton = page.getByRole("button", {
+          name: "Delete permanently",
+          exact: true,
+        });
+        await expect(permanentDeleteButton).toBeDisabled();
         await deleteConfirmInput.fill(projectName);
-        await deleteProjectButton.click();
+        await expect(permanentDeleteButton).toBeEnabled();
+
+        // Keep the real DELETE request in flight briefly so the visible and
+        // accessible loading state is asserted instead of merely inferred.
+        await page.route(`**/api/projects/*`, async (route) => {
+          if (route.request().method() !== "DELETE") {
+            await route.continue();
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          await route.continue();
+        });
+        await permanentDeleteButton.click();
+        await expect(
+          page.getByRole("status").filter({
+            hasText: "Securing deletion and removing project access",
+          })
+        ).toBeVisible();
         await expect(page).toHaveURL(/\/dashboard\/projects$/, {
           timeout: 10_000,
         });
@@ -328,6 +357,18 @@ test.describe("project lifecycle", () => {
         page.locator(`a[href="/dashboard/projects/${projectSlug}"]`),
         "deleted project should no longer be present in the list"
       ).toHaveCount(0, { timeout: 20_000 });
+
+      // Deleted-project URLs must resolve to a clean empty state instead of
+      // rendering the settings form with a null project and crashing.
+      await page.goto(`/dashboard/projects/${projectSlug}/settings`, {
+        waitUntil: "domcontentloaded",
+      });
+      await expect(
+        page.getByRole("heading", { name: "Project not found" })
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(
+        page.getByText("Failed to load project", { exact: false })
+      ).toHaveCount(0);
     } catch (err) {
       // Best-effort cleanup so a failed assertion above doesn't leave a
       // stray project behind for subsequent runs.
@@ -340,7 +381,7 @@ test.describe("project lifecycle", () => {
       if (await dangerTab.isVisible().catch(() => false)) {
         await dangerTab.click();
         const deleteBtn = page.getByRole("button", {
-          name: "Delete Project",
+          name: "Delete project",
           exact: true,
         });
         if (await deleteBtn.isVisible().catch(() => false)) {
@@ -351,7 +392,10 @@ test.describe("project lifecycle", () => {
           if (await confirmInput.isVisible().catch(() => false)) {
             await confirmInput.fill(projectName);
             await page
-              .getByRole("button", { name: "Delete Project", exact: true })
+              .getByRole("button", {
+                name: "Delete permanently",
+                exact: true,
+              })
               .click();
           }
         }

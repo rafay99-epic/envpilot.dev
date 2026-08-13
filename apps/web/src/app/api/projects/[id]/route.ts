@@ -119,8 +119,10 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
-    // Get the project first to check organization
-    const existingProject = await convex.query(
+    // Sync the user before the identity-protected lookup.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
+    const existingProject = await authed.query(
       api.features.projects.queries.getById,
       {
         projectId: id as Id<"projects">,
@@ -130,10 +132,6 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (!existingProject) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-
-    // Ensure the `users` row exists so the session JWT resolves server-side.
-    await getOrCreateConvexUser(convex, user);
-    const authed = createAuthedConvexClient(accessToken!);
 
     // Verify user is a member of the project's organization
     const membership = await checkOrganizationMembership(
@@ -181,7 +179,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 }
 
 /**
- * DELETE /api/projects/[id] - Delete a project (soft delete)
+ * DELETE /api/projects/[id] - Hide a project and queue permanent deletion
  */
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
@@ -192,8 +190,11 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Get the project first to check organization
-    const existingProject = await convex.query(
+    // getById requires a verified identity. Using the unauthenticated singleton
+    // here made every delete fail before it reached the mutation.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
+    const existingProject = await authed.query(
       api.features.projects.queries.getById,
       {
         projectId: id as Id<"projects">,
@@ -203,10 +204,6 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     if (!existingProject) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-
-    // Ensure the `users` row exists so the session JWT resolves server-side.
-    await getOrCreateConvexUser(convex, user);
-    const authed = createAuthedConvexClient(accessToken!);
 
     // Verify user is a member of the project's organization
     const membership = await checkOrganizationMembership(
@@ -230,7 +227,10 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       projectId: id as Id<"projects">,
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(
+      { success: true, cleanup: "queued" },
+      { status: 202 }
+    );
   } catch (error) {
     console.error("Error deleting project:", error);
     return handleApiError(error, "Failed to delete project");

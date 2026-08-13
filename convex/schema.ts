@@ -203,10 +203,37 @@ export default defineSchema({
     updatedAt: v.number(),
     // Soft delete support
     deletedAt: v.optional(v.number()),
+    // Durable, bounded cascade state. A deleted project disappears from every
+    // read immediately while the worker removes its owned data in small
+    // indexed batches and destroys external Vault/blob objects first.
+    deletionStage: v.optional(
+      v.union(
+        v.literal("variables"),
+        v.literal("accounts"),
+        v.literal("files"),
+        v.literal("requests"),
+        v.literal("shares"),
+        v.literal("doc_content"),
+        v.literal("doc_shares"),
+        v.literal("docs"),
+        v.literal("favorites"),
+        v.literal("members"),
+        v.literal("access"),
+        v.literal("api_keys"),
+        v.literal("webhooks"),
+        v.literal("invitations"),
+        v.literal("finalize")
+      )
+    ),
+    deletionCursor: v.optional(v.string()),
+    deletionLeaseUntil: v.optional(v.number()),
+    deletionAttempts: v.optional(v.number()),
+    deletionStartedBy: v.optional(v.id("users")),
   })
     .index("by_organization", ["organizationId"])
     .index("by_organization_and_deleted_at", ["organizationId", "deletedAt"])
     .index("by_org_and_slug", ["organizationId", "slug"])
+    .index("by_org_slug_deleted", ["organizationId", "slug", "deletedAt"])
     .index("by_created_by", ["createdBy"]),
 
   // ==========================================

@@ -283,7 +283,7 @@ async function reportToSentry(message: string): Promise<void> {
  * doc can finish on the next run). Any other outcome logs + reports and returns
  * false so the caller skips that doc's DB deletion.
  */
-async function deleteVaultObject(
+export async function deleteVaultObject(
   vaultRef: string,
   apiKey: string
 ): Promise<boolean> {
@@ -293,6 +293,7 @@ async function deleteVaultObject(
       {
         method: "DELETE",
         headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(10_000),
       }
     );
 

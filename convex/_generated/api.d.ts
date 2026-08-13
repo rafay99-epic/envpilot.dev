@@ -92,6 +92,7 @@ import type * as features_permissions_accountPermissions_queries from "../featur
 import type * as features_permissions_revocationEvents from "../features/permissions/revocationEvents.js";
 import type * as features_permissions_variablePermissions_cleanup from "../features/permissions/variablePermissions/cleanup.js";
 import type * as features_permissions_variablePermissions_queries from "../features/permissions/variablePermissions/queries.js";
+import type * as features_projects_deletion from "../features/projects/deletion.js";
 import type * as features_projects_favorites from "../features/projects/favorites.js";
 import type * as features_projects_helpers from "../features/projects/helpers.js";
 import type * as features_projects_members from "../features/projects/members.js";
@@ -226,6 +227,7 @@ declare const fullApi: ApiFromModules<{
   "features/permissions/revocationEvents": typeof features_permissions_revocationEvents;
   "features/permissions/variablePermissions/cleanup": typeof features_permissions_variablePermissions_cleanup;
   "features/permissions/variablePermissions/queries": typeof features_permissions_variablePermissions_queries;
+  "features/projects/deletion": typeof features_projects_deletion;
   "features/projects/favorites": typeof features_projects_favorites;
   "features/projects/helpers": typeof features_projects_helpers;
   "features/projects/members": typeof features_projects_members;

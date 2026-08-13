@@ -1595,4 +1595,58 @@ Available on Pro.`,
 - Several confirm and primary buttons were rendering dark text on a dark fill, leaving their labels effectively invisible
 - Light-mode styles left over from before the platform went dark-only have been removed; they never painted, but they made every component harder to read`,
   },
+
+  // ============================================================
+  // v1.59.2 — Direct Convex dashboard workflows (2026-08-13)
+  // ============================================================
+  {
+    title: "Faster, Real-Time Project and Organization Workflows",
+    version: "v1.59.2",
+    type: "improvement",
+    publishedAt: ts("2026-08-13T14:15:00Z"),
+    content: `Project, organization, member, and tag workflows now use authenticated Convex queries and mutations directly instead of bouncing routine dashboard work through an extra Next.js API layer.
+
+### What You Will Notice
+- Project and organization updates arrive through the same real-time connection that powers the rest of the dashboard
+- Creating, editing, moving, and managing access no longer waits on an unnecessary server round trip
+- Errors are presented consistently instead of changing shape between API routes and Convex functions
+
+### Safer Authorization
+- Convex derives the acting user from the signed-in identity instead of trusting user ids sent by the browser
+- Organization and project membership checks live beside the data operation they protect
+- Current-user organization queries only return organizations where that user has an active membership
+
+### Bounded Cleanup
+- Tag deletion now removes variable and project references through scheduled, paginated batches instead of one unbounded transaction
+- Large legacy organizations receive an explicit overflow state while cleanup continues, avoiding an expensive full-table read
+- The work is split into small resumable units to keep Convex execution and database costs predictable`,
+  },
+
+  // ============================================================
+  // v1.59.4 — Durable project cascade deletion (2026-08-13)
+  // ============================================================
+  {
+    title: "Project Deletion Now Finishes the Whole Job",
+    version: "v1.59.4",
+    type: "fix",
+    publishedAt: ts("2026-08-13T15:15:00Z"),
+    content: `Deleting a project now hides access immediately and queues a durable, permanent cleanup of the data and external secrets owned by that project.
+
+### A Clearer Delete Flow
+- Only the organization owner can delete a project
+- The confirmation panel lists what will be removed and requires the exact project name
+- The destructive action stays disabled until the name matches, then shows a disabled loading state while deletion is secured
+- Deleted and inaccessible project URLs show a clean "Project not found" state instead of rendering stale settings or crashing
+
+### Complete Project Cleanup
+- Environment variables, version history, permissions, shared accounts, secret files, requests, secret shares, documentation, favorites, member assignments, and access records are removed
+- Vault objects and stored file blobs are deleted before their database rows, preventing unreachable external data
+- Project scopes are removed from API keys, webhooks, and invitations; credentials or destinations with no remaining scope are revoked or disabled
+- The project settings row is removed only after every cleanup stage completes; security audit history remains available
+
+### Designed for Large Projects and Predictable Convex Cost
+- External deletions run in batches of 8 and database cleanup in batches of 64
+- A lease and watchdog recover interrupted work, while failed provider calls retry with bounded exponential backoff
+- Project reads exclude the project as soon as deletion starts, so users lose access immediately without forcing the entire cascade into one expensive request`,
+  },
 ];
