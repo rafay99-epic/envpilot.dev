@@ -47,6 +47,37 @@ env:
   ENVPILOT_SERVER_URL: https://www.envpilot.dev
 
 jobs:
+  # Temporary PR #175 smoke test. Remove after the Envpilot pull succeeds.
+  envpilot-smoke:
+    name: Envpilot action smoke test
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 175
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify bootstrap token exists
+        env:
+          ENVPILOT_TOKEN: ${{ secrets.ENVPILOT_TOKEN }}
+        run: |
+          if [ -z "$ENVPILOT_TOKEN" ]; then
+            echo "::error::Add the Envpilot GitHub Action API key as the ENVPILOT_TOKEN repository secret, then rerun this job."
+            exit 1
+          fi
+      - id: envpilot
+        uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_TOKEN }}
+          environment: development
+          required: ENVPILOT_SMOKE_TEST
+      - name: Confirm variables were pulled
+        env:
+          COUNT: ${{ steps.envpilot.outputs.count }}
+        run: |
+          if ! [[ "$COUNT" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Envpilot returned an invalid variable count."
+            exit 1
+          fi
+          echo "Envpilot smoke test passed; values remained masked."
+
   # ------------------------------------------------------------------
   # Stage 0: what changed?
   # ------------------------------------------------------------------

@@ -1,6 +1,11 @@
 name: Tag PR by scope
 
 on:
+  # Temporary PR #175 trigger so the workflow can be tested before it exists
+  # on the default branch. Remove this trigger and its conditional checkout
+  # after the smoke test passes.
+  pull_request:
+    types: [synchronize]
   pull_request_target:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
@@ -21,8 +26,13 @@ concurrency:
 jobs:
   label:
     name: Apply scope labels
+    if: github.event_name == 'pull_request_target' || github.event.pull_request.number == 175
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout PR configuration for the pre-merge smoke test
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+
       # Do not check out or execute PR code in a pull_request_target workflow.
       # actions/labeler reads this configuration from the trusted base branch.
       - uses: actions/labeler@v7
