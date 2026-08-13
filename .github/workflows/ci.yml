@@ -331,7 +331,7 @@ jobs:
   # Stage 2: the gate — the single required status check
   # ------------------------------------------------------------------
   checks-passed:
-    name: ${{ github.event_name == 'workflow_dispatch' && inputs.envpilot_smoke != 'none' && 'Envpilot smoke only' || 'All checks passed' }}
+    name: All checks passed${{ github.event_name == 'workflow_dispatch' && inputs.envpilot_smoke != 'none' && ' - not evaluated for smoke' || '' }}
     needs:
       - changes
       - checks
