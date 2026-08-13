@@ -196,7 +196,7 @@ export default function NewDocPage({ params }: NewDocPageProps) {
                   className={`rounded-lg border px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                     type === value
                       ? "border-line bg-ink text-ink-inverse"
-                      : "border-line text-ink-muted hover:bg-ink-muted"
+                      : "border-line text-ink-muted hover:bg-surface-hover hover:text-ink"
                   }`}
                 >
                   {value}

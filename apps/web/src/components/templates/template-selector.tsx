@@ -112,8 +112,8 @@ export function TemplateSelector({
           onClick={() => setSelectedCategory("all")}
           className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
             selectedCategory === "all"
-              ? "bg-ink text-ink-inverse"
-              : "bg-ink text-ink-muted hover:bg-ink-muted"
+              ? "bg-accent-soft text-accent ring-1 ring-accent-line"
+              : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
           }`}
         >
           All
@@ -129,8 +129,8 @@ export function TemplateSelector({
               onClick={() => setSelectedCategory(cat)}
               className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
                 selectedCategory === cat
-                  ? "bg-ink text-ink-inverse"
-                  : "bg-ink text-ink-muted hover:bg-ink-muted"
+                  ? "bg-accent-soft text-accent ring-1 ring-accent-line"
+                  : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
               }`}
             >
               {IconComponent && <IconComponent className="h-3 w-3" />}

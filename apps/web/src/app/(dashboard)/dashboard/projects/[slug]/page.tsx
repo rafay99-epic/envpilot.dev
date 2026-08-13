@@ -699,8 +699,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             onClick={() => setSelectedEnvironment("all")}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               selectedEnvironment === "all"
-                ? "bg-ink text-ink-inverse"
-                : "bg-ink text-ink-muted hover:bg-ink-muted"
+                ? "bg-accent-soft text-accent ring-1 ring-accent-line"
+                : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
             }`}
           >
             All
@@ -711,8 +711,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               onClick={() => setSelectedEnvironment(env)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                 selectedEnvironment === env
-                  ? "bg-ink text-ink-inverse"
-                  : "bg-ink text-ink-muted hover:bg-ink-muted"
+                  ? "bg-accent-soft text-accent ring-1 ring-accent-line"
+                  : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
               }`}
             >
               {env}

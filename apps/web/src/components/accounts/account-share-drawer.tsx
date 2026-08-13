@@ -274,8 +274,8 @@ function TeamMemberMode({
               onClick={() => setExpiryMs(opt.ms)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 expiryMs === opt.ms
-                  ? "bg-ink text-ink-inverse"
-                  : "bg-ink text-ink-muted hover:bg-ink-muted"
+                  ? "bg-accent-soft text-accent ring-1 ring-accent-line"
+                  : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
               }`}
             >
               {opt.label}
