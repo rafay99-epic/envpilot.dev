@@ -3,7 +3,11 @@ import { paginationOptsValidator } from "convex/server";
 import { query } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
 import { batchGetUsers, userDisplay } from "../../lib/users";
-import { getRetentionCutoff, assertAuditAccess } from "./helpers";
+import {
+  getRetentionCutoff,
+  assertAuditAccess,
+  hasAuditAccess,
+} from "./helpers";
 
 /**
  * Comprehensive Audit Log Queries
@@ -135,6 +139,57 @@ export const countByOrganization = query({
       .take(COUNT_CAP);
 
     return logs.length;
+  },
+});
+
+/**
+ * Newest log for one action, for settings provenance ("changed by X, 2 days
+ * ago"). Returns a single row instead of a page so a settings screen does not
+ * ship an audit list it will throw away.
+ *
+ * auditLogs has no (org, action) index and a settings line does not justify
+ * one, so the scan is bounded by SCAN_CAP the same way countByOrganization
+ * bounds its count: past that depth the answer is "unknown" (null), never an
+ * unbounded read.
+ */
+const SCAN_CAP = 300;
+
+export const lastChange = query({
+  args: {
+    organizationId: v.id("organizations"),
+    action: v.string(),
+    projectId: v.optional(v.id("projects")),
+  },
+  handler: async (ctx, args) => {
+    // Deliberately soft where every other audit query throws: this feeds ONE
+    // decorative line on a settings page. A stale client capability map would
+    // otherwise take the whole tab down with a render-time query error. Access
+    // is still checked — an unauthorized caller gets null, never a row.
+    if (!(await hasAuditAccess(ctx, args.organizationId))) return null;
+
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+
+    const logs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_org_and_created", (q) => {
+        const base = q.eq("organizationId", args.organizationId);
+        return cutoff ? base.gte("createdAt", cutoff) : base;
+      })
+      .order("desc")
+      .take(SCAN_CAP);
+
+    const match = logs.find(
+      (log) =>
+        log.action === args.action &&
+        (!args.projectId || log.projectId === args.projectId)
+    );
+    if (!match) return null;
+
+    const user = await ctx.db.get(match.userId);
+    return {
+      userName: userDisplay(user).userName,
+      changedAt: match.createdAt,
+    };
   },
 });
 

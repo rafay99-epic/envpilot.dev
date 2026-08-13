@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   Copy,
   Check,
   ChevronDown,
@@ -14,10 +15,10 @@ import {
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import * as Sentry from "@sentry/nextjs";
+import { SettingsField, SettingsSection } from "@envpilot/ui";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { DrawerPanel } from "@/components/ui";
 import {
-  TerminalCard,
   TerminalButton,
   TerminalInput,
   TerminalBadge,
@@ -144,7 +145,7 @@ export function ApiKeysSection({
       organizationId={organizationId}
       featureKey="public_api"
       featureName="Public REST API"
-      fallbackVariant="card"
+      fallbackVariant="line"
     >
       <ApiKeysSectionInner organizationId={organizationId} isOwner={isOwner} />
     </FeatureGate>
@@ -181,63 +182,57 @@ function ApiKeysSectionInner({
   const [showCreate, setShowCreate] = useState(false);
 
   return (
-    <div className="space-y-6">
-      <TerminalCard>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold text-ink">API Keys</h2>
-            <p className="mt-1 text-sm text-ink-subtle">
-              Scoped keys for the public REST API, MCP server, and GitHub
-              Action. Read-only — except keys with the requests resource, which
-              may file variable requests for human approval.
-            </p>
-          </div>
-          <TerminalButton
-            type="button"
-            variant="primary"
-            onClick={() => setShowCreate(true)}
-          >
-            New Key
-          </TerminalButton>
-        </div>
+    <SettingsSection
+      title="API keys"
+      description="Scoped keys for the public REST API, MCP server, and GitHub Action. Read-only — except keys with the requests resource, which may file variable requests for human approval."
+    >
+      <div className="flex justify-end">
+        <TerminalButton
+          type="button"
+          variant="primary"
+          onClick={() => setShowCreate(true)}
+        >
+          New Key
+        </TerminalButton>
+      </div>
 
-        {organizationId && (
-          <CreateKeyDrawer
-            organizationId={organizationId}
-            isOwner={isOwner}
-            isOpen={showCreate}
-            onClose={() => setShowCreate(false)}
+      {organizationId && (
+        <CreateKeyDrawer
+          organizationId={organizationId}
+          isOwner={isOwner}
+          isOpen={showCreate}
+          onClose={() => setShowCreate(false)}
+        />
+      )}
+
+      {isLoading ? (
+        <TerminalLoading />
+      ) : keyList.length === 0 ? (
+        !showCreate && (
+          <TerminalEmptyState
+            command='curl -H "Authorization: Bearer $ENVPILOT_API_KEY" https://www.envpilot.dev/api/v1/projects'
+            message="No API keys yet. Create one to call the public REST API or connect the MCP server."
+            action={{
+              label: "New Key",
+              onClick: () => setShowCreate(true),
+            }}
           />
-        )}
-
-        <div className="mt-6">
-          {isLoading ? (
-            <TerminalLoading />
-          ) : keyList.length === 0 ? (
-            !showCreate && (
-              <TerminalEmptyState
-                command='curl -H "Authorization: Bearer $ENVPILOT_API_KEY" https://www.envpilot.dev/api/v1/projects'
-                message="No API keys yet. Create one to call the public REST API or connect the MCP server."
-                action={{
-                  label: "New Key",
-                  onClick: () => setShowCreate(true),
-                }}
-              />
-            )
-          ) : (
-            <ul data-testid="api-keys-list" className="divide-y divide-line">
-              {keyList.map((key) => (
-                <KeyRow
-                  key={key._id}
-                  keyItem={key}
-                  usage={usageResult?.usage[key._id as string] ?? null}
-                />
-              ))}
-            </ul>
-          )}
-        </div>
-      </TerminalCard>
-    </div>
+        )
+      ) : (
+        <ul
+          data-testid="api-keys-list"
+          className="divide-y divide-line border-t border-line"
+        >
+          {keyList.map((key) => (
+            <KeyRow
+              key={key._id}
+              keyItem={key}
+              usage={usageResult?.usage[key._id as string] ?? null}
+            />
+          ))}
+        </ul>
+      )}
+    </SettingsSection>
   );
 }
 
@@ -419,9 +414,10 @@ function KeyRow({
               transition={{ duration: 0.15 }}
               className="overflow-hidden"
             >
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-line bg-danger-soft px-4 py-3">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-danger-line/40 pt-3">
                 <div className="min-w-0">
-                  <p className="text-xs text-danger">
+                  <p className="flex items-start gap-2 text-xs text-danger">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     Revoke this key? Anything using it will stop working
                     immediately.
                   </p>
@@ -707,21 +703,21 @@ function CreateKeyDrawer({
             <h3 className="text-sm font-semibold text-accent">Key created</h3>
           </div>
 
-          <div className="flex items-start gap-2 rounded-lg border border-warning-line bg-warning-soft px-3 py-2">
-            <span className="text-sm text-warning">
+          <p className="flex items-start gap-2 text-sm text-warning">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
               <span className="font-semibold">
                 Copy it now — you won&apos;t see this key again.
               </span>{" "}
               Envpilot only stores its hash.
             </span>
-          </div>
+          </p>
 
-          <div>
-            <label className="block text-sm font-medium text-ink-muted">
-              API Key
-            </label>
-            <div className="mt-1 flex items-center gap-2">
-              <code className="flex-1 truncate rounded-lg border border-line bg-surface px-3 py-2 font-mono text-xs text-ink">
+          {/* The one bordered block on this surface: copyable terminal output
+              shown exactly once, where the emphasis is the point. */}
+          <SettingsField label="API key">
+            <div className="flex items-center gap-2">
+              <code className="flex-1 truncate rounded-panel border border-line bg-surface px-3 py-2 font-mono text-xs text-ink">
                 {createdToken}
               </code>
               <TerminalButton
@@ -737,12 +733,12 @@ function CreateKeyDrawer({
                 )}
               </TerminalButton>
             </div>
-          </div>
+          </SettingsField>
 
           {mcpSelected && (
             <p
               data-testid="api-key-mcp-rotation-hint"
-              className="rounded-lg border border-line bg-surface/60 px-3 py-2 text-xs text-ink-muted"
+              className="text-xs text-ink-muted"
             >
               Replacing a key in an existing MCP setup? Swap this key into your
               client&apos;s Authorization header (or the exported{" "}
@@ -783,7 +779,7 @@ function CreateKeyDrawer({
                   transition={{ duration: 0.2, ease: "easeInOut" }}
                   className="overflow-hidden"
                 >
-                  <pre className="mt-2 overflow-x-auto rounded-lg border border-line bg-canvas px-3 py-3 text-xs text-ink-muted">
+                  <pre className="mt-2 overflow-x-auto rounded-panel bg-canvas px-3 py-3 text-xs text-ink-muted">
                     {`curl -H "Authorization: Bearer $ENVPILOT_API_KEY" \\
   "https://www.envpilot.dev/api/v1/projects/{slug}/variables?environment=production"`}
                   </pre>
@@ -812,18 +808,13 @@ function CreateKeyDrawer({
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
-            <div className="rounded-lg border border-danger-line bg-danger-soft p-3">
-              <p className="text-sm text-danger">{error}</p>
-            </div>
+            <p className="flex items-start gap-2 text-sm text-danger">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {error}
+            </p>
           )}
 
-          <div>
-            <label
-              htmlFor="api-key-name"
-              className="block text-sm font-medium text-ink-muted"
-            >
-              Name
-            </label>
+          <SettingsField label="Name" htmlFor="api-key-name">
             <TerminalInput
               id="api-key-name"
               type="text"
@@ -832,15 +823,18 @@ function CreateKeyDrawer({
               placeholder="e.g. deploy-pipeline"
               required
               maxLength={100}
-              className="mt-1"
             />
-          </div>
+          </SettingsField>
 
-          <div>
-            <label className="block text-sm font-medium text-ink-muted">
-              Surfaces
-            </label>
-            <div className="mt-2 flex flex-wrap gap-2">
+          <SettingsField
+            label="Surfaces"
+            hint={
+              githubActionSelected
+                ? "A GitHub Action key is locked to exactly one project and the variables resource — the Action's pull endpoint takes no project parameter."
+                : "Where this key may be used. The GitHub Action pulls variables for a single project."
+            }
+          >
+            <div className="flex flex-wrap gap-2">
               {SURFACES.map((surface) => {
                 const selected = selectedSurfaces.has(surface);
                 return (
@@ -859,27 +853,19 @@ function CreateKeyDrawer({
                 );
               })}
             </div>
-            <p className="mt-2 text-xs text-ink-subtle">
-              {githubActionSelected
-                ? "A GitHub Action key is locked to exactly one project and the variables resource — the Action's pull endpoint takes no project parameter."
-                : "Where this key may be used. The GitHub Action pulls variables for a single project."}
-            </p>
-          </div>
+          </SettingsField>
 
-          <div>
-            <label className="block text-sm font-medium text-ink-muted">
-              Projects
-            </label>
-            <div className="mt-2 flex gap-1 rounded-lg bg-surface-raised p-1">
+          <SettingsField label="Projects">
+            <div className="flex flex-wrap gap-2">
               {isOwner && !githubActionSelected && (
                 <button
                   type="button"
                   aria-pressed={projectMode === "all"}
                   onClick={() => setProjectMode("all")}
-                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`${CHIP_BASE} normal-case ${
                     projectMode === "all"
-                      ? "bg-surface-hover text-ink"
-                      : "text-ink-muted hover:text-ink-muted"
+                      ? CHIP_SELECTED_GENERIC
+                      : CHIP_UNSELECTED
                   }`}
                 >
                   All projects (includes future ones)
@@ -889,10 +875,10 @@ function CreateKeyDrawer({
                 type="button"
                 aria-pressed={projectMode === "specific"}
                 onClick={() => setProjectMode("specific")}
-                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`${CHIP_BASE} normal-case ${
                   projectMode === "specific"
-                    ? "bg-surface-hover text-ink"
-                    : "text-ink-muted hover:text-ink-muted"
+                    ? CHIP_SELECTED_GENERIC
+                    : CHIP_UNSELECTED
                 }`}
               >
                 Specific projects
@@ -900,13 +886,13 @@ function CreateKeyDrawer({
             </div>
 
             {projectMode === "specific" && (
-              <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg border border-line p-2">
+              <div className="mt-3 max-h-48 divide-y divide-line overflow-y-auto border-t border-line">
                 {projectsLoading ? (
-                  <p className="px-2 py-1.5 text-xs text-ink-subtle">
+                  <p className="py-2 text-xs text-ink-subtle">
                     Loading projects...
                   </p>
                 ) : projects.length === 0 ? (
-                  <p className="px-2 py-1.5 text-xs text-ink-subtle">
+                  <p className="py-2 text-xs text-ink-subtle">
                     No projects yet.
                   </p>
                 ) : (
@@ -914,7 +900,7 @@ function CreateKeyDrawer({
                     <label
                       key={project._id}
                       data-testid={`api-key-project-${project.slug}`}
-                      className="flex items-center gap-2 rounded px-2 py-1.5 text-sm text-ink-muted hover:bg-surface-hover/60"
+                      className="flex cursor-pointer items-center gap-2 py-2 text-sm text-ink-muted hover:text-ink"
                     >
                       <input
                         type="checkbox"
@@ -928,13 +914,13 @@ function CreateKeyDrawer({
                 )}
               </div>
             )}
-          </div>
+          </SettingsField>
 
-          <div>
-            <label className="block text-sm font-medium text-ink-muted">
-              Environments
-            </label>
-            <div className="mt-2 flex flex-wrap gap-2">
+          <SettingsField
+            label="Environments"
+            hint="Recommended: scope keys to a single environment."
+          >
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 aria-pressed={envMode === "all"}
@@ -963,16 +949,17 @@ function CreateKeyDrawer({
                 );
               })}
             </div>
-            <p className="mt-2 text-xs text-ink-subtle">
-              Recommended: scope keys to a single environment.
-            </p>
-          </div>
+          </SettingsField>
 
-          <div>
-            <label className="block text-sm font-medium text-ink-muted">
-              Resources
-            </label>
-            <div className="mt-2 flex flex-wrap gap-2">
+          <SettingsField
+            label="Resources"
+            hint={
+              selectedResources.has("requests")
+                ? "This key may file variable requests over MCP — a human approves them in the dashboard and supplies the value. Keys never write secrets."
+                : undefined
+            }
+          >
+            <div className="flex flex-wrap gap-2">
               {RESOURCES.map((resource) => {
                 const selected = selectedResources.has(resource);
                 // The Action pulls variables and, optionally, secret files.
@@ -1012,67 +999,56 @@ function CreateKeyDrawer({
                 );
               })}
             </div>
-            {selectedResources.has("requests") && (
-              <p className="mt-2 text-xs text-ink-subtle">
-                This key may file variable requests over MCP — a human approves
-                them in the dashboard and supplies the value. Keys never write
-                secrets.
-              </p>
-            )}
-            {mcpSelected && (
-              <div
-                data-testid="api-key-mcp-requirements"
-                className="mt-3 rounded-lg border border-line bg-surface/60 p-3"
-              >
-                <p className="text-xs font-medium text-ink-muted">
-                  MCP server — tools this key will unlock
-                </p>
-                <ul className="mt-2 space-y-1">
-                  {RESOURCES.map((resource) => {
-                    const enabled = selectedResources.has(resource);
-                    return (
-                      <li
-                        key={resource}
-                        data-testid={`api-key-mcp-tools-${resource}`}
-                        className={`flex gap-2 text-xs ${
-                          enabled ? "text-ink-muted" : "text-ink-faint"
-                        }`}
-                      >
-                        <span
-                          className={enabled ? "text-accent" : "text-ink-faint"}
-                        >
-                          {enabled ? "✓" : "✗"}
-                        </span>
-                        <span>
-                          <span className="capitalize">{resource}</span> —{" "}
-                          <span className="font-mono">
-                            {MCP_RESOURCE_TOOLS[resource]}
-                          </span>
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-                {!selectedResources.has("projects") && (
-                  <p
-                    data-testid="api-key-mcp-projects-warning"
-                    className="mt-2 rounded-md border border-warning-line bg-warning-soft p-2 text-xs text-warning"
-                  >
-                    Without the projects resource, MCP clients cannot list or
-                    search projects — most assistants start there, so every
-                    session fails with a scope error. Enable projects for a
-                    usable MCP key.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
+          </SettingsField>
 
-          <div>
-            <label className="block text-sm font-medium text-ink-muted">
-              Expiry
-            </label>
-            <div className="mt-2 flex flex-wrap gap-2">
+          {mcpSelected && (
+            <div data-testid="api-key-mcp-requirements">
+              <p className="text-xs font-medium text-ink-muted">
+                MCP server — tools this key will unlock
+              </p>
+              <ul className="mt-2 space-y-1">
+                {RESOURCES.map((resource) => {
+                  const enabled = selectedResources.has(resource);
+                  return (
+                    <li
+                      key={resource}
+                      data-testid={`api-key-mcp-tools-${resource}`}
+                      className={`flex gap-2 text-xs ${
+                        enabled ? "text-ink-muted" : "text-ink-faint"
+                      }`}
+                    >
+                      <span
+                        className={enabled ? "text-accent" : "text-ink-faint"}
+                      >
+                        {enabled ? "✓" : "✗"}
+                      </span>
+                      <span>
+                        <span className="capitalize">{resource}</span> —{" "}
+                        <span className="font-mono">
+                          {MCP_RESOURCE_TOOLS[resource]}
+                        </span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {!selectedResources.has("projects") && (
+                <p
+                  data-testid="api-key-mcp-projects-warning"
+                  className="mt-2 flex items-start gap-2 text-xs text-warning"
+                >
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  Without the projects resource, MCP clients cannot list or
+                  search projects — most assistants start there, so every
+                  session fails with a scope error. Enable projects for a usable
+                  MCP key.
+                </p>
+              )}
+            </div>
+          )}
+
+          <SettingsField label="Expiry">
+            <div className="flex flex-wrap gap-2">
               {(
                 [
                   { id: "none", label: "No expiry" },
@@ -1108,7 +1084,7 @@ function CreateKeyDrawer({
                 className="mt-2"
               />
             )}
-          </div>
+          </SettingsField>
 
           <div className="flex justify-end gap-3 pt-2">
             <TerminalButton

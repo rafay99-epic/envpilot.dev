@@ -28,7 +28,7 @@ interface UpgradePromptProps {
   /**
    * Display variant
    */
-  variant?: "inline" | "modal" | "banner" | "card";
+  variant?: "inline" | "modal" | "banner" | "card" | "line";
   /**
    * Optional className for additional styling
    */
@@ -62,6 +62,26 @@ export function UpgradePrompt({
       window.location.href = "/api/checkout?tier=pro";
     }
   };
+
+  // Settings run on the "one border level" rule — only controls carry a
+  // border there, so the gate is a line of text, not a box.
+  if (variant === "line") {
+    return (
+      <div
+        className={`flex flex-wrap items-center gap-2 text-sm text-ink-muted ${className}`}
+      >
+        <Sparkles className="h-4 w-4 shrink-0 text-warning" aria-hidden />
+        <span className="flex-1">{reason}</span>
+        <button
+          onClick={handleUpgradeClick}
+          className="inline-flex items-center gap-1 font-medium whitespace-nowrap text-accent transition-colors hover:text-accent-hover"
+        >
+          Upgrade to {upgradeName}
+          <ArrowRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
 
   if (variant === "inline") {
     return (

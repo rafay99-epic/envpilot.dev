@@ -58,6 +58,24 @@
   --color-chart-4: #a78bfa;
   --color-chart-5: #ef5350;
 
+  /* User-chosen accents (project icons, variable tags). Muted enough to sit
+     under an icon on a dark surface and still be told apart at swatch size —
+     the old pastels were all near-white and read as one colour here. Stored
+     values are hex strings, so these are what the picker OFFERS; a row keeps
+     whatever it already holds. */
+  --color-swatch-1: #4ade80;
+  --color-swatch-2: #60a5fa;
+  --color-swatch-3: #fbbf24;
+  --color-swatch-4: #a78bfa;
+  --color-swatch-5: #f87171;
+  --color-swatch-6: #22d3ee;
+  --color-swatch-7: #fb923c;
+  --color-swatch-8: #f472b6;
+  --color-swatch-9: #818cf8;
+  --color-swatch-10: #a3e635;
+  --color-swatch-11: #2dd4bf;
+  --color-swatch-12: #a1a1aa;
+
   --radius-panel: 0.5rem;
   --shadow-panel: inset 0 1px 0 rgb(255 255 255 / 0.055);
 }
