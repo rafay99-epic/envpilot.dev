@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { Settings } from "lucide-react";
@@ -55,7 +55,19 @@ function OrganizationSettingsPageContent({
   // Owner-only sections stay owner-only; API Keys additionally opens up to
   // project managers and team leads (minting a project-scoped key is the same
   // bar as minting a CI/CD service token elsewhere in the app).
-  const role = normalizeOrgRole(organization?.role);
+  // Sticky across reactive churn: a tab that flips locked→unlocked→locked
+  // swaps its body for the lock message and back, which unmounts whatever was
+  // open inside it (an in-progress key drawer, a half-typed form). The role
+  // only moves forward here; the backend stays the real authority either way.
+  const liveRole = normalizeOrgRole(organization?.role);
+  const [stickyRole, setStickyRole] = useState(liveRole);
+  // Adjusting state during render is React's own answer here — an effect
+  // would land a frame late, and that frame is exactly when the body swaps.
+  if (organization?.role !== undefined && stickyRole !== liveRole) {
+    setStickyRole(liveRole);
+  }
+  const role = organization?.role !== undefined ? liveRole : stickyRole;
+
   const isOwner = role === "owner";
   const canManageApiKeys = roleLevel(role) >= ROLE_LEVEL.team_lead;
 

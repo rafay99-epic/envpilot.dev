@@ -32,6 +32,10 @@ export function useSettingsTab(tabs: SettingsTabDef[]): {
 
   const onChange = useCallback(
     (id: string) => {
+      // Re-clicking the active tab must do nothing. Replacing the URL with
+      // itself still re-renders the tree, which remounts the tab body and
+      // closes anything open inside it — an open drawer, a half-typed form.
+      if (id === active) return;
       // Switching tabs unmounts the form, so unsaved edits die silently
       // without this — the browser's beforeunload never fires for a
       // client-side route change.
@@ -45,7 +49,7 @@ export function useSettingsTab(tabs: SettingsTabDef[]): {
       params.set("tab", id);
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
-    [pathname, router, searchParams]
+    [active, pathname, router, searchParams]
   );
 
   return { active, onChange };

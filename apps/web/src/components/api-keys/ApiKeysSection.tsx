@@ -98,6 +98,47 @@ const MCP_RESOURCE_TOOLS: Record<Resource, string> = {
   requests: "envpilot_request_variable, envpilot_get_request_status",
 };
 
+/**
+ * What the key is FOR, chosen before any chip. Each preset is a combination the
+ * backend already accepts, so the common paths cannot produce a key that mints
+ * and then fails on first use. "custom" opts out and opens the advanced block.
+ *
+ * Presets set surfaces and resources only — project and environment scope stay
+ * a deliberate choice, because no default is safe for every org.
+ */
+const PRESETS = [
+  {
+    id: "agent",
+    label: "Agent / MCP",
+    blurb: "Claude, Cursor, Codex",
+    surfaces: ["mcp_server"],
+    resources: ["variables", "projects"],
+  },
+  {
+    id: "action",
+    label: "GitHub Action",
+    blurb: "CI pulls variables",
+    surfaces: ["github_action"],
+    resources: ["variables"],
+  },
+  {
+    id: "rest",
+    label: "REST read-only",
+    blurb: "scripts, dashboards",
+    surfaces: ["rest_api"],
+    resources: ["variables"],
+  },
+  {
+    id: "custom",
+    label: "Custom",
+    blurb: "choose everything",
+    surfaces: [],
+    resources: [],
+  },
+] as const;
+
+type PresetId = (typeof PRESETS)[number]["id"];
+
 const SURFACES = ["rest_api", "mcp_server", "github_action"] as const;
 type Surface = (typeof SURFACES)[number];
 
@@ -504,6 +545,10 @@ function CreateKeyDrawer({
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [customExpiry, setCustomExpiry] = useState("");
 
+  const [preset, setPreset] = useState<PresetId>("agent");
+  // Problems are computed on every render but only SHOWN once the user has
+  // tried to create — an empty form should not open scolding.
+  const [triedSubmit, setTriedSubmit] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
@@ -515,12 +560,14 @@ function CreateKeyDrawer({
   useEffect(() => {
     if (!isOpen) return;
     setName("");
+    setPreset("agent");
+    setTriedSubmit(false);
     setProjectMode("specific");
     setSelectedProjectIds(new Set());
     setEnvMode("specific");
     setSelectedEnvs(new Set<Environment>(["production"]));
     setSelectedResources(new Set<Resource>(["variables", "projects"]));
-    setSelectedSurfaces(new Set<Surface>(["rest_api", "mcp_server"]));
+    setSelectedSurfaces(new Set<Surface>(["mcp_server"]));
     setExpiryMode("none");
     setCustomExpiry("");
     setIsSubmitting(false);
@@ -621,18 +668,98 @@ function CreateKeyDrawer({
     expiryMode !== "custom" ||
     (customExpiry.length > 0 && new Date(customExpiry).getTime() > Date.now());
 
-  const canSubmit =
-    name.trim().length > 0 &&
-    projectSelectionValid &&
-    envSelectionValid &&
-    resourceSelectionValid &&
-    surfaceSelectionValid &&
-    customExpiryValid &&
-    !isSubmitting;
+  const applyPreset = (id: PresetId) => {
+    setPreset(id);
+    const chosen = PRESETS.find((p) => p.id === id);
+    if (!chosen || id === "custom") return;
+    setSelectedSurfaces(
+      new Set<Surface>(chosen.surfaces as readonly Surface[])
+    );
+    setSelectedResources(
+      new Set<Resource>(chosen.resources as readonly Resource[])
+    );
+    // The Action pull endpoint takes no project parameter, so its key IS the
+    // project scope — force the shape the backend will accept.
+    if (id === "action") setProjectMode("specific");
+  };
+
+  /**
+   * Every reason this key cannot be created, in the order the fields appear.
+   * Mirrors convex/features/api/keys.ts one-for-one: the point is that the
+   * user reads the rule HERE instead of after a failed round trip.
+   */
+  const problems: { field: string; message: string }[] = [];
+  if (name.trim().length === 0) {
+    problems.push({
+      field: "name",
+      message: "Name your key (1–100 characters).",
+    });
+  } else if (name.trim().length > 100) {
+    problems.push({ field: "name", message: "Name must be 1–100 characters." });
+  }
+  if (!surfaceSelectionValid) {
+    problems.push({
+      field: "surfaces",
+      message: "Pick at least one surface — where this key may be used.",
+    });
+  }
+  if (!projectSelectionValid) {
+    problems.push({
+      field: "projects",
+      message: githubActionSelected
+        ? "A GitHub Action key must be scoped to exactly one project — the Action's pull endpoint takes no project parameter."
+        : "Pick at least one project, or scope the key to all projects.",
+    });
+  }
+  if (!envSelectionValid) {
+    problems.push({
+      field: "environments",
+      message:
+        "Pick at least one environment, or scope the key to all of them.",
+    });
+  }
+  if (selectedResources.size === 0) {
+    problems.push({
+      field: "resources",
+      message: "Pick at least one resource — a key with none can read nothing.",
+    });
+  } else if (!resourceSelectionValid) {
+    problems.push({
+      field: "resources",
+      message:
+        'A GitHub Action key must carry "variables", and may additionally carry "files" — nothing else.',
+    });
+  }
+  if (selectedResources.has("docs") && selectedResources.has("files")) {
+    problems.push({
+      field: "resources",
+      message:
+        'A key cannot carry both "docs" and "files" — docs are text an agent reads into context, and file access returns decrypted key material. Mint two keys.',
+    });
+  }
+  if (!customExpiryValid) {
+    problems.push({
+      field: "expiry",
+      message: "Pick an expiry date in the future.",
+    });
+  }
+
+  const mcpToolCount = RESOURCES.filter((r) => selectedResources.has(r)).length;
+
+  const showProblems = triedSubmit && problems.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit) return;
+    setTriedSubmit(true);
+    // Never a dead button: a click with gaps explains them instead of doing
+    // nothing, which is the whole reason this form was confusing.
+    if (problems.length > 0) {
+      document
+        .getElementById("api-key-problems")
+        ?.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    if (isSubmitting) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -814,48 +941,92 @@ function CreateKeyDrawer({
             </p>
           )}
 
-          <SettingsField label="Name" htmlFor="api-key-name">
-            <TerminalInput
-              id="api-key-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. deploy-pipeline"
-              required
-              maxLength={100}
-            />
-          </SettingsField>
+          {showProblems && (
+            <div
+              id="api-key-problems"
+              data-testid="api-key-problems"
+              role="alert"
+              className="border-l-2 border-danger py-1 pl-3"
+            >
+              <p className="text-sm font-medium text-danger">
+                {problems.length === 1
+                  ? "One thing left before this key can be created"
+                  : `${problems.length} things left before this key can be created`}
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {problems.map((problem) => (
+                  <li
+                    key={`${problem.field}-${problem.message}`}
+                    className="text-sm text-ink-muted"
+                  >
+                    <span className="font-mono text-[12px] text-ink-subtle">
+                      {problem.field}
+                    </span>{" "}
+                    — {problem.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <SettingsField
-            label="Surfaces"
-            hint={
-              githubActionSelected
-                ? "A GitHub Action key is locked to exactly one project and the variables resource — the Action's pull endpoint takes no project parameter."
-                : "Where this key may be used. The GitHub Action pulls variables for a single project."
-            }
+            label="What is this key for?"
+            required
+            hint="Presets pick a surface and resources that are known to work together. Everything stays editable under Advanced."
           >
-            <div className="flex flex-wrap gap-2">
-              {SURFACES.map((surface) => {
-                const selected = selectedSurfaces.has(surface);
+            <div className="grid gap-2 sm:grid-cols-2">
+              {PRESETS.map((option) => {
+                const selected = preset === option.id;
                 return (
                   <button
-                    key={surface}
+                    key={option.id}
                     type="button"
-                    data-testid={`api-key-surface-${surface}`}
+                    data-testid={`api-key-preset-${option.id}`}
                     aria-pressed={selected}
-                    onClick={() => toggleSurface(surface)}
-                    className={`${CHIP_BASE} normal-case ${
-                      selected ? CHIP_SELECTED_GENERIC : CHIP_UNSELECTED
+                    onClick={() => applyPreset(option.id)}
+                    className={`rounded-panel px-3 py-2 text-left ring-1 transition-colors ${
+                      selected
+                        ? "bg-accent-soft text-accent ring-accent-line"
+                        : "text-ink-muted ring-line hover:text-ink hover:ring-line-strong"
                     }`}
                   >
-                    {SURFACE_LABEL[surface]}
+                    <span className="block text-sm font-medium">
+                      {option.label}
+                    </span>
+                    <span className="block text-xs text-ink-subtle">
+                      {option.blurb}
+                    </span>
                   </button>
                 );
               })}
             </div>
           </SettingsField>
 
-          <SettingsField label="Projects">
+          <SettingsField
+            label="Name"
+            htmlFor="api-key-name"
+            required
+            hint={`1–100 characters · ${name.trim().length}/100`}
+            error={
+              showProblems
+                ? (problems.find((p) => p.field === "name")?.message ?? null)
+                : null
+            }
+          >
+            <TerminalInput
+              id="api-key-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. deploy-pipeline"
+              maxLength={100}
+              aria-invalid={
+                showProblems && problems.some((p) => p.field === "name")
+              }
+            />
+          </SettingsField>
+
+          <SettingsField label="Projects" required>
             <div className="flex flex-wrap gap-2">
               {isOwner && !githubActionSelected && (
                 <button
@@ -918,6 +1089,7 @@ function CreateKeyDrawer({
 
           <SettingsField
             label="Environments"
+            required
             hint="Recommended: scope keys to a single environment."
           >
             <div className="flex flex-wrap gap-2">
@@ -951,140 +1123,199 @@ function CreateKeyDrawer({
             </div>
           </SettingsField>
 
-          <SettingsField
-            label="Resources"
-            hint={
-              selectedResources.has("requests")
-                ? "This key may file variable requests over MCP — a human approves them in the dashboard and supplies the value. Keys never write secrets."
-                : undefined
-            }
+          <details
+            className="border-t border-line pt-4"
+            open={preset === "custom" || showProblems}
           >
-            <div className="flex flex-wrap gap-2">
-              {RESOURCES.map((resource) => {
-                const selected = selectedResources.has(resource);
-                // The Action pulls variables and, optionally, secret files.
-                // Everything else stays off so an Action credential never
-                // doubles as broader REST/MCP access.
-                const disabled =
-                  githubActionSelected &&
-                  resource !== "variables" &&
-                  resource !== "files";
-                // The other half of an exclusive pair stays clickable — it
-                // swaps the selection rather than being blocked — but says so.
-                const excluded = MUTUALLY_EXCLUSIVE[resource];
-                const swaps = Boolean(
-                  excluded && selectedResources.has(excluded)
-                );
-                return (
-                  <button
-                    key={resource}
-                    type="button"
-                    data-testid={`api-key-resource-${resource}`}
-                    aria-pressed={selected}
-                    disabled={disabled}
-                    title={
-                      disabled
-                        ? "GitHub Action keys carry variables, and optionally files — nothing else"
-                        : swaps
-                          ? `Selecting "${resource}" clears "${excluded}" — a key cannot carry both`
-                          : RESOURCE_HINT[resource]
-                    }
-                    onClick={() => toggleResource(resource)}
-                    className={`${CHIP_BASE} ${
-                      selected ? CHIP_SELECTED_GENERIC : CHIP_UNSELECTED
-                    } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
-                  >
-                    {resource}
-                  </button>
-                );
-              })}
-            </div>
-          </SettingsField>
+            <summary
+              data-testid="api-key-advanced"
+              className="cursor-pointer list-none font-mono text-[12px] text-ink-subtle transition-colors hover:text-ink [&::-webkit-details-marker]:hidden"
+            >
+              <span aria-hidden className="mr-2 text-accent">
+                &#9656;
+              </span>
+              Advanced — surfaces, resources, expiry
+            </summary>
 
-          {mcpSelected && (
-            <div data-testid="api-key-mcp-requirements">
-              <p className="text-xs font-medium text-ink-muted">
-                MCP server — tools this key will unlock
-              </p>
-              <ul className="mt-2 space-y-1">
-                {RESOURCES.map((resource) => {
-                  const enabled = selectedResources.has(resource);
-                  return (
-                    <li
-                      key={resource}
-                      data-testid={`api-key-mcp-tools-${resource}`}
-                      className={`flex gap-2 text-xs ${
-                        enabled ? "text-ink-muted" : "text-ink-faint"
+            <div className="mt-4 space-y-5">
+              <SettingsField
+                label="Surfaces"
+                required
+                hint={
+                  githubActionSelected
+                    ? "A GitHub Action key is locked to exactly one project and the variables resource — the Action's pull endpoint takes no project parameter."
+                    : "Where this key may be used. The GitHub Action pulls variables for a single project."
+                }
+              >
+                <div className="flex flex-wrap gap-2">
+                  {SURFACES.map((surface) => {
+                    const selected = selectedSurfaces.has(surface);
+                    return (
+                      <button
+                        key={surface}
+                        type="button"
+                        data-testid={`api-key-surface-${surface}`}
+                        aria-pressed={selected}
+                        onClick={() => toggleSurface(surface)}
+                        className={`${CHIP_BASE} normal-case ${
+                          selected ? CHIP_SELECTED_GENERIC : CHIP_UNSELECTED
+                        }`}
+                      >
+                        {SURFACE_LABEL[surface]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </SettingsField>
+
+              <SettingsField
+                label="Resources"
+                required
+                hint={
+                  selectedResources.has("requests")
+                    ? "This key may file variable requests over MCP — a human approves them in the dashboard and supplies the value. Keys never write secrets."
+                    : undefined
+                }
+              >
+                <div className="flex flex-wrap gap-2">
+                  {RESOURCES.map((resource) => {
+                    const selected = selectedResources.has(resource);
+                    // The Action pulls variables and, optionally, secret files.
+                    // Everything else stays off so an Action credential never
+                    // doubles as broader REST/MCP access.
+                    const disabled =
+                      githubActionSelected &&
+                      resource !== "variables" &&
+                      resource !== "files";
+                    // The other half of an exclusive pair stays clickable — it
+                    // swaps the selection rather than being blocked — but says so.
+                    const excluded = MUTUALLY_EXCLUSIVE[resource];
+                    const swaps = Boolean(
+                      excluded && selectedResources.has(excluded)
+                    );
+                    return (
+                      <button
+                        key={resource}
+                        type="button"
+                        data-testid={`api-key-resource-${resource}`}
+                        aria-pressed={selected}
+                        disabled={disabled}
+                        title={
+                          disabled
+                            ? "GitHub Action keys carry variables, and optionally files — nothing else"
+                            : swaps
+                              ? `Selecting "${resource}" clears "${excluded}" — a key cannot carry both`
+                              : RESOURCE_HINT[resource]
+                        }
+                        onClick={() => toggleResource(resource)}
+                        className={`${CHIP_BASE} ${
+                          selected ? CHIP_SELECTED_GENERIC : CHIP_UNSELECTED
+                        } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
+                      >
+                        {resource}
+                      </button>
+                    );
+                  })}
+                </div>
+              </SettingsField>
+
+              {mcpSelected && (
+                <div data-testid="api-key-mcp-requirements">
+                  {/* The full tool list is six lines of mono the moment MCP is
+                      picked, which buried the fields under it. Headline first,
+                      list on demand. */}
+                  <details>
+                    <summary className="cursor-pointer list-none text-xs font-medium text-ink-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
+                      <span aria-hidden className="mr-1.5 text-accent">
+                        &#9656;
+                      </span>
+                      MCP server — {mcpToolCount} of {RESOURCES.length} resource
+                      groups unlock tools
+                    </summary>
+                    <ul className="mt-2 space-y-1">
+                      {RESOURCES.map((resource) => {
+                        const enabled = selectedResources.has(resource);
+                        return (
+                          <li
+                            key={resource}
+                            data-testid={`api-key-mcp-tools-${resource}`}
+                            className={`flex gap-2 text-xs ${
+                              enabled ? "text-ink-muted" : "text-ink-faint"
+                            }`}
+                          >
+                            <span
+                              className={
+                                enabled ? "text-accent" : "text-ink-faint"
+                              }
+                            >
+                              {enabled ? "✓" : "✗"}
+                            </span>
+                            <span>
+                              <span className="capitalize">{resource}</span> —{" "}
+                              <span className="font-mono">
+                                {MCP_RESOURCE_TOOLS[resource]}
+                              </span>
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </details>
+                  {!selectedResources.has("projects") && (
+                    <p
+                      data-testid="api-key-mcp-projects-warning"
+                      className="mt-2 flex items-start gap-2 text-xs text-warning"
+                    >
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      Without the projects resource, MCP clients cannot list or
+                      search projects — most assistants start there, so every
+                      session fails with a scope error. Enable projects for a
+                      usable MCP key.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <SettingsField label="Expiry" optional>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      { id: "none", label: "No expiry" },
+                      { id: "30d", label: "30 days" },
+                      { id: "90d", label: "90 days" },
+                      { id: "custom", label: "Custom date" },
+                    ] as const
+                  ).map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      aria-pressed={expiryMode === option.id}
+                      onClick={() => setExpiryMode(option.id)}
+                      className={`${CHIP_BASE} ${
+                        expiryMode === option.id
+                          ? CHIP_SELECTED_GENERIC
+                          : CHIP_UNSELECTED
                       }`}
                     >
-                      <span
-                        className={enabled ? "text-accent" : "text-ink-faint"}
-                      >
-                        {enabled ? "✓" : "✗"}
-                      </span>
-                      <span>
-                        <span className="capitalize">{resource}</span> —{" "}
-                        <span className="font-mono">
-                          {MCP_RESOURCE_TOOLS[resource]}
-                        </span>
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-              {!selectedResources.has("projects") && (
-                <p
-                  data-testid="api-key-mcp-projects-warning"
-                  className="mt-2 flex items-start gap-2 text-xs text-warning"
-                >
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  Without the projects resource, MCP clients cannot list or
-                  search projects — most assistants start there, so every
-                  session fails with a scope error. Enable projects for a usable
-                  MCP key.
-                </p>
-              )}
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {expiryMode === "custom" && (
+                  <TerminalDatePicker
+                    id="api-key-expiry-custom"
+                    value={customExpiry}
+                    onChange={setCustomExpiry}
+                    min={new Date(Date.now() + 24 * 60 * 60 * 1000)
+                      .toISOString()
+                      .slice(0, 10)}
+                    placeholder="Pick an expiry date"
+                    className="mt-2"
+                  />
+                )}
+              </SettingsField>
             </div>
-          )}
-
-          <SettingsField label="Expiry">
-            <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  { id: "none", label: "No expiry" },
-                  { id: "30d", label: "30 days" },
-                  { id: "90d", label: "90 days" },
-                  { id: "custom", label: "Custom date" },
-                ] as const
-              ).map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  aria-pressed={expiryMode === option.id}
-                  onClick={() => setExpiryMode(option.id)}
-                  className={`${CHIP_BASE} ${
-                    expiryMode === option.id
-                      ? CHIP_SELECTED_GENERIC
-                      : CHIP_UNSELECTED
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            {expiryMode === "custom" && (
-              <TerminalDatePicker
-                id="api-key-expiry-custom"
-                value={customExpiry}
-                onChange={setCustomExpiry}
-                min={new Date(Date.now() + 24 * 60 * 60 * 1000)
-                  .toISOString()
-                  .slice(0, 10)}
-                placeholder="Pick an expiry date"
-                className="mt-2"
-              />
-            )}
-          </SettingsField>
+          </details>
 
           <div className="flex justify-end gap-3 pt-2">
             <TerminalButton
@@ -1095,7 +1326,7 @@ function CreateKeyDrawer({
             >
               Cancel
             </TerminalButton>
-            <TerminalButton type="submit" disabled={!canSubmit}>
+            <TerminalButton type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Creating..." : "Create Key"}
             </TerminalButton>
           </div>

@@ -50,12 +50,18 @@ export function SettingsField({
   hint,
   error,
   htmlFor,
+  required,
+  optional,
   children,
 }: {
   label?: string;
   hint?: ReactNode;
   error?: string | null;
   htmlFor?: string;
+  /** Marks the field required — a green asterisk, plus a word for screen readers. */
+  required?: boolean;
+  /** Marks the field explicitly optional, so "unmarked" never has to be guessed. */
+  optional?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -66,6 +72,15 @@ export function SettingsField({
           className="mb-1.5 block font-mono text-[12px] text-ink-subtle"
         >
           {label}
+          {required && (
+            <>
+              <span aria-hidden className="ml-1 text-accent">
+                *
+              </span>
+              <span className="sr-only"> (required)</span>
+            </>
+          )}
+          {optional && <span className="ml-1 text-ink-faint">optional</span>}
         </label>
       )}
       {children}
