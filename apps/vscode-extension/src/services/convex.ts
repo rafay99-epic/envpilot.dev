@@ -52,6 +52,7 @@ export interface RevocationEvent {
 export class ConvexService {
   private client: ConvexClient;
   private subscriptions = new Map<string, () => void>();
+  private nextSubscriptionId = 0;
   private _disposed = false;
   private fetcher: TokenFetcher;
   /** Last auth state reported by the client's setAuth onChange callback. */
@@ -129,9 +130,9 @@ export class ConvexService {
    */
   subscribeToRevocations(
     callback: (events: RevocationEvent[]) => void,
-    onError?: SubscriptionErrorHandler
+    onError: SubscriptionErrorHandler
   ): string {
-    const id = `revocations-${Date.now()}`;
+    const id = `revocations-${this.nextSubscriptionId++}`;
 
     const unsubscribe = this.client.onUpdate(
       anyApi.features.permissions.revocationEvents.listMine,
@@ -157,9 +158,9 @@ export class ConvexService {
    */
   subscribeToProjectAccess(
     callback: (records: CallerProjectAccess[]) => void,
-    onError?: SubscriptionErrorHandler
+    onError: SubscriptionErrorHandler
   ): string {
-    const id = `access-${Date.now()}`;
+    const id = `access-${this.nextSubscriptionId++}`;
 
     const unsubscribe = this.client.onUpdate(
       anyApi.features.users.projectAccess.listForCaller,
@@ -192,9 +193,9 @@ export class ConvexService {
         updatedAt: number;
       }>
     ) => void,
-    onError?: SubscriptionErrorHandler
+    onError: SubscriptionErrorHandler
   ): string {
-    const id = `vars-${projectId.slice(0, 8)}-${Date.now()}`;
+    const id = `vars-${projectId.slice(0, 8)}-${this.nextSubscriptionId++}`;
 
     const unsubscribe = this.client.onUpdate(
       anyApi.features.variables.queries.listMetadataByProject,

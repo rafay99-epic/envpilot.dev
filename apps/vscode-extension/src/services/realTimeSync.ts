@@ -42,11 +42,19 @@ export class RealTimeSyncService {
   private desiredRunning = false;
   private reconnecting = false;
   private reconnectTimer: ReturnType<typeof setInterval> | null = null;
+  private subscriptionReconnectTimer: ReturnType<typeof setTimeout> | null =
+    null;
+  private subscriptionStableTimer: ReturnType<typeof setTimeout> | null = null;
+  private subscriptionReconnectAttempt = 0;
   /** Low-frequency bounded-backoff check — NOT a replacement for the
    * WebSocket subscriptions, just a backstop for when Convex never connected
    * in the first place (e.g. a proxy blocking the wss:// upgrade) or the
    * connection got torn down without ever coming back up. */
   private static readonly RECONNECT_CHECK_INTERVAL_MS = 3 * 60 * 1000;
+  private static readonly SUBSCRIPTION_RECONNECT_DELAYS_MS = [
+    0, 5_000, 15_000, 60_000,
+  ];
+  private static readonly SUBSCRIPTION_STABLE_MS = 60_000;
 
   private _onRevocationDetected = new vscode.EventEmitter<{
     project: LinkedProjectV2;
@@ -63,6 +71,9 @@ export class RealTimeSyncService {
     this.syncService = syncService;
     this.storage = storage;
     this.getFreshToken = getFreshToken;
+    this.syncService.setSubscriptionErrorHandler((error) =>
+      this.handleSubscriptionError(error)
+    );
   }
 
   /**
@@ -105,6 +116,9 @@ export class RealTimeSyncService {
     this.isRunning = false;
     this.teardownSubscriptions();
     this.stopReconnectTimer();
+    this.stopSubscriptionReconnectTimer();
+    this.stopSubscriptionStableTimer();
+    this.subscriptionReconnectAttempt = 0;
     this.syncService.setConnectionState("disconnected");
   }
 
@@ -121,6 +135,8 @@ export class RealTimeSyncService {
     this.isRunning = false;
     this.teardownSubscriptions();
     this.stopReconnectTimer();
+    this.stopSubscriptionReconnectTimer();
+    this.stopSubscriptionStableTimer();
     this.syncService.setConnectionState("disconnected");
   }
 
@@ -153,6 +169,43 @@ export class RealTimeSyncService {
     if (this.reconnectTimer) {
       clearInterval(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+  }
+
+  private scheduleSubscriptionReconnect(): void {
+    if (this.subscriptionReconnectTimer !== null) return;
+    const delay =
+      RealTimeSyncService.SUBSCRIPTION_RECONNECT_DELAYS_MS[
+        this.subscriptionReconnectAttempt
+      ] ?? 60_000;
+    this.subscriptionReconnectAttempt++;
+    this.subscriptionReconnectTimer = setTimeout(() => {
+      this.subscriptionReconnectTimer = null;
+      void this.checkConnectionAndReconnect();
+    }, delay);
+    this.subscriptionReconnectTimer.unref?.();
+  }
+
+  private stopSubscriptionReconnectTimer(): void {
+    if (this.subscriptionReconnectTimer) {
+      clearTimeout(this.subscriptionReconnectTimer);
+      this.subscriptionReconnectTimer = null;
+    }
+  }
+
+  private scheduleSubscriptionStableReset(): void {
+    this.stopSubscriptionStableTimer();
+    this.subscriptionStableTimer = setTimeout(() => {
+      this.subscriptionStableTimer = null;
+      this.subscriptionReconnectAttempt = 0;
+    }, RealTimeSyncService.SUBSCRIPTION_STABLE_MS);
+    this.subscriptionStableTimer.unref?.();
+  }
+
+  private stopSubscriptionStableTimer(): void {
+    if (this.subscriptionStableTimer) {
+      clearTimeout(this.subscriptionStableTimer);
+      this.subscriptionStableTimer = null;
     }
   }
 
@@ -238,25 +291,29 @@ export class RealTimeSyncService {
     // Identity-scoped revocation events (no access tokens passed). Match each
     // event to a linked project by projectId.
     this.revocationSubId = this.convexService.subscribeToRevocations(
-      (events) => this.handleRevocationEvents(events, linkedProjects),
+      (events) => void this.handleRevocationEvents(events, linkedProjects),
       (error) => this.handleSubscriptionError(error)
     );
 
     // Identity-scoped set of the caller's still-active project accesses. When a
     // linked project drops out of this set, its access has ended.
     this.accessSubId = this.convexService.subscribeToProjectAccess(
-      (records) => this.handleProjectAccessUpdate(records),
+      (records) => void this.handleProjectAccessUpdate(records),
       (error) => this.handleSubscriptionError(error)
     );
+    this.scheduleSubscriptionStableReset();
   }
 
   private handleSubscriptionError(error: Error): void {
-    if (!this.desiredRunning) return;
+    if (!this.desiredRunning || !this.isRunning) return;
 
     captureError(error, { phase: "realtime-subscription" });
     this.isRunning = false;
     this.teardownSubscriptions();
+    this.stopSubscriptionStableTimer();
+    this.syncService.stopPeriodicSync();
     this.syncService.setConnectionState("disconnected");
+    this.scheduleSubscriptionReconnect();
   }
 
   /**

@@ -116,6 +116,7 @@ export class SyncService {
   private api: ApiService;
   private storage: StorageService;
   private convexService: ConvexService | null = null;
+  private subscriptionErrorHandler: ((error: Error) => void) | null = null;
   private fileProtection: FileProtectionService | null = null;
   private clipboardGuard: ClipboardGuardService | null = null;
   private metadataSubIds: string[] = [];
@@ -148,6 +149,10 @@ export class SyncService {
    */
   setConvexService(convexService: ConvexService): void {
     this.convexService = convexService;
+  }
+
+  setSubscriptionErrorHandler(handler: (error: Error) => void): void {
+    this.subscriptionErrorHandler = handler;
   }
 
   /**
@@ -216,7 +221,8 @@ export class SyncService {
               this.debouncedSync(project, directory);
             }
             this.lastMetadataHash.set(key, hash);
-          }
+          },
+          (error) => this.subscriptionErrorHandler?.(error)
         );
 
         this.metadataSubIds.push(subId);

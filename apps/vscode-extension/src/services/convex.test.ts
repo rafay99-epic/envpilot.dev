@@ -46,4 +46,27 @@ describe("ConvexService subscriptions", () => {
       expect(call[3]).toBe(onError);
     }
   });
+
+  it("assigns unique IDs to subscriptions created in the same tick", () => {
+    const service = new ConvexService(
+      "https://convex.example",
+      async () => "token"
+    );
+    const onError = vi.fn();
+
+    const first = service.subscribeToVariableMetadata(
+      "project",
+      undefined,
+      vi.fn(),
+      onError
+    );
+    const second = service.subscribeToVariableMetadata(
+      "project",
+      undefined,
+      vi.fn(),
+      onError
+    );
+
+    expect(first).not.toBe(second);
+  });
 });
