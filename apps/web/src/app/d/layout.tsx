@@ -40,7 +40,7 @@ export default function DocShareLayout({
   // `dark` is explicit: this route sits outside the dashboard shell, which is
   // where the rest of the app gets the class the `dark:` variants key on.
   return (
-    <div className="dark min-h-screen bg-canvas">
+    <div className="min-h-screen bg-canvas">
       <header className="border-b border-line">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <span className="font-mono text-sm font-bold text-accent">

@@ -536,9 +536,7 @@ function DangerZoneSettings({
     <div className="space-y-6">
       {/* Transfer Ownership */}
       <TerminalCard>
-        <h2 className="text-base font-semibold text-ink">
-          Transfer Ownership
-        </h2>
+        <h2 className="text-base font-semibold text-ink">Transfer Ownership</h2>
         <p className="mt-1 text-sm text-ink-subtle">
           Transfer this organization to another user. They will become the owner
           and all current members will be removed.
@@ -972,9 +970,7 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
       <TerminalCard>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-ink">
-              Variable Tags
-            </h2>
+            <h2 className="text-base font-semibold text-ink">Variable Tags</h2>
             <p className="mt-1 text-sm text-ink-subtle">
               Create and manage tags to organize your environment variables.
               {tags.length > 0 && (

@@ -504,7 +504,9 @@ function AuditLogRow({ log }: { log: AuditLogData }) {
 
   return (
     <div className="flex items-start gap-3 px-5 py-3 font-mono text-xs transition-colors hover:bg-accent-soft">
-      <span className="shrink-0 whitespace-nowrap text-ink-faint">[{time}]</span>
+      <span className="shrink-0 whitespace-nowrap text-ink-faint">
+        [{time}]
+      </span>
       <div className="min-w-0 flex-1">
         <p className="text-ink-muted">
           <span className="text-accent">{log.userName}</span>{" "}

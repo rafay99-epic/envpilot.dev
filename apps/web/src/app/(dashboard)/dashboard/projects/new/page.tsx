@@ -207,9 +207,7 @@ export default function NewProjectPage() {
             />
           </svg>
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-ink">
-          Access Denied
-        </h2>
+        <h2 className="mt-4 text-lg font-semibold text-ink">Access Denied</h2>
         <p className="mt-2 text-sm text-ink-muted">
           You do not have permission to create projects.
         </p>

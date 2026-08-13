@@ -238,7 +238,8 @@ export default function CheckoutSuccessPage() {
           {checkoutId && (
             <div className="rounded border border-line bg-canvas p-3">
               <p className="font-mono text-xs text-ink-faint">
-                <span className="text-ink-subtle">checkout_id:</span> {checkoutId}
+                <span className="text-ink-subtle">checkout_id:</span>{" "}
+                {checkoutId}
               </p>
             </div>
           )}

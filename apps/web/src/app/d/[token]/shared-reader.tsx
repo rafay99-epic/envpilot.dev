@@ -246,9 +246,7 @@ export function SharedDocReader({
         <p className="font-mono text-xs tracking-wide text-ink-subtle uppercase">
           {module.projectName}
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-ink">
-          {module.module}
-        </h1>
+        <h1 className="mt-2 text-3xl font-bold text-ink">{module.module}</h1>
         <p className="mt-3 text-sm text-ink-subtle">
           Shared by {module.sharedByName}. {module.pages.length}{" "}
           {module.pages.length === 1 ? "page" : "pages"}.

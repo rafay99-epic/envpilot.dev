@@ -283,9 +283,7 @@ export default function ProjectSettingsPage({
             />
           </svg>
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-ink">
-          Access Denied
-        </h2>
+        <h2 className="mt-4 text-lg font-semibold text-ink">Access Denied</h2>
         <p className="mt-2 text-sm text-ink-subtle">
           You do not have permission to manage project settings.
         </p>
@@ -776,9 +774,7 @@ function VscodeSyncSectionInner({
                   className="flex items-center justify-between gap-3 py-3"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-ink">
-                      {memberName}
-                    </p>
+                    <p className="truncate text-sm text-ink">{memberName}</p>
                     <p className="text-xs text-ink-subtle">
                       {resolved ? "unsyncs" : "keeps files"}
                     </p>
@@ -854,9 +850,7 @@ function DangerZoneProjectSettings({
     <div className="space-y-6">
       {/* Transfer Project */}
       <TerminalCard>
-        <h2 className="text-base font-semibold text-ink">
-          Transfer Project
-        </h2>
+        <h2 className="text-base font-semibold text-ink">Transfer Project</h2>
         <p className="mt-1 text-sm text-ink-subtle">
           Move this project and all its environment variables to another
           organization.

@@ -20,9 +20,9 @@ export function Card({ children, className, title }: CardProps) {
         )}
       >
         <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2.5">
-          <span className="h-3 w-3 rounded-full bg-[#ef5350]/80" />
-          <span className="h-3 w-3 rounded-full bg-[#fbbf24]/80" />
-          <span className="h-3 w-3 rounded-full bg-[#22c55e]/80" />
+          <span className="h-3 w-3 rounded-full bg-danger/80" />
+          <span className="h-3 w-3 rounded-full bg-warning/80" />
+          <span className="h-3 w-3 rounded-full bg-accent/80" />
           <span className="ml-2 text-xs text-ink-subtle">{title}</span>
         </div>
         <div className="flex-1 p-6">{children}</div>

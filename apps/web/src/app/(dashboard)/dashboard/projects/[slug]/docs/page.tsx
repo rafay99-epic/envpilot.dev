@@ -84,11 +84,7 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
 
   if (isLoadingProject) return <TerminalLoading fullPage />;
   if (!project) {
-    return (
-      <p className="text-sm text-ink-muted">
-        Project not found.
-      </p>
-    );
+    return <p className="text-sm text-ink-muted">Project not found.</p>;
   }
 
   return (
@@ -231,9 +227,7 @@ function DocRow({
       <FileText className="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-ink">
-            {doc.title}
-          </span>
+          <span className="text-sm font-medium text-ink">{doc.title}</span>
           <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] text-ink-subtle uppercase border-line text-ink-muted">
             {doc.type}
           </span>

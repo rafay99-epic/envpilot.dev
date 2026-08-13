@@ -67,7 +67,7 @@ export function SectionStatusBar({
   return (
     <div
       aria-hidden
-      className={`fixed inset-x-0 bottom-0 z-50 border-t ${terminal.line} bg-[#08090A]/90 backdrop-blur-md`}
+      className={`fixed inset-x-0 bottom-0 z-50 border-t ${terminal.line} bg-chrome/90 backdrop-blur-md`}
     >
       <div
         className={`${terminal.shell} flex h-9 items-center gap-3 ${terminal.mono} text-[11px] tracking-wide`}

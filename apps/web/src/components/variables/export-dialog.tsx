@@ -95,10 +95,8 @@ export function ExportDialog({
           <>
             <p className="text-sm text-ink-muted">
               Export environment variables from{" "}
-              <span className="font-medium text-ink">
-                {projectName}
-              </span>{" "}
-              in your preferred format.
+              <span className="font-medium text-ink">{projectName}</span> in
+              your preferred format.
             </p>
 
             {notice && (

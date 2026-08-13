@@ -250,9 +250,7 @@ export function ShareLinkForm({
         </div>
 
         {mode === "one_time" && (
-          <p className="text-xs text-ink-muted">
-            {oneTimeDestroyedMessage}
-          </p>
+          <p className="text-xs text-ink-muted">{oneTimeDestroyedMessage}</p>
         )}
 
         <div className="flex justify-end border-t border-line pt-4 border-line">
@@ -399,9 +397,7 @@ export function ShareLinkForm({
         )}
       </div>
 
-      {error && (
-        <p className="text-sm text-danger">{error}</p>
-      )}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       <div className="flex gap-3 border-t border-line pt-4 border-line">
         <button

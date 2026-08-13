@@ -10,10 +10,18 @@
    light theme, a second brand) without touching a single component. */
 
 @theme {
-  /* NOTE: `--color-*: initial` (which deletes Tailwind's default palette so
-     bg-zinc-900 stops compiling) is added in the final migration commit,
-     once every package is off the raw palette. Adding it earlier would
-     silently unstyle everything that has not been migrated yet. */
+  /* Tailwind's default palette is deleted outright. `bg-zinc-900` is not
+     deprecated here — it does not exist, and compiles to nothing. That is
+     what keeps this file the only place a color is written. */
+  --color-*: initial;
+
+  /* `initial` removes these too. Not design tokens, but CSS keywords the
+     utilities depend on. */
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-inherit: inherit;
+  --color-white: #fff;
+  --color-black: #000;
 
   /* Surfaces */
   --color-canvas: #09090b;
@@ -38,6 +46,9 @@
   /* Accent + status, each with a soft fill for badges and a line for borders */
   --color-accent: #22c55e;
   --color-accent-hover: #16a34a;
+  /* Stops for the marketing shimmer gradient */
+  --color-accent-bright: #4ade80;
+  --color-accent-pale: #86efac;
   --color-accent-soft: rgb(34 197 94 / 0.1);
   --color-accent-line: rgb(34 197 94 / 0.3);
   --color-warning: #fbbf24;

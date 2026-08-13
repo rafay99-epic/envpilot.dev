@@ -23,9 +23,7 @@ export function TagFilter({
   return (
     <>
       <span className="mx-2 text-ink-faint">|</span>
-      <label className="text-sm font-medium text-ink-muted">
-        Tags:
-      </label>
+      <label className="text-sm font-medium text-ink-muted">Tags:</label>
       <div className="flex flex-wrap gap-1.5">
         <button
           onClick={onClearAll}

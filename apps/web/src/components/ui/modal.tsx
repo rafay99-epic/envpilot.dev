@@ -67,9 +67,7 @@ export function Modal({
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-line px-6 py-4 border-line">
-            <h2 className="text-lg font-semibold text-ink">
-              {title}
-            </h2>
+            <h2 className="text-lg font-semibold text-ink">{title}</h2>
             <button
               onClick={onClose}
               className="rounded-lg p-1 text-ink-muted hover:bg-surface-hover hover:text-ink-faint hover:bg-surface-hover hover:text-ink-muted"

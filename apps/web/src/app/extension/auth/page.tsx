@@ -49,7 +49,7 @@ function ExtensionAuthContent() {
   }, [sessionToken]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0f172a] p-4">
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
       {/* Grid background */}
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.03]"
@@ -63,9 +63,9 @@ function ExtensionAuthContent() {
       <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-line bg-surface/90 shadow-2xl">
         {/* Terminal header */}
         <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2.5">
-          <div className="h-3 w-3 rounded-full bg-[#ef5350]/80" />
-          <div className="h-3 w-3 rounded-full bg-[#fbbf24]/80" />
-          <div className="h-3 w-3 rounded-full bg-[#22c55e]/80" />
+          <div className="h-3 w-3 rounded-full bg-danger/80" />
+          <div className="h-3 w-3 rounded-full bg-warning/80" />
+          <div className="h-3 w-3 rounded-full bg-accent/80" />
           <span className="ml-2 text-xs text-ink-subtle">extension-auth</span>
         </div>
 
@@ -121,7 +121,7 @@ export default function ExtensionAuthPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#0f172a]">
+        <div className="flex min-h-screen items-center justify-center bg-canvas">
           <span className="font-mono text-sm text-accent">
             <span className="text-ink-subtle">$</span> authenticating
             <span

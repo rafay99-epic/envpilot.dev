@@ -142,9 +142,7 @@ export function FilePermissionsDrawer({
         </div>
 
         <div>
-          <h3 className="text-sm font-medium text-ink-muted">
-            Current grants
-          </h3>
+          <h3 className="text-sm font-medium text-ink-muted">Current grants</h3>
           {grants === undefined ? (
             <TerminalLoading />
           ) : grants.length === 0 ? (

@@ -80,17 +80,16 @@ interface SharedPageProps {
 const STATUS_CONFIG: Record<ShareStatus, { label: string; classes: string }> = {
   active: {
     label: "Active",
-    classes:
-      "bg-accent-soft text-accent-hover bg-accent-soft text-accent",
+    classes: "bg-accent-soft text-accent-hover bg-accent-soft text-accent",
   },
   burned: {
     label: "Viewed",
-    classes:
-      "bg-warning-soft text-warning bg-warning-soft text-warning",
+    classes: "bg-warning-soft text-warning bg-warning-soft text-warning",
   },
   expired: {
     label: "Expired",
-    classes: "bg-surface-raised text-ink-subtle bg-surface-raised text-ink-muted",
+    classes:
+      "bg-surface-raised text-ink-subtle bg-surface-raised text-ink-muted",
   },
   revoked: {
     label: "Revoked",
@@ -117,15 +116,13 @@ const STATS_CONFIG = [
     key: "active" as FilterKey,
     label: "Active",
     icon: Shield,
-    color:
-      "text-accent bg-accent-soft",
+    color: "text-accent bg-accent-soft",
   },
   {
     key: "burned" as FilterKey,
     label: "Viewed",
     icon: Eye,
-    color:
-      "text-warning bg-warning-soft",
+    color: "text-warning bg-warning-soft",
   },
   {
     key: "expired" as FilterKey,
@@ -764,9 +761,7 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
       {/* Error Banner */}
       {revokeError && (
         <div className="flex items-center justify-between rounded-lg border border-danger-line bg-danger-soft p-4 border-danger-line bg-danger-soft">
-          <p className="text-sm text-danger">
-            {revokeError}
-          </p>
+          <p className="text-sm text-danger">{revokeError}</p>
           <button
             onClick={dismissError}
             className="ml-4 shrink-0 text-danger hover:text-danger"

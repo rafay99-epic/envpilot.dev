@@ -734,9 +734,7 @@ export default function EnvironmentDiffPage({
             </p>
             <div className="mt-0.5 flex items-center gap-2">
               <GitCompareArrows className="h-4 w-4 text-accent" />
-              <h1 className="text-lg font-bold text-ink">
-                Environment Diff
-              </h1>
+              <h1 className="text-lg font-bold text-ink">Environment Diff</h1>
               {elapsedMs !== null && !isLoadingVars && (
                 <span className="text-xs text-ink-faint">({elapsedMs}ms)</span>
               )}

@@ -266,12 +266,7 @@ export function DocMarkdown({ body }: { body: string }) {
               {children}
             </blockquote>
           ),
-          hr: (props) => (
-            <hr
-              className="my-6 border-line"
-              {...props}
-            />
-          ),
+          hr: (props) => <hr className="my-6 border-line" {...props} />,
         }}
       >
         {deferredBody}

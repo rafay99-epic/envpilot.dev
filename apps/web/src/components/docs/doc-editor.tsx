@@ -166,10 +166,7 @@ export function DocEditor({
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
           <div className="space-y-1">
             {warnings.map((warning) => (
-              <p
-                key={warning}
-                className="text-xs text-warning"
-              >
+              <p key={warning} className="text-xs text-warning">
                 {warning}
               </p>
             ))}
@@ -271,7 +268,9 @@ export function DocEditor({
               {body.trim().length > 0 ? (
                 <DocMarkdown body={body} />
               ) : (
-                <p className="text-sm text-ink-subtle">Nothing to preview yet.</p>
+                <p className="text-sm text-ink-subtle">
+                  Nothing to preview yet.
+                </p>
               )}
             </div>
           </div>

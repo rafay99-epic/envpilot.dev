@@ -33,13 +33,21 @@ const statusConfig: Record<
   string,
   { label: string; color: string; dot: string }
 > = {
-  submitted: { label: "submitted", color: "text-ink-muted", dot: "bg-surface-hover" },
+  submitted: {
+    label: "submitted",
+    color: "text-ink-muted",
+    dot: "bg-surface-hover",
+  },
   under_review: {
     label: "under-review",
     color: "text-warning",
     dot: "bg-warning",
   },
-  planned: { label: "planned", color: "text-ink-muted", dot: "bg-surface-hover" },
+  planned: {
+    label: "planned",
+    color: "text-ink-muted",
+    dot: "bg-surface-hover",
+  },
   in_progress: {
     label: "in-progress",
     color: "text-warning",
@@ -354,10 +362,7 @@ function LoadingSkeleton({ rows }: { rows: number }) {
   return (
     <div className="space-y-3">
       {Array.from({ length: rows }).map((_, i) => (
-        <div
-          key={i}
-          className="flex gap-4 rounded-xl border border-line p-5"
-        >
+        <div key={i} className="flex gap-4 rounded-xl border border-line p-5">
           <div className="h-14 w-14 shrink-0 animate-pulse rounded-lg bg-surface/40" />
           <div className="flex-1 space-y-3 py-1">
             <div className="h-4 w-1/3 animate-pulse rounded bg-surface/40" />

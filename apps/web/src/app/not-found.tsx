@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0f172a] px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4">
       {/* Grid background */}
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.03]"
@@ -16,9 +16,9 @@ export default function NotFound() {
       <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-line bg-surface/90 shadow-2xl">
         {/* Terminal header */}
         <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2.5">
-          <div className="h-3 w-3 rounded-full bg-[#ef5350]/80" />
-          <div className="h-3 w-3 rounded-full bg-[#fbbf24]/80" />
-          <div className="h-3 w-3 rounded-full bg-[#22c55e]/80" />
+          <div className="h-3 w-3 rounded-full bg-danger/80" />
+          <div className="h-3 w-3 rounded-full bg-warning/80" />
+          <div className="h-3 w-3 rounded-full bg-accent/80" />
           <span className="ml-2 text-xs text-ink-subtle">not-found</span>
         </div>
 

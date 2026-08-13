@@ -14,15 +14,15 @@ import { TerminalWindow } from "@/components/dashboard/terminal-ui";
 const chartConfig = {
   created: {
     label: "Created",
-    color: "hsl(var(--chart-1))",
+    color: "var(--color-chart-1)",
   },
   updated: {
     label: "Updated",
-    color: "hsl(var(--chart-3))",
+    color: "var(--color-chart-3)",
   },
   deleted: {
     label: "Deleted",
-    color: "hsl(var(--chart-5))",
+    color: "var(--color-chart-5)",
   },
 } satisfies ChartConfig;
 
@@ -62,7 +62,7 @@ export function VariableChangesChart({ data }: VariableChangesChartProps) {
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="#27272a"
+                stroke="var(--color-line-strong)"
                 horizontal={false}
               />
               <XAxis
@@ -93,19 +93,19 @@ export function VariableChangesChart({ data }: VariableChangesChartProps) {
               <Bar
                 dataKey="created"
                 stackId="a"
-                fill="hsl(var(--chart-1))"
+                fill="var(--color-chart-1)"
                 radius={[0, 0, 0, 0]}
               />
               <Bar
                 dataKey="updated"
                 stackId="a"
-                fill="hsl(var(--chart-3))"
+                fill="var(--color-chart-3)"
                 radius={[0, 0, 0, 0]}
               />
               <Bar
                 dataKey="deleted"
                 stackId="a"
-                fill="hsl(var(--chart-5))"
+                fill="var(--color-chart-5)"
                 radius={[0, 4, 4, 0]}
               />
             </BarChart>

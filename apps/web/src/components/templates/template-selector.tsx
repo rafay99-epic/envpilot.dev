@@ -117,9 +117,7 @@ export function TemplateSelector({
           }`}
         >
           All
-          <span className="text-ink-subtle">
-            {categoryCounts.all}
-          </span>
+          <span className="text-ink-subtle">{categoryCounts.all}</span>
         </button>
         {(Object.keys(TEMPLATE_CATEGORIES) as TemplateCategory[]).map((cat) => {
           const { label, icon } = TEMPLATE_CATEGORIES[cat];
@@ -137,9 +135,7 @@ export function TemplateSelector({
             >
               {IconComponent && <IconComponent className="h-3 w-3" />}
               {label}
-              <span className="text-ink-subtle">
-                {categoryCounts[cat]}
-              </span>
+              <span className="text-ink-subtle">{categoryCounts[cat]}</span>
             </button>
           );
         })}
@@ -163,9 +159,7 @@ export function TemplateSelector({
           )}
         </div>
         <div>
-          <p className="text-sm font-medium text-ink">
-            Start from Scratch
-          </p>
+          <p className="text-sm font-medium text-ink">Start from Scratch</p>
           <p className="text-xs text-ink-muted">
             Empty project, add variables manually
           </p>
@@ -177,9 +171,7 @@ export function TemplateSelector({
         <div>
           <div className="mb-2 flex items-center gap-1.5">
             <TrendingUp className="h-3 w-3 text-ink-muted" />
-            <span className="text-xs font-medium text-ink-muted">
-              Popular
-            </span>
+            <span className="text-xs font-medium text-ink-muted">Popular</span>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {popularTemplates.map((template) => (
@@ -238,9 +230,7 @@ export function TemplateSelector({
       {/* No Results */}
       {filteredTemplates.length === 0 && (
         <div className="rounded-lg border border-dashed border-line px-4 py-6 text-center border-line">
-          <p className="text-sm text-ink-muted">
-            No templates found
-          </p>
+          <p className="text-sm text-ink-muted">No templates found</p>
           <button
             type="button"
             onClick={() => {
@@ -307,12 +297,8 @@ function TemplateRow({
         <span className="rounded bg-surface-raised px-1.5 py-0.5 text-[10px] font-medium text-ink-subtle bg-surface-raised text-ink-muted">
           {template.variables.length}
         </span>
-        {sensitiveCount > 0 && (
-          <Lock className="h-3 w-3 text-ink-subtle" />
-        )}
-        {isSelected && (
-          <Check className="h-4 w-4 text-ink" />
-        )}
+        {sensitiveCount > 0 && <Lock className="h-3 w-3 text-ink-subtle" />}
+        {isSelected && <Check className="h-4 w-4 text-ink" />}
       </div>
     </button>
   );
@@ -339,9 +325,7 @@ export function TemplateVariablesPreview({
           >
             <FrameworkLogo projectType={template.projectType} size={14} />
           </div>
-          <span className="text-xs font-medium text-ink">
-            {template.name}
-          </span>
+          <span className="text-xs font-medium text-ink">{template.name}</span>
         </div>
         <div className="flex items-center gap-2 text-[10px] text-ink-muted">
           <span>{template.variables.length} vars</span>

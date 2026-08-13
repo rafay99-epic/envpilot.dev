@@ -202,7 +202,9 @@ function GeneralSettings({
     <div className="space-y-6">
       <TerminalCard>
         <h2 className="text-base font-semibold text-ink">Profile</h2>
-        <p className="mt-1 text-sm text-ink-subtle">Your personal information</p>
+        <p className="mt-1 text-sm text-ink-subtle">
+          Your personal information
+        </p>
 
         <div className="mt-6 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -277,9 +279,7 @@ function GeneralSettings({
 
       {/* Connected Account */}
       <TerminalCard>
-        <h2 className="text-base font-semibold text-ink">
-          Connected Account
-        </h2>
+        <h2 className="text-base font-semibold text-ink">Connected Account</h2>
         <p className="mt-1 text-sm text-ink-subtle">
           Your authentication provider
         </p>
@@ -537,9 +537,7 @@ function IntegrationsSettings() {
   return (
     <div className="space-y-6" id="integrations">
       <TerminalCard>
-        <h2 className="text-base font-semibold text-ink">
-          IDE Extensions
-        </h2>
+        <h2 className="text-base font-semibold text-ink">IDE Extensions</h2>
         <p className="mt-1 text-sm text-ink-subtle">
           Install extensions to sync variables to your local environment
         </p>
@@ -1084,9 +1082,7 @@ function SecuritySettings() {
   return (
     <div className="space-y-6">
       <TerminalCard>
-        <h2 className="text-base font-semibold text-ink">
-          Browser Session
-        </h2>
+        <h2 className="text-base font-semibold text-ink">Browser Session</h2>
         <p className="mt-1 text-sm text-ink-subtle">
           Your current browser session
         </p>
@@ -1098,9 +1094,7 @@ function SecuritySettings() {
                 <Shield className="h-4 w-4 text-accent" />
               </div>
               <div>
-                <p className="text-sm font-medium text-ink">
-                  Current Session
-                </p>
+                <p className="text-sm font-medium text-ink">Current Session</p>
                 <p className="text-xs text-ink-subtle">
                   This device &middot; Active now
                 </p>
@@ -1730,9 +1724,7 @@ function BillingSettings({
             <CreditCard className="h-4 w-4 text-accent" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-ink">
-              Subscription
-            </h2>
+            <h2 className="text-base font-semibold text-ink">Subscription</h2>
             <p className="text-sm text-ink-subtle">
               Your current plan and billing details
             </p>
@@ -1866,9 +1858,7 @@ function BillingSettings({
 
       {/* Actions */}
       <TerminalCard>
-        <h2 className="text-base font-semibold text-ink">
-          Billing Actions
-        </h2>
+        <h2 className="text-base font-semibold text-ink">Billing Actions</h2>
         <p className="mt-1 text-sm text-ink-subtle">
           Manage your payment methods, invoices, and subscription
         </p>
@@ -1878,9 +1868,7 @@ function BillingSettings({
             <>
               <div className="flex items-center justify-between rounded-lg border border-line bg-surface-raised/50 p-4">
                 <div>
-                  <p className="text-sm font-medium text-ink">
-                    Manage Billing
-                  </p>
+                  <p className="text-sm font-medium text-ink">Manage Billing</p>
                   <p className="text-xs text-ink-subtle">
                     Update payment methods and billing details
                   </p>

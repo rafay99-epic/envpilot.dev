@@ -57,7 +57,7 @@ export function Start() {
             <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
               <Link
                 href="/sign-up"
-                className="inline-flex items-center rounded-md bg-accent px-6 py-3 font-sans text-[15px] font-semibold text-[#08090A] shadow-[0_0_32px_-10px_rgba(34,197,94,0.9)] transition-colors hover:bg-accent"
+                className="inline-flex items-center rounded-md bg-accent px-6 py-3 font-sans text-[15px] font-semibold text-chrome shadow-[0_0_32px_-10px_rgba(34,197,94,0.9)] transition-colors hover:bg-accent"
               >
                 Start free
               </Link>

@@ -159,7 +159,7 @@ export const docsComponents = {
 
   pre: (props: P<"pre">) => (
     <pre
-      className="overflow-x-auto bg-[#0f172a] py-4 font-mono text-sm leading-relaxed"
+      className="overflow-x-auto bg-canvas py-4 font-mono text-sm leading-relaxed"
       {...props}
     />
   ),

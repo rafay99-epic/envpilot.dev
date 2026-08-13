@@ -37,7 +37,7 @@ export function Sidebar() {
   const { signOut } = useAuth();
 
   return (
-    <aside className="flex h-screen w-60 flex-col border-r border-line bg-[#0f172a]">
+    <aside className="flex h-screen w-60 flex-col border-r border-line bg-canvas">
       <div className="flex h-14 items-center border-b border-line px-4">
         <span className="font-mono text-xs lowercase tracking-wide text-ink-subtle">
           <span className="text-accent">$</span> envpilot admin

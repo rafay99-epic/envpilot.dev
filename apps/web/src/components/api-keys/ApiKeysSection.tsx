@@ -110,10 +110,8 @@ const CHIP_BASE =
   "rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors";
 const CHIP_UNSELECTED =
   "border-line bg-surface text-ink-subtle hover:border-line-strong hover:text-ink-muted";
-const CHIP_SELECTED_GENERIC =
-  "border-accent-line bg-accent-soft text-accent";
-const CHIP_SELECTED_PURPLE =
-  "border-premium-line bg-premium-soft text-premium";
+const CHIP_SELECTED_GENERIC = "border-accent-line bg-accent-soft text-accent";
+const CHIP_SELECTED_PURPLE = "border-premium-line bg-premium-soft text-premium";
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const EXPIRY_URGENT_MS = 7 * 24 * 60 * 60 * 1000;
@@ -227,10 +225,7 @@ function ApiKeysSectionInner({
               />
             )
           ) : (
-            <ul
-              data-testid="api-keys-list"
-              className="divide-y divide-line"
-            >
+            <ul data-testid="api-keys-list" className="divide-y divide-line">
               {keyList.map((key) => (
                 <KeyRow
                   key={key._id}
@@ -709,9 +704,7 @@ function CreateKeyDrawer({
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Check className="h-4 w-4 text-accent" />
-            <h3 className="text-sm font-semibold text-accent">
-              Key created
-            </h3>
+            <h3 className="text-sm font-semibold text-accent">Key created</h3>
           </div>
 
           <div className="flex items-start gap-2 rounded-lg border border-warning-line bg-warning-soft px-3 py-2">
@@ -1046,9 +1039,7 @@ function CreateKeyDrawer({
                         }`}
                       >
                         <span
-                          className={
-                            enabled ? "text-accent" : "text-ink-faint"
-                          }
+                          className={enabled ? "text-accent" : "text-ink-faint"}
                         >
                           {enabled ? "✓" : "✗"}
                         </span>

@@ -185,11 +185,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
 
   if (isLoadingProject) return <TerminalLoading fullPage />;
   if (!project) {
-    return (
-      <p className="text-sm text-ink-muted">
-        Project not found.
-      </p>
-    );
+    return <p className="text-sm text-ink-muted">Project not found.</p>;
   }
 
   return (
@@ -422,10 +418,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
             {warnings.length > 0 && !isEditing && (
               <div className="space-y-1 border-l-2 border-warning-line py-1 pl-3">
                 {warnings.map((warning) => (
-                  <p
-                    key={warning}
-                    className="text-xs text-warning"
-                  >
+                  <p key={warning} className="text-xs text-warning">
                     {warning}
                   </p>
                 ))}

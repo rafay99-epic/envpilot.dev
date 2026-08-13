@@ -807,9 +807,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       <div className="rounded-xl border border-line bg-white border-line bg-surface">
         <div className="flex items-center justify-between border-b border-line px-6 py-4 border-line">
           <div>
-            <h2 className="font-semibold text-ink">
-              Environment Variables
-            </h2>
+            <h2 className="font-semibold text-ink">Environment Variables</h2>
             <p className="mt-1 text-sm text-ink-muted">
               {filteredVariables.length}
               {isSearching ? " result" : " variable"}

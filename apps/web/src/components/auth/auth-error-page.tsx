@@ -24,7 +24,7 @@ export function AuthErrorPage({
   onRetry,
 }: AuthErrorPageProps) {
   return (
-    <div className="dark flex min-h-screen items-center justify-center bg-[#0f172a] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       {/* Subtle grid background */}
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.03]"

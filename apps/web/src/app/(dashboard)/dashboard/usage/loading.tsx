@@ -40,10 +40,7 @@ export default function UsageLoading() {
       {/* Feature categories skeleton */}
       <div className="space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div
-            key={i}
-            className="rounded-lg border border-line bg-surface/90"
-          >
+          <div key={i} className="rounded-lg border border-line bg-surface/90">
             <div className="border-b border-line px-5 py-3">
               <div className="h-4 w-32 animate-pulse rounded bg-surface-raised" />
             </div>

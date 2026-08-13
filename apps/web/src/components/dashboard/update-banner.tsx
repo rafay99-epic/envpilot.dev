@@ -59,9 +59,9 @@ export function UpdateBanner() {
       <div className="overflow-hidden rounded-lg border border-line bg-surface/90 shadow-xl backdrop-blur-sm">
         {/* Terminal window header — matches TerminalWindow component */}
         <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-3 py-1.5">
-          <div className="h-2 w-2 rounded-full bg-[#ef5350]/80" />
-          <div className="h-2 w-2 rounded-full bg-[#fbbf24]/80" />
-          <div className="h-2 w-2 rounded-full bg-[#22c55e]/80" />
+          <div className="h-2 w-2 rounded-full bg-danger/80" />
+          <div className="h-2 w-2 rounded-full bg-warning/80" />
+          <div className="h-2 w-2 rounded-full bg-accent/80" />
           <span className="ml-1 font-mono text-[10px] text-ink-subtle">
             update
           </span>

@@ -57,7 +57,7 @@ export function AccessNotices({
   // ── Security hold on the active org ─────────────────────────────────
   if (membershipStatus?.status === "suspended" && !onEscapeRoute) {
     return (
-      <div className="dark fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a] px-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-canvas px-4">
         {/* Subtle grid background (matches auth-error-page) */}
         <div
           className="pointer-events-none fixed inset-0 opacity-[0.03]"
@@ -72,9 +72,7 @@ export function AccessNotices({
           className="relative z-10 w-full max-w-md shadow-2xl"
         >
           <div className="p-8 font-mono text-sm">
-            <p className="text-danger">
-              ERROR: access revoked [exit code 403]
-            </p>
+            <p className="text-danger">ERROR: access revoked [exit code 403]</p>
             <p className="mt-3 text-ink-muted">
               Your access to this organization has been revoked
               {membershipStatus.suspendedAt
@@ -136,7 +134,7 @@ export function AccessNotices({
   }
 
   return (
-    <div className="dark fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
       <TerminalWindow
         title="notice"
         className="relative z-10 w-full max-w-md shadow-2xl"

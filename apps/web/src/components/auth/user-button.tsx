@@ -131,7 +131,7 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
                 setIsOpen(false);
                 signOut();
               }}
-              className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-[#ef5350] transition-colors hover:bg-danger-soft"
+              className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-danger transition-colors hover:bg-danger-soft"
             >
               <LogOut className="h-4 w-4" />
               Sign out

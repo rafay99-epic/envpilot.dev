@@ -122,14 +122,9 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
           />
         </svg>
       ),
-      color:
-        summary.securityEventCount > 0
-          ? "text-danger"
-          : "text-accent",
+      color: summary.securityEventCount > 0 ? "text-danger" : "text-accent",
       bgColor:
-        summary.securityEventCount > 0
-          ? "bg-danger-soft"
-          : "bg-accent-soft",
+        summary.securityEventCount > 0 ? "bg-danger-soft" : "bg-accent-soft",
     },
     {
       label: "Active Users",
@@ -171,15 +166,9 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
                 {stat.icon}
               </div>
               <div>
-                <p className="text-sm text-ink-muted">
-                  {stat.label}
-                </p>
-                <p className="text-2xl font-semibold text-ink">
-                  {stat.value}
-                </p>
-                <p className="text-xs text-ink-subtle">
-                  {stat.subLabel}
-                </p>
+                <p className="text-sm text-ink-muted">{stat.label}</p>
+                <p className="text-2xl font-semibold text-ink">{stat.value}</p>
+                <p className="text-xs text-ink-subtle">{stat.subLabel}</p>
               </div>
             </div>
           </div>
@@ -205,12 +194,8 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
                   return (
                     <div key={severity}>
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-ink-muted">
-                          {config.label}
-                        </span>
-                        <span className="font-medium text-ink">
-                          {count}
-                        </span>
+                        <span className="text-ink-muted">{config.label}</span>
+                        <span className="font-medium text-ink">{count}</span>
                       </div>
                       <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-surface-raised">
                         <div
@@ -232,9 +217,7 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
 
         {/* Resource Types */}
         <div className="rounded-lg border border-line bg-white p-4 border-line bg-surface">
-          <h3 className="text-sm font-medium text-ink">
-            Activity by Resource
-          </h3>
+          <h3 className="text-sm font-medium text-ink">Activity by Resource</h3>
           <div className="mt-4 space-y-2">
             {Object.entries(summary.resourceTypeCounts).length > 0 ? (
               Object.entries(summary.resourceTypeCounts)
@@ -260,9 +243,7 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
 
         {/* Top Users */}
         <div className="rounded-lg border border-line bg-white p-4 border-line bg-surface">
-          <h3 className="text-sm font-medium text-ink">
-            Most Active Users
-          </h3>
+          <h3 className="text-sm font-medium text-ink">Most Active Users</h3>
           <div className="mt-4 space-y-3">
             {summary.topActiveUsers.length > 0 ? (
               summary.topActiveUsers.map((user, index) => (
@@ -284,9 +265,7 @@ export function AuditSummary({ summary, loading }: AuditSummaryProps) {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-ink-muted">
-                No user activity data
-              </p>
+              <p className="text-sm text-ink-muted">No user activity data</p>
             )}
           </div>
         </div>

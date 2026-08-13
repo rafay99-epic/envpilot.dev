@@ -108,9 +108,7 @@ export function ConfirmDialog({
           )}
         </div>
 
-        <p className="mt-4 text-sm text-ink-muted">
-          {message}
-        </p>
+        <p className="mt-4 text-sm text-ink-muted">{message}</p>
 
         <div className="mt-6 flex w-full gap-3">
           <button

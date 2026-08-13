@@ -436,12 +436,8 @@ function RequestRow({
       {/* Request: key, project, requester */}
       <td className="px-5 py-3">
         <div className="flex items-center gap-2">
-          {request.isSensitive && (
-            <Lock className="h-3.5 w-3.5 text-warning" />
-          )}
-          <code className="font-mono text-sm text-warning">
-            {request.key}
-          </code>
+          {request.isSensitive && <Lock className="h-3.5 w-3.5 text-warning" />}
+          <code className="font-mono text-sm text-warning">{request.key}</code>
         </div>
         <p className="mt-0.5 text-xs text-ink-subtle">{request.projectName}</p>
         {isMachine ? (

@@ -299,9 +299,7 @@ export default function VariablesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-ink">
-            Environment Variables
-          </h1>
+          <h1 className="text-xl font-bold text-ink">Environment Variables</h1>
           <p className="mt-1 text-sm text-ink-subtle">
             Manage your encrypted secrets and configuration
           </p>

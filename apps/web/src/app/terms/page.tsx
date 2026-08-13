@@ -354,10 +354,7 @@ export default function TermsOfServicePage() {
             <Section id="privacy" n={9} title="Privacy">
               <p>
                 Your use of the Service is also governed by our{" "}
-                <Link
-                  href="/privacy"
-                  className="text-accent hover:underline"
-                >
+                <Link href="/privacy" className="text-accent hover:underline">
                   Privacy Policy
                 </Link>
                 , which describes how we collect, use, store, and protect your

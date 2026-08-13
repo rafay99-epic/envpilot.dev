@@ -77,7 +77,7 @@ export function BarChart({
                   x2={VIEW_WIDTH - PADDING.right}
                   y1={y}
                   y2={y}
-                  stroke="#27272a"
+                  stroke="var(--color-line-strong)"
                   strokeDasharray="4 4"
                 />
                 <text

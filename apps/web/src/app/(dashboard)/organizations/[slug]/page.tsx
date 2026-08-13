@@ -94,9 +94,7 @@ export default function OrganizationPage({
     return (
       <div className="space-y-8">
         <div className="rounded-xl border border-danger-line bg-danger-soft p-6 border-danger-line bg-danger-soft">
-          <h3 className="font-semibold text-danger">
-            Error
-          </h3>
+          <h3 className="font-semibold text-danger">Error</h3>
           <p className="mt-1 text-sm text-danger">
             {error || "Organization not found"}
           </p>
@@ -199,9 +197,7 @@ export default function OrganizationPage({
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-ink">
-                Members
-              </h3>
+              <h3 className="font-semibold text-ink">Members</h3>
               <p className="text-sm text-ink-muted">
                 {memberCount} member{memberCount !== 1 ? "s" : ""}
               </p>
@@ -248,12 +244,8 @@ export default function OrganizationPage({
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-ink">
-                Settings
-              </h3>
-              <p className="text-sm text-ink-muted">
-                Configure organization
-              </p>
+              <h3 className="font-semibold text-ink">Settings</h3>
+              <p className="text-sm text-ink-muted">Configure organization</p>
             </div>
             <svg
               className="h-5 w-5 text-ink-muted transition-transform group-hover:translate-x-1"
@@ -297,12 +289,8 @@ export default function OrganizationPage({
             </svg>
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-ink">
-              Projects
-            </h3>
-            <p className="text-sm text-ink-muted">
-              View all projects
-            </p>
+            <h3 className="font-semibold text-ink">Projects</h3>
+            <p className="text-sm text-ink-muted">View all projects</p>
           </div>
           <svg
             className="h-5 w-5 text-ink-muted transition-transform group-hover:translate-x-1"
@@ -322,14 +310,10 @@ export default function OrganizationPage({
 
       {/* Organization Info */}
       <div className="rounded-xl border border-line bg-white p-6 border-line bg-surface">
-        <h2 className="text-lg font-semibold text-ink">
-          Organization Details
-        </h2>
+        <h2 className="text-lg font-semibold text-ink">Organization Details</h2>
         <dl className="mt-4 space-y-4">
           <div className="flex justify-between border-b border-line pb-4 border-line">
-            <dt className="text-sm text-ink-muted">
-              Created
-            </dt>
+            <dt className="text-sm text-ink-muted">Created</dt>
             <dd className="text-sm text-ink">
               {new Date(organization.createdAt).toLocaleDateString("en-US", {
                 year: "numeric",
@@ -345,9 +329,7 @@ export default function OrganizationPage({
             </dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-sm text-ink-muted">
-              Last Updated
-            </dt>
+            <dt className="text-sm text-ink-muted">Last Updated</dt>
             <dd className="text-sm text-ink">
               {new Date(organization.updatedAt).toLocaleDateString("en-US", {
                 year: "numeric",

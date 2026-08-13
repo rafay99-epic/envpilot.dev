@@ -735,9 +735,7 @@ function OrganizationMembersPageContent({
       {/* Members List */}
       <div className="rounded-xl border border-line bg-white border-line bg-surface">
         <div className="border-b border-line px-6 py-4 border-line">
-          <h2 className="font-semibold text-ink">
-            Members ({members.length})
-          </h2>
+          <h2 className="font-semibold text-ink">Members ({members.length})</h2>
         </div>
         <AnimatedList
           className="divide-y divide-line"
@@ -1121,9 +1119,7 @@ function OrganizationMembersPageContent({
                     </svg>
                   </div>
                   <div>
-                    <p className="font-medium text-ink">
-                      {invitation.email}
-                    </p>
+                    <p className="font-medium text-ink">{invitation.email}</p>
                     <p className="text-sm text-ink-muted">
                       Invited{" "}
                       {new Date(invitation.createdAt).toLocaleDateString()} ·
@@ -1238,9 +1234,7 @@ function OrganizationMembersPageContent({
         <form onSubmit={handleInvite} className="space-y-4">
           {inviteError && (
             <div className="rounded-lg border border-danger-line bg-danger-soft p-3 border-danger-line bg-danger-soft">
-              <p className="text-sm text-danger">
-                {inviteError}
-              </p>
+              <p className="text-sm text-danger">{inviteError}</p>
             </div>
           )}
           <div className="relative">
@@ -1402,9 +1396,7 @@ function OrganizationMembersPageContent({
                         >
                           <ProjectIcon icon={project.icon} size={14} />
                         </span>
-                        <span className="text-sm text-ink">
-                          {project.name}
-                        </span>
+                        <span className="text-sm text-ink">{project.name}</span>
                       </div>
                     </label>
                   ))}

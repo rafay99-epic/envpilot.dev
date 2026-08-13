@@ -147,9 +147,7 @@ export function SuspendMemberDialog({
                       checked={selectedCreds.has(cred.id)}
                       onChange={() => toggleCred(cred.id)}
                     />
-                    <span className="font-medium text-ink">
-                      {cred.name}
-                    </span>
+                    <span className="font-medium text-ink">{cred.name}</span>
                     <span className="ml-auto text-xs text-ink-subtle">
                       {cred.type === "api_key" ? "API key" : "CI/CD token"}
                     </span>

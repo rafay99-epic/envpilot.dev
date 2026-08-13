@@ -38,8 +38,7 @@ export function ProofRail() {
               rel={external ? "noopener noreferrer" : undefined}
               className={`${terminal.mono} text-[12px] text-ink-subtle transition-colors hover:text-ink`}
             >
-              <span className="text-accent/80">{item.strong}</span>{" "}
-              {item.label}
+              <span className="text-accent/80">{item.strong}</span> {item.label}
             </a>
           );
         })}

@@ -73,9 +73,7 @@ export function ProtectedRoute({
               />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-ink">
-            Access Denied
-          </h2>
+          <h2 className="text-xl font-semibold text-ink">Access Denied</h2>
           <p className="text-sm text-ink-muted">
             You don&apos;t have permission to view this page.
           </p>

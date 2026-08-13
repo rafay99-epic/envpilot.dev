@@ -137,9 +137,7 @@ export function VariableHistory({
       {/* Filter and Compare Controls */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-line pb-4 border-line">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-ink-muted">
-            Filter:
-          </span>
+          <span className="text-xs font-medium text-ink-muted">Filter:</span>
           {(["all", "updates", "rollbacks"] as FilterType[]).map((type) => (
             <button
               key={type}
@@ -292,9 +290,7 @@ export function VariableHistory({
                 />
               </svg>
             </div>
-            <p className="mt-3 text-sm font-medium text-danger">
-              {error}
-            </p>
+            <p className="mt-3 text-sm font-medium text-danger">{error}</p>
           </div>
         ) : isLoading ? (
           <div className="flex flex-col items-center justify-center py-12">

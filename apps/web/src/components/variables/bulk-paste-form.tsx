@@ -182,15 +182,10 @@ export function BulkPasteForm({
       {/* Parse errors */}
       {errors.length > 0 && (
         <div className="rounded-lg border border-warning-line bg-warning-soft p-3 border-warning-line bg-warning-soft">
-          <p className="text-xs font-medium text-warning">
-            Parse warnings:
-          </p>
+          <p className="text-xs font-medium text-warning">Parse warnings:</p>
           <ul className="mt-1 space-y-0.5">
             {errors.slice(0, 5).map((err, i) => (
-              <li
-                key={i}
-                className="text-xs text-warning"
-              >
+              <li key={i} className="text-xs text-warning">
                 Line {err.line}: {err.reason}
               </li>
             ))}

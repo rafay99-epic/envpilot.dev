@@ -110,8 +110,7 @@ export default async function PricingPage() {
             eyebrow="faq"
             title={
               <>
-                Frequently asked{" "}
-                <span className="text-accent">questions</span>
+                Frequently asked <span className="text-accent">questions</span>
               </>
             }
             description="Everything you need to know before getting started."
@@ -145,8 +144,7 @@ export default async function PricingPage() {
             eyebrow="get started"
             title={
               <>
-                Ship secrets <span className="text-accent">safely</span>{" "}
-                today
+                Ship secrets <span className="text-accent">safely</span> today
               </>
             }
             description="Get started in under 2 minutes. No credit card required."

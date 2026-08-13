@@ -185,11 +185,7 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
 
   if (isLoadingProject) return <TerminalLoading fullPage />;
   if (!project) {
-    return (
-      <p className="text-sm text-ink-muted">
-        Project not found.
-      </p>
-    );
+    return <p className="text-sm text-ink-muted">Project not found.</p>;
   }
 
   return (
@@ -215,9 +211,7 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
 
         {notice && (
           <div className="rounded-lg border border-accent-line bg-accent-soft p-4 border-accent-line bg-accent-soft">
-            <p className="text-sm text-accent">
-              {notice}
-            </p>
+            <p className="text-sm text-accent">{notice}</p>
           </div>
         )}
         {error && (
@@ -262,9 +256,7 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
         <div className="rounded-xl border border-line bg-white border-line bg-surface">
           <div className="flex flex-col gap-3 border-b border-line px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 border-line">
             <div>
-              <h2 className="font-semibold text-ink">
-                Files
-              </h2>
+              <h2 className="font-semibold text-ink">Files</h2>
               <p className="mt-1 text-sm text-ink-muted">
                 {filteredFiles.length} file
                 {filteredFiles.length !== 1 ? "s" : ""}

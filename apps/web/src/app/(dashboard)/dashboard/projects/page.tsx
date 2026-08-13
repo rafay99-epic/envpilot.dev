@@ -182,9 +182,9 @@ function ProjectCard({
       className="group flex flex-col overflow-hidden rounded-lg border border-line bg-surface/90 transition-all hover:border-accent-line hover:shadow-lg hover:shadow-accent-line"
     >
       <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2">
-        <div className="h-2.5 w-2.5 rounded-full bg-[#ef5350]/80" />
-        <div className="h-2.5 w-2.5 rounded-full bg-[#fbbf24]/80" />
-        <div className="h-2.5 w-2.5 rounded-full bg-[#22c55e]/80" />
+        <div className="h-2.5 w-2.5 rounded-full bg-danger/80" />
+        <div className="h-2.5 w-2.5 rounded-full bg-warning/80" />
+        <div className="h-2.5 w-2.5 rounded-full bg-accent/80" />
         <span className="ml-2 truncate text-xs text-ink-subtle">
           {project.slug}
         </span>

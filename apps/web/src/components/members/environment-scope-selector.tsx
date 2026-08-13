@@ -85,9 +85,7 @@ export function EnvironmentScopeSelector({
               onChange={(e) => toggle(env, e.target.checked)}
               className="h-4 w-4"
             />
-            <span className="text-sm capitalize text-ink">
-              {env}
-            </span>
+            <span className="text-sm capitalize text-ink">{env}</span>
           </label>
         ))}
       </div>

@@ -125,9 +125,7 @@ export function SharedVariablesSection({
     <div className="rounded-xl border border-line bg-white border-line bg-surface">
       <div className="border-b border-line px-6 py-4 border-line">
         <div className="flex items-center gap-2">
-          <h2 className="font-semibold text-ink">
-            Shared Variables
-          </h2>
+          <h2 className="font-semibold text-ink">Shared Variables</h2>
           <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-faint bg-surface-raised text-ink-muted">
             {shares.length}
           </span>

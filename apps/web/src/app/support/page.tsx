@@ -152,8 +152,8 @@ export default function SupportPage() {
                     </p>
                     <p className="mt-2 text-sm leading-relaxed text-ink-muted">
                       We typically respond to support tickets within{" "}
-                      <span className="text-accent">24 hours</span> on
-                      business days.
+                      <span className="text-accent">24 hours</span> on business
+                      days.
                     </p>
                   </GlowCard>
                 </StaggerItem>

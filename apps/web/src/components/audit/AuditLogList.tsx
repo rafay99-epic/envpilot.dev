@@ -331,9 +331,7 @@ export function AuditLogList({
             d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
           />
         </svg>
-        <p className="mt-4 text-sm text-ink-muted">
-          {emptyMessage}
-        </p>
+        <p className="mt-4 text-sm text-ink-muted">{emptyMessage}</p>
       </div>
     );
   }
@@ -413,9 +411,7 @@ export function AuditLogList({
                         .slice(0, 3)
                         .map(([key, value]) => (
                           <div key={key} className="truncate">
-                            <span className="text-ink-subtle">
-                              {key}:
-                            </span>{" "}
+                            <span className="text-ink-subtle">{key}:</span>{" "}
                             {typeof value === "object"
                               ? JSON.stringify(value)
                               : String(value)}

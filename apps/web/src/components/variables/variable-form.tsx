@@ -182,7 +182,9 @@ export function VariableForm({
         >
           Value {!isEditing && <span className="text-danger">*</span>}
           {isEditing && (
-            <span className="text-ink-muted">(leave empty to keep current)</span>
+            <span className="text-ink-muted">
+              (leave empty to keep current)
+            </span>
           )}
         </label>
         <div className="relative mt-1">

@@ -267,9 +267,7 @@ export default function TrashPage({ params }: TrashPageProps) {
       ) : totalCount === 0 ? (
         <div className="rounded-xl border border-dashed border-line bg-white px-6 py-16 text-center border-line bg-surface">
           <Trash2 className="mx-auto h-10 w-10 text-ink-faint" />
-          <h2 className="mt-4 font-semibold text-ink">
-            Trash is empty
-          </h2>
+          <h2 className="mt-4 font-semibold text-ink">Trash is empty</h2>
           <p className="mt-1 text-sm text-ink-muted">
             Deleted variables and shared accounts will appear here for{" "}
             {RETENTION_DAYS} days before being permanently destroyed.
@@ -281,9 +279,7 @@ export default function TrashPage({ params }: TrashPageProps) {
             <section className="rounded-xl border border-line bg-white border-line bg-surface">
               <div className="flex items-center gap-2 border-b border-line px-6 py-4 border-line">
                 <KeyRound className="h-4 w-4 text-ink-muted" />
-                <h2 className="font-semibold text-ink">
-                  Variables
-                </h2>
+                <h2 className="font-semibold text-ink">Variables</h2>
                 <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-faint bg-surface-raised text-ink-muted">
                   {deletedVariables.length}
                 </span>
@@ -337,9 +333,7 @@ export default function TrashPage({ params }: TrashPageProps) {
             <section className="rounded-xl border border-line bg-white border-line bg-surface">
               <div className="flex items-center gap-2 border-b border-line px-6 py-4 border-line">
                 <UserRound className="h-4 w-4 text-ink-muted" />
-                <h2 className="font-semibold text-ink">
-                  Shared accounts
-                </h2>
+                <h2 className="font-semibold text-ink">Shared accounts</h2>
                 <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-faint bg-surface-raised text-ink-muted">
                   {deletedAccounts.length}
                 </span>
@@ -393,9 +387,7 @@ export default function TrashPage({ params }: TrashPageProps) {
             <section className="rounded-xl border border-line bg-white border-line bg-surface">
               <div className="flex items-center gap-2 border-b border-line px-6 py-4 border-line">
                 <FileKey className="h-4 w-4 text-ink-muted" />
-                <h2 className="font-semibold text-ink">
-                  Secret files
-                </h2>
+                <h2 className="font-semibold text-ink">Secret files</h2>
                 <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-faint bg-surface-raised text-ink-muted">
                   {deletedFiles.length}
                 </span>
@@ -450,9 +442,7 @@ export default function TrashPage({ params }: TrashPageProps) {
             <section className="rounded-xl border border-line bg-white border-line bg-surface">
               <div className="flex items-center gap-2 border-b border-line px-6 py-4 border-line">
                 <BookText className="h-4 w-4 text-ink-muted" />
-                <h2 className="font-semibold text-ink">
-                  Documentation
-                </h2>
+                <h2 className="font-semibold text-ink">Documentation</h2>
                 <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium text-ink-faint bg-surface-raised text-ink-muted">
                   {deletedDocs.length}
                 </span>

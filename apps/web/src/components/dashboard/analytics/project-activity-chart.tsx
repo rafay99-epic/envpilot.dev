@@ -12,7 +12,7 @@ import { TerminalWindow } from "@/components/dashboard/terminal-ui";
 const chartConfig = {
   eventCount: {
     label: "Events",
-    color: "hsl(var(--chart-1))",
+    color: "var(--color-chart-1)",
   },
 } satisfies ChartConfig;
 
@@ -25,8 +25,8 @@ export function ProjectActivityChart({ data }: ProjectActivityChartProps) {
     <TerminalWindow title="most-active-projects">
       <div className="border-b border-line px-5 py-2.5">
         <span className="font-mono text-xs text-ink-subtle">
-          <span className="text-accent">$</span> envpilot analytics
-          --projects --top=10
+          <span className="text-accent">$</span> envpilot analytics --projects
+          --top=10
         </span>
       </div>
       <div className="p-5">
@@ -47,7 +47,7 @@ export function ProjectActivityChart({ data }: ProjectActivityChartProps) {
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="#27272a"
+                stroke="var(--color-line-strong)"
                 horizontal={false}
               />
               <XAxis
@@ -76,7 +76,7 @@ export function ProjectActivityChart({ data }: ProjectActivityChartProps) {
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar
                 dataKey="eventCount"
-                fill="hsl(var(--chart-1))"
+                fill="var(--color-chart-1)"
                 radius={[0, 4, 4, 0]}
               />
             </BarChart>

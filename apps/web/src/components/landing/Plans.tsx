@@ -115,7 +115,7 @@ function PricingCards({
                 href={ctaHref}
                 className={`block rounded-md px-5 py-3 text-center font-sans text-[15px] font-semibold transition-colors ${
                   isDefault
-                    ? "bg-accent text-[#08090A] hover:bg-accent"
+                    ? "bg-accent text-chrome hover:bg-accent"
                     : "text-ink ring-1 ring-white/[0.08] hover:ring-white/25"
                 }`}
               >

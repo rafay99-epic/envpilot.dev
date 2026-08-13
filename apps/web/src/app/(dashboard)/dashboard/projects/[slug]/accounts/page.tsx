@@ -263,9 +263,7 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
 
         {notice && (
           <div className="rounded-lg border border-accent-line bg-accent-soft p-4 border-accent-line bg-accent-soft">
-            <p className="text-sm text-accent">
-              {notice}
-            </p>
+            <p className="text-sm text-accent">{notice}</p>
           </div>
         )}
         {error && (
@@ -310,9 +308,7 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
         <div className="rounded-xl border border-line bg-white border-line bg-surface">
           <div className="flex items-center justify-between border-b border-line px-6 py-4 border-line">
             <div>
-              <h2 className="font-semibold text-ink">
-                Accounts
-              </h2>
+              <h2 className="font-semibold text-ink">Accounts</h2>
               <p className="mt-1 text-sm text-ink-muted">
                 {filteredAccounts.length} account
                 {filteredAccounts.length !== 1 ? "s" : ""}

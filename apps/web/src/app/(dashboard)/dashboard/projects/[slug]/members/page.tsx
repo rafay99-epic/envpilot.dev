@@ -351,9 +351,7 @@ export default function ProjectMembersPage({
 
       {successMessage && (
         <div className="rounded-lg border border-accent-line bg-accent-soft p-4 border-accent-line bg-accent-soft">
-          <p className="text-sm text-accent">
-            {successMessage}
-          </p>
+          <p className="text-sm text-accent">{successMessage}</p>
         </div>
       )}
 
@@ -368,9 +366,7 @@ export default function ProjectMembersPage({
       {/* Members List */}
       <div className="rounded-xl border border-line bg-white border-line bg-surface">
         <div className="border-b border-line px-6 py-4 border-line">
-          <h2 className="font-semibold text-ink">
-            Members ({members.length})
-          </h2>
+          <h2 className="font-semibold text-ink">Members ({members.length})</h2>
         </div>
 
         {members.length === 0 ? (
@@ -514,9 +510,7 @@ export default function ProjectMembersPage({
         <form onSubmit={handleAddMember} className="mt-6 space-y-4">
           {/* User selection */}
           <div>
-            <label className="block text-sm font-medium text-ink">
-              Member
-            </label>
+            <label className="block text-sm font-medium text-ink">Member</label>
             <select
               value={selectedUserId}
               onChange={(e) => setSelectedUserId(e.target.value)}

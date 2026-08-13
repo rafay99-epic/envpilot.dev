@@ -34,8 +34,7 @@ const TTL_OPTIONS = [
 
 const FIELD =
   "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-inverse outline-none placeholder:text-ink-subtle focus:border-line bg-surface text-ink placeholder:text-ink-faint";
-const LABEL =
-  "mb-1.5 block text-xs font-medium text-ink-muted";
+const LABEL = "mb-1.5 block text-xs font-medium text-ink-muted";
 
 interface DocShareDrawerProps {
   isOpen: boolean;

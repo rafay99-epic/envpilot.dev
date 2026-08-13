@@ -108,9 +108,7 @@ export function Access() {
               are data; capabilities are code.
             </p>
             <p className="font-sans text-[15px] leading-relaxed text-ink-muted">
-              <span className="text-ink">
-                The owner column is derived,
-              </span>{" "}
+              <span className="text-ink">The owner column is derived,</span>{" "}
               never hand-written — so a capability shipped on Tuesday cannot
               lock an owner out of their own organization on Wednesday. A test
               pins it.
@@ -121,7 +119,7 @@ export function Access() {
             className={`mt-10 grid gap-px overflow-hidden ${terminal.panel} sm:grid-cols-3`}
           >
             {NOTES.map((item) => (
-              <div key={item.t} className="bg-[#0B0D0C] p-6">
+              <div key={item.t} className="bg-surface p-6">
                 <h3 className="font-sans text-[15px] font-semibold text-ink">
                   {item.t}
                 </h3>

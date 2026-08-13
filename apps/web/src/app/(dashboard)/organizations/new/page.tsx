@@ -148,9 +148,7 @@ export default function NewOrganizationPage() {
                 URL Slug
               </label>
               <div className="mt-2 flex items-center">
-                <span className="text-sm text-ink-muted">
-                  envpilot.dev/
-                </span>
+                <span className="text-sm text-ink-muted">envpilot.dev/</span>
                 <input
                   type="text"
                   id="slug"

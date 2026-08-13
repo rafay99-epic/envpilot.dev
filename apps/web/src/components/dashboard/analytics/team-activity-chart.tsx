@@ -12,7 +12,7 @@ import { TerminalWindow } from "@/components/dashboard/terminal-ui";
 const chartConfig = {
   actionCount: {
     label: "Actions",
-    color: "hsl(var(--chart-2))",
+    color: "var(--color-chart-2)",
   },
 } satisfies ChartConfig;
 
@@ -56,7 +56,7 @@ export function TeamActivityChart({ users }: TeamActivityChartProps) {
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="#27272a"
+                stroke="var(--color-line-strong)"
                 horizontal={false}
               />
               <XAxis
@@ -85,7 +85,7 @@ export function TeamActivityChart({ users }: TeamActivityChartProps) {
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar
                 dataKey="actionCount"
-                fill="hsl(var(--chart-2))"
+                fill="var(--color-chart-2)"
                 radius={[0, 4, 4, 0]}
               />
             </BarChart>

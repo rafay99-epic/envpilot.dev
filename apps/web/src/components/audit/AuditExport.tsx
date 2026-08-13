@@ -193,9 +193,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
                   onChange={() => setFormat("csv")}
                   className="h-4 w-4"
                 />
-                <span className="text-sm text-ink-muted">
-                  CSV
-                </span>
+                <span className="text-sm text-ink-muted">CSV</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -206,9 +204,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
                   onChange={() => setFormat("json")}
                   className="h-4 w-4"
                 />
-                <span className="text-sm text-ink-muted">
-                  JSON
-                </span>
+                <span className="text-sm text-ink-muted">JSON</span>
               </label>
             </div>
           </div>

@@ -141,8 +141,8 @@ export function ChangelogContent({
         ) : (
           <div className="rounded-xl border border-line bg-surface/40 p-12 text-center">
             <p className="font-mono text-sm text-ink-subtle">
-              <span className="text-accent">❯</span> envpilot changelog
-              --filter {selectedType ?? "all"}
+              <span className="text-accent">❯</span> envpilot changelog --filter{" "}
+              {selectedType ?? "all"}
             </p>
             <p className="mt-2 font-mono text-xs text-ink-faint">
               {selectedType

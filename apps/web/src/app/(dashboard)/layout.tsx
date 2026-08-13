@@ -69,7 +69,7 @@ export default async function DashboardLayout({
   // Check if user is banned
   if (convexUser.isBanned) {
     return (
-      <div className="dark flex min-h-screen items-center justify-center bg-[#0f172a] text-ink">
+      <div className="flex min-h-screen items-center justify-center bg-canvas text-ink">
         <div className="mx-auto max-w-md rounded-lg border border-danger-line bg-danger-soft p-8 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-danger-soft">
             <svg

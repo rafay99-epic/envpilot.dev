@@ -27,13 +27,12 @@ export function SecurityInsights({
     <TerminalWindow title="security-insights">
       <div className="border-b border-line px-5 py-2.5">
         <span className="font-mono text-xs text-ink-subtle">
-          <span className="text-accent">$</span> envpilot analytics
-          --security
+          <span className="text-accent">$</span> envpilot analytics --security
         </span>
       </div>
       <div className="grid grid-cols-2 gap-px bg-surface-raised/50 lg:grid-cols-4">
         {/* Security Events */}
-        <div className="bg-[#0f172a] p-5">
+        <div className="bg-canvas p-5">
           <div className="flex items-center gap-2 text-ink-subtle mb-3">
             <Shield className="h-4 w-4" />
             <span className="font-mono text-xs">Security Events</span>
@@ -62,7 +61,7 @@ export function SecurityInsights({
         </div>
 
         {/* Sensitive Access */}
-        <div className="bg-[#0f172a] p-5">
+        <div className="bg-canvas p-5">
           <div className="flex items-center gap-2 text-ink-subtle mb-3">
             <Eye className="h-4 w-4" />
             <span className="font-mono text-xs">Sensitive Access</span>
@@ -76,7 +75,7 @@ export function SecurityInsights({
         </div>
 
         {/* Permission Changes */}
-        <div className="bg-[#0f172a] p-5">
+        <div className="bg-canvas p-5">
           <div className="flex items-center gap-2 text-ink-subtle mb-3">
             <KeyRound className="h-4 w-4" />
             <span className="font-mono text-xs">Permission Changes</span>
@@ -90,7 +89,7 @@ export function SecurityInsights({
         </div>
 
         {/* Compliance Status */}
-        <div className="bg-[#0f172a] p-5">
+        <div className="bg-canvas p-5">
           <div className="flex items-center gap-2 text-ink-subtle mb-3">
             <CheckCircle className="h-4 w-4" />
             <span className="font-mono text-xs">Compliance</span>

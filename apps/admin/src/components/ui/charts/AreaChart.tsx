@@ -130,7 +130,7 @@ export function AreaChart({
                   x2={VIEW_WIDTH - PADDING.right}
                   y1={y}
                   y2={y}
-                  stroke="#27272a"
+                  stroke="var(--color-line-strong)"
                   strokeDasharray="4 4"
                 />
                 <text
@@ -177,7 +177,7 @@ export function AreaChart({
             }
             y1={PADDING.top}
             y2={baseline}
-            stroke="#3f3f46"
+            stroke="var(--color-line-strong)"
             strokeDasharray="4 4"
           />
         )}
@@ -221,7 +221,7 @@ export function AreaChart({
                       cy={pt.y}
                       r={hoveredIdx === i ? 4 : 3}
                       fill={c}
-                      stroke="#18181b"
+                      stroke="var(--color-surface)"
                       strokeWidth={2}
                       className="transition-all duration-100"
                     />

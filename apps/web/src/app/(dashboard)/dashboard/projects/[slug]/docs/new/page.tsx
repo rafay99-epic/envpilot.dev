@@ -96,11 +96,7 @@ export default function NewDocPage({ params }: NewDocPageProps) {
 
   if (isLoadingProject) return <TerminalLoading fullPage />;
   if (!project) {
-    return (
-      <p className="text-sm text-ink-muted">
-        Project not found.
-      </p>
-    );
+    return <p className="text-sm text-ink-muted">Project not found.</p>;
   }
 
   return (
@@ -120,9 +116,7 @@ export default function NewDocPage({ params }: NewDocPageProps) {
 
         <div className="flex items-center gap-2">
           <BookText className="h-6 w-6 text-ink-muted" />
-          <h1 className="text-2xl font-bold text-ink">
-            New page
-          </h1>
+          <h1 className="text-2xl font-bold text-ink">New page</h1>
         </div>
 
         {blocked && (

@@ -102,7 +102,7 @@ export function DonutChart({
                 slice.endAngle
               )}
               fill={slice.color}
-              stroke="#18181b"
+              stroke="var(--color-surface)"
               strokeWidth={2}
               opacity={hovered === null || hovered === slice.index ? 1 : 0.4}
               className="transition-opacity duration-150"

@@ -237,9 +237,7 @@ export function OrganizationSwitcher({
                 key={org._id}
                 onClick={() => handleSelectOrganization(org)}
                 className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-surface-hover ${
-                  org._id === currentOrg?._id
-                    ? "bg-surface-hover/50"
-                    : ""
+                  org._id === currentOrg?._id ? "bg-surface-hover/50" : ""
                 }`}
               >
                 {org.logoUrl ? (

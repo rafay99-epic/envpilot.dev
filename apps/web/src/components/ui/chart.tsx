@@ -337,7 +337,9 @@ const ChartLegendContent = React.forwardRef<
                   }}
                 />
               )}
-              <span className="text-ink-muted text-xs">{itemConfig?.label}</span>
+              <span className="text-ink-muted text-xs">
+                {itemConfig?.label}
+              </span>
             </div>
           );
         })}
