@@ -66,8 +66,7 @@ jobs:
         uses: ./.github/actions/load-env
         with:
           token: ${{ secrets.ENVPILOT_TOKEN }}
-          environment: development
-          required: ENVPILOT_SMOKE_TEST
+          environment: production
       - name: Confirm variables were pulled
         env:
           COUNT: ${{ steps.envpilot.outputs.count }}
