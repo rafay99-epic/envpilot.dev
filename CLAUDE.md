@@ -182,8 +182,9 @@ Only the built surface is ever published: `action.yml`, `dist/index.js`
   CLI/extension: never ship a client before the backend contract it calls).
 - **Secret**: publishing needs `ACTION_PUBLISH_TOKEN` in Envpilot — a
   fine-grained PAT with Contents read/write on the public repo ONLY. The
-  workflow keeps only the bootstrap `ENVPILOT_TOKEN` in GitHub and fails
-  loudly if the publish token is missing from the pulled environment.
+  workflow uses the `ENVPILOT_PROD_TOKEN` bootstrap secret from the
+  `Production` GitHub Environment and fails loudly if the publish token is
+  missing from the pulled environment.
 - **Backend counterpart**: CI/CD service tokens (`convex/features/cicd/`) —
   read-only, SHA-256-hash-stored, project+environment scoped, pro-gated
   (`cicd_service_tokens`), managed in Project → Settings → CI/CD Tokens.
@@ -324,10 +325,14 @@ went public and Actions became free for it; do not re-add config there.
   `if:`-gated job block.
 - **Deployment variables come from Envpilot**: deployment jobs call the
   published `rafay99-epic/envpilot-action@v1` through
-  `.github/actions/load-env`. `ENVPILOT_TOKEN` is the sole bootstrap repository
-  secret; GitHub's generated `GITHUB_TOKEN` remains built in. Keep production
-  credentials, publish tokens, service identifiers, and Sentry DSNs in the
-  Envpilot production environment rather than duplicating them in GitHub.
+  `.github/actions/load-env`. GitHub Environment secrets are the bootstrap:
+  `Production` holds `ENVPILOT_PROD_TOKEN`, while `development` holds
+  `ENVPILOT_DEV_TOKEN`. Main jobs pull Envpilot's production environment;
+  same-repository PR jobs pull development. Fork PRs receive neither secret
+  and compile with the literal CI stubs. GitHub's generated `GITHUB_TOKEN`
+  remains built in. Keep production credentials, publish tokens, service
+  identifiers, and Sentry DSNs in Envpilot rather than duplicating them in
+  GitHub.
 - **PR scope labels**: `.github/workflows/pr-labeler.yml` uses the official
   `actions/labeler` action with `.github/labeler.yml`. It runs as
   `pull_request_target` without checking out or executing PR code, so fork PRs

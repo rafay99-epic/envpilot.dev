@@ -22,7 +22,9 @@ on:
         value: ${{ jobs.publish.outputs.version }}
     secrets:
       ENVPILOT_TOKEN:
-        required: true
+        required: false
+      ENVPILOT_PROD_TOKEN:
+        required: false
   workflow_dispatch:
     inputs:
       force:
@@ -42,6 +44,7 @@ jobs:
   publish:
     name: Publish extension
     runs-on: ubuntu-latest
+    environment: Production
     outputs:
       published: ${{ steps.guard.outputs.should_publish }}
       version: ${{ steps.guard.outputs.local_version }}
@@ -52,7 +55,8 @@ jobs:
 
       - uses: ./.github/actions/load-env
         with:
-          token: ${{ secrets.ENVPILOT_TOKEN }}
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
           required: |
             ENVPILOT_SERVER_URL
             WORKOS_CLIENT_ID

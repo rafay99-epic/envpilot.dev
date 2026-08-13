@@ -25,7 +25,9 @@ on:
         type: string
     secrets:
       ENVPILOT_TOKEN:
-        required: true
+        required: false
+      ENVPILOT_PROD_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -34,7 +36,7 @@ jobs:
   deploy:
     name: Deploy ${{ inputs.app }} to Vercel
     runs-on: ubuntu-latest
-    environment: production
+    environment: Production
     concurrency:
       group: deploy-vercel-${{ inputs.app }}
       cancel-in-progress: false
@@ -43,7 +45,8 @@ jobs:
 
       - uses: ./.github/actions/load-env
         with:
-          token: ${{ secrets.ENVPILOT_TOKEN }}
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
           required: |
             VERCEL_TOKEN
             VERCEL_ORG_ID

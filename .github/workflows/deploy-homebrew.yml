@@ -21,7 +21,9 @@ on:
         value: ${{ jobs.deploy.outputs.updated }}
     secrets:
       ENVPILOT_TOKEN:
-        required: true
+        required: false
+      ENVPILOT_PROD_TOKEN:
+        required: false
   # Manual retry when a previous automated push failed — the release gets
   # created without it, so you can dispatch this independently to catch up.
   workflow_dispatch:
@@ -42,6 +44,7 @@ jobs:
   deploy:
     name: Update Homebrew formula
     runs-on: ubuntu-latest
+    environment: Production
     outputs:
       updated: ${{ steps.push.outputs.updated }}
     steps:
@@ -64,7 +67,8 @@ jobs:
 
       - uses: ./.github/actions/load-env
         with:
-          token: ${{ secrets.ENVPILOT_TOKEN }}
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
           required: HOMEBREW_TAP_PAT
 
       - name: Clone the public homebrew-apps tap

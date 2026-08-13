@@ -16,7 +16,9 @@ on:
   workflow_call:
     secrets:
       ENVPILOT_TOKEN:
-        required: true
+        required: false
+      ENVPILOT_PROD_TOKEN:
+        required: false
   workflow_dispatch:
 
 permissions:
@@ -30,12 +32,13 @@ jobs:
   publish:
     name: Publish to envpilot-action
     runs-on: ubuntu-latest
-    environment: production
+    environment: Production
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/load-env
         with:
-          token: ${{ secrets.ENVPILOT_TOKEN }}
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
           required: ACTION_PUBLISH_TOKEN
       - uses: ./.github/actions/setup
 
