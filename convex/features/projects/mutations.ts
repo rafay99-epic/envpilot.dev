@@ -10,8 +10,10 @@ import {
   assertOrgAction,
   assertProjectAction,
   getRoleProfile,
+  normalizeOrgRole,
   bypassesAssignment,
 } from "../../lib/authz";
+import { internal } from "../../_generated/api";
 
 const PROJECT_NAME_MAX = 100;
 const PROJECT_SLUG_MAX = 50;
@@ -540,6 +542,31 @@ export const move = mutation({
       organizationId: args.targetOrganizationId,
       updatedAt: now,
     });
+
+    const targetOwners = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.targetOrganizationId)
+      )
+      .collect()
+      .then((members) =>
+        members.filter((member) => normalizeOrgRole(member.role) === "owner")
+      );
+    const transferredByName = actor.name || actor.email;
+    for (const owner of targetOwners) {
+      const user = await ctx.db.get(owner.userId);
+      if (!user?.email) continue;
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.emails.emails.sendProjectTransferEmailInternal,
+        {
+          to: user.email,
+          projectName: project.name,
+          organizationName: targetOrg.name,
+          transferredByName,
+        }
+      );
+    }
 
     // Clean up source org relationships
     // Delete project members

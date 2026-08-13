@@ -3,7 +3,6 @@ import { query, internalQuery, type QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import {
-  assertOrgAction,
   getActiveMembership,
   getRoleProfile,
   hasCapability,
@@ -181,12 +180,12 @@ export const getMembersForCurrentUser = query({
   returns: v.array(organizationMemberValidator),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    await assertOrgAction(
+    const membership = await getActiveMembership(
       ctx,
-      actor._id,
       args.organizationId,
-      "org:invite_member"
+      actor._id
     );
+    if (!membership) return [];
 
     const memberships = await ctx.db
       .query("organizationMembers")

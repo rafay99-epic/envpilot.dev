@@ -85,6 +85,7 @@ function OrganizationSettingsPageContent({
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const seededOrganizationId = useRef<string | null>(null);
 
   // Transfer state
   const [transferEmail, setTransferEmail] = useState("");
@@ -144,7 +145,9 @@ function OrganizationSettingsPageContent({
     : (tabs[0]?.id ?? "general");
 
   useEffect(() => {
-    if (!organization) return;
+    if (!organization || seededOrganizationId.current === organization._id)
+      return;
+    seededOrganizationId.current = organization._id;
     setName(organization.name);
     setDescription(organization.description || "");
   }, [organization]);
@@ -1162,7 +1165,11 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
             <>
               <div className="divide-y divide-line">
                 {pagination.pageItems.map((tag) => (
-                  <div key={tag._id} className="flex items-center gap-3 py-3">
+                  <div
+                    key={tag._id}
+                    data-testid="tag-row"
+                    className="flex items-center gap-3 py-3"
+                  >
                     {editingId === tag._id ? (
                       <>
                         <div className="flex flex-1 items-center gap-3">

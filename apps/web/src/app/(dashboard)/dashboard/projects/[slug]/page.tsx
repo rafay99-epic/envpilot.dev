@@ -87,11 +87,15 @@ interface VersionRecord {
 export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const { slug } = use(params);
   const { canDo, organization, user, capabilities } = useAuthContext();
+  // Project actions follow the caller's resolved registry profile so custom
+  // roles receive the same gates the Convex authorization layer enforces.
   const canCreateVariable = capabilities["project.variables.create"] === true;
   const canUpdateVariable = capabilities["project.variables.update"] === true;
   const canDeleteVariable = capabilities["project.variables.delete"] === true;
   const canSeeTrash =
     canDeleteVariable || capabilities["project.read"] === true;
+  // Read access keeps the trash recovery route available to members who may
+  // need to restore content they previously deleted.
   const canRequestVariable = capabilities["project.requests.submit"] === true;
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
@@ -818,7 +822,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {}
             <button
               onClick={() => setShowExportDrawer(true)}
               className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
@@ -839,7 +842,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               Export
             </button>
 
-            {}
             {canCreateVariable && (
               <button
                 onClick={() => setShowImportDrawer(true)}
@@ -862,7 +864,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               </button>
             )}
 
-            {}
             {(canCreateVariable || canRequestVariable) && (
               <button
                 onClick={() => setShowCreateModal(true)}
@@ -1016,7 +1017,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         variant="danger"
       />
 
-      {}
       {projectId && (
         <ExportDialog
           isOpen={showExportDrawer}
@@ -1027,7 +1027,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         />
       )}
 
-      {}
       {projectId && (
         <ImportDialog
           isOpen={showImportDrawer}
@@ -1037,7 +1036,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         />
       )}
 
-      {}
       <ConfirmDialog
         isOpen={showBulkDeleteConfirm}
         onClose={() => setShowBulkDeleteConfirm(false)}
@@ -1048,7 +1046,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         variant="danger"
       />
 
-      {}
       {isSelectionMode && selectedIds.size > 0 && (
         <FeatureGate
           organizationId={orgId}
@@ -1115,7 +1112,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         </FeatureGate>
       )}
 
-      {}
       {sharingVariable && projectId && orgId && (
         <ShareSecretDrawer
           isOpen={!!sharingVariable}

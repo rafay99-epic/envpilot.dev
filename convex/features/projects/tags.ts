@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
-import { mutation, query } from "../../_generated/server";
+import { internalMutation, mutation, query } from "../../_generated/server";
+import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { createAuditLog } from "../../lib/audit";
@@ -21,7 +22,7 @@ import { rateLimiter } from "../../lib/rateLimits";
 
 const MAX_TAGS_PER_ORG = 100;
 const MAX_TAG_NAME_LENGTH = 50;
-const MAX_CASCADE_UPDATES = 500;
+const CASCADE_PAGE_SIZE = 200;
 
 const SYSTEM_TAGS: Array<{ name: string; color: string }> = [
   { name: "Database", color: "#3b82f6" },
@@ -91,7 +92,13 @@ export const listByOrganization = query({
       .withIndex("by_organization_and_deleted_at", (q) =>
         q.eq("organizationId", args.organizationId).eq("deletedAt", undefined)
       )
-      .take(MAX_TAGS_PER_ORG);
+      .take(MAX_TAGS_PER_ORG + 1);
+
+    if (tags.length > MAX_TAGS_PER_ORG) {
+      throw new ConvexError(
+        "This organization has more tags than the supported limit. Contact support."
+      );
+    }
 
     return tags.sort((a, b) => a.name.localeCompare(b.name));
   },
@@ -301,7 +308,7 @@ export const remove = mutation({
   args: {
     tagId: v.id("variableTags"),
   },
-  returns: v.object({ deleted: v.boolean(), variablesAffected: v.number() }),
+  returns: v.object({ deleted: v.boolean(), cascadeScheduled: v.boolean() }),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
     const tag = await ctx.db.get(args.tagId);
@@ -324,53 +331,14 @@ export const remove = mutation({
       updatedAt: Date.now(),
     });
 
-    // Cascade: strip this tag ID from all active variables. Refuse oversized
-    // cascades atomically instead of deleting the tag and leaving dangling IDs.
-    const projects = await ctx.db
-      .query("projects")
-      .withIndex("by_organization_and_deleted_at", (q) =>
-        q.eq("organizationId", tag.organizationId).eq("deletedAt", undefined)
-      )
-      .take(MAX_CASCADE_UPDATES + 1);
-
-    if (projects.length > MAX_CASCADE_UPDATES) {
-      throw new ConvexError(
-        "This tag is used across too many projects to delete safely. Contact support."
-      );
-    }
-
-    let strippedCount = 0;
-    let totalProcessed = 0;
-
-    for (const project of projects) {
-      const remaining = MAX_CASCADE_UPDATES - totalProcessed;
-      const variables = await ctx.db
-        .query("environmentVariables")
-        .withIndex("by_project_deleted", (q) =>
-          q.eq("projectId", project._id).eq("deletedAt", undefined)
-        )
-        .take(remaining + 1);
-
-      if (variables.length > remaining) {
-        throw new ConvexError(
-          "This tag is used across too many variables to delete safely. Contact support."
-        );
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.projects.tags.cascadeTagRemoval,
+      {
+        tagId: args.tagId,
+        organizationId: tag.organizationId,
       }
-
-      for (const variable of variables) {
-        totalProcessed++;
-
-        if (variable.tagIds && variable.tagIds.includes(args.tagId)) {
-          const newTagIds = variable.tagIds.filter(
-            (id: Id<"variableTags">) => id !== args.tagId
-          );
-          await ctx.db.patch(variable._id, {
-            tagIds: newTagIds.length > 0 ? newTagIds : undefined,
-          });
-          strippedCount++;
-        }
-      }
-    }
+    );
 
     await createAuditLog(ctx, {
       organizationId: tag.organizationId,
@@ -378,10 +346,76 @@ export const remove = mutation({
       action: "tag.deleted",
       details: {
         tagName: tag.name,
-        variablesAffected: strippedCount,
+        cascadeScheduled: true,
       },
     });
 
-    return { deleted: true, variablesAffected: strippedCount };
+    return { deleted: true, cascadeScheduled: true };
+  },
+});
+
+export const cascadeTagRemoval = internalMutation({
+  args: {
+    tagId: v.id("variableTags"),
+    organizationId: v.id("organizations"),
+    projectCursor: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
+    variableCursor: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    let projectId = args.projectId;
+    let nextProjectCursor = args.projectCursor;
+
+    if (!projectId) {
+      const projects = await ctx.db
+        .query("projects")
+        .withIndex("by_organization_and_deleted_at", (q) =>
+          q.eq("organizationId", args.organizationId).eq("deletedAt", undefined)
+        )
+        .paginate({ numItems: 1, cursor: args.projectCursor ?? null });
+      projectId = projects.page[0]?._id;
+      if (!projectId) return null;
+      nextProjectCursor = projects.continueCursor;
+    }
+
+    const variables = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", projectId).eq("deletedAt", undefined)
+      )
+      .paginate({
+        numItems: CASCADE_PAGE_SIZE,
+        cursor: args.variableCursor ?? null,
+      });
+
+    for (const variable of variables.page) {
+      if (!variable.tagIds?.includes(args.tagId)) continue;
+      const tagIds = variable.tagIds.filter(
+        (id: Id<"variableTags">) => id !== args.tagId
+      );
+      await ctx.db.patch(variable._id, {
+        tagIds: tagIds.length > 0 ? tagIds : undefined,
+      });
+    }
+
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.projects.tags.cascadeTagRemoval,
+      variables.isDone
+        ? {
+            tagId: args.tagId,
+            organizationId: args.organizationId,
+            projectCursor: nextProjectCursor,
+          }
+        : {
+            tagId: args.tagId,
+            organizationId: args.organizationId,
+            projectCursor: nextProjectCursor,
+            projectId,
+            variableCursor: variables.continueCursor,
+          }
+    );
+    return null;
   },
 });

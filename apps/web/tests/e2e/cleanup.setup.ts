@@ -82,7 +82,8 @@ setup(CLEANUP_TITLE, async ({ request, page }) => {
     });
     const tagsAvailable = await page
       .getByText("Variable Tags", { exact: true })
-      .isVisible({ timeout: 10_000 })
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
       .catch(() => false);
 
     let hasNextPage = tagsAvailable;
@@ -99,7 +100,7 @@ setup(CLEANUP_TITLE, async ({ request, page }) => {
         break;
       }
 
-      const rows = page.locator("div.flex.items-center.gap-3.py-3");
+      const rows = page.getByTestId("tag-row");
       const rowCount = await rows.count();
       let deletedOnPage = false;
 

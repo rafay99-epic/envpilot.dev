@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, use } from "react";
+import Link from "next/link";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
@@ -244,10 +245,19 @@ export default function ProjectMembersPage({
     return <TerminalLoading fullPage />;
   }
 
-  if (error && !project) {
+  if (!project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <h2 className="text-lg font-semibold text-ink">{error}</h2>
+        <h2 className="text-lg font-semibold text-ink">Project not found</h2>
+        <p className="mt-2 text-sm text-ink-muted">
+          This project does not exist or you do not have access.
+        </p>
+        <Link
+          href="/dashboard/projects"
+          className="mt-4 text-sm font-medium text-accent hover:underline"
+        >
+          Back to Projects
+        </Link>
       </div>
     );
   }

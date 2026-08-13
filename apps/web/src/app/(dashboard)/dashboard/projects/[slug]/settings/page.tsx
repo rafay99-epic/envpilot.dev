@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Settings } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
@@ -99,6 +99,7 @@ export default function ProjectSettingsPage({
     icon: DEFAULT_PROJECT_ICON,
     color: DEFAULT_PROJECT_COLOR,
   });
+  const seededProjectId = useRef<string | null>(null);
 
   // Tab state
   type ProjectSettingsTab = "general" | "danger";
@@ -112,7 +113,8 @@ export default function ProjectSettingsPage({
   ];
 
   useEffect(() => {
-    if (!liveProject) return;
+    if (!liveProject || seededProjectId.current === liveProject._id) return;
+    seededProjectId.current = liveProject._id;
     setProjectSnapshot(liveProject as Project);
     setFormData({
       name: liveProject.name,
@@ -138,7 +140,7 @@ export default function ProjectSettingsPage({
       router.refresh();
       router.push("/dashboard/projects");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(sanitizeConvexError(err));
       setIsTransferring(false);
     }
   };

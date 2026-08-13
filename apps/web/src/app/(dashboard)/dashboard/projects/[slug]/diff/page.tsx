@@ -679,7 +679,15 @@ export default function EnvironmentDiffPage({
       />
     );
   }
-  if (!project) return null;
+  if (!project) {
+    return (
+      <TerminalEmptyState
+        command="envpilot diff --project not-found"
+        message="Project not found or you do not have access."
+        action={{ label: "Back to Projects", href: "/dashboard/projects" }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">

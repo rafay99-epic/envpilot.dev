@@ -8,7 +8,11 @@ import { PageHeader } from "@envpilot/ui";
 import { useAuthContext } from "@/components/auth";
 import { useTierLimitCheck } from "@/hooks/useTierLimits";
 import { useCreateProject } from "@/hooks";
-import { sanitizeConvexError } from "@/lib/error-messages";
+import {
+  isRateLimitError,
+  isTierLimitError,
+  sanitizeConvexError,
+} from "@/lib/error-messages";
 import { LimitWarning } from "@/components/tier/FeatureGate";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
@@ -152,7 +156,13 @@ export default function NewProjectPage() {
 
       router.push(`/dashboard/projects/${projectSlug}`);
     } catch (err) {
-      setError(sanitizeConvexError(err));
+      const message = sanitizeConvexError(err);
+      if (isRateLimitError(err)) setError(message);
+      else if (isTierLimitError(message)) {
+        setError(
+          "You've reached the project limit on your current plan. Upgrade to Pro for unlimited projects."
+        );
+      } else setError(message);
     } finally {
       setIsSubmitting(false);
     }

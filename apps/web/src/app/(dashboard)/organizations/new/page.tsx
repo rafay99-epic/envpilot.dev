@@ -6,7 +6,11 @@ import Link from "next/link";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useCreateOrganization } from "@/hooks";
-import { sanitizeConvexError } from "@/lib/error-messages";
+import {
+  isRateLimitError,
+  isTierLimitError,
+  sanitizeConvexError,
+} from "@/lib/error-messages";
 
 export default function NewOrganizationPage() {
   const router = useRouter();
@@ -56,7 +60,8 @@ export default function NewOrganizationPage() {
       router.refresh();
     } catch (err) {
       const message = sanitizeConvexError(err);
-      if (message.toLowerCase().includes("limit")) setTierLimitHit(true);
+      if (isRateLimitError(err)) setError(message);
+      else if (isTierLimitError(message)) setTierLimitHit(true);
       else setError(message);
       setIsSubmitting(false);
     }
