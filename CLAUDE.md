@@ -320,10 +320,10 @@ went public and Actions became free for it; do not re-add config there.
   downstream `needs.e2e.result` condition accepts `skipped` OR `success`.
   The local Playwright run is the gate of record (see the testing policy).
 - **Manual control**: `workflow_dispatch` on `ci.yml`, or on an individual
-  `deploy-*.yml` to retry one surface. Set `envpilot_smoke` to `development`
-  or `production` when dispatching `ci.yml` to validate that Environment's
-  bootstrap key and required variables without checking out code or running
-  any build or deployment.
+  `deploy-*.yml` to retry one surface. Dispatch `envpilot-smoke.yml` with
+  `development` or `production` to validate that Environment's bootstrap key
+  and required variables without checking out code or running any build or
+  deployment.
 - **Adding a surface**: one path rule in the `changes` job, one output, one
   `if:`-gated job block.
 - **Deployment variables come from Envpilot**: deployment jobs call the
