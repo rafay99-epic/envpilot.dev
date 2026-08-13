@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 
@@ -14,6 +14,20 @@ export function useUserOrganizations(userId: Id<"users"> | undefined) {
     api.features.organizations.queries.listForUser,
     userId ? {} : "skip"
   );
+}
+
+/** Current user's organizations once the authenticated dashboard is ready. */
+export function useCurrentUserOrganizations(enabled = true) {
+  return useQuery(
+    api.features.organizations.queries.listForUser,
+    enabled ? {} : "skip"
+  );
+}
+
+export function useCreateOrganization() {
+  const create = useMutation(api.features.organizations.mutations.create);
+  return (input: { name: string; slug: string; description?: string }) =>
+    create(input);
 }
 
 /**
@@ -61,7 +75,24 @@ export function useOrganizationMembers(
   organizationId: Id<"organizations"> | undefined
 ) {
   return useQuery(
-    api.features.organizations.queries.getMembers,
+    api.features.organizations.queries.getMembersForCurrentUser,
     organizationId ? { organizationId } : "skip"
+  );
+}
+
+export function useOrganizationMemberCount(
+  organizationId: Id<"organizations"> | undefined
+) {
+  return useQuery(
+    api.features.organizations.queries.getMemberCountForCurrentUser,
+    organizationId ? { organizationId } : "skip"
+  );
+}
+
+/** Authenticated organization lookup for dashboard slug routes. */
+export function useOrganizationBySlug(slug: string | undefined) {
+  return useQuery(
+    api.features.organizations.queries.getBySlugForCurrentUser,
+    slug ? { slug } : "skip"
   );
 }

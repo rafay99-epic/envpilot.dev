@@ -3,11 +3,45 @@ import { query, internalQuery, type QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import {
+  assertOrgAction,
+  getActiveMembership,
   getRoleProfile,
   hasCapability,
   isSuspendedMembership,
   normalizeOrgRole,
 } from "../../lib/authz";
+
+const organizationForMemberValidator = v.object({
+  _id: v.id("organizations"),
+  _creationTime: v.number(),
+  name: v.string(),
+  slug: v.string(),
+  description: v.optional(v.string()),
+  logoUrl: v.optional(v.string()),
+  settings: v.optional(v.object({ teamLeadsCanCreateProjects: v.boolean() })),
+  workosOrgId: v.optional(v.string()),
+  createdBy: v.id("users"),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+  role: v.string(),
+});
+
+const organizationMemberValidator = v.object({
+  _id: v.id("organizationMembers"),
+  organizationId: v.id("organizations"),
+  userId: v.id("users"),
+  role: v.string(),
+  joinedAt: v.number(),
+  invitedBy: v.optional(v.id("users")),
+  status: v.optional(v.union(v.literal("active"), v.literal("suspended"))),
+  suspendedAt: v.optional(v.number()),
+  user: v.object({
+    _id: v.id("users"),
+    email: v.string(),
+    name: v.optional(v.string()),
+    avatarUrl: v.optional(v.string()),
+  }),
+});
 
 /**
  * Organization Queries and Mutations
@@ -68,6 +102,28 @@ export const getBySlug = query({
   },
 });
 
+/** Authenticated dashboard lookup. Legacy server adapters use getBySlug. */
+export const getBySlugForCurrentUser = query({
+  args: { slug: v.string() },
+  returns: v.union(organizationForMemberValidator, v.null()),
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const organization = await ctx.db
+      .query("organizations")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .first();
+    if (!organization) return null;
+
+    const membership = await getActiveMembership(
+      ctx,
+      organization._id,
+      actor._id
+    );
+    if (!membership) return null;
+    return { ...organization, role: membership.role };
+  },
+});
+
 /**
  * Get all members of an organization
  */
@@ -116,6 +172,73 @@ export const getMembers = query({
     );
 
     return members.filter(Boolean);
+  },
+});
+
+/** Authenticated member list for reactive dashboard clients. */
+export const getMembersForCurrentUser = query({
+  args: { organizationId: v.id("organizations") },
+  returns: v.array(organizationMemberValidator),
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    await assertOrgAction(
+      ctx,
+      actor._id,
+      args.organizationId,
+      "org:invite_member"
+    );
+
+    const memberships = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
+    const members = await Promise.all(
+      memberships.map(async (member) => {
+        const user = await ctx.db.get(member.userId);
+        return user
+          ? {
+              _id: member._id,
+              organizationId: member.organizationId,
+              userId: member.userId,
+              role: member.role,
+              joinedAt: member.joinedAt,
+              invitedBy: member.invitedBy,
+              status: member.status,
+              suspendedAt: member.suspendedAt,
+              user: {
+                _id: user._id,
+                email: user.email,
+                name: user.name,
+                avatarUrl: user.avatarUrl,
+              },
+            }
+          : null;
+      })
+    );
+    return members.filter((member) => member !== null);
+  },
+});
+
+export const getMemberCountForCurrentUser = query({
+  args: { organizationId: v.id("organizations") },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const membership = await getActiveMembership(
+      ctx,
+      args.organizationId,
+      actor._id
+    );
+    if (!membership) return 0;
+    const members = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .take(1001);
+    return members.length;
   },
 });
 

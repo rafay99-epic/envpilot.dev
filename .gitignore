@@ -67,3 +67,4 @@ apps/web/tests/e2e/.auth/
 .vscode/
 
 .firecrawl/
+claude_html/

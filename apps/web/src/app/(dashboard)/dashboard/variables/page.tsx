@@ -493,7 +493,6 @@ export default function VariablesPage() {
                   organizationId: activeOrganizationId as string,
                   name,
                   color,
-                  createdBy: convexUserId as string,
                 });
               }
             : undefined

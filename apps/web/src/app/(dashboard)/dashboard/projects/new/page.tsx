@@ -7,6 +7,8 @@ import { FolderPlus } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import { useAuthContext } from "@/components/auth";
 import { useTierLimitCheck } from "@/hooks/useTierLimits";
+import { useCreateProject } from "@/hooks";
+import { sanitizeConvexError } from "@/lib/error-messages";
 import { LimitWarning } from "@/components/tier/FeatureGate";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
@@ -37,6 +39,7 @@ export default function NewProjectPage() {
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const tierCheck = useTierLimitCheck(orgId, "create_project");
   const enforcing = useEnforcementEnabled();
+  const createProject = useCreateProject();
 
   const [selectedTemplate, setSelectedTemplate] =
     useState<EnvironmentTemplate | null>(null);
@@ -112,29 +115,12 @@ export default function NewProjectPage() {
         return;
       }
 
-      const response = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          organizationId: organization.id,
-        }),
+      const projectId = await createProject({
+        ...formData,
+        description: formData.description || undefined,
+        organizationId: organization.id,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.code === "TIER_LIMIT_REACHED") {
-          setError(
-            "You've reached the project limit on your current plan. Upgrade to Pro for unlimited projects."
-          );
-          return;
-        }
-        throw new Error(data.error || "Failed to create project");
-      }
-
-      const projectId = data.project._id;
-      const projectSlug = data.project.slug;
+      const projectSlug = formData.slug;
 
       if (selectedTemplate) {
         // Create template variables sequentially to avoid overwhelming
@@ -166,7 +152,7 @@ export default function NewProjectPage() {
 
       router.push(`/dashboard/projects/${projectSlug}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(sanitizeConvexError(err));
     } finally {
       setIsSubmitting(false);
     }

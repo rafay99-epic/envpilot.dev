@@ -14,7 +14,13 @@ import {
 } from "@/components/members/environment-scope-selector";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
-import { usePagination, useConvexUser, useAssignableRoles } from "@/hooks";
+import {
+  usePagination,
+  useConvexUser,
+  useAssignableRoles,
+  useOrganizationBySlug,
+  useOrganizationMembers,
+} from "@/hooks";
 import { RequireRole, useAuthContext } from "@/components/auth";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks";
@@ -67,13 +73,10 @@ function OrganizationMembersPageContent({
   // ---------------------------------------------------------------------------
   // Convex queries — real-time via WebSocket, no fetch() round-trip
   // ---------------------------------------------------------------------------
-  const org = useQuery(api.features.organizations.queries.getBySlug, { slug });
+  const org = useOrganizationBySlug(slug);
   const orgId = org?._id;
 
-  const membersData = useQuery(
-    api.features.organizations.queries.getMembers,
-    orgId ? { organizationId: orgId } : "skip"
-  );
+  const membersData = useOrganizationMembers(orgId);
   const invitationsData = useQuery(
     // The requesting user is derived server-side from the browser's verified
     // JWT identity (requireAuthedUser). convexUserId is kept only as an

@@ -27,6 +27,13 @@ import {
 } from "@/constants/framework-logos";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
+import {
+  useCurrentUserOrganizations,
+  useDeleteProject,
+  useMoveProject,
+  useProjectBySlug,
+  useUpdateProject,
+} from "@/hooks";
 import { sanitizeConvexError } from "@/lib/error-messages";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -57,9 +64,17 @@ export default function ProjectSettingsPage({
   const { canDo, organization } = useAuthContext();
   const canUpdateProject = canDo("org:create_project");
   const canDeleteProject = canDo("org:delete_project");
+  const updateProject = useUpdateProject();
+  const deleteProject = useDeleteProject();
+  const moveProject = useMoveProject();
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const liveProject = useProjectBySlug(
+    organization?.id,
+    organization?.id ? slug : undefined
+  );
+  const [projectSnapshot, setProjectSnapshot] = useState<Project | null>(null);
+  const project =
+    (liveProject as Project | null | undefined) ?? projectSnapshot;
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,9 +87,11 @@ export default function ProjectSettingsPage({
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
   const [transferConfirmText, setTransferConfirmText] = useState("");
   const [targetOrgId, setTargetOrgId] = useState("");
-  const [userOrgs, setUserOrgs] = useState<
-    { _id: string; name: string; slug: string }[]
-  >([]);
+  const organizations = useCurrentUserOrganizations(!!organization?.id);
+  const userOrgs = (organizations ?? []).filter(
+    (org): org is NonNullable<typeof org> =>
+      org !== null && org._id !== project?.organizationId
+  );
 
   const [formData, setFormData] = useState({
     name: "",
@@ -94,67 +111,16 @@ export default function ProjectSettingsPage({
       : []),
   ];
 
-  // Fetch project data
   useEffect(() => {
-    async function fetchProject() {
-      try {
-        if (!organization?.id) {
-          setError("No organization found");
-          setIsLoading(false);
-          return;
-        }
-
-        const projectsResponse = await fetch(
-          `/api/projects?organizationId=${organization.id}`
-        );
-        const projectsData = await projectsResponse.json();
-
-        const foundProject = projectsData.projects?.find(
-          (p: Project) => p.slug === slug
-        );
-
-        if (!foundProject) {
-          setError("Project not found");
-        } else {
-          setProject(foundProject);
-          setFormData({
-            name: foundProject.name,
-            description: foundProject.description || "",
-            icon: foundProject.icon || DEFAULT_PROJECT_ICON,
-            color: foundProject.color || DEFAULT_PROJECT_COLOR,
-          });
-        }
-      } catch {
-        setError("Failed to load project");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchProject();
-  }, [organization?.id, slug]);
-
-  // Fetch user's organizations for transfer dropdown
-  useEffect(() => {
-    async function fetchOrgs() {
-      try {
-        const response = await fetch("/api/organizations");
-        if (response.ok) {
-          const data = await response.json();
-          const orgs = data.organizations || [];
-          // Exclude current org
-          setUserOrgs(
-            orgs.filter(
-              (o: { _id: string }) => o._id !== project?.organizationId
-            )
-          );
-        }
-      } catch {
-        // Non-critical, ignore
-      }
-    }
-    if (project) fetchOrgs();
-  }, [project?.organizationId]);
+    if (!liveProject) return;
+    setProjectSnapshot(liveProject as Project);
+    setFormData({
+      name: liveProject.name,
+      description: liveProject.description || "",
+      icon: liveProject.icon || DEFAULT_PROJECT_ICON,
+      color: liveProject.color || DEFAULT_PROJECT_COLOR,
+    });
+  }, [liveProject]);
 
   const handleTransfer = async () => {
     if (!project || transferConfirmText !== project.name || !targetOrgId)
@@ -164,16 +130,10 @@ export default function ProjectSettingsPage({
     setError(null);
 
     try {
-      const response = await fetch(`/api/projects/${project._id}/move`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetOrganizationId: targetOrgId }),
+      await moveProject({
+        projectId: project._id,
+        targetOrganizationId: targetOrgId,
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to transfer project");
-      }
 
       router.refresh();
       router.push("/dashboard/projects");
@@ -192,24 +152,10 @@ export default function ProjectSettingsPage({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`/api/projects/${project._id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to update project");
-      }
-
-      setProject(data.project);
+      await updateProject({ projectId: project._id, ...formData });
       setSuccessMessage("Project updated successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(sanitizeConvexError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -222,23 +168,16 @@ export default function ProjectSettingsPage({
     setError(null);
 
     try {
-      const response = await fetch(`/api/projects/${project._id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to delete project");
-      }
+      await deleteProject(project._id);
 
       router.push("/dashboard/projects");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(sanitizeConvexError(err));
       setIsDeleting(false);
     }
   };
 
-  if (isLoading) {
+  if (liveProject === undefined) {
     return <TerminalLoading fullPage />;
   }
 
@@ -334,7 +273,7 @@ export default function ProjectSettingsPage({
             />
             <VscodeSyncSection
               project={project!}
-              onProjectUpdated={setProject}
+              onProjectUpdated={setProjectSnapshot}
             />
           </div>
         )}
@@ -660,6 +599,7 @@ function VscodeSyncSectionInner({
   const setMemberOverride = useMutation(
     api.features.projects.mutations.setMemberUnsyncOverride
   );
+  const updateProject = useUpdateProject();
 
   const [enabled, setEnabled] = useState(
     project.vscodeAutoUnsyncOnClose ?? true
@@ -675,20 +615,15 @@ function VscodeSyncSectionInner({
     setSectionError(null);
 
     try {
-      const response = await fetch(`/api/projects/${project._id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vscodeAutoUnsyncOnClose: next }),
+      await updateProject({
+        projectId: project._id,
+        vscodeAutoUnsyncOnClose: next,
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to update setting");
-      }
-      onProjectUpdated(data.project);
+      onProjectUpdated({ ...project, vscodeAutoUnsyncOnClose: next });
     } catch (err) {
       // Revert on error
       setEnabled(!next);
-      setSectionError(err instanceof Error ? err.message : "An error occurred");
+      setSectionError(sanitizeConvexError(err));
     } finally {
       setIsSaving(false);
     }

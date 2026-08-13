@@ -1,13 +1,22 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, use } from "react";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
-import { usePagination } from "@/hooks";
+import {
+  useAssignableProjectMembers,
+  useConvexUser,
+  usePagination,
+  useProjectBySlug,
+  useProjectMemberActions,
+  useProjectMembers,
+} from "@/hooks";
+import { sanitizeConvexError } from "@/lib/error-messages";
 import { DrawerPanel } from "@/components/ui";
 import { PageHeader } from "@envpilot/ui";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   EnvironmentScopeSelector,
   allEnvironments,
@@ -98,14 +107,19 @@ export default function ProjectMembersPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = use(params);
-  const { organization, roleMeta } = useAuthContext();
-
-  const [project, setProject] = useState<Project | null>(null);
-  const [members, setMembers] = useState<ProjectMember[]>([]);
-  const [assignableMembers, setAssignableMembers] = useState<
-    AssignableMember[]
-  >([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { organization, roleMeta, user } = useAuthContext();
+  const { convexUserId } = useConvexUser(user?.id);
+  const project = useProjectBySlug(organization?.id, slug);
+  const projectMemberActions = useProjectMemberActions();
+  const projectId = project?._id as Id<"projects"> | undefined;
+  const { members: liveMembers, isLoading: membersLoading } =
+    useProjectMembers(projectId);
+  const { members: liveAssignableMembers, isLoading: assignableLoading } =
+    useAssignableProjectMembers(projectId, convexUserId);
+  const members = liveMembers as ProjectMember[];
+  const assignableMembers = liveAssignableMembers as AssignableMember[];
+  const isLoading =
+    project === undefined || membersLoading || assignableLoading;
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -146,50 +160,6 @@ export default function ProjectMembersPage({
     !!selectedAddTarget &&
     isEnvScopedRole(normalizeOrgRole(selectedAddTarget.orgRole));
 
-  async function fetchData() {
-    try {
-      if (!organization?.id) return;
-
-      // Fetch project
-      const projectsRes = await fetch(
-        `/api/projects?organizationId=${organization.id}`
-      );
-      const projectsData = await projectsRes.json();
-      const foundProject = projectsData.projects?.find(
-        (p: Project) => p.slug === slug
-      );
-
-      if (!foundProject) {
-        setError("Project not found");
-        setIsLoading(false);
-        return;
-      }
-
-      setProject(foundProject);
-
-      // Fetch project members
-      const membersRes = await fetch(
-        `/api/projects/${foundProject._id}/members`
-      );
-      const membersData = await membersRes.json();
-
-      if (!membersRes.ok) {
-        throw new Error(membersData.error || "Failed to fetch members");
-      }
-
-      setMembers(membersData.members ?? []);
-      setAssignableMembers(membersData.assignableMembers ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    fetchData();
-  }, [organization?.id, slug]);
-
   async function handleAddMember(e: React.FormEvent) {
     e.preventDefault();
     if (!project || !selectedUserId) return;
@@ -203,27 +173,18 @@ export default function ProjectMembersPage({
       : undefined;
 
     try {
-      const response = await fetch(`/api/projects/${project._id}/members`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: selectedUserId,
-          ...(environments ? { environments } : {}),
-        }),
+      await projectMemberActions.add({
+        projectId: project._id,
+        userId: selectedUserId,
+        environments,
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to add member");
-      }
 
       setSuccessMessage("Member added successfully");
       setShowAddMember(false);
       setSelectedUserId("");
       setAddEnvScope(allEnvironments());
-      await fetchData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(sanitizeConvexError(err));
     } finally {
       setIsAdding(false);
     }
@@ -249,25 +210,16 @@ export default function ProjectMembersPage({
     const environments = scopeToPayload(editEnvScope);
 
     try {
-      const response = await fetch(`/api/projects/${project._id}/members`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: editingScopeMember.userId,
-          ...(environments ? { environments } : {}),
-        }),
+      await projectMemberActions.setEnvironments({
+        projectId: project._id,
+        userId: editingScopeMember.userId,
+        environments,
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to update environment access");
-      }
 
       setSuccessMessage("Environment access updated");
       setEditingScopeMember(null);
-      await fetchData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(sanitizeConvexError(err));
     } finally {
       setIsSavingScope(false);
     }
@@ -278,20 +230,11 @@ export default function ProjectMembersPage({
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/projects/${project._id}/members?userId=${userId}`,
-        { method: "DELETE" }
-      );
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to remove member");
-      }
+      await projectMemberActions.remove({ projectId: project._id, userId });
 
       setSuccessMessage("Member removed");
-      await fetchData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(sanitizeConvexError(err));
     }
   }
 

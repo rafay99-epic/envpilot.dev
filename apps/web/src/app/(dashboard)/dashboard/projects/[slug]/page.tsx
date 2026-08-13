@@ -87,15 +87,9 @@ interface VersionRecord {
 export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const { slug } = use(params);
   const { canDo, organization, user, capabilities } = useAuthContext();
-  // Project-scoped gates come from the caller's resolved registry capability
-  // profile (getMyPermissions). Assignment is enforced server-side; these
-  // only shape the UI and work for custom roles too.
   const canCreateVariable = capabilities["project.variables.create"] === true;
   const canUpdateVariable = capabilities["project.variables.update"] === true;
   const canDeleteVariable = capabilities["project.variables.delete"] === true;
-  // Trash holds docs too, and any project member can delete a page they wrote.
-  // Gating the link on variable-delete alone hid the only route back for a
-  // member who trashed their own doc.
   const canSeeTrash =
     canDeleteVariable || capabilities["project.read"] === true;
   const canRequestVariable = capabilities["project.requests.submit"] === true;
@@ -110,7 +104,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const createTag = useCreateTag();
   const orgTags = showTags ? tagsData : [];
 
-  // Variable selection store for bulk operations
   const {
     selectedIds,
     isSelectionMode,
@@ -151,7 +144,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         setShowCreateModal(true);
       }
     },
-    { enabled: addVarBinding.type === "sequence" }
+    addVarBinding.type === "sequence"
+      ? { enabled: true }
+      : { enabled: false, conflictBehavior: "allow" }
   );
 
   // --- Convex: real-time data fetching (direct WebSocket, no API proxy) ---
@@ -823,7 +818,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Export Button */}
+            {}
             <button
               onClick={() => setShowExportDrawer(true)}
               className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
@@ -844,7 +839,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               Export
             </button>
 
-            {/* Import Button */}
+            {}
             {canCreateVariable && (
               <button
                 onClick={() => setShowImportDrawer(true)}
@@ -867,7 +862,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               </button>
             )}
 
-            {/* Add Variable Button */}
+            {}
             {(canCreateVariable || canRequestVariable) && (
               <button
                 onClick={() => setShowCreateModal(true)}
@@ -1005,7 +1000,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                   organizationId: organization.id,
                   name,
                   color,
-                  createdBy: convexUserId as string,
                 });
               }
             : undefined
@@ -1022,7 +1016,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         variant="danger"
       />
 
-      {/* Export Drawer */}
+      {}
       {projectId && (
         <ExportDialog
           isOpen={showExportDrawer}
@@ -1033,7 +1027,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         />
       )}
 
-      {/* Import Drawer */}
+      {}
       {projectId && (
         <ImportDialog
           isOpen={showImportDrawer}
@@ -1043,7 +1037,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         />
       )}
 
-      {/* Bulk Delete Confirm Dialog */}
+      {}
       <ConfirmDialog
         isOpen={showBulkDeleteConfirm}
         onClose={() => setShowBulkDeleteConfirm(false)}
@@ -1054,7 +1048,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         variant="danger"
       />
 
-      {/* Floating Bulk Action Bar */}
+      {}
       {isSelectionMode && selectedIds.size > 0 && (
         <FeatureGate
           organizationId={orgId}
@@ -1121,7 +1115,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         </FeatureGate>
       )}
 
-      {/* Share Secret Drawer */}
+      {}
       {sharingVariable && projectId && orgId && (
         <ShareSecretDrawer
           isOpen={!!sharingVariable}

@@ -169,7 +169,9 @@ export function CommandPalette() {
         openPalette();
       }
     },
-    { enabled: cmdPaletteBinding.type === "sequence" }
+    cmdPaletteBinding.type === "sequence"
+      ? { enabled: true }
+      : { enabled: false, conflictBehavior: "allow" }
   );
 
   // Listen for custom open event (from search trigger button)

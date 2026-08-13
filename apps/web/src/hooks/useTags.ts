@@ -56,7 +56,6 @@ export function useCreateTag() {
       organizationId: string;
       name: string;
       color: string;
-      createdBy: string;
     }) => {
       setIsPending(true);
       try {
@@ -64,7 +63,6 @@ export function useCreateTag() {
           organizationId: data.organizationId as Id<"organizations">,
           name: data.name,
           color: data.color,
-          createdBy: data.createdBy as Id<"users">,
         });
         return { tag: { _id: tagId } };
       } catch (error) {
@@ -94,7 +92,6 @@ export function useUpdateTag() {
       tagId: string;
       name?: string;
       color?: string;
-      updatedBy: string;
     }) => {
       setIsPending(true);
       try {
@@ -102,7 +99,6 @@ export function useUpdateTag() {
           tagId: data.tagId as Id<"variableTags">,
           name: data.name,
           color: data.color,
-          updatedBy: data.updatedBy as Id<"users">,
         });
         return { tag: { _id: tagId } };
       } catch (error) {
@@ -128,12 +124,11 @@ export function useDeleteTag() {
 
   return {
     isPending,
-    mutateAsync: async (data: { tagId: string; deletedBy: string }) => {
+    mutateAsync: async (data: { tagId: string }) => {
       setIsPending(true);
       try {
         const result = await mutate({
           tagId: data.tagId as Id<"variableTags">,
-          deletedBy: data.deletedBy as Id<"users">,
         });
         return result;
       } catch (error) {

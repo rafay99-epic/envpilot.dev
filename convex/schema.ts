@@ -205,6 +205,7 @@ export default defineSchema({
     deletedAt: v.optional(v.number()),
   })
     .index("by_organization", ["organizationId"])
+    .index("by_organization_and_deleted_at", ["organizationId", "deletedAt"])
     .index("by_org_and_slug", ["organizationId", "slug"])
     .index("by_created_by", ["createdBy"]),
 
@@ -329,6 +330,7 @@ export default defineSchema({
     deletedAt: v.optional(v.number()),
   })
     .index("by_organization", ["organizationId"])
+    .index("by_organization_and_deleted_at", ["organizationId", "deletedAt"])
     .index("by_organization_and_name", ["organizationId", "name"]),
 
   // ==========================================

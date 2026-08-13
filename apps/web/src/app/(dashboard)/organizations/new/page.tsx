@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
+import { useCreateOrganization } from "@/hooks";
+import { sanitizeConvexError } from "@/lib/error-messages";
 
 export default function NewOrganizationPage() {
   const router = useRouter();
+  const createOrganization = useCreateOrganization();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tierLimitHit, setTierLimitHit] = useState(false);
@@ -43,32 +46,18 @@ export default function NewOrganizationPage() {
     setError(null);
 
     try {
-      const response = await fetch("/api/organizations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          slug,
-          description: description || undefined,
-        }),
+      const organizationId = await createOrganization({
+        name,
+        slug,
+        description: description || undefined,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.code === "TIER_LIMIT_REACHED") {
-          setTierLimitHit(true);
-          setIsSubmitting(false);
-          return;
-        }
-        throw new Error(data.error || "Failed to create organization");
-      }
-
-      setActiveOrganizationCookie(data.organization._id);
-      router.push(`/organizations/${data.organization.slug}`);
+      setActiveOrganizationCookie(organizationId);
+      router.push(`/organizations/${slug}`);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      const message = sanitizeConvexError(err);
+      if (message.toLowerCase().includes("limit")) setTierLimitHit(true);
+      else setError(message);
       setIsSubmitting(false);
     }
   }

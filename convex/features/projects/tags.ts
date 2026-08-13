@@ -1,9 +1,11 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { createAuditLog } from "../../lib/audit";
-import { normalizeOrgRole, assertOrgAction } from "../../lib/authz";
+import { assertOrgAction } from "../../lib/authz";
+import { getActiveMembership } from "../../lib/authz";
+import { requireAuthedUser } from "../../lib/identity";
 import { rateLimiter } from "../../lib/rateLimits";
 
 /**
@@ -19,7 +21,6 @@ import { rateLimiter } from "../../lib/rateLimits";
 
 const MAX_TAGS_PER_ORG = 100;
 const MAX_TAG_NAME_LENGTH = 50;
-const CASCADE_BATCH_SIZE = 100;
 const MAX_CASCADE_UPDATES = 500;
 
 const SYSTEM_TAGS: Array<{ name: string; color: string }> = [
@@ -75,30 +76,24 @@ export const listByOrganization = query({
   },
   returns: v.array(tagDocValidator),
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const membership = await getActiveMembership(
+      ctx,
+      args.organizationId,
+      actor._id
+    );
+    if (!membership) {
+      throw new ConvexError("You are not a member of this organization.");
+    }
+
     const tags = await ctx.db
       .query("variableTags")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
+      .withIndex("by_organization_and_deleted_at", (q) =>
+        q.eq("organizationId", args.organizationId).eq("deletedAt", undefined)
       )
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
+      .take(MAX_TAGS_PER_ORG);
 
     return tags.sort((a, b) => a.name.localeCompare(b.name));
-  },
-});
-
-/**
- * Get a single tag by ID.
- */
-export const getById = query({
-  args: {
-    tagId: v.id("variableTags"),
-  },
-  returns: v.union(tagDocValidator, v.null()),
-  handler: async (ctx, args) => {
-    const tag = await ctx.db.get(args.tagId);
-    if (!tag || tag.deletedAt) return null;
-    return tag;
   },
 });
 
@@ -115,16 +110,16 @@ export const create = mutation({
     organizationId: v.id("organizations"),
     name: v.string(),
     color: v.string(),
-    createdBy: v.id("users"),
   },
   returns: v.id("variableTags"),
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     const now = Date.now();
 
     // Auth: verify caller is a member of the org
     await assertOrgAction(
       ctx,
-      args.createdBy,
+      actor._id,
       args.organizationId,
       "org:create_tag"
     );
@@ -142,14 +137,14 @@ export const create = mutation({
       "variable_tags"
     );
     if (!gate.allowed) {
-      throw new Error(
+      throw new ConvexError(
         "Variable tags requires a higher tier. Upgrade to enable tagging."
       );
     }
 
     // Validate color is a valid hex color
     if (!isValidHexColor(args.color)) {
-      throw new Error(
+      throw new ConvexError(
         "Invalid color format. Must be a hex color (e.g., #3b82f6)."
       );
     }
@@ -157,10 +152,10 @@ export const create = mutation({
     // Validate and sanitize name
     const trimmedName = args.name.trim();
     if (!trimmedName) {
-      throw new Error("Tag name cannot be empty");
+      throw new ConvexError("Tag name cannot be empty");
     }
     if (trimmedName.length > MAX_TAG_NAME_LENGTH) {
-      throw new Error(
+      throw new ConvexError(
         `Tag name must be ${MAX_TAG_NAME_LENGTH} characters or less`
       );
     }
@@ -168,14 +163,13 @@ export const create = mutation({
     // Check uniqueness within org (case-insensitive) + enforce max tags limit
     const existing = await ctx.db
       .query("variableTags")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
+      .withIndex("by_organization_and_deleted_at", (q) =>
+        q.eq("organizationId", args.organizationId).eq("deletedAt", undefined)
       )
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
+      .take(MAX_TAGS_PER_ORG);
 
     if (existing.length >= MAX_TAGS_PER_ORG) {
-      throw new Error(
+      throw new ConvexError(
         `Maximum of ${MAX_TAGS_PER_ORG} tags per organization reached`
       );
     }
@@ -184,7 +178,7 @@ export const create = mutation({
       (t) => t.name.toLowerCase() === trimmedName.toLowerCase()
     );
     if (duplicate) {
-      throw new Error(
+      throw new ConvexError(
         `Tag "${trimmedName}" already exists in this organization`
       );
     }
@@ -193,14 +187,14 @@ export const create = mutation({
       organizationId: args.organizationId,
       name: trimmedName,
       color: args.color,
-      createdBy: args.createdBy,
+      createdBy: actor._id,
       createdAt: now,
       updatedAt: now,
     });
 
     await createAuditLog(ctx, {
       organizationId: args.organizationId,
-      userId: args.createdBy,
+      userId: actor._id,
       action: "tag.created",
       details: { tagName: trimmedName, color: args.color },
     });
@@ -218,22 +212,17 @@ export const update = mutation({
     tagId: v.id("variableTags"),
     name: v.optional(v.string()),
     color: v.optional(v.string()),
-    updatedBy: v.id("users"),
   },
   returns: v.id("variableTags"),
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     const tag = await ctx.db.get(args.tagId);
     if (!tag || tag.deletedAt) {
-      throw new Error("Tag not found");
+      throw new ConvexError("Tag not found");
     }
 
     // Auth: verify caller is admin or team_lead in the org
-    await assertOrgAction(
-      ctx,
-      args.updatedBy,
-      tag.organizationId,
-      "org:manage_tag"
-    );
+    await assertOrgAction(ctx, actor._id, tag.organizationId, "org:manage_tag");
 
     // Rate limit
     await rateLimiter.limit(ctx, "tagMutate", {
@@ -248,10 +237,10 @@ export const update = mutation({
     if (args.name !== undefined) {
       const trimmedName = args.name.trim();
       if (!trimmedName) {
-        throw new Error("Tag name cannot be empty");
+        throw new ConvexError("Tag name cannot be empty");
       }
       if (trimmedName.length > MAX_TAG_NAME_LENGTH) {
-        throw new Error(
+        throw new ConvexError(
           `Tag name must be ${MAX_TAG_NAME_LENGTH} characters or less`
         );
       }
@@ -259,11 +248,10 @@ export const update = mutation({
       // Check uniqueness (exclude self)
       const existing = await ctx.db
         .query("variableTags")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", tag.organizationId)
+        .withIndex("by_organization_and_deleted_at", (q) =>
+          q.eq("organizationId", tag.organizationId).eq("deletedAt", undefined)
         )
-        .collect()
-        .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
+        .take(MAX_TAGS_PER_ORG);
 
       const duplicate = existing.find(
         (t) =>
@@ -271,7 +259,7 @@ export const update = mutation({
           t.name.toLowerCase() === trimmedName.toLowerCase()
       );
       if (duplicate) {
-        throw new Error(
+        throw new ConvexError(
           `Tag "${trimmedName}" already exists in this organization`
         );
       }
@@ -281,7 +269,7 @@ export const update = mutation({
 
     if (args.color !== undefined) {
       if (!isValidHexColor(args.color)) {
-        throw new Error(
+        throw new ConvexError(
           "Invalid color format. Must be a hex color (e.g., #3b82f6)."
         );
       }
@@ -292,7 +280,7 @@ export const update = mutation({
 
     await createAuditLog(ctx, {
       organizationId: tag.organizationId,
-      userId: args.updatedBy,
+      userId: actor._id,
       action: "tag.updated",
       details: {
         tagName: tag.name,
@@ -312,22 +300,17 @@ export const update = mutation({
 export const remove = mutation({
   args: {
     tagId: v.id("variableTags"),
-    deletedBy: v.id("users"),
   },
   returns: v.object({ deleted: v.boolean(), variablesAffected: v.number() }),
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     const tag = await ctx.db.get(args.tagId);
     if (!tag || tag.deletedAt) {
-      throw new Error("Tag not found");
+      throw new ConvexError("Tag not found");
     }
 
     // Auth: verify caller is admin or team_lead in the org
-    await assertOrgAction(
-      ctx,
-      args.deletedBy,
-      tag.organizationId,
-      "org:manage_tag"
-    );
+    await assertOrgAction(ctx, actor._id, tag.organizationId, "org:manage_tag");
 
     // Rate limit
     await rateLimiter.limit(ctx, "tagMutate", {
@@ -341,30 +324,40 @@ export const remove = mutation({
       updatedAt: Date.now(),
     });
 
-    // Cascade: strip this tag ID from all variables that reference it
-    // Process in batches to avoid unbounded loops
+    // Cascade: strip this tag ID from all active variables. Refuse oversized
+    // cascades atomically instead of deleting the tag and leaving dangling IDs.
     const projects = await ctx.db
       .query("projects")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", tag.organizationId)
+      .withIndex("by_organization_and_deleted_at", (q) =>
+        q.eq("organizationId", tag.organizationId).eq("deletedAt", undefined)
       )
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
+      .take(MAX_CASCADE_UPDATES + 1);
+
+    if (projects.length > MAX_CASCADE_UPDATES) {
+      throw new ConvexError(
+        "This tag is used across too many projects to delete safely. Contact support."
+      );
+    }
 
     let strippedCount = 0;
     let totalProcessed = 0;
 
     for (const project of projects) {
-      if (totalProcessed >= MAX_CASCADE_UPDATES) break;
-
+      const remaining = MAX_CASCADE_UPDATES - totalProcessed;
       const variables = await ctx.db
         .query("environmentVariables")
-        .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .take(CASCADE_BATCH_SIZE)
-        .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
+        .withIndex("by_project_deleted", (q) =>
+          q.eq("projectId", project._id).eq("deletedAt", undefined)
+        )
+        .take(remaining + 1);
+
+      if (variables.length > remaining) {
+        throw new ConvexError(
+          "This tag is used across too many variables to delete safely. Contact support."
+        );
+      }
 
       for (const variable of variables) {
-        if (totalProcessed >= MAX_CASCADE_UPDATES) break;
         totalProcessed++;
 
         if (variable.tagIds && variable.tagIds.includes(args.tagId)) {
@@ -381,7 +374,7 @@ export const remove = mutation({
 
     await createAuditLog(ctx, {
       organizationId: tag.organizationId,
-      userId: args.deletedBy,
+      userId: actor._id,
       action: "tag.deleted",
       details: {
         tagName: tag.name,

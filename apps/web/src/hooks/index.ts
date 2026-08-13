@@ -1,8 +1,12 @@
 // Organization hooks
 export {
   useUserOrganizations,
+  useCurrentUserOrganizations,
+  useCreateOrganization,
   useOrganization,
+  useOrganizationBySlug,
   useOrganizationMembers,
+  useOrganizationMemberCount,
   useAssignableRoles,
   type AssignableRole,
 } from "./useOrganizations";
@@ -15,6 +19,12 @@ export {
   useUserProjects,
   useProjectBySlug,
 } from "./useProjects";
+export {
+  useCreateProject,
+  useUpdateProject,
+  useDeleteProject,
+  useMoveProject,
+} from "./useProjectActions";
 
 // Variable hooks
 export {
@@ -113,6 +123,7 @@ export {
   useProjectMembers,
   useProjectMembership,
   useAssignableProjectMembers,
+  useProjectMemberActions,
 } from "./useProjectMembers";
 
 // Favorite hooks
