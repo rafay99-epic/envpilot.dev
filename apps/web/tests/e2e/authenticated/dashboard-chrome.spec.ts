@@ -3,18 +3,12 @@ import { expect, test } from "@playwright/test";
 import { hasE2ECredentials, SKIP_REASON } from "../env";
 import { trackClientErrors } from "./support";
 
-// Authenticated e2e — the design token system (packages/ui/src/theme.css).
-//
-// Tailwind's default palette is deleted there with `--color-*: initial`, so a
-// class the migration missed emits NO css and renders an invisible element
-// rather than failing a build. Nothing else in the pipeline catches that:
-// typecheck passes, lint only sees classes typed as literals, and the app
-// still "works". These assertions read computed styles so a surface that
-// silently lost its paint fails here.
+// With the palette deleted in theme.css, a missed class emits no CSS and
+// renders invisible instead of failing the build — typecheck and lint both
+// pass. These assertions read computed styles, which is what catches it.
 
 test.skip(!hasE2ECredentials, SKIP_REASON);
 
-/** Every color the app paints resolves through one of these. */
 const REQUIRED_TOKENS = [
   "--color-canvas",
   "--color-surface",

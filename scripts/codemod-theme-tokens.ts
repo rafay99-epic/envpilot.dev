@@ -60,7 +60,6 @@ const LINE_PREFIXES = [
   "to",
 ];
 
-/** Semantic token names, for recognising already-migrated classes. */
 const TOKEN_NAMES = [
   "canvas",
   "surface-raised",
@@ -155,7 +154,6 @@ const CLASS_RE = new RegExp(
   "g"
 );
 
-/** Which semantic family a palette name belongs to, or null for neutrals. */
 function familyOf(palette: string): string | null {
   for (const [family, members] of Object.entries(FAMILIES)) {
     if (members.includes(palette)) return family;
@@ -173,8 +171,6 @@ function mapClass(
   const family = familyOf(palette);
 
   if (family) {
-    // Alpha fills and light steps become the family's soft/line token, which
-    // already carries the transparency. Everything else is the solid color.
     let token: string;
     if (LINE_PREFIXES.includes(prefix)) {
       token = `${family}-line`;
@@ -192,12 +188,9 @@ function mapClass(
     return `${variants}${prefix}-${token}${keepAlpha}`;
   }
 
-  // Neutrals.
   let token: string | undefined;
   if (SURFACE_PREFIXES.includes(prefix)) {
     token = SURFACE_BY_STEP[step];
-    // A neutral background behind an interaction variant is a hover surface,
-    // whatever step the author reached for.
     if (
       token &&
       /\b(hover|focus|active|group-hover|aria-selected):/.test(variants)
@@ -216,15 +209,11 @@ function mapClass(
   return `${variants}${prefix}-${token}${keepAlpha}`;
 }
 
-/**
- * Drop the light half of a `light dark:x` pair and unwrap the dark variant.
- * Runs before mapping so both halves are still recognisable as palette classes.
- */
+/** Drop the light half of a `light dark:x` pair. Runs before mapping. */
 function collapseDarkPairs(text: string): string {
   const prefixes = ALL_PREFIXES.join("|");
   const palettes = PALETTES.join("|");
-  // `text-zinc-900 dark:text-zinc-100` -> `dark:text-zinc-100`, but only when
-  // both halves target the same utility (\1) — `bg-x dark:text-y` is not a pair.
+  // \1 pins the utility, so `bg-x dark:text-y` is not treated as a pair.
   const pair = new RegExp(
     String.raw`\b(${prefixes})-(?:(?:${palettes})-\d{2,3}(?:\/[\d.]+)?|white|black|transparent)\s+(dark:\1-)`,
     "g"
@@ -240,17 +229,14 @@ function collapseDarkPairs(text: string): string {
 }
 
 /**
- * Second-chance collapse for pairs the palette-level pass could not see —
- * `hover:bg-x dark:hover:bg-y`, where the variant chain sits between `dark:`
- * and the utility. Both halves are already migrated by this point, so the
- * match is against token names rather than palette names. Restricting to
- * TOKEN_NAMES is what keeps `text-sm dark:text-ink` from losing its size.
+ * Catches pairs whose variant chain sits between `dark:` and the utility.
+ * Matches token names since both halves are migrated by now; that restriction
+ * is what stops `text-sm` being eaten as the light half of a pair.
  */
 function collapseMigratedDarkPairs(text: string): string {
   const prefixes = ALL_PREFIXES.join("|");
   const tokens = TOKEN_NAMES.join("|");
-  // \1 pins the variant chain and \2 the utility prefix, so only a genuine
-  // light/dark pair of the SAME property collapses.
+  // \1 pins the variant chain, \2 the prefix — same property only.
   const pair = new RegExp(
     String.raw`\b((?:(?!dark:)[a-z0-9-]+:)*)(${prefixes})-(?:${tokens})(?:\/[\d.]+)?\s+(dark:\1\2-(?:${tokens})(?:\/[\d.]+)?)`,
     "g"
@@ -263,7 +249,7 @@ function collapseMigratedDarkPairs(text: string): string {
     out = out.replace(pair, "$3");
   } while (out !== previous);
 
-  // Whatever `dark:` classes remain apply unconditionally in a dark-only app.
+  // Remaining `dark:` classes apply unconditionally in a dark-only app.
   return out.replace(
     new RegExp(String.raw`\bdark:((?:(?:[a-z0-9-]+:)*)(?:${prefixes})-)`, "g"),
     "$1"
@@ -271,13 +257,9 @@ function collapseMigratedDarkPairs(text: string): string {
 }
 
 /**
- * Drop earlier duplicates of the same property within one class list.
- *
- * The pair collapses above only fire when the two halves are adjacent. Authors
- * frequently wrote them apart — `bg-white … text-zinc-900 … dark:bg-zinc-800
- * dark:text-zinc-100` — so after unwrapping `dark:` BOTH halves land in the
- * same list and CSS source order silently decides the winner. The dark half was
- * the intended one, and it is always last, so last-wins is the correct rule.
+ * Last-wins dedupe per property. The collapses above only fire on adjacent
+ * halves; authors often wrote them apart, so both survive the unwrap and CSS
+ * source order silently decides. The dark half is last and is the intended one.
  */
 function dedupeClassLists(text: string): string {
   const prefixes = ALL_PREFIXES.join("|");
@@ -353,17 +335,14 @@ function migrate(text: string): string {
 
 function selftest(): void {
   const cases: [string, string][] = [
-    // neutral ramps
     ['"bg-zinc-900"', '"bg-surface"'],
     ['"bg-zinc-800"', '"bg-surface-raised"'],
     ['"text-zinc-500"', '"text-ink-subtle"'],
     ['"text-zinc-100"', '"text-ink"'],
     ['"border-zinc-700/50"', '"border-line"'],
     ['"divide-zinc-800"', '"divide-line"'],
-    // interaction variants pick the hover surface
     ['"hover:bg-zinc-800"', '"hover:bg-surface-hover"'],
     ['"md:hover:bg-zinc-700"', '"md:hover:bg-surface-hover"'],
-    // accent + status families
     ['"text-green-400"', '"text-accent"'],
     ['"bg-green-500/10"', '"bg-accent-soft"'],
     ['"border-green-500/30"', '"border-accent-line"'],
@@ -371,34 +350,24 @@ function selftest(): void {
     ['"text-red-400"', '"text-danger"'],
     ['"text-blue-400"', '"text-info"'],
     ['"text-purple-400"', '"text-premium"'],
-    // dead light/dark pairs collapse to the dark half
     ['"text-zinc-900 dark:text-zinc-100"', '"text-ink"'],
     ['"bg-zinc-100 dark:bg-zinc-800"', '"bg-surface-raised"'],
-    // mismatched prefixes are NOT a pair — both survive
     ['"bg-zinc-100 dark:text-zinc-100"', '"bg-surface-raised text-ink"'],
-    // pairs whose variant chain sits between dark: and the utility
     ['"hover:bg-zinc-800 dark:hover:bg-zinc-700"', '"hover:bg-surface-hover"'],
     ['"md:text-zinc-900 dark:md:text-zinc-100"', '"md:text-ink"'],
-    // directional borders — the prefix alternation must offer border-t first
     ['"border-t-zinc-400"', '"border-t-line-strong"'],
     ['"ring-offset-zinc-900"', '"ring-offset-line"'],
-    // inline styles reaching the palette through CSS variables
     ['"var(--color-zinc-500)"', '"var(--color-ink-subtle)"'],
     ['"var(--color-green-500)"', '"var(--color-accent)"'],
-    // a size utility must survive next to a dark: color
     ['"text-sm dark:text-ink"', '"text-sm text-ink"'],
-    // non-adjacent light/dark halves: after unwrapping, the dark half (last)
-    // is the one the author meant to win
     [
       '"rounded border bg-white p-2 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"',
       '"rounded border p-2 bg-surface-raised text-ink"',
     ],
-    // different variant chains are different properties, both survive
     [
       '"bg-surface hover:bg-surface-hover"',
       '"bg-surface hover:bg-surface-hover"',
     ],
-    // untouched: not a class, no palette step
     ['"text-sm font-medium"', '"text-sm font-medium"'],
     ['"variable.rotation_reminder_sent"', '"variable.rotation_reminder_sent"'],
   ];

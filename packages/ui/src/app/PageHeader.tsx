@@ -8,11 +8,7 @@ export interface PageHeaderProps {
   title: string;
   description?: ReactNode;
   actions?: ReactNode;
-  /**
-   * Mono command line above the title, matching the landing page's `❯ cmd`
-   * treatment — e.g. "envpilot usage". Pages that map to a real CLI command
-   * should set it; the rest read fine without.
-   */
+  /** Mono `❯ cmd` line above the title, e.g. "envpilot usage". */
   cmd?: string;
 }
 

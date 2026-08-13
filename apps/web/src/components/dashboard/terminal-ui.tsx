@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-/** The panel identity, shared with the landing page chrome. */
 const panel = "rounded-panel bg-surface ring-1 ring-line shadow-panel";
 
 export function TerminalWindow({
@@ -12,11 +11,8 @@ export function TerminalWindow({
   className = "",
 }: {
   title: string;
-  /** Muted right-aligned note in the title bar. */
   meta?: string;
-  /** Renders the `$ cmd` toolbar row under the title bar. */
   cmd?: string;
-  /** Trailing link for that toolbar row, e.g. "View all". */
   action?: { label: string; href: string };
   children: React.ReactNode;
   className?: string;
@@ -34,7 +30,6 @@ export function TerminalWindow({
         )}
       </div>
 
-      {/* Every widget used to hand-roll this row; it is a prop now. */}
       {cmd && (
         <div className="flex items-center justify-between border-b border-line px-5 py-2.5">
           <span className="truncate font-mono text-xs text-ink-subtle">
@@ -95,8 +90,7 @@ export function TerminalSelect({
 
 type ButtonVariant = "primary" | "secondary" | "danger";
 
-// Hover has to differ from the resting fill — every variant previously hovered
-// to its own background, so nothing moved on pointer-over.
+// Hover must differ from the resting fill, or nothing moves on pointer-over.
 const buttonVariants: Record<ButtonVariant, string> = {
   primary: "border-accent-line bg-accent-soft text-accent hover:bg-accent-line",
   secondary:

@@ -2,10 +2,8 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
-// Raw palette classes do not compile any more (packages/ui/src/theme.css
-// deletes Tailwind's palette with `--color-*: initial`), so typing one yields
-// an invisible element rather than an error. This turns that silence into a
-// message naming the replacement.
+// theme.css deletes the palette, so a raw palette class renders invisible
+// rather than erroring. This turns that silence into a message.
 const PALETTE_CLASS =
   "\\b(?:bg|text|border|border-[xytrbles]|divide|divide-[xy]|ring|ring-offset|" +
   "outline|placeholder|from|via|to|fill|stroke|shadow|caret|accent|decoration)" +
@@ -32,8 +30,7 @@ const eslintConfig = defineConfig([
           message: PALETTE_MESSAGE,
         },
         {
-          // Template literals hold the class strings in the shared primitives,
-          // and their value is an object — hence value.raw, not value.
+          // TemplateElement.value is an object — hence value.raw.
           selector: `TemplateElement[value.raw=/${PALETTE_CLASS}/]`,
           message: PALETTE_MESSAGE,
         },
