@@ -36,7 +36,8 @@ export function useOrganizationTags(
   );
 
   return {
-    tags: (tags ?? []) as Tag[],
+    tags: (tags?.tags ?? []) as Tag[],
+    hasOverflow: tags?.hasOverflow ?? false,
     isLoading: organizationId ? tags === undefined : false,
   };
 }

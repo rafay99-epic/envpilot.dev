@@ -75,7 +75,10 @@ export const listByOrganization = query({
   args: {
     organizationId: v.id("organizations"),
   },
-  returns: v.array(tagDocValidator),
+  returns: v.object({
+    tags: v.array(tagDocValidator),
+    hasOverflow: v.boolean(),
+  }),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
     const membership = await getActiveMembership(
@@ -94,13 +97,12 @@ export const listByOrganization = query({
       )
       .take(MAX_TAGS_PER_ORG + 1);
 
-    if (tags.length > MAX_TAGS_PER_ORG) {
-      throw new ConvexError(
-        "This organization has more tags than the supported limit. Contact support."
-      );
-    }
-
-    return tags.sort((a, b) => a.name.localeCompare(b.name));
+    return {
+      tags: tags
+        .slice(0, MAX_TAGS_PER_ORG)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      hasOverflow: tags.length > MAX_TAGS_PER_ORG,
+    };
   },
 });
 
@@ -364,20 +366,31 @@ export const cascadeTagRemoval = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    let projectId = args.projectId;
-    let nextProjectCursor = args.projectCursor;
-
-    if (!projectId) {
+    if (!args.projectId) {
       const projects = await ctx.db
         .query("projects")
         .withIndex("by_organization_and_deleted_at", (q) =>
           q.eq("organizationId", args.organizationId).eq("deletedAt", undefined)
         )
         .paginate({ numItems: 1, cursor: args.projectCursor ?? null });
-      projectId = projects.page[0]?._id;
+      const projectId = projects.page[0]?._id;
       if (!projectId) return null;
-      nextProjectCursor = projects.continueCursor;
+
+      // Convex permits only one paginated read per function execution. Hand
+      // the selected project to a fresh invocation before paging variables.
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.projects.tags.cascadeTagRemoval,
+        {
+          tagId: args.tagId,
+          organizationId: args.organizationId,
+          projectCursor: projects.continueCursor,
+          projectId,
+        }
+      );
+      return null;
     }
+    const projectId = args.projectId;
 
     const variables = await ctx.db
       .query("environmentVariables")
@@ -406,12 +419,12 @@ export const cascadeTagRemoval = internalMutation({
         ? {
             tagId: args.tagId,
             organizationId: args.organizationId,
-            projectCursor: nextProjectCursor,
+            projectCursor: args.projectCursor,
           }
         : {
             tagId: args.tagId,
             organizationId: args.organizationId,
-            projectCursor: nextProjectCursor,
+            projectCursor: args.projectCursor,
             projectId,
             variableCursor: variables.continueCursor,
           }

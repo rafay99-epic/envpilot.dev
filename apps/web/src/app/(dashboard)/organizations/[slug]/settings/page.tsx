@@ -673,7 +673,7 @@ const TAG_COLORS = [
 ];
 
 function TagSettingsTab({ organizationId }: { organizationId: string }) {
-  const { tags, isLoading } = useOrganizationTags(organizationId);
+  const { tags, hasOverflow, isLoading } = useOrganizationTags(organizationId);
   const isFetchError = false; // Convex handles errors via error boundaries
   const createTagMut = useCreateTag();
   const updateTagMut = useUpdateTag();
@@ -938,6 +938,15 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
           >
             Dismiss
           </button>
+        </div>
+      )}
+
+      {hasOverflow && (
+        <div className="rounded-lg border border-warning-line bg-warning-soft p-4">
+          <p className="text-sm text-warning">
+            Showing the first 100 tags. Delete unused tags to reveal the
+            remaining legacy tags.
+          </p>
         </div>
       )}
 

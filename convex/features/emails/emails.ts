@@ -297,44 +297,6 @@ export const sendOrgTransferConfirmationEmail = action({
   },
 });
 
-export const sendProjectTransferEmail = action({
-  args: {
-    to: v.string(),
-    projectName: v.string(),
-    organizationName: v.string(),
-    transferredByName: v.string(),
-  },
-  handler: async (_ctx, args) => {
-    const safeProject = escapeHtml(args.projectName);
-    const safeOrg = escapeHtml(args.organizationName);
-    const safeTransferredBy = escapeHtml(args.transferredByName);
-    const initial = args.projectName.charAt(0).toUpperCase();
-
-    const html = emailWrapper(
-      `Project Transferred - ${safeProject}`,
-      [
-        iconRow(initial),
-        headingRow("Project Transferred"),
-        paragraphRow(
-          `<strong>${safeTransferredBy}</strong> has transferred the project <strong>${safeProject}</strong> to your organization <strong>${safeOrg}</strong>.`
-        ),
-        footerRow(
-          "The project and all its environment variables are now available in your organization."
-        ),
-      ].join("")
-    );
-
-    const text = `Project Transferred - ${args.projectName}\n\n${args.transferredByName} has transferred the project ${args.projectName} to your organization ${args.organizationName}.\n\nThe project and all its environment variables are now available in your organization.`;
-
-    return sendEmail(
-      args.to,
-      `Project ${args.projectName} transferred to ${args.organizationName}`,
-      html,
-      text
-    );
-  },
-});
-
 export const sendProjectTransferEmailInternal = internalAction({
   args: {
     to: v.string(),
@@ -342,6 +304,11 @@ export const sendProjectTransferEmailInternal = internalAction({
     organizationName: v.string(),
     transferredByName: v.string(),
   },
+  returns: v.object({
+    success: v.boolean(),
+    error: v.optional(v.string()),
+    skipped: v.optional(v.boolean()),
+  }),
   handler: async (_ctx, args) => {
     const safeProject = escapeHtml(args.projectName);
     const safeOrg = escapeHtml(args.organizationName);
