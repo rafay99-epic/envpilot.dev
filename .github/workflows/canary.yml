@@ -1,0 +1,59 @@
+name: Canary
+
+# Continuous production probe for the surfaces an HTTP uptime check cannot
+# reach on its own: the published GitHub Action, the REST API behind a real
+# API key, and the CLI build that npm actually serves.
+#
+# The final step pings an Instatus cron monitor. Any earlier failure skips the
+# ping, the heartbeat lapses, and Instatus opens an incident — so a workflow
+# that dies or hangs is caught as loudly as one that fails an assertion.
+#
+# NOT the published action (packages/github-action). This workflow only runs
+# here; it consumes rafay99-epic/envpilot-action@v1 as the dogfood probe.
+#
+# GitHub's scheduler skews by minutes and drops runs under load, which is why
+# the cron monitor's grace period (1800s) is far wider than the 15m interval.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Probe production
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - uses: actions/checkout@v4
+
+      # This step IS the GitHub Action probe: pulling variables exercises the
+      # published action, /api/v1/secrets, API-key authorization, and a real
+      # vault decrypt end to end. If any of that breaks, the job fails here.
+      - uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
+          required: INSTATUS_CANARY_PING_URL
+
+      - name: Published CLI runs and matches the release manifest
+        run: |
+          set -euo pipefail
+          published=$(npx -y @envpilot/cli@latest --version | tr -d '[:space:]')
+          manifest=$(curl -fsS https://www.envpilot.dev/api/version \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["cli"])')
+          echo "npm=$published manifest=$manifest"
+          if [ "$published" != "$manifest" ]; then
+            echo "::error::Published CLI ($published) does not match /api/version ($manifest)"
+            exit 1
+          fi
+
+      - name: Heartbeat
+        run: curl -fsS --retry 3 --max-time 30 "$INSTATUS_CANARY_PING_URL"
