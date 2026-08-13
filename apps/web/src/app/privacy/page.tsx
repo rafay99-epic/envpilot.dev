@@ -1,10 +1,5 @@
 import type { Metadata } from "next";
-import {
-  MarketingShell,
-  PageHero,
-  GlowDivider,
-  Reveal,
-} from "@/components/marketing";
+import { MarketingShell, PageHero, terminal } from "@/components/marketing";
 import { ScrollSpySidebar } from "@/components/ui/ScrollSpySidebar";
 
 export const metadata: Metadata = {
@@ -36,23 +31,25 @@ const SECTIONS = [
 export default function PrivacyPolicyPage() {
   return (
     <MarketingShell>
-      <PageHero eyebrow="privacy" title="Privacy Policy" align="left">
-        <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/60 px-3 py-1.5 font-mono text-xs text-ink-muted">
+      <PageHero eyebrow="privacy" title="Privacy Policy">
+        <span
+          className={`inline-flex items-center gap-2 ${terminal.mono} text-[12px] text-ink-subtle`}
+        >
           <span className="text-accent">&#10095;</span>
           Effective: March 10, 2026 &middot; Last updated: August 2, 2026
         </span>
       </PageHero>
 
-      <GlowDivider />
-
       {/* Content with sidebar */}
-      <section className="relative py-12 pb-24">
-        <div className="mx-auto grid max-w-5xl gap-12 px-4 sm:px-6 lg:grid-cols-[14rem_1fr]">
+      <section className="pb-24">
+        <div
+          className={`${terminal.shell} grid gap-12 lg:grid-cols-[14rem_1fr]`}
+        >
           {/* Sidebar TOC — client island for scroll-spy */}
           <ScrollSpySidebar sections={SECTIONS} />
 
           {/* Main content — fully server-rendered */}
-          <div className="min-w-0 font-mono text-sm leading-relaxed text-ink-muted">
+          <div className="min-w-0 font-sans text-[15px] leading-relaxed text-ink-muted">
             <Section id="introduction" n={1} title="Introduction">
               <p>
                 Envpilot (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or
@@ -295,10 +292,10 @@ export default function PrivacyPolicyPage() {
                 We share personal data with the following service providers,
                 each bound by data processing agreements:
               </p>
-              <div className="mt-4 overflow-x-auto rounded-xl border border-line bg-surface/30">
+              <div className={`mt-4 overflow-x-auto ${terminal.panel}`}>
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-line bg-surface/50">
+                    <tr className="border-b border-line bg-surface-raised">
                       <th className="px-4 py-3 font-sans font-semibold text-ink">
                         Provider
                       </th>
@@ -458,10 +455,10 @@ export default function PrivacyPolicyPage() {
                 We use only strictly necessary cookies required for the Service
                 to function:
               </p>
-              <div className="mt-4 overflow-x-auto rounded-xl border border-line bg-surface/30">
+              <div className={`mt-4 overflow-x-auto ${terminal.panel}`}>
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-line bg-surface/50">
+                    <tr className="border-b border-line bg-surface-raised">
                       <th className="px-4 py-3 font-sans font-semibold text-ink">
                         Cookie
                       </th>
@@ -498,7 +495,7 @@ export default function PrivacyPolicyPage() {
             </Section>
 
             <Section id="data-retention" n={11} title="Data Retention">
-              <div className="rounded-xl border border-line bg-surface/30 p-5">
+              <div className={`${terminal.panel} p-5`}>
                 <ul className="space-y-2 pl-4">
                   <Li>
                     <Term>Account data:</Term> retained for account duration.
@@ -536,7 +533,7 @@ export default function PrivacyPolicyPage() {
 
             <Section id="your-rights" n={12} title="Your Rights">
               <Subsection title="12.1 GDPR Rights (EEA/UK)">
-                <div className="rounded-xl border border-line bg-surface/30 p-5">
+                <div className={`${terminal.panel} p-5`}>
                   <p>You have the right to:</p>
                   <ul className="mt-2 space-y-1 pl-4">
                     <Li>
@@ -674,7 +671,7 @@ export default function PrivacyPolicyPage() {
                 For questions, concerns, or requests related to this Privacy
                 Policy or your personal data:
               </p>
-              <div className="mt-4 rounded-xl border border-line bg-surface/30 p-5">
+              <div className={`mt-4 ${terminal.panel} p-5`}>
                 <p className="flex items-center gap-2 text-ink">
                   <span className="text-accent">&#10095;</span>
                   <strong className="font-semibold">
@@ -715,17 +712,17 @@ function Section({
       id={id}
       className="scroll-mt-24 border-b border-line py-10 first:pt-0 last:border-b-0"
     >
-      <Reveal>
-        <div className="flex items-baseline gap-3">
-          <span className="font-mono text-xs tracking-widest text-accent">
-            &sect; {String(n).padStart(2, "0")}
-          </span>
-          <h2 className="font-sans text-xl font-semibold tracking-tight text-ink">
-            {title}
-          </h2>
-        </div>
-        <div className="mt-4">{children}</div>
-      </Reveal>
+      <div className="flex items-baseline gap-3">
+        <span
+          className={`${terminal.mono} text-[12px] tracking-[0.14em] text-accent`}
+        >
+          &sect; {String(n).padStart(2, "0")}
+        </span>
+        <h2 className="font-sans text-[20px] font-semibold tracking-[-0.02em] text-ink">
+          {title}
+        </h2>
+      </div>
+      <div className="mt-4">{children}</div>
     </section>
   );
 }
@@ -739,7 +736,7 @@ function Subsection({
 }) {
   return (
     <div className="mt-6">
-      <h3 className="font-sans text-sm font-semibold text-ink">{title}</h3>
+      <h3 className="font-sans text-[16px] font-semibold text-ink">{title}</h3>
       <div className="mt-2">{children}</div>
     </div>
   );

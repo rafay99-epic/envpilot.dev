@@ -81,10 +81,7 @@ export function Intro() {
         </p>
 
         <div className="mt-10 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-          <Link
-            href="/sign-up"
-            className="inline-flex items-center rounded-md bg-accent px-6 py-3 font-sans text-[15px] font-semibold text-chrome shadow-[0_0_32px_-10px_rgba(34,197,94,0.9)] transition-colors hover:bg-accent"
-          >
+          <Link href="/sign-up" className={terminal.cta}>
             Start free
           </Link>
           <CopyChip text="npm install -g @envpilot/cli" />

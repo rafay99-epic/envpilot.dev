@@ -1,4 +1,5 @@
 import { query } from "../../../_generated/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 
 /**
@@ -33,6 +34,27 @@ export const listPublished = query({
       const bTime = b.publishedAt ?? b.createdAt;
       return bTime - aTime;
     });
+  },
+});
+
+/**
+ * Published entries, one page at a time (public).
+ *
+ * Ordering comes from by_published_and_date, not from a JS sort: the sort must
+ * hold ACROSS pages, and a handler can only sort the rows it read. Every
+ * published entry carries publishedAt (create, update and the seed migration
+ * all set it), so the index order matches listPublished's.
+ */
+export const listPublishedPaginated = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("changelog")
+      .withIndex("by_published_and_date", (q) => q.eq("isPublished", true))
+      .order("desc")
+      .paginate(args.paginationOpts);
   },
 });
 

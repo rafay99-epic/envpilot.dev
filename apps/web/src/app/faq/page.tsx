@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { MarketingShell, PageHero, GlowDivider } from "@/components/marketing";
+import { MarketingShell, PageHero, terminal } from "@/components/marketing";
 import { ScrollSpySidebar } from "@/components/ui/ScrollSpySidebar";
 import { FAQAccordion } from "@/components/faq/FAQAccordion";
 
@@ -234,10 +234,8 @@ export default function FAQPage() {
         }
       />
 
-      <GlowDivider />
-
-      <section className="relative py-20">
-        <div className="mx-auto flex max-w-5xl gap-12 px-4 sm:px-6">
+      <section className="pb-24">
+        <div className={`${terminal.shell} flex gap-12`}>
           {/* Sidebar TOC — client island for scroll-spy */}
           <ScrollSpySidebar sections={SECTIONS} />
 

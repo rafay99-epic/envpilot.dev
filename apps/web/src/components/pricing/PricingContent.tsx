@@ -6,10 +6,9 @@ import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Check, X, Minus } from "lucide-react";
 import {
-  SectionHeading,
-  Stagger,
-  StaggerItem,
-  Reveal,
+  TerminalCommand,
+  TerminalPanel,
+  terminal,
 } from "@/components/marketing";
 import { generateFeatureLines } from "@/lib/pricing";
 
@@ -91,118 +90,86 @@ function PricingCard({ tier }: { tier: Tier }) {
     tier.ctaText ||
     (isComingSoon ? "Coming Soon" : isDefault ? "Get Started Free" : "Upgrade");
   const ctaHref = tier.ctaLink || "/sign-up";
-  const emphasized = isDefault && !isComingSoon;
 
   const badgeColorClass =
     tier.badgeColor === "amber"
-      ? "border-warning-line bg-warning-soft text-warning"
+      ? "text-warning"
       : tier.badgeColor === "green"
-        ? "border-accent-line bg-accent-soft text-accent"
-        : "border-line bg-surface-raised/50 text-ink-subtle";
-  const dotColorClass =
-    tier.badgeColor === "amber"
-      ? "bg-warning"
-      : tier.badgeColor === "green"
-        ? "bg-accent"
-        : "bg-surface-hover";
+        ? "text-accent"
+        : "text-ink-faint";
 
   return (
-    <div
-      className={`relative w-full rounded-2xl p-px transition-shadow duration-300 ${
-        emphasized
-          ? "bg-gradient-to-b from-accent-line via-line to-line shadow-[0_0_60px_-16px_rgba(34,197,94,0.35)]"
-          : "bg-surface-raised/60"
-      }`}
-    >
-      <div className="flex h-full flex-col rounded-[15px] bg-canvas/95 p-7">
-        {/* Tier name + badge */}
-        <div className="flex items-center justify-between gap-3">
-          <span className="font-mono text-xs uppercase tracking-widest text-ink-subtle">
-            {tier.name}
-          </span>
-          <div className="flex items-center gap-2">
-            {isComingSoon && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-raised/50 px-2.5 py-0.5 font-mono text-[10px] text-ink-subtle">
-                <span className="h-1 w-1 rounded-full bg-surface-hover" />
-                coming soon
-              </span>
-            )}
-            {tier.badge && (
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] ${badgeColorClass}`}
-              >
-                <span className={`h-1 w-1 rounded-full ${dotColorClass}`} />
-                {tier.badge}
-              </span>
-            )}
-          </div>
+    <div className={`${terminal.panel} flex h-full flex-col p-7`}>
+      <div className="flex items-center justify-between gap-3">
+        <span
+          className={`${terminal.mono} text-[11px] tracking-[0.16em] text-accent uppercase`}
+        >
+          {tier.name}
+        </span>
+        <div className={`flex items-center gap-3 ${terminal.mono} text-[11px]`}>
+          {isComingSoon && <span className="text-ink-faint">coming soon</span>}
+          {tier.badge && <span className={badgeColorClass}>{tier.badge}</span>}
         </div>
+      </div>
 
-        {/* Display name */}
-        <h3
-          className={`mt-4 font-sans text-lg font-bold tracking-tight ${
-            isComingSoon ? "text-ink-muted" : "text-ink"
+      <h3
+        className={`mt-5 font-sans text-[17px] font-semibold tracking-tight ${
+          isComingSoon ? "text-ink-muted" : "text-ink"
+        }`}
+      >
+        {tier.displayName}
+      </h3>
+
+      <div className="mt-2 flex items-baseline gap-2">
+        <span
+          className={`font-sans text-5xl font-semibold tracking-[-0.035em] ${
+            isComingSoon ? "text-ink-subtle" : "text-ink"
           }`}
         >
-          {tier.displayName}
-        </h3>
-
-        {/* Price */}
-        <div className="mt-2 flex items-baseline gap-2">
-          <span
-            className={`font-sans text-5xl font-bold tracking-tight ${
-              isComingSoon ? "text-ink-muted" : "text-ink"
-            }`}
-          >
-            ${price}
-          </span>
-          <span className="font-mono text-xs text-ink-faint">
-            / month / organization
-          </span>
-        </div>
-
-        {/* What's included */}
-        <p className="mt-7 font-mono text-[10px] uppercase tracking-widest text-ink-faint">
-          {"// what's included"}
-        </p>
-        <div className="mt-3 space-y-2.5">
-          {highlights.map((item) => (
-            <p
-              key={item}
-              className={`flex items-start gap-2.5 font-mono text-xs ${
-                isComingSoon ? "text-ink-faint" : "text-ink-muted"
-              }`}
-            >
-              <Check
-                className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
-                  isComingSoon ? "text-ink-faint" : "text-accent"
-                }`}
-              />
-              {item}
-            </p>
-          ))}
-        </div>
-
-        <div className="mt-8 flex-1" />
-
-        {/* CTA */}
-        {isComingSoon ? (
-          <span className="block cursor-not-allowed rounded-lg border border-line px-5 py-3 text-center font-mono text-xs text-ink-faint">
-            {cta}
-          </span>
-        ) : (
-          <Link
-            href={ctaHref}
-            className={`block rounded-lg px-5 py-3 text-center font-mono text-xs font-semibold transition-all ${
-              emphasized
-                ? "bg-accent text-ink-inverse shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] hover:shadow-[0_0_55px_-8px_rgba(34,197,94,0.8)]"
-                : "border border-accent-line bg-accent-soft text-accent hover:bg-accent-soft"
-            }`}
-          >
-            {cta}
-          </Link>
-        )}
+          ${price}
+        </span>
+        <span className={`${terminal.mono} text-[12px] text-ink-faint`}>
+          /mo · per org, not per seat
+        </span>
       </div>
+
+      <div className="mt-7 space-y-2.5">
+        {highlights.map((item) => (
+          <p
+            key={item}
+            className={`flex items-start gap-2.5 font-sans text-[15px] ${
+              isComingSoon ? "text-ink-subtle" : "text-ink-muted"
+            }`}
+          >
+            <Check
+              aria-hidden
+              className={`mt-1 h-3.5 w-3.5 shrink-0 ${
+                isComingSoon ? "text-ink-faint" : "text-accent"
+              }`}
+            />
+            {item}
+          </p>
+        ))}
+      </div>
+
+      <div className="mt-8 flex-1" />
+
+      {isComingSoon ? (
+        <span className="block cursor-not-allowed rounded-md px-5 py-3 text-center font-sans text-[15px] text-ink-subtle ring-1 ring-line">
+          {cta}
+        </span>
+      ) : (
+        <Link
+          href={ctaHref}
+          className={`block rounded-md px-5 py-3 text-center font-sans text-[15px] font-semibold transition-colors ${
+            isDefault
+              ? "bg-accent text-chrome hover:bg-accent-hover"
+              : "text-ink ring-1 ring-line hover:ring-line-strong"
+          }`}
+        >
+          {cta}
+        </Link>
+      )}
     </div>
   );
 }
@@ -249,83 +216,83 @@ function ComparisonTable({
   const hiddenKeys = new Set(["sso_enabled"]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-surface/40 backdrop-blur-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left font-mono text-xs">
-          <thead>
-            <tr className="border-b border-line bg-surface/60">
-              <th className="w-1/3 px-5 py-4 font-medium uppercase tracking-widest text-ink-subtle">
-                Feature
+    <div className="overflow-x-auto">
+      <table
+        className={`w-full text-left ${terminal.mono} text-[12px] sm:text-[13px]`}
+      >
+        <thead>
+          <tr className={`border-b ${terminal.line}`}>
+            <th className="w-1/2 px-3 py-3 text-[11px] tracking-[0.14em] text-ink-faint uppercase sm:px-5">
+              feature
+            </th>
+            {tiers.map((tier) => (
+              <th
+                key={tier.name}
+                className="px-2 py-3 text-center text-[11px] tracking-[0.14em] text-ink-muted uppercase sm:px-4"
+              >
+                {tier.displayName}
               </th>
-              {tiers.map((tier) => (
-                <th
-                  key={tier.name}
-                  className="px-4 py-4 text-center font-sans text-sm font-bold tracking-tight text-ink"
-                >
-                  {tier.displayName}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {categories.map((category) => {
-              const features = featuresByCategory.get(category) ?? [];
-              const visibleFeatures = features.filter(
-                (f) => !hiddenKeys.has(f.key)
-              );
-              if (visibleFeatures.length === 0) return null;
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {categories.map((category) => {
+            const features = featuresByCategory.get(category) ?? [];
+            const visibleFeatures = features.filter(
+              (f) => !hiddenKeys.has(f.key)
+            );
+            if (visibleFeatures.length === 0) return null;
 
-              return (
-                <Fragment key={category}>
-                  <tr className="border-b border-line bg-accent/[0.03]">
-                    <td
-                      colSpan={tiers.length + 1}
-                      className="px-5 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-widest text-accent"
-                    >
-                      {`// ${category}`}
+            return (
+              <Fragment key={category}>
+                <tr>
+                  <td
+                    colSpan={tiers.length + 1}
+                    className="px-3 pt-6 pb-2 text-[11px] tracking-[0.14em] text-accent uppercase sm:px-5"
+                  >
+                    # {category}
+                  </td>
+                </tr>
+                {visibleFeatures.map((feature) => (
+                  <tr key={feature.key}>
+                    <td className="px-3 py-3 text-ink-muted sm:px-5">
+                      {feature.displayName}
+                      {feature.description && (
+                        <span className="mt-0.5 block text-[11px] text-ink-faint">
+                          {feature.description}
+                        </span>
+                      )}
                     </td>
-                  </tr>
-                  {visibleFeatures.map((feature) => (
-                    <tr
-                      key={feature.key}
-                      className="border-b border-line transition-colors last:border-b-0 hover:bg-accent/[0.04]"
-                    >
-                      <td className="px-5 py-3 text-ink-muted">
-                        {feature.displayName}
-                        {feature.description && (
-                          <span className="mt-0.5 block text-[10px] text-ink-faint">
-                            {feature.description}
-                          </span>
-                        )}
-                      </td>
-                      {tiers.map((tier) => {
-                        const entry = tierFeatureMap
-                          .get(tier.name)
-                          ?.get(feature.key);
-                        if (!entry) {
-                          return (
-                            <td
-                              key={tier.name}
-                              className="px-4 py-3 text-center"
-                            >
-                              <Minus className="mx-auto h-3.5 w-3.5 text-ink-faint" />
-                            </td>
-                          );
-                        }
+                    {tiers.map((tier) => {
+                      const entry = tierFeatureMap
+                        .get(tier.name)
+                        ?.get(feature.key);
+                      if (!entry) {
                         return (
-                          <td key={tier.name} className="px-4 py-3 text-center">
-                            {formatFeatureValue(entry.value, entry.valueType)}
+                          <td
+                            key={tier.name}
+                            className="px-2 py-3 text-center sm:px-4"
+                          >
+                            <Minus className="mx-auto h-3.5 w-3.5 text-ink-faint" />
                           </td>
                         );
-                      })}
-                    </tr>
-                  ))}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                      }
+                      return (
+                        <td
+                          key={tier.name}
+                          className="px-2 py-3 text-center sm:px-4"
+                        >
+                          {formatFeatureValue(entry.value, entry.valueType)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -358,12 +325,9 @@ export function PricingContent({
   if (!pricingData) {
     // Still loading client-side
     return (
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         {[0, 1].map((i) => (
-          <div
-            key={i}
-            className="h-96 animate-pulse rounded-2xl border border-line bg-surface/40"
-          />
+          <div key={i} className={`${terminal.panel} h-96 animate-pulse`} />
         ))}
       </div>
     );
@@ -381,33 +345,30 @@ export function PricingContent({
 
   return (
     <>
-      {/* Pricing Cards */}
-      <Stagger className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         {tiers.map((tier) => (
-          <StaggerItem key={tier.name} className="flex">
-            <PricingCard tier={tier} />
-          </StaggerItem>
+          <PricingCard key={tier.name} tier={tier} />
         ))}
-      </Stagger>
+      </div>
 
-      {/* Feature Comparison */}
-      <section className="mt-28">
-        <SectionHeading
-          eyebrow="details"
-          title={
-            <>
-              Feature <span className="text-accent">comparison</span>
-            </>
-          }
-          description="A detailed breakdown of what's included in each plan."
+      <section className="mt-24">
+        <TerminalCommand
+          cmd="envpilot plans --compare"
+          comment="every gate in the registry, per tier — including the ones free wins."
         />
-        <Reveal className="mt-10" delay={0.1}>
-          <ComparisonTable
-            tiers={tiers}
-            allFeatures={allFeatures}
-            categories={categories}
-          />
-        </Reveal>
+        <div className="mt-10">
+          <TerminalPanel
+            title="tierFeatures — free vs pro"
+            meta={`${allFeatures.length} features`}
+            bodyClassName="p-0"
+          >
+            <ComparisonTable
+              tiers={tiers}
+              allFeatures={allFeatures}
+              categories={categories}
+            />
+          </TerminalPanel>
+        </div>
       </section>
     </>
   );

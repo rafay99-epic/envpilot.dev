@@ -7,9 +7,7 @@ export {
 } from "./MarketingFooter";
 export { StatusIndicator } from "./StatusIndicator";
 export { PageHero } from "./PageHero";
-export { SectionHeading } from "./SectionHeading";
 export { GlowCard } from "./GlowCard";
-export { TerminalFrame } from "./TerminalFrame";
 export {
   TerminalPlayer,
   type TerminalScene,

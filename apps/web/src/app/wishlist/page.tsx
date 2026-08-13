@@ -12,11 +12,8 @@ import { ChevronUp, Plus, X, AlertTriangle } from "lucide-react";
 import {
   MarketingShell,
   PageHero,
-  GlowCard,
-  GlowDivider,
-  TerminalFrame,
-  Stagger,
-  StaggerItem,
+  TerminalPanel,
+  terminal,
 } from "@/components/marketing";
 
 type TabType = "requests" | "roadmap";
@@ -60,6 +57,15 @@ const statusConfig: Record<
   },
   declined: { label: "declined", color: "text-danger", dot: "bg-danger" },
 };
+
+const STATUS_FILTERS: StatusFilter[] = [
+  "all",
+  "submitted",
+  "under_review",
+  "planned",
+  "in_progress",
+  "completed",
+];
 
 interface FeatureRequestType {
   _id: Id<"featureRequests">;
@@ -148,15 +154,14 @@ export default function WishlistPage() {
           </>
         }
         description="Vote on what we build next, or submit your own ideas. Every vote shapes the product."
-        align="left"
       >
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => setShowSubmitForm(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-mono text-xs font-semibold text-ink-inverse shadow-[0_0_24px_-6px_rgba(34,197,94,0.6)] transition-all hover:bg-accent"
+            className={terminal.cta}
           >
-            <Plus className="h-3.5 w-3.5" />
-            submit-feature
+            <Plus className="h-4 w-4" />
+            Submit a feature
           </button>
           <div className="flex gap-2">
             <TabButton
@@ -175,52 +180,52 @@ export default function WishlistPage() {
         </div>
       </PageHero>
 
-      <GlowDivider />
-
       {/* Content */}
-      <section className="relative py-14">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+      <section className="pb-24">
+        <div className={terminal.shell}>
           {activeTab === "requests" ? (
             <>
-              {/* Filters */}
-              <div className="mb-10 flex flex-wrap items-center gap-3">
-                <span className="font-mono text-xs text-ink-faint">
-                  --status
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {(
-                    [
-                      "all",
-                      "submitted",
-                      "under_review",
-                      "planned",
-                      "in_progress",
-                      "completed",
-                    ] as StatusFilter[]
-                  ).map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => setStatusFilter(status)}
-                      className={`rounded-lg border px-2.5 py-1 font-mono text-xs transition-all ${
-                        statusFilter === status
-                          ? "border-accent-line bg-accent-soft text-accent shadow-[0_0_16px_-4px_rgba(34,197,94,0.4)]"
-                          : "border-line text-ink-subtle hover:border-accent-line hover:text-ink-muted"
-                      }`}
-                    >
-                      {status === "all" ? "*" : status.replace("_", "-")}
-                    </button>
-                  ))}
+              {/* Filters — a labelled toolbar, so the status row and the
+                  category picker stop reading as one run-on line. */}
+              <div
+                className={`mb-8 ${terminal.panel} flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between`}
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                  <span
+                    className={`${terminal.mono} shrink-0 text-[12px] text-ink-faint`}
+                  >
+                    --status
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {STATUS_FILTERS.map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => setStatusFilter(status)}
+                        aria-pressed={statusFilter === status}
+                        className={`shrink-0 rounded-md px-2.5 py-1.5 ${terminal.mono} text-[12px] ring-1 transition-colors ${
+                          statusFilter === status
+                            ? "bg-accent-soft text-accent ring-accent-line"
+                            : "text-ink-subtle ring-line hover:text-ink hover:ring-line-strong"
+                        }`}
+                      >
+                        {status === "all" ? "all" : status.replace("_", "-")}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {categories && categories.length > 0 && (
-                  <>
-                    <span className="font-mono text-xs text-ink-faint">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`${terminal.mono} shrink-0 text-[12px] text-ink-faint`}
+                    >
                       --category
                     </span>
                     <select
+                      aria-label="Filter by category"
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="rounded-lg border border-line bg-surface/60 px-2.5 py-1 font-mono text-xs text-ink focus:border-accent-line focus:outline-none focus:ring-2 focus:ring-accent-line"
+                      className={`min-w-0 flex-1 rounded-md border border-line bg-surface-raised px-2.5 py-1.5 ${terminal.mono} text-[12px] text-ink transition-colors focus:border-accent-line focus:ring-1 focus:ring-accent-line focus:outline-none lg:flex-none`}
                     >
                       <option value="all">all</option>
                       {categories.map((cat: string) => (
@@ -229,7 +234,7 @@ export default function WishlistPage() {
                         </option>
                       ))}
                     </select>
-                  </>
+                  </div>
                 )}
               </div>
 
@@ -239,17 +244,16 @@ export default function WishlistPage() {
               ) : featureRequests.length === 0 ? (
                 <EmptyState onSubmit={() => setShowSubmitForm(true)} />
               ) : (
-                <Stagger className="space-y-3">
+                <div className="space-y-3">
                   {featureRequests.map((feature: FeatureRequestType) => (
-                    <StaggerItem key={feature._id}>
-                      <FeatureCard
-                        feature={feature}
-                        hasVoted={votedFeatures.has(feature._id)}
-                        onVote={() => handleVote(feature._id)}
-                      />
-                    </StaggerItem>
+                    <FeatureCard
+                      key={feature._id}
+                      feature={feature}
+                      hasVoted={votedFeatures.has(feature._id)}
+                      onVote={() => handleVote(feature._id)}
+                    />
                   ))}
-                </Stagger>
+                </div>
               )}
             </>
           ) : (
@@ -270,56 +274,52 @@ export default function WishlistPage() {
 
       {/* Email Prompt Dialog */}
       {showEmailPrompt && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-xl bg-gradient-to-b from-accent-line via-line to-line p-px shadow-[0_0_60px_-12px_rgba(34,197,94,0.35)]">
-            <div className="overflow-hidden rounded-[11px] bg-canvas font-mono">
-              <div className="border-b border-line px-5 py-4">
-                <h3 className="font-sans text-sm font-bold tracking-tight text-ink">
-                  Enter your email to vote
-                </h3>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-overlay backdrop-blur-sm">
+          <TerminalPanel
+            title="envpilot vote --email"
+            className="mx-4 w-full max-w-sm"
+          >
+            <form onSubmit={handleEmailSubmit}>
+              <p className="font-sans text-[15px] leading-relaxed text-ink-muted">
+                Your email tracks your votes and prevents duplicates.
+              </p>
+              <input
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="you@example.com"
+                required
+                autoFocus
+                className={`mt-4 ${terminal.input}`}
+              />
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEmailPrompt(false);
+                    setPendingVoteId(null);
+                    setEmailInput("");
+                  }}
+                  className="rounded-md px-4 py-2 font-sans text-[14px] text-ink-muted ring-1 ring-line transition-colors hover:text-ink hover:ring-line-strong"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-md bg-accent px-4 py-2 font-sans text-[14px] font-semibold text-chrome transition-colors hover:bg-accent-hover"
+                >
+                  Vote
+                </button>
               </div>
-              <form onSubmit={handleEmailSubmit} className="px-5 py-4">
-                <p className="mb-3 text-xs text-ink-muted">
-                  Your email is used to track your votes and prevent duplicates.
-                </p>
-                <input
-                  type="email"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="you@example.com"
-                  required
-                  autoFocus
-                  className="w-full rounded-lg border border-line bg-surface/60 px-3 py-2 text-sm text-ink placeholder-ink-faint focus:border-accent-line focus:outline-none focus:ring-2 focus:ring-accent-line"
-                />
-                <div className="mt-4 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEmailPrompt(false);
-                      setPendingVoteId(null);
-                      setEmailInput("");
-                    }}
-                    className="rounded-lg border border-line px-4 py-1.5 text-xs text-ink-muted transition-colors hover:border-accent-line hover:text-ink-muted"
-                  >
-                    cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-ink-inverse shadow-[0_0_20px_-6px_rgba(34,197,94,0.6)] transition-colors hover:bg-accent"
-                  >
-                    vote
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+            </form>
+          </TerminalPanel>
         </div>
       )}
 
       {/* Toast */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[100]">
-          <div className="flex items-center gap-2 rounded-lg border border-danger-line bg-canvas px-4 py-3 font-mono text-xs text-danger shadow-[0_0_30px_-8px_rgba(248,113,113,0.4)]">
+        <div className="fixed right-6 bottom-6 z-[100]">
+          <div className="flex items-center gap-2 rounded-panel border border-danger-line bg-danger-soft px-4 py-3 font-sans text-[14px] text-danger">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>{toastMessage}</span>
             <button
@@ -347,10 +347,10 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`rounded-lg border px-4 py-2 font-mono text-xs transition-all ${
+      className={`rounded-md px-4 py-2.5 font-mono text-[13px] ring-1 transition-colors ${
         active
-          ? "border-accent-line bg-accent-soft text-accent shadow-[0_0_16px_-4px_rgba(34,197,94,0.4)]"
-          : "border-line text-ink-subtle hover:border-accent-line hover:text-ink-muted"
+          ? "bg-accent-soft text-accent ring-accent-line"
+          : "text-ink-subtle ring-line hover:text-ink hover:ring-line-strong"
       }`}
     >
       {children}
@@ -362,12 +362,12 @@ function LoadingSkeleton({ rows }: { rows: number }) {
   return (
     <div className="space-y-3">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex gap-4 rounded-xl border border-line p-5">
-          <div className="h-14 w-14 shrink-0 animate-pulse rounded-lg bg-surface/40" />
+        <div key={i} className={`flex gap-4 ${terminal.panel} p-5`}>
+          <div className="h-14 w-14 shrink-0 animate-pulse rounded-md bg-surface-raised" />
           <div className="flex-1 space-y-3 py-1">
-            <div className="h-4 w-1/3 animate-pulse rounded bg-surface/40" />
-            <div className="h-3 w-2/3 animate-pulse rounded bg-surface/40" />
-            <div className="h-3 w-1/4 animate-pulse rounded bg-surface/40" />
+            <div className="h-4 w-1/3 animate-pulse rounded bg-surface-raised" />
+            <div className="h-3 w-2/3 animate-pulse rounded bg-surface-raised" />
+            <div className="h-3 w-1/4 animate-pulse rounded bg-surface-raised" />
           </div>
         </div>
       ))}
@@ -385,44 +385,46 @@ function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
   const status = statusConfig[feature.status] ?? statusConfig.submitted;
 
   return (
-    <GlowCard className="p-5">
+    <div
+      className={`${terminal.panel} p-5 transition-shadow hover:ring-line-strong`}
+    >
       <div className="flex gap-4">
         {/* Upvote */}
         <button
           onClick={onVote}
           aria-pressed={hasVoted}
-          className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-lg border font-mono transition-all ${
+          className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-md ${terminal.mono} ring-1 transition-colors ${
             hasVoted
-              ? "border-accent-line bg-accent-soft text-accent shadow-[0_0_20px_-4px_rgba(34,197,94,0.5)]"
-              : "border-line bg-canvas/40 text-ink-subtle hover:border-accent-line hover:text-accent"
+              ? "bg-accent-soft text-accent ring-accent-line"
+              : "text-ink-subtle ring-line hover:text-accent hover:ring-accent-line"
           }`}
         >
           <ChevronUp className="h-4 w-4" />
-          <span className="text-xs font-bold">{feature.voteCount}</span>
+          <span className="text-[13px] font-semibold">{feature.voteCount}</span>
         </button>
 
         {/* Content */}
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-sans text-sm font-bold tracking-tight text-ink">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h3 className="font-sans text-[16px] font-semibold tracking-[-0.01em] text-ink">
               {feature.title}
             </h3>
             <span
-              className={`flex items-center gap-1.5 font-mono text-[10px] ${status.color}`}
+              className={`flex items-center gap-1.5 ${terminal.mono} text-[11px] ${status.color}`}
             >
               <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
               {status.label}
             </span>
             {feature.category && (
-              <span className="rounded-full border border-line bg-canvas/60 px-2 py-0.5 font-mono text-[10px] text-ink-subtle">
-                {feature.category}
+              <span className={`${terminal.mono} text-[11px] text-ink-faint`}>
+                #{feature.category}
               </span>
             )}
           </div>
-          <p className="mt-1.5 line-clamp-2 font-mono text-xs leading-relaxed text-ink-subtle">
+          <p className="mt-1.5 line-clamp-2 font-sans text-[15px] leading-relaxed text-ink-muted">
             {feature.description}
           </p>
-          <p className="mt-2 font-mono text-[10px] text-ink-faint">
+          <p className={`mt-2 ${terminal.mono} text-[11px] text-ink-faint`}>
             {new Date(feature.createdAt).toLocaleDateString("en-US", {
               year: "numeric",
               month: "short",
@@ -431,25 +433,22 @@ function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
           </p>
         </div>
       </div>
-    </GlowCard>
+    </div>
   );
 }
 
 function EmptyState({ onSubmit }: { onSubmit: () => void }) {
   return (
-    <div className="rounded-xl border border-dashed border-line bg-surface/40 p-12 text-center">
-      <p className="font-mono text-sm text-ink-subtle">
+    <div className={`${terminal.panel} p-12 text-center`}>
+      <p className={`${terminal.mono} text-[13px] text-ink-subtle`}>
         <span className="text-accent">❯</span> envpilot wishlist --list
       </p>
-      <p className="mt-2 font-mono text-xs text-ink-faint">
+      <p className="mt-2 font-sans text-[15px] text-ink-muted">
         No feature requests yet. Be the first.
       </p>
-      <button
-        onClick={onSubmit}
-        className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-mono text-xs font-semibold text-ink-inverse shadow-[0_0_24px_-6px_rgba(34,197,94,0.6)] transition-all hover:bg-accent"
-      >
-        <Plus className="h-3.5 w-3.5" />
-        submit-feature
+      <button onClick={onSubmit} className={`mt-6 ${terminal.cta}`}>
+        <Plus className="h-4 w-4" />
+        Submit a feature
       </button>
     </div>
   );
@@ -488,12 +487,12 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
 
   if (!plannedFeatures) {
     return (
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="space-y-3">
-            <div className="h-8 animate-pulse rounded-lg bg-surface/40" />
-            <div className="h-24 animate-pulse rounded-xl bg-surface/40" />
-            <div className="h-24 animate-pulse rounded-xl bg-surface/40" />
+            <div className="h-8 animate-pulse rounded-md bg-surface-raised" />
+            <div className="h-24 animate-pulse rounded-panel bg-surface-raised" />
+            <div className="h-24 animate-pulse rounded-panel bg-surface-raised" />
           </div>
         ))}
       </div>
@@ -530,7 +529,7 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
   ];
 
   return (
-    <Stagger className="grid gap-6 lg:grid-cols-3">
+    <div className="grid gap-4 lg:grid-cols-3">
       {columns.map((col) => {
         const isExpanded = expanded[col.title] ?? false;
         const hasOverflow = col.items.length > INITIAL_VISIBLE;
@@ -540,10 +539,7 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
         const hiddenCount = col.items.length - INITIAL_VISIBLE;
 
         return (
-          <StaggerItem
-            key={col.title}
-            className={`rounded-xl border ${col.borderColor} bg-surface/20 p-4`}
-          >
+          <div key={col.title} className={`${terminal.panel} p-4`}>
             {/* Column header */}
             <div className="mb-4 flex items-center gap-2 border-b border-line pb-3">
               <span
@@ -552,11 +548,13 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
                 }`}
               />
               <h3
-                className={`font-mono text-xs font-bold uppercase tracking-wider ${col.color}`}
+                className={`${terminal.mono} text-[11px] tracking-[0.14em] uppercase ${col.color}`}
               >
                 {col.title}
               </h3>
-              <span className="ml-auto rounded-full border border-line bg-canvas/60 px-2 py-0.5 font-mono text-[10px] text-ink-subtle">
+              <span
+                className={`ml-auto ${terminal.mono} text-[11px] text-ink-faint`}
+              >
                 {col.items.length}
               </span>
             </div>
@@ -564,7 +562,9 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
             {/* Cards */}
             <div className="space-y-3">
               {col.items.length === 0 ? (
-                <p className="py-6 text-center font-mono text-xs text-ink-faint">
+                <p
+                  className={`py-6 text-center ${terminal.mono} text-[12px] text-ink-faint`}
+                >
                   # empty
                 </p>
               ) : (
@@ -572,15 +572,17 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
                   {visibleItems.map((feature) => (
                     <div
                       key={feature._id}
-                      className="rounded-xl border border-line bg-surface/40 p-4 transition-colors hover:border-accent-line"
+                      className="rounded-md bg-surface-raised p-4 ring-1 ring-line transition-shadow hover:ring-line-strong"
                     >
-                      <h4 className="font-sans text-xs font-bold tracking-tight text-ink">
+                      <h4 className="font-sans text-[15px] font-semibold tracking-[-0.01em] text-ink">
                         {feature.title}
                       </h4>
-                      <p className="mt-1.5 line-clamp-2 font-mono text-[11px] leading-relaxed text-ink-subtle">
+                      <p className="mt-1.5 line-clamp-2 font-sans text-[14px] leading-relaxed text-ink-muted">
                         {feature.description}
                       </p>
-                      <div className="mt-3 flex items-center justify-between font-mono text-[10px] text-ink-faint">
+                      <div
+                        className={`mt-3 flex items-center justify-between ${terminal.mono} text-[11px] text-ink-faint`}
+                      >
                         <span className="flex items-center gap-1">
                           <ChevronUp className="h-3 w-3" />
                           {feature.voteCount}
@@ -610,7 +612,7 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
                           [col.title]: !isExpanded,
                         }))
                       }
-                      className={`flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed ${col.borderColor} py-2.5 font-mono text-[11px] font-medium ${col.color} transition-colors hover:bg-surface-hover/50`}
+                      className={`flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed ${col.borderColor} py-2.5 ${terminal.mono} text-[11px] ${col.color} transition-colors hover:bg-surface-hover`}
                     >
                       {isExpanded ? (
                         <>
@@ -628,10 +630,10 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
                 </>
               )}
             </div>
-          </StaggerItem>
+          </div>
         );
       })}
-    </Stagger>
+    </div>
   );
 }
 
@@ -648,8 +650,7 @@ interface SubmitFeatureModalProps {
   setVoterEmail: (email: string) => void;
 }
 
-const INPUT_CLASSES =
-  "mt-1.5 block w-full rounded-lg border border-line bg-surface/60 px-3 py-2 font-mono text-xs text-ink placeholder-ink-faint focus:border-accent-line focus:outline-none focus:ring-2 focus:ring-accent-line";
+const INPUT_CLASSES = `mt-1.5 block ${terminal.input}`;
 
 function SubmitFeatureModal({
   onClose,
@@ -712,23 +713,22 @@ function SubmitFeatureModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+        className="fixed inset-0 bg-overlay backdrop-blur-sm"
         onClick={onClose}
       />
-      <TerminalFrame
-        title="submit-feature-request"
-        glow
+      <TerminalPanel
+        title="envpilot feature --new"
         className="relative w-full max-w-lg"
-        bodyClassName="max-h-[80vh] overflow-y-auto"
+        bodyClassName="max-h-[80vh] overflow-y-auto p-5"
       >
         <div className="flex items-start justify-between">
-          <p className="font-mono text-xs text-ink-subtle">
+          <p className={`${terminal.mono} text-[13px] text-ink-subtle`}>
             <span className="text-accent">❯</span> envpilot feature --new
           </p>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-0.5 text-ink-subtle transition-colors hover:text-ink-muted"
+            className="rounded p-0.5 text-ink-subtle transition-colors hover:text-ink"
           >
             <X className="h-4 w-4" />
           </button>
@@ -736,15 +736,13 @@ function SubmitFeatureModal({
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           {error && (
-            <div className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 font-mono text-xs text-danger">
+            <div className="rounded-panel border border-danger-line bg-danger-soft px-3 py-2 font-sans text-[14px] text-danger">
               error: {error}
             </div>
           )}
 
           <div>
-            <label className="block font-mono text-xs text-ink-muted">
-              title *
-            </label>
+            <label className={`block ${terminal.label}`}>title *</label>
             <input
               type="text"
               value={title}
@@ -755,9 +753,7 @@ function SubmitFeatureModal({
           </div>
 
           <div>
-            <label className="block font-mono text-xs text-ink-muted">
-              description *
-            </label>
+            <label className={`block ${terminal.label}`}>description *</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -769,9 +765,7 @@ function SubmitFeatureModal({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block font-mono text-xs text-ink-muted">
-                email *
-              </label>
+              <label className={`block ${terminal.label}`}>email *</label>
               <input
                 type="email"
                 value={email}
@@ -781,9 +775,7 @@ function SubmitFeatureModal({
               />
             </div>
             <div>
-              <label className="block font-mono text-xs text-ink-muted">
-                name
-              </label>
+              <label className={`block ${terminal.label}`}>name</label>
               <input
                 type="text"
                 value={name}
@@ -795,9 +787,7 @@ function SubmitFeatureModal({
           </div>
 
           <div>
-            <label className="block font-mono text-xs text-ink-muted">
-              category
-            </label>
+            <label className={`block ${terminal.label}`}>category</label>
             <input
               type="text"
               value={category}
@@ -811,20 +801,20 @@ function SubmitFeatureModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-line px-4 py-2 font-mono text-xs text-ink-subtle transition-colors hover:border-accent-line hover:text-ink-muted"
+              className="rounded-md px-4 py-2 font-sans text-[14px] text-ink-muted ring-1 ring-line transition-colors hover:text-ink hover:ring-line-strong"
             >
-              cancel
+              Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-lg bg-accent px-4 py-2 font-mono text-xs font-semibold text-ink-inverse shadow-[0_0_20px_-6px_rgba(34,197,94,0.6)] transition-all hover:bg-accent disabled:opacity-50"
+              className="rounded-md bg-accent px-4 py-2 font-sans text-[14px] font-semibold text-chrome transition-colors hover:bg-accent-hover disabled:opacity-50"
             >
-              {isSubmitting ? "submitting..." : "submit"}
+              {isSubmitting ? "Submitting…" : "Submit"}
             </button>
           </div>
         </form>
-      </TerminalFrame>
+      </TerminalPanel>
     </div>
   );
 }

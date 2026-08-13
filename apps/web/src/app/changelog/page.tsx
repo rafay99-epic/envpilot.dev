@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
-import { MarketingShell, PageHero, GlowDivider } from "@/components/marketing";
+import { MarketingShell, PageHero, terminal } from "@/components/marketing";
 import {
   ChangelogContent,
+  CHANGELOG_PAGE_SIZE,
   type ChangelogEntry,
 } from "@/components/changelog/ChangelogContent";
 
@@ -20,10 +21,11 @@ export default async function ChangelogPage() {
   let entries: ChangelogEntry[] = [];
   try {
     entries =
+      // First page only — the client pages the rest in on demand.
       ((await convex.query(
         api.features.community.changelog.queries.listPublished,
         {
-          limit: 50,
+          limit: CHANGELOG_PAGE_SIZE,
         }
       )) as ChangelogEntry[]) ?? [];
   } catch {
@@ -40,13 +42,10 @@ export default async function ChangelogPage() {
           </>
         }
         description="All the latest updates, improvements, and fixes. Follow along as we build."
-        align="left"
       />
 
-      <GlowDivider />
-
-      <section className="relative py-16">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6">
+      <section className="pb-24">
+        <div className={terminal.shell}>
           <ChangelogContent initialEntries={entries} />
         </div>
       </section>

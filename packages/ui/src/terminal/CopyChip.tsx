@@ -41,7 +41,7 @@ export function CopyChip({
         copied ? "Copied to clipboard" : `Copy "${text}" to clipboard`
       }
       aria-live="polite"
-      className={`group inline-flex items-center gap-3 rounded-md px-4 py-3 ${terminal.mono} text-[13px] text-ink-muted ring-1 ring-white/[0.08] transition-colors hover:text-ink hover:ring-white/20 ${className}`}
+      className={`group inline-flex items-center gap-3 rounded-md px-4 py-3 ${terminal.mono} text-[13px] text-ink-muted ring-1 ring-line transition-colors hover:text-ink hover:ring-line-strong ${className}`}
     >
       <span aria-hidden className="text-ink-faint">
         {prefix}

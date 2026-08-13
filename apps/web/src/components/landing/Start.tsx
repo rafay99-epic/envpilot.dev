@@ -22,9 +22,7 @@ export function Start() {
           comment="the questions people actually send before signing up."
         />
 
-        <div
-          className={`mt-12 divide-y divide-white/[0.06] border-y ${terminal.line}`}
-        >
+        <div className={`mt-12 divide-y divide-line border-y ${terminal.line}`}>
           {FAQ_ITEMS.map((item) => (
             <details key={item.question} className="group py-4">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-sans text-[16px] font-medium text-ink [&::-webkit-details-marker]:hidden">
@@ -55,16 +53,10 @@ export function Start() {
               Three commands and you&apos;ll never paste one again.
             </h2>
             <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-              <Link
-                href="/sign-up"
-                className="inline-flex items-center rounded-md bg-accent px-6 py-3 font-sans text-[15px] font-semibold text-chrome shadow-[0_0_32px_-10px_rgba(34,197,94,0.9)] transition-colors hover:bg-accent"
-              >
+              <Link href="/sign-up" className={terminal.cta}>
                 Start free
               </Link>
-              <Link
-                href={SITE_URLS.docs}
-                className="inline-flex items-center rounded-md px-6 py-3 font-sans text-[15px] text-ink-muted ring-1 ring-white/[0.08] transition-colors hover:text-ink hover:ring-white/20"
-              >
+              <Link href={SITE_URLS.docs} className={terminal.ctaGhost}>
                 Read the docs
               </Link>
             </div>
