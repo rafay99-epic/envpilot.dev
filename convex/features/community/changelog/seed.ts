@@ -1568,4 +1568,31 @@ Available on Pro.`,
 - Tier defaults only ever get inserted, never overwritten, so the move of documentation onto the free plan would not have reached organizations created earlier
 - A scoped migration now applies the three documentation values to existing plans, leaving every other tier setting untouched`,
   },
+  // ============================================================
+  // Unified design system across every surface (2026-08-13)
+  // ============================================================
+  {
+    title: "One Design System Across Every Surface",
+    version: "v1.59.0",
+    type: "improvement",
+    publishedAt: ts("2026-08-13T12:00:00Z"),
+    content: `The dashboard now wears the same design language as the redesigned landing page, and every colour in the product comes from one file instead of being spelled out in each component.
+
+### The Dashboard Matches the Marketing Site
+- Panels carry the landing page's chrome — a mono title bar, a fine ring, and a soft top highlight — instead of the old macOS-style window dots
+- The sidebar sits on its own darker surface, so navigation reads as chrome rather than as more page
+- Page titles follow one pattern everywhere: the four competing heading styles the dashboard had grown are gone
+- Widget toolbars are no longer copy-pasted per widget, so the "View all" rows behave identically wherever they appear
+
+### Colours Live in One Place
+- Every surface, line, text tone and status colour is a named token — change the token and the dashboard, admin panel, blog and docs all follow
+- Roughly 7,100 hard-coded colour classes across the web app, admin panel, blog, docs and the shared component library were migrated onto those tokens
+- The stock colour palette has been removed from the build entirely, so a hard-coded colour is no longer something the platform can accidentally ship
+- Charts, form controls, scrollbars and focus rings draw from the same tokens as everything else, rather than from their own private values
+
+### Fixes Along the Way
+- Dashboard body text was falling back to Arial instead of the intended Geist typeface wherever a component did not set a font itself
+- Several confirm and primary buttons were rendering dark text on a dark fill, leaving their labels effectively invisible
+- Light-mode styles left over from before the platform went dark-only have been removed; they never painted, but they made every component harder to read`,
+  },
 ];
