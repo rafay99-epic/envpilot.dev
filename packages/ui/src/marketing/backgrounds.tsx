@@ -79,18 +79,7 @@ export function Noise({ className = "" }: { className?: string }) {
   );
 }
 
-/** Thin glowing divider line between sections. */
+/** Hairline rule between sections, matching the landing page's section lines. */
 export function GlowDivider({ className = "" }: { className?: string }) {
-  return (
-    <div aria-hidden className={`relative h-px w-full ${className}`}>
-      <div className="absolute inset-0 bg-surface-raised/60" />
-      <div
-        className="absolute inset-y-0 left-1/2 w-1/3 -translate-x-1/2"
-        style={{
-          background:
-            "linear-gradient(90deg, transparent, rgba(34,197,94,0.5), transparent)",
-        }}
-      />
-    </div>
-  );
+  return <div aria-hidden className={`h-px w-full bg-line ${className}`} />;
 }

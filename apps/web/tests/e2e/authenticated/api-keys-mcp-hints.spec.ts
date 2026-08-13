@@ -38,6 +38,14 @@ test("MCP requirements panel reacts to surface + resource selection", async ({
   await apiKeysTab.click();
 
   await page.getByRole("button", { name: /^New Key$/i }).click();
+  // The drawer mounts with the keys query, so wait for the form itself
+  // before reaching into it — clicking mid-mount silently no-ops.
+  await expect(page.locator("#api-key-name")).toBeVisible({
+    timeout: 20_000,
+  });
+  // Surfaces, resources and expiry live under the Advanced disclosure
+  // now that the drawer opens on a purpose preset.
+  await page.getByTestId("api-key-advanced").click();
   await expect(page.locator("#api-key-name")).toBeVisible({ timeout: 10_000 });
 
   // MCP server is a default surface, so the requirements panel starts

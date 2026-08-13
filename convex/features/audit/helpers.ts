@@ -16,6 +16,22 @@ import {
  * now calls this first: caller must be an active org member whose role
  * holds org.audit.view (owner/PM by default via seeds; TL included).
  */
+/**
+ * Same check as {@link assertAuditAccess}, but answers instead of throwing.
+ * For reads whose failure mode should be "render nothing" rather than "kill
+ * the page" — the settings provenance line, not the audit log itself.
+ */
+export async function hasAuditAccess(
+  ctx: MutationCtx | QueryCtx,
+  organizationId: Id<"organizations">
+): Promise<boolean> {
+  const actor = await requireAuthedUser(ctx);
+  const membership = await getActiveMembership(ctx, organizationId, actor._id);
+  if (!membership) return false;
+  const profile = await getRoleProfile(ctx, membership.role);
+  return hasCapability(profile, "org.audit.view");
+}
+
 export async function assertAuditAccess(
   ctx: MutationCtx | QueryCtx,
   organizationId: Id<"organizations">

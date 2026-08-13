@@ -1649,4 +1649,68 @@ Available on Pro.`,
 - A lease and watchdog recover interrupted work, while failed provider calls retry with bounded exponential backoff
 - Project reads exclude the project as soon as deletion starts, so users lose access immediately without forcing the entire cascade into one expensive request`,
   },
+
+  // ============================================================
+  // v1.61.0 — Settings rebuilt on one shell (2026-08-14)
+  // ============================================================
+  {
+    title: "Account, Organization, and Project Settings Now Work the Same Way",
+    version: "v1.61.0",
+    type: "improvement",
+    publishedAt: ts("2026-08-14T02:30:00Z"),
+    content: `The three settings screens were built at different times and had drifted apart. They now share one layout, one set of controls, and one set of rules.
+
+### One Layout Instead of Three
+- Sections are separated by a rule and a heading rather than stacked cards inside cards
+- Only the things you can actually interact with — inputs, buttons, toggles, colour swatches — are outlined
+- Every settings screen reads the same on a phone, and long tab rows scroll instead of wrapping
+
+### Nothing Is Lost by Accident
+- A single save bar appears once a screen has unsaved changes, and saves the whole tab at once
+- Leaving a tab or closing the browser with unsaved edits now asks first
+- Discarding restores exactly what was loaded
+
+### Easier to Find and Link
+- Every settings tab has its own address, including project settings, so a tab can be linked and reopened
+- Settings destinations are searchable from the command palette across all three scopes
+- Organisation tabs that need the owner role are shown with the reason instead of quietly disappearing
+
+### Consistent Colours and Clearer Danger Zones
+- Project colours and variable tag colours now come from one shared palette that is legible on the dark theme
+- A colour saved before this change is preserved and stays selected, so no existing choice is overwritten
+- Destructive actions list their consequences and require the exact name before they can run
+
+### Fixes
+- The large "ENVPILOT" wordmark in the site footer is visible again
+- "Back to project" links, the documentation title editor, and the selected project icon are no longer invisible against the dark background`,
+  },
+
+  // ============================================================
+  // v1.62.0 — API key creation explains itself (2026-08-14)
+  // ============================================================
+  {
+    title: "Creating an API Key Now Tells You What It Needs",
+    version: "v1.62.0",
+    type: "improvement",
+    publishedAt: ts("2026-08-14T03:30:00Z"),
+    content: `Creating an API key used to leave the Create button greyed out with no explanation when something was missing. The form now states its requirements up front and explains anything left undone.
+
+### Start From What the Key Is For
+- Choose a purpose — Agent / MCP, GitHub Action, REST read-only, or Custom — and the surface and resources are set to a combination that works
+- Project and environment scope stay a deliberate choice, because no default is safe for every organisation
+- Surfaces, resources, and expiry remain fully editable under Advanced
+
+### Requirements Are Visible Before You Submit
+- Required fields are marked, and expiry is labelled optional
+- The key name shows its limit of 1 to 100 characters, with a live count
+- Create is always clickable; pressing it with something missing lists exactly what is left, and highlights the field
+
+### Rules That Used to Fail Only After Submitting
+- A key cannot carry both documentation and secret files, and the form now says so before you try
+- A GitHub Action key must be scoped to exactly one project and carry variables, optionally secret files
+- Every rule shown here is the rule the server enforces, so the form and the backend can no longer disagree
+
+### A Calmer MCP Section
+- The list of MCP tools a key unlocks is summarised in one line and expands on demand instead of filling the panel`,
+  },
 ];

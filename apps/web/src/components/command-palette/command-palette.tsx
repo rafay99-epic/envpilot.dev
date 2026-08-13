@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
 import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
 import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "convex/react";
-import { Search, Lock, X, Tag } from "lucide-react";
+import { Search, Lock, X, Tag, SlidersHorizontal } from "lucide-react";
 import { api as convexApi } from "@convex/_generated/api";
 import { useAuthContext } from "@/components/auth";
 import { useConvexUser, useGlobalSearch } from "@/hooks";
@@ -14,6 +14,7 @@ import { ENVIRONMENTS } from "@/constants/project";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { SHORTCUTS, parseBinding } from "@/hooks/useKeyboardShortcuts";
 import { TagBadge } from "@/components/variables/tag-badge";
+import { searchSettings } from "@/settings/settings-index";
 
 export const OPEN_COMMAND_PALETTE_EVENT = "open-command-palette";
 
@@ -34,8 +35,9 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const pathname = usePathname();
 
-  const { user } = useAuthContext();
+  const { user, organization } = useAuthContext();
   const { convexUserId } = useConvexUser(user?.id);
   const { searchTerm, setSearchTerm, results, isLoading } =
     useGlobalSearch(convexUserId);
@@ -91,8 +93,14 @@ export function CommandPalette() {
     [tagFilter, availableTagIds]
   );
 
+  // Gated on the CURRENT term for the same reason `visibleDocs` is: the
+  // variable query is debounced 300ms, so clearing the box left the previous
+  // hits in `navCount` and reachable by Enter while the list already showed
+  // the "type at least 2 characters" placeholder.
+  const activeResults = searchTerm.trim().length >= 2 ? results : [];
+
   // Filter results by environment AND tags
-  const filteredResults = results.filter((r) => {
+  const filteredResults = activeResults.filter((r) => {
     // Environment filter
     if (
       envFilter !== "all" &&
@@ -109,10 +117,41 @@ export function CommandPalette() {
     return true;
   });
 
-  // One navigable list: variables first, doc hits after them.
-  const navCount = filteredResults.length + visibleDocs.length;
+  // Settings live on three routes, so "where do I turn X off" is a hunt.
+  // The palette answers it; the project scope comes from the URL when the
+  // user is already inside a project — except `/dashboard/projects/new`, which
+  // is the create form, so its "settings" would be a dead link.
+  const pathSlug = pathname?.match(/^\/dashboard\/projects\/([^/]+)/)?.[1];
+  const projectSlug = pathSlug && pathSlug !== "new" ? pathSlug : null;
+  const settingsHits = useMemo(
+    () =>
+      searchSettings(searchTerm, {
+        orgSlug: organization?.slug ?? null,
+        projectSlug,
+      }),
+    [searchTerm, organization?.slug, projectSlug]
+  );
+
+  // ONE navigable list — variables, then docs, then settings. Every row
+  // carries its own nav index, so adding a group never re-opens the
+  // off-by-one arithmetic this used to do by hand.
+  const navItems = useMemo(
+    () => [
+      ...filteredResults.map((_, index) => ({
+        kind: "variable" as const,
+        index,
+      })),
+      ...visibleDocs.map((_, index) => ({ kind: "doc" as const, index })),
+      ...settingsHits.map((_, index) => ({ kind: "setting" as const, index })),
+    ],
+    [filteredResults, visibleDocs, settingsHits]
+  );
+  const navCount = navItems.length;
+  // ArrowUp on an empty list wraps to `navCount - 1` === -1; clamp the low end
+  // too, or the next batch of results arrives with nothing highlighted and
+  // Enter indexes past the start of navItems.
   const clampedIndex =
-    navCount === 0 ? 0 : Math.min(selectedIndex, navCount - 1);
+    navCount === 0 ? 0 : Math.min(Math.max(selectedIndex, 0), navCount - 1);
 
   function handleSearch(value: string) {
     setSearchTerm(value);
@@ -184,17 +223,14 @@ export function CommandPalette() {
       window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, handleOpen);
   }, []);
 
-  // Scroll selected item into view — the "Documentation" heading is a child
-  // too, so doc rows sit one further along than their nav index.
+  // Rows tag themselves with their nav index, so headings between groups no
+  // longer shift the lookup.
   useEffect(() => {
-    if (!listRef.current) return;
-    const domIndex =
-      clampedIndex < filteredResults.length ? clampedIndex : clampedIndex + 1;
-    const selected = listRef.current.children[domIndex] as HTMLElement;
-    if (selected) {
-      selected.scrollIntoView({ block: "nearest" });
-    }
-  }, [clampedIndex, filteredResults.length]);
+    const selected = listRef.current?.querySelector(
+      `[data-nav-index="${clampedIndex}"]`
+    );
+    selected?.scrollIntoView({ block: "nearest" });
+  }, [clampedIndex]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
@@ -205,9 +241,11 @@ export function CommandPalette() {
       setSelectedIndex((prev) => (prev > 0 ? prev - 1 : navCount - 1));
     } else if (e.key === "Enter" && navCount > 0) {
       e.preventDefault();
-      const variable = filteredResults[clampedIndex];
-      if (variable) navigateToResult(variable);
-      else navigateToDoc(visibleDocs[clampedIndex - filteredResults.length]);
+      const item = navItems[clampedIndex];
+      if (item.kind === "variable")
+        navigateToResult(filteredResults[item.index]);
+      else if (item.kind === "doc") navigateToDoc(visibleDocs[item.index]);
+      else navigateTo(settingsHits[item.index].href);
     } else if (e.key === "Escape") {
       e.preventDefault();
       closePalette();
@@ -222,6 +260,11 @@ export function CommandPalette() {
   function navigateToDoc(doc: (typeof visibleDocs)[0]) {
     closePalette();
     router.push(`/dashboard/projects/${doc.projectSlug}/docs/${doc.slug}`);
+  }
+
+  function navigateTo(href: string) {
+    closePalette();
+    router.push(href);
   }
 
   return (
@@ -339,7 +382,7 @@ export function CommandPalette() {
                       Searching...
                     </span>
                   </div>
-                ) : filteredResults.length === 0 && visibleDocs.length === 0 ? (
+                ) : navCount === 0 ? (
                   <div className="px-4 py-8 text-center text-sm text-ink-subtle">
                     Nothing found for &ldquo;{searchTerm}&rdquo;
                   </div>
@@ -347,6 +390,7 @@ export function CommandPalette() {
                   filteredResults.map((result, index) => (
                     <button
                       key={result._id}
+                      data-nav-index={index}
                       onClick={() => navigateToResult(result)}
                       className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
                         index === clampedIndex
@@ -423,6 +467,7 @@ export function CommandPalette() {
                       <button
                         key={doc._id}
                         data-testid={`palette-doc-${doc.slug}`}
+                        data-nav-index={filteredResults.length + index}
                         onClick={() => navigateToDoc(doc)}
                         className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
                           filteredResults.length + index === clampedIndex
@@ -450,10 +495,46 @@ export function CommandPalette() {
                     ))}
                   </>
                 )}
+
+                {/* Settings — three scopes, one search box. Entries are the
+                    static index in @/settings/settings-index, so a tab that
+                    moves does not silently strand its keywords. */}
+                {settingsHits.length > 0 && (
+                  <>
+                    <div className="border-t border-line px-4 pt-3 pb-1 font-mono text-[10px] tracking-wider text-ink-faint uppercase">
+                      Settings
+                    </div>
+                    {settingsHits.map((hit, index) => {
+                      const navIndex =
+                        filteredResults.length + visibleDocs.length + index;
+                      return (
+                        <button
+                          key={`${hit.entry.scope}-${hit.entry.tab}-${hit.entry.label}`}
+                          data-nav-index={navIndex}
+                          data-testid={`palette-setting-${hit.entry.scope}-${hit.entry.tab}`}
+                          onClick={() => navigateTo(hit.href)}
+                          className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+                            navIndex === clampedIndex
+                              ? "bg-accent-soft"
+                              : "hover:bg-surface-hover/50"
+                          }`}
+                        >
+                          <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-ink-subtle" />
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
+                            {hit.entry.label}
+                          </span>
+                          <span className="shrink-0 font-mono text-[10px] text-ink-faint">
+                            {hit.entry.scope}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
               </div>
 
               {/* Footer */}
-              {(filteredResults.length > 0 || visibleDocs.length > 0) && (
+              {navCount > 0 && (
                 <div className="flex items-center gap-4 border-t border-line px-4 py-2 text-[10px] text-ink-faint">
                   <span>
                     <kbd className="rounded border border-line bg-surface-raised px-1 py-0.5 font-mono">

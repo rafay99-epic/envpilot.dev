@@ -53,6 +53,14 @@ test.describe.serial("API keys", () => {
     await apiKeysTab.click();
 
     await page.getByRole("button", { name: /^New Key$/i }).click();
+    // The drawer mounts with the keys query, so wait for the form itself
+    // before reaching into it — clicking mid-mount silently no-ops.
+    await expect(page.locator("#api-key-name")).toBeVisible({
+      timeout: 20_000,
+    });
+    // Surfaces, resources and expiry live under the Advanced disclosure
+    // now that the drawer opens on a purpose preset.
+    await page.getByTestId("api-key-advanced").click();
 
     // The create panel is inline — no dialog. It expands in place above the
     // key list.
@@ -95,15 +103,16 @@ test.describe.serial("API keys", () => {
       "true"
     );
 
-    // Surfaces: REST API + MCP server are the pre-selected defaults —
-    // assert; GitHub Action is opt-in.
-    await expect(page.getByTestId("api-key-surface-rest_api")).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
+    // Surfaces come from the purpose preset the drawer opens on ("Agent /
+    // MCP"), so the MCP server is on and the other two are opt-in. Presets
+    // exist precisely so a key is never minted for a mix nobody asked for.
     await expect(
       page.getByTestId("api-key-surface-mcp_server")
     ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("api-key-surface-rest_api")).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
     await expect(
       page.getByTestId("api-key-surface-github_action")
     ).toHaveAttribute("aria-pressed", "false");
@@ -142,9 +151,7 @@ test.describe.serial("API keys", () => {
     await expect(row).toBeVisible({ timeout: 10_000 });
     // Scope renders as one quiet line, not a badge per datum.
     await expect(
-      row.getByText(
-        /1 project · production · variables, projects · REST API, MCP server/
-      )
+      row.getByText(/1 project · production · variables, projects · MCP server/)
     ).toBeVisible();
 
     expect(
@@ -205,6 +212,14 @@ test.describe.serial("API keys", () => {
     await apiKeysTab.click();
 
     await page.getByRole("button", { name: /^New Key$/i }).click();
+    // The drawer mounts with the keys query, so wait for the form itself
+    // before reaching into it — clicking mid-mount silently no-ops.
+    await expect(page.locator("#api-key-name")).toBeVisible({
+      timeout: 20_000,
+    });
+    // Surfaces, resources and expiry live under the Advanced disclosure
+    // now that the drawer opens on a purpose preset.
+    await page.getByTestId("api-key-advanced").click();
     await page.locator("#api-key-name").fill(expiringKeyName);
     await page
       .getByTestId(`api-key-project-${slug}`)

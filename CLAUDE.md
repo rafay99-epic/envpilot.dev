@@ -187,7 +187,9 @@ Only the built surface is ever published: `action.yml`, `dist/index.js`
   missing from the pulled environment.
 - **Backend counterpart**: CI/CD service tokens (`convex/features/cicd/`) —
   read-only, SHA-256-hash-stored, project+environment scoped, pro-gated
-  (`cicd_service_tokens`), managed in Project → Settings → CI/CD Tokens.
+  (`cicd_service_tokens`), issued from Organization → Settings → API Keys
+  (the legacy per-project CI/CD Tokens tab is gone; `cicd/pull.ts` still
+  accepts the old `serviceTokens` via its compat fallback).
   Every pull/denial is audit-logged; pulls fail LOUDLY (never partial data,
   never sentinel values). Prod feature-registry seeding is automatic after
   every convex deploy (`deploy-convex.yml` runs the seed migrations).

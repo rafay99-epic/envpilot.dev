@@ -2,6 +2,8 @@
  * Project-related constants
  */
 
+import { DEFAULT_SWATCH_COLOR, SWATCH_COLORS } from "./swatches";
+
 export const PROJECT_ICONS = [
   "folder",
   "globe",
@@ -17,23 +19,14 @@ export const PROJECT_ICONS = [
   "rocket",
 ] as const;
 
-export const PROJECT_COLORS = [
-  "#f4f4f5",
-  "#fee2e2",
-  "#fef3c7",
-  "#d1fae5",
-  "#dbeafe",
-  "#e0e7ff",
-  "#fae8ff",
-  "#fce7f3",
-  "#f0fdf4",
-  "#ecfeff",
-  "#eff6ff",
-  "#f5f3ff",
-] as const;
+/**
+ * Project colours ARE the shared swatch ramp — one list, so a tag and a
+ * project icon can never drift apart. See constants/swatches.ts.
+ */
+export const PROJECT_COLORS = SWATCH_COLORS;
 
 export const DEFAULT_PROJECT_ICON = "folder";
-export const DEFAULT_PROJECT_COLOR = "#f4f4f5";
+export const DEFAULT_PROJECT_COLOR = DEFAULT_SWATCH_COLOR;
 
 /**
  * Maps legacy emoji icons to their Lucide replacements.
@@ -76,5 +69,5 @@ export function envToggleClasses(env: Environment, selected: boolean): string {
 }
 
 export type ProjectIcon = (typeof PROJECT_ICONS)[number];
-export type ProjectColor = (typeof PROJECT_COLORS)[number];
+export type ProjectColor = string;
 export type Environment = (typeof ENVIRONMENTS)[number];

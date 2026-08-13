@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { SettingsSection } from "@envpilot/ui";
 import {
   TerminalBadge,
   TerminalButton,
@@ -139,7 +140,7 @@ function ProviderMark({ provider }: { provider: Provider }) {
 
 function ProviderLoadingRows() {
   return (
-    <div className="divide-y divide-line border-y border-line">
+    <div className="divide-y divide-line border-t border-line">
       {["slack", "discord"].map((provider) => (
         <div key={provider} className="flex items-center gap-3 py-4">
           <div className="h-9 w-9 animate-pulse rounded-full bg-surface-raised" />
@@ -156,7 +157,7 @@ function ProviderLoadingRows() {
 
 function DestinationLoadingRows() {
   return (
-    <div className="divide-y divide-line border-y border-line">
+    <div className="divide-y divide-line border-t border-line">
       {[1, 2].map((row) => (
         <div key={row} className="flex items-center gap-3 py-4">
           <div className="h-9 w-9 animate-pulse rounded-full bg-surface-raised" />
@@ -453,31 +454,21 @@ export function IntegrationsSection({
   };
 
   return (
-    <div className="space-y-10">
-      <section aria-labelledby="connect-notifications-heading">
-        <div className="mb-5">
-          <h2
-            id="connect-notifications-heading"
-            className="text-base font-semibold text-ink"
-          >
-            Connect a channel
-          </h2>
-          <p className="mt-1 text-sm leading-6 text-ink-subtle">
-            Choose a provider, select a channel there, and return here. Secret
-            values are never included in notifications.
-          </p>
-        </div>
-
+    <div>
+      <SettingsSection
+        title="Connect a channel"
+        description="Choose a provider, select a channel there, and return here. Secret values are never included in notifications."
+      >
         <FeatureGate
           organizationId={organizationId}
           featureKey="team_notifications"
           featureName="Slack & Discord Notifications"
-          fallbackVariant="card"
+          fallbackVariant="line"
         >
           {providerState.status === "loading" ? (
             <ProviderLoadingRows />
           ) : providerState.status === "error" ? (
-            <div className="flex items-center justify-between gap-4 border-y border-line py-4">
+            <div className="flex items-center justify-between gap-4 border-t border-line py-4">
               <p className="text-sm text-ink-muted">
                 Connection options are temporarily unavailable.
               </p>
@@ -486,7 +477,7 @@ export function IntegrationsSection({
               </TerminalButton>
             </div>
           ) : (
-            <div className="divide-y divide-line border-y border-line">
+            <div className="divide-y divide-line border-t border-line">
               {(["slack", "discord"] as const).map((provider) => {
                 const available = providerState[provider];
                 const connecting = connectingProvider === provider;
@@ -648,33 +639,23 @@ export function IntegrationsSection({
             </div>
           )}
         </FeatureGate>
-      </section>
+      </SettingsSection>
 
-      <section aria-labelledby="connected-destinations-heading">
-        <div className="mb-5">
-          <h2
-            id="connected-destinations-heading"
-            className="text-base font-semibold text-ink"
-          >
-            Connected destinations
-          </h2>
-          <p className="mt-1 text-sm leading-6 text-ink-subtle">
-            Route all organization activity or selected projects to each
-            channel. Connect the same provider again for another channel.
-          </p>
-        </div>
-
+      <SettingsSection
+        title="Connected destinations"
+        description="Route all organization activity or selected projects to each channel. Connect the same provider again for another channel."
+      >
         {webhooks === undefined ? (
           <DestinationLoadingRows />
         ) : webhooks.length === 0 ? (
-          <div className="border-y border-dashed border-line py-8 text-center">
+          <div className="py-4">
             <p className="text-sm text-ink-muted">No channels connected yet.</p>
             <p className="mt-1 text-xs text-ink-faint">
               Slack or Discord will ask you which channel to use.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-line border-y border-line">
+          <div className="divide-y divide-line border-t border-line">
             {(webhooks as WebhookRow[]).map((hook) => {
               const editing = editingId === hook._id;
               const deleting = deletingId === hook._id;
@@ -913,7 +894,7 @@ export function IntegrationsSection({
             })}
           </div>
         )}
-      </section>
+      </SettingsSection>
     </div>
   );
 }

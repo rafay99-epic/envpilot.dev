@@ -44,7 +44,7 @@ export function TerminalTable({
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-white/[0.05]">
+        <tbody className="divide-y divide-line">
           {rows.map((row) => (
             <tr key={row.key} className="hover:bg-white/[0.02]">
               {row.cells.map((cell, i) => (

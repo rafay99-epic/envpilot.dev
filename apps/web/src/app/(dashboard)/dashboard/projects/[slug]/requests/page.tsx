@@ -101,7 +101,7 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
         </h2>
         <Link
           href="/dashboard/projects"
-          className="mt-6 text-sm font-medium text-ink-inverse hover:text-ink-muted"
+          className="mt-6 text-sm font-medium text-ink hover:text-ink-muted"
         >
           Back to Projects
         </Link>

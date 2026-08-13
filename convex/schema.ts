@@ -1189,6 +1189,9 @@ export default defineSchema({
   })
     .index("by_published", ["isPublished"])
     .index("by_published_at", ["publishedAt"])
+    // Cursor pagination needs the sort to come from the index — a JS sort per
+    // page cannot order rows it has not read.
+    .index("by_published_and_date", ["isPublished", "publishedAt"])
     .index("by_version", ["version"])
     .index("by_type", ["type"])
     .index("by_publish_status", ["publishStatus"]),

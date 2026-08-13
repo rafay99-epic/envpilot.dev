@@ -111,8 +111,11 @@ export function MarketingFooter({
         aria-hidden
         className="pointer-events-none select-none overflow-hidden"
       >
+        {/* surface-hover, not ink-inverse: a near-black ghost ON the canvas,
+            not text on a light fill. ink-inverse (#0a0a0a) sits one step off
+            bg-canvas (#09090b) and renders invisible. */}
         <p
-          className="-mb-8 text-center font-sans text-[18vw] font-black leading-none tracking-tighter text-ink-inverse sm:-mb-12"
+          className="-mb-8 text-center font-sans text-[18vw] font-black leading-none tracking-tighter text-surface-hover sm:-mb-12"
           style={{
             maskImage: "linear-gradient(to bottom, black 10%, transparent 75%)",
             WebkitMaskImage:

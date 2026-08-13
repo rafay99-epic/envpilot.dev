@@ -48,7 +48,7 @@ interface FeatureGateProps {
   /**
    * How to display the fallback
    */
-  fallbackVariant?: "inline" | "banner" | "card" | "hide";
+  fallbackVariant?: "inline" | "banner" | "card" | "line" | "hide";
   /**
    * Current tier for the upgrade prompt
    */
@@ -124,13 +124,7 @@ export function FeatureGate({
       reason={reason || "This feature requires an upgrade."}
       feature={featureName}
       currentTier={currentTier}
-      variant={
-        fallbackVariant === "inline"
-          ? "inline"
-          : fallbackVariant === "banner"
-            ? "banner"
-            : "card"
-      }
+      variant={fallbackVariant}
     />
   );
 }

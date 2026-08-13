@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   Copy,
   Check,
   ChevronDown,
@@ -14,10 +15,10 @@ import {
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import * as Sentry from "@sentry/nextjs";
+import { SettingsField, SettingsSection } from "@envpilot/ui";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { DrawerPanel } from "@/components/ui";
 import {
-  TerminalCard,
   TerminalButton,
   TerminalInput,
   TerminalBadge,
@@ -97,6 +98,47 @@ const MCP_RESOURCE_TOOLS: Record<Resource, string> = {
   requests: "envpilot_request_variable, envpilot_get_request_status",
 };
 
+/**
+ * What the key is FOR, chosen before any chip. Each preset is a combination the
+ * backend already accepts, so the common paths cannot produce a key that mints
+ * and then fails on first use. "custom" opts out and opens the advanced block.
+ *
+ * Presets set surfaces and resources only — project and environment scope stay
+ * a deliberate choice, because no default is safe for every org.
+ */
+const PRESETS = [
+  {
+    id: "agent",
+    label: "Agent / MCP",
+    blurb: "Claude, Cursor, Codex",
+    surfaces: ["mcp_server"],
+    resources: ["variables", "projects"],
+  },
+  {
+    id: "action",
+    label: "GitHub Action",
+    blurb: "CI pulls variables",
+    surfaces: ["github_action"],
+    resources: ["variables"],
+  },
+  {
+    id: "rest",
+    label: "REST read-only",
+    blurb: "scripts, dashboards",
+    surfaces: ["rest_api"],
+    resources: ["variables"],
+  },
+  {
+    id: "custom",
+    label: "Custom",
+    blurb: "choose everything",
+    surfaces: [],
+    resources: [],
+  },
+] as const;
+
+type PresetId = (typeof PRESETS)[number]["id"];
+
 const SURFACES = ["rest_api", "mcp_server", "github_action"] as const;
 type Surface = (typeof SURFACES)[number];
 
@@ -144,7 +186,7 @@ export function ApiKeysSection({
       organizationId={organizationId}
       featureKey="public_api"
       featureName="Public REST API"
-      fallbackVariant="card"
+      fallbackVariant="line"
     >
       <ApiKeysSectionInner organizationId={organizationId} isOwner={isOwner} />
     </FeatureGate>
@@ -181,63 +223,57 @@ function ApiKeysSectionInner({
   const [showCreate, setShowCreate] = useState(false);
 
   return (
-    <div className="space-y-6">
-      <TerminalCard>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold text-ink">API Keys</h2>
-            <p className="mt-1 text-sm text-ink-subtle">
-              Scoped keys for the public REST API, MCP server, and GitHub
-              Action. Read-only — except keys with the requests resource, which
-              may file variable requests for human approval.
-            </p>
-          </div>
-          <TerminalButton
-            type="button"
-            variant="primary"
-            onClick={() => setShowCreate(true)}
-          >
-            New Key
-          </TerminalButton>
-        </div>
+    <SettingsSection
+      title="API keys"
+      description="Scoped keys for the public REST API, MCP server, and GitHub Action. Read-only — except keys with the requests resource, which may file variable requests for human approval."
+    >
+      <div className="flex justify-end">
+        <TerminalButton
+          type="button"
+          variant="primary"
+          onClick={() => setShowCreate(true)}
+        >
+          New Key
+        </TerminalButton>
+      </div>
 
-        {organizationId && (
-          <CreateKeyDrawer
-            organizationId={organizationId}
-            isOwner={isOwner}
-            isOpen={showCreate}
-            onClose={() => setShowCreate(false)}
+      {organizationId && (
+        <CreateKeyDrawer
+          organizationId={organizationId}
+          isOwner={isOwner}
+          isOpen={showCreate}
+          onClose={() => setShowCreate(false)}
+        />
+      )}
+
+      {isLoading ? (
+        <TerminalLoading />
+      ) : keyList.length === 0 ? (
+        !showCreate && (
+          <TerminalEmptyState
+            command='curl -H "Authorization: Bearer $ENVPILOT_API_KEY" https://www.envpilot.dev/api/v1/projects'
+            message="No API keys yet. Create one to call the public REST API or connect the MCP server."
+            action={{
+              label: "New Key",
+              onClick: () => setShowCreate(true),
+            }}
           />
-        )}
-
-        <div className="mt-6">
-          {isLoading ? (
-            <TerminalLoading />
-          ) : keyList.length === 0 ? (
-            !showCreate && (
-              <TerminalEmptyState
-                command='curl -H "Authorization: Bearer $ENVPILOT_API_KEY" https://www.envpilot.dev/api/v1/projects'
-                message="No API keys yet. Create one to call the public REST API or connect the MCP server."
-                action={{
-                  label: "New Key",
-                  onClick: () => setShowCreate(true),
-                }}
-              />
-            )
-          ) : (
-            <ul data-testid="api-keys-list" className="divide-y divide-line">
-              {keyList.map((key) => (
-                <KeyRow
-                  key={key._id}
-                  keyItem={key}
-                  usage={usageResult?.usage[key._id as string] ?? null}
-                />
-              ))}
-            </ul>
-          )}
-        </div>
-      </TerminalCard>
-    </div>
+        )
+      ) : (
+        <ul
+          data-testid="api-keys-list"
+          className="divide-y divide-line border-t border-line"
+        >
+          {keyList.map((key) => (
+            <KeyRow
+              key={key._id}
+              keyItem={key}
+              usage={usageResult?.usage[key._id as string] ?? null}
+            />
+          ))}
+        </ul>
+      )}
+    </SettingsSection>
   );
 }
 
@@ -419,9 +455,10 @@ function KeyRow({
               transition={{ duration: 0.15 }}
               className="overflow-hidden"
             >
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-line bg-danger-soft px-4 py-3">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-danger-line/40 pt-3">
                 <div className="min-w-0">
-                  <p className="text-xs text-danger">
+                  <p className="flex items-start gap-2 text-xs text-danger">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     Revoke this key? Anything using it will stop working
                     immediately.
                   </p>
@@ -508,6 +545,10 @@ function CreateKeyDrawer({
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [customExpiry, setCustomExpiry] = useState("");
 
+  const [preset, setPreset] = useState<PresetId>("agent");
+  // Problems are computed on every render but only SHOWN once the user has
+  // tried to create — an empty form should not open scolding.
+  const [triedSubmit, setTriedSubmit] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
@@ -519,12 +560,14 @@ function CreateKeyDrawer({
   useEffect(() => {
     if (!isOpen) return;
     setName("");
+    setPreset("agent");
+    setTriedSubmit(false);
     setProjectMode("specific");
     setSelectedProjectIds(new Set());
     setEnvMode("specific");
     setSelectedEnvs(new Set<Environment>(["production"]));
     setSelectedResources(new Set<Resource>(["variables", "projects"]));
-    setSelectedSurfaces(new Set<Surface>(["rest_api", "mcp_server"]));
+    setSelectedSurfaces(new Set<Surface>(["mcp_server"]));
     setExpiryMode("none");
     setCustomExpiry("");
     setIsSubmitting(false);
@@ -625,18 +668,98 @@ function CreateKeyDrawer({
     expiryMode !== "custom" ||
     (customExpiry.length > 0 && new Date(customExpiry).getTime() > Date.now());
 
-  const canSubmit =
-    name.trim().length > 0 &&
-    projectSelectionValid &&
-    envSelectionValid &&
-    resourceSelectionValid &&
-    surfaceSelectionValid &&
-    customExpiryValid &&
-    !isSubmitting;
+  const applyPreset = (id: PresetId) => {
+    setPreset(id);
+    const chosen = PRESETS.find((p) => p.id === id);
+    if (!chosen || id === "custom") return;
+    setSelectedSurfaces(
+      new Set<Surface>(chosen.surfaces as readonly Surface[])
+    );
+    setSelectedResources(
+      new Set<Resource>(chosen.resources as readonly Resource[])
+    );
+    // The Action pull endpoint takes no project parameter, so its key IS the
+    // project scope — force the shape the backend will accept.
+    if (id === "action") setProjectMode("specific");
+  };
+
+  /**
+   * Every reason this key cannot be created, in the order the fields appear.
+   * Mirrors convex/features/api/keys.ts one-for-one: the point is that the
+   * user reads the rule HERE instead of after a failed round trip.
+   */
+  const problems: { field: string; message: string }[] = [];
+  if (name.trim().length === 0) {
+    problems.push({
+      field: "name",
+      message: "Name your key (1–100 characters).",
+    });
+  } else if (name.trim().length > 100) {
+    problems.push({ field: "name", message: "Name must be 1–100 characters." });
+  }
+  if (!surfaceSelectionValid) {
+    problems.push({
+      field: "surfaces",
+      message: "Pick at least one surface — where this key may be used.",
+    });
+  }
+  if (!projectSelectionValid) {
+    problems.push({
+      field: "projects",
+      message: githubActionSelected
+        ? "A GitHub Action key must be scoped to exactly one project — the Action's pull endpoint takes no project parameter."
+        : "Pick at least one project, or scope the key to all projects.",
+    });
+  }
+  if (!envSelectionValid) {
+    problems.push({
+      field: "environments",
+      message:
+        "Pick at least one environment, or scope the key to all of them.",
+    });
+  }
+  if (selectedResources.size === 0) {
+    problems.push({
+      field: "resources",
+      message: "Pick at least one resource — a key with none can read nothing.",
+    });
+  } else if (!resourceSelectionValid) {
+    problems.push({
+      field: "resources",
+      message:
+        'A GitHub Action key must carry "variables", and may additionally carry "files" — nothing else.',
+    });
+  }
+  if (selectedResources.has("docs") && selectedResources.has("files")) {
+    problems.push({
+      field: "resources",
+      message:
+        'A key cannot carry both "docs" and "files" — docs are text an agent reads into context, and file access returns decrypted key material. Mint two keys.',
+    });
+  }
+  if (!customExpiryValid) {
+    problems.push({
+      field: "expiry",
+      message: "Pick an expiry date in the future.",
+    });
+  }
+
+  const mcpToolCount = RESOURCES.filter((r) => selectedResources.has(r)).length;
+
+  const showProblems = triedSubmit && problems.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit) return;
+    setTriedSubmit(true);
+    // Never a dead button: a click with gaps explains them instead of doing
+    // nothing, which is the whole reason this form was confusing.
+    if (problems.length > 0) {
+      document
+        .getElementById("api-key-problems")
+        ?.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    if (isSubmitting) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -707,21 +830,21 @@ function CreateKeyDrawer({
             <h3 className="text-sm font-semibold text-accent">Key created</h3>
           </div>
 
-          <div className="flex items-start gap-2 rounded-lg border border-warning-line bg-warning-soft px-3 py-2">
-            <span className="text-sm text-warning">
+          <p className="flex items-start gap-2 text-sm text-warning">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
               <span className="font-semibold">
                 Copy it now — you won&apos;t see this key again.
               </span>{" "}
               Envpilot only stores its hash.
             </span>
-          </div>
+          </p>
 
-          <div>
-            <label className="block text-sm font-medium text-ink-muted">
-              API Key
-            </label>
-            <div className="mt-1 flex items-center gap-2">
-              <code className="flex-1 truncate rounded-lg border border-line bg-surface px-3 py-2 font-mono text-xs text-ink">
+          {/* The one bordered block on this surface: copyable terminal output
+              shown exactly once, where the emphasis is the point. */}
+          <SettingsField label="API key">
+            <div className="flex items-center gap-2">
+              <code className="flex-1 truncate rounded-panel border border-line bg-surface px-3 py-2 font-mono text-xs text-ink">
                 {createdToken}
               </code>
               <TerminalButton
@@ -737,12 +860,12 @@ function CreateKeyDrawer({
                 )}
               </TerminalButton>
             </div>
-          </div>
+          </SettingsField>
 
           {mcpSelected && (
             <p
               data-testid="api-key-mcp-rotation-hint"
-              className="rounded-lg border border-line bg-surface/60 px-3 py-2 text-xs text-ink-muted"
+              className="text-xs text-ink-muted"
             >
               Replacing a key in an existing MCP setup? Swap this key into your
               client&apos;s Authorization header (or the exported{" "}
@@ -783,7 +906,7 @@ function CreateKeyDrawer({
                   transition={{ duration: 0.2, ease: "easeInOut" }}
                   className="overflow-hidden"
                 >
-                  <pre className="mt-2 overflow-x-auto rounded-lg border border-line bg-canvas px-3 py-3 text-xs text-ink-muted">
+                  <pre className="mt-2 overflow-x-auto rounded-panel bg-canvas px-3 py-3 text-xs text-ink-muted">
                     {`curl -H "Authorization: Bearer $ENVPILOT_API_KEY" \\
   "https://www.envpilot.dev/api/v1/projects/{slug}/variables?environment=production"`}
                   </pre>
@@ -812,74 +935,108 @@ function CreateKeyDrawer({
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
-            <div className="rounded-lg border border-danger-line bg-danger-soft p-3">
-              <p className="text-sm text-danger">{error}</p>
+            <p className="flex items-start gap-2 text-sm text-danger">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {error}
+            </p>
+          )}
+
+          {showProblems && (
+            <div
+              id="api-key-problems"
+              data-testid="api-key-problems"
+              role="alert"
+              className="border-l-2 border-danger py-1 pl-3"
+            >
+              <p className="text-sm font-medium text-danger">
+                {problems.length === 1
+                  ? "One thing left before this key can be created"
+                  : `${problems.length} things left before this key can be created`}
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {problems.map((problem) => (
+                  <li
+                    key={`${problem.field}-${problem.message}`}
+                    className="text-sm text-ink-muted"
+                  >
+                    <span className="font-mono text-[12px] text-ink-subtle">
+                      {problem.field}
+                    </span>{" "}
+                    — {problem.message}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
-          <div>
-            <label
-              htmlFor="api-key-name"
-              className="block text-sm font-medium text-ink-muted"
-            >
-              Name
-            </label>
+          <SettingsField
+            label="What is this key for?"
+            required
+            hint="Presets pick a surface and resources that are known to work together. Everything stays editable under Advanced."
+          >
+            <div className="grid gap-2 sm:grid-cols-2">
+              {PRESETS.map((option) => {
+                const selected = preset === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    data-testid={`api-key-preset-${option.id}`}
+                    aria-pressed={selected}
+                    onClick={() => applyPreset(option.id)}
+                    className={`rounded-panel px-3 py-2 text-left ring-1 transition-colors ${
+                      selected
+                        ? "bg-accent-soft text-accent ring-accent-line"
+                        : "text-ink-muted ring-line hover:text-ink hover:ring-line-strong"
+                    }`}
+                  >
+                    <span className="block text-sm font-medium">
+                      {option.label}
+                    </span>
+                    <span className="block text-xs text-ink-subtle">
+                      {option.blurb}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </SettingsField>
+
+          <SettingsField
+            label="Name"
+            htmlFor="api-key-name"
+            required
+            hint={`1–100 characters · ${name.trim().length}/100`}
+            error={
+              showProblems
+                ? (problems.find((p) => p.field === "name")?.message ?? null)
+                : null
+            }
+          >
             <TerminalInput
               id="api-key-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. deploy-pipeline"
-              required
               maxLength={100}
-              className="mt-1"
+              aria-invalid={
+                showProblems && problems.some((p) => p.field === "name")
+              }
             />
-          </div>
+          </SettingsField>
 
-          <div>
-            <label className="block text-sm font-medium text-ink-muted">
-              Surfaces
-            </label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {SURFACES.map((surface) => {
-                const selected = selectedSurfaces.has(surface);
-                return (
-                  <button
-                    key={surface}
-                    type="button"
-                    data-testid={`api-key-surface-${surface}`}
-                    aria-pressed={selected}
-                    onClick={() => toggleSurface(surface)}
-                    className={`${CHIP_BASE} normal-case ${
-                      selected ? CHIP_SELECTED_GENERIC : CHIP_UNSELECTED
-                    }`}
-                  >
-                    {SURFACE_LABEL[surface]}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="mt-2 text-xs text-ink-subtle">
-              {githubActionSelected
-                ? "A GitHub Action key is locked to exactly one project and the variables resource — the Action's pull endpoint takes no project parameter."
-                : "Where this key may be used. The GitHub Action pulls variables for a single project."}
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-ink-muted">
-              Projects
-            </label>
-            <div className="mt-2 flex gap-1 rounded-lg bg-surface-raised p-1">
+          <SettingsField label="Projects" required>
+            <div className="flex flex-wrap gap-2">
               {isOwner && !githubActionSelected && (
                 <button
                   type="button"
                   aria-pressed={projectMode === "all"}
                   onClick={() => setProjectMode("all")}
-                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`${CHIP_BASE} normal-case ${
                     projectMode === "all"
-                      ? "bg-surface-hover text-ink"
-                      : "text-ink-muted hover:text-ink-muted"
+                      ? CHIP_SELECTED_GENERIC
+                      : CHIP_UNSELECTED
                   }`}
                 >
                   All projects (includes future ones)
@@ -889,10 +1046,10 @@ function CreateKeyDrawer({
                 type="button"
                 aria-pressed={projectMode === "specific"}
                 onClick={() => setProjectMode("specific")}
-                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`${CHIP_BASE} normal-case ${
                   projectMode === "specific"
-                    ? "bg-surface-hover text-ink"
-                    : "text-ink-muted hover:text-ink-muted"
+                    ? CHIP_SELECTED_GENERIC
+                    : CHIP_UNSELECTED
                 }`}
               >
                 Specific projects
@@ -900,13 +1057,13 @@ function CreateKeyDrawer({
             </div>
 
             {projectMode === "specific" && (
-              <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg border border-line p-2">
+              <div className="mt-3 max-h-48 divide-y divide-line overflow-y-auto border-t border-line">
                 {projectsLoading ? (
-                  <p className="px-2 py-1.5 text-xs text-ink-subtle">
+                  <p className="py-2 text-xs text-ink-subtle">
                     Loading projects...
                   </p>
                 ) : projects.length === 0 ? (
-                  <p className="px-2 py-1.5 text-xs text-ink-subtle">
+                  <p className="py-2 text-xs text-ink-subtle">
                     No projects yet.
                   </p>
                 ) : (
@@ -914,7 +1071,7 @@ function CreateKeyDrawer({
                     <label
                       key={project._id}
                       data-testid={`api-key-project-${project.slug}`}
-                      className="flex items-center gap-2 rounded px-2 py-1.5 text-sm text-ink-muted hover:bg-surface-hover/60"
+                      className="flex cursor-pointer items-center gap-2 py-2 text-sm text-ink-muted hover:text-ink"
                     >
                       <input
                         type="checkbox"
@@ -928,13 +1085,14 @@ function CreateKeyDrawer({
                 )}
               </div>
             )}
-          </div>
+          </SettingsField>
 
-          <div>
-            <label className="block text-sm font-medium text-ink-muted">
-              Environments
-            </label>
-            <div className="mt-2 flex flex-wrap gap-2">
+          <SettingsField
+            label="Environments"
+            required
+            hint="Recommended: scope keys to a single environment."
+          >
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 aria-pressed={envMode === "all"}
@@ -963,152 +1121,201 @@ function CreateKeyDrawer({
                 );
               })}
             </div>
-            <p className="mt-2 text-xs text-ink-subtle">
-              Recommended: scope keys to a single environment.
-            </p>
-          </div>
+          </SettingsField>
 
-          <div>
-            <label className="block text-sm font-medium text-ink-muted">
-              Resources
-            </label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {RESOURCES.map((resource) => {
-                const selected = selectedResources.has(resource);
-                // The Action pulls variables and, optionally, secret files.
-                // Everything else stays off so an Action credential never
-                // doubles as broader REST/MCP access.
-                const disabled =
-                  githubActionSelected &&
-                  resource !== "variables" &&
-                  resource !== "files";
-                // The other half of an exclusive pair stays clickable — it
-                // swaps the selection rather than being blocked — but says so.
-                const excluded = MUTUALLY_EXCLUSIVE[resource];
-                const swaps = Boolean(
-                  excluded && selectedResources.has(excluded)
-                );
-                return (
-                  <button
-                    key={resource}
-                    type="button"
-                    data-testid={`api-key-resource-${resource}`}
-                    aria-pressed={selected}
-                    disabled={disabled}
-                    title={
-                      disabled
-                        ? "GitHub Action keys carry variables, and optionally files — nothing else"
-                        : swaps
-                          ? `Selecting "${resource}" clears "${excluded}" — a key cannot carry both`
-                          : RESOURCE_HINT[resource]
-                    }
-                    onClick={() => toggleResource(resource)}
-                    className={`${CHIP_BASE} ${
-                      selected ? CHIP_SELECTED_GENERIC : CHIP_UNSELECTED
-                    } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
-                  >
-                    {resource}
-                  </button>
-                );
-              })}
-            </div>
-            {selectedResources.has("requests") && (
-              <p className="mt-2 text-xs text-ink-subtle">
-                This key may file variable requests over MCP — a human approves
-                them in the dashboard and supplies the value. Keys never write
-                secrets.
-              </p>
-            )}
-            {mcpSelected && (
-              <div
-                data-testid="api-key-mcp-requirements"
-                className="mt-3 rounded-lg border border-line bg-surface/60 p-3"
+          <details
+            className="border-t border-line pt-4"
+            open={preset === "custom" || showProblems}
+          >
+            <summary
+              data-testid="api-key-advanced"
+              className="cursor-pointer list-none font-mono text-[12px] text-ink-subtle transition-colors hover:text-ink [&::-webkit-details-marker]:hidden"
+            >
+              <span aria-hidden className="mr-2 text-accent">
+                &#9656;
+              </span>
+              Advanced — surfaces, resources, expiry
+            </summary>
+
+            <div className="mt-4 space-y-5">
+              <SettingsField
+                label="Surfaces"
+                required
+                hint={
+                  githubActionSelected
+                    ? "A GitHub Action key is locked to exactly one project and the variables resource — the Action's pull endpoint takes no project parameter."
+                    : "Where this key may be used. The GitHub Action pulls variables for a single project."
+                }
               >
-                <p className="text-xs font-medium text-ink-muted">
-                  MCP server — tools this key will unlock
-                </p>
-                <ul className="mt-2 space-y-1">
-                  {RESOURCES.map((resource) => {
-                    const enabled = selectedResources.has(resource);
+                <div className="flex flex-wrap gap-2">
+                  {SURFACES.map((surface) => {
+                    const selected = selectedSurfaces.has(surface);
                     return (
-                      <li
-                        key={resource}
-                        data-testid={`api-key-mcp-tools-${resource}`}
-                        className={`flex gap-2 text-xs ${
-                          enabled ? "text-ink-muted" : "text-ink-faint"
+                      <button
+                        key={surface}
+                        type="button"
+                        data-testid={`api-key-surface-${surface}`}
+                        aria-pressed={selected}
+                        onClick={() => toggleSurface(surface)}
+                        className={`${CHIP_BASE} normal-case ${
+                          selected ? CHIP_SELECTED_GENERIC : CHIP_UNSELECTED
                         }`}
                       >
-                        <span
-                          className={enabled ? "text-accent" : "text-ink-faint"}
-                        >
-                          {enabled ? "✓" : "✗"}
-                        </span>
-                        <span>
-                          <span className="capitalize">{resource}</span> —{" "}
-                          <span className="font-mono">
-                            {MCP_RESOURCE_TOOLS[resource]}
-                          </span>
-                        </span>
-                      </li>
+                        {SURFACE_LABEL[surface]}
+                      </button>
                     );
                   })}
-                </ul>
-                {!selectedResources.has("projects") && (
-                  <p
-                    data-testid="api-key-mcp-projects-warning"
-                    className="mt-2 rounded-md border border-warning-line bg-warning-soft p-2 text-xs text-warning"
-                  >
-                    Without the projects resource, MCP clients cannot list or
-                    search projects — most assistants start there, so every
-                    session fails with a scope error. Enable projects for a
-                    usable MCP key.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              </SettingsField>
 
-          <div>
-            <label className="block text-sm font-medium text-ink-muted">
-              Expiry
-            </label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {(
-                [
-                  { id: "none", label: "No expiry" },
-                  { id: "30d", label: "30 days" },
-                  { id: "90d", label: "90 days" },
-                  { id: "custom", label: "Custom date" },
-                ] as const
-              ).map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  aria-pressed={expiryMode === option.id}
-                  onClick={() => setExpiryMode(option.id)}
-                  className={`${CHIP_BASE} ${
-                    expiryMode === option.id
-                      ? CHIP_SELECTED_GENERIC
-                      : CHIP_UNSELECTED
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
+              <SettingsField
+                label="Resources"
+                required
+                hint={
+                  selectedResources.has("requests")
+                    ? "This key may file variable requests over MCP — a human approves them in the dashboard and supplies the value. Keys never write secrets."
+                    : undefined
+                }
+              >
+                <div className="flex flex-wrap gap-2">
+                  {RESOURCES.map((resource) => {
+                    const selected = selectedResources.has(resource);
+                    // The Action pulls variables and, optionally, secret files.
+                    // Everything else stays off so an Action credential never
+                    // doubles as broader REST/MCP access.
+                    const disabled =
+                      githubActionSelected &&
+                      resource !== "variables" &&
+                      resource !== "files";
+                    // The other half of an exclusive pair stays clickable — it
+                    // swaps the selection rather than being blocked — but says so.
+                    const excluded = MUTUALLY_EXCLUSIVE[resource];
+                    const swaps = Boolean(
+                      excluded && selectedResources.has(excluded)
+                    );
+                    return (
+                      <button
+                        key={resource}
+                        type="button"
+                        data-testid={`api-key-resource-${resource}`}
+                        aria-pressed={selected}
+                        disabled={disabled}
+                        title={
+                          disabled
+                            ? "GitHub Action keys carry variables, and optionally files — nothing else"
+                            : swaps
+                              ? `Selecting "${resource}" clears "${excluded}" — a key cannot carry both`
+                              : RESOURCE_HINT[resource]
+                        }
+                        onClick={() => toggleResource(resource)}
+                        className={`${CHIP_BASE} ${
+                          selected ? CHIP_SELECTED_GENERIC : CHIP_UNSELECTED
+                        } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
+                      >
+                        {resource}
+                      </button>
+                    );
+                  })}
+                </div>
+              </SettingsField>
+
+              {mcpSelected && (
+                <div data-testid="api-key-mcp-requirements">
+                  {/* The full tool list is six lines of mono the moment MCP is
+                      picked, which buried the fields under it. Headline first,
+                      list on demand. */}
+                  <details>
+                    <summary className="cursor-pointer list-none text-xs font-medium text-ink-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
+                      <span aria-hidden className="mr-1.5 text-accent">
+                        &#9656;
+                      </span>
+                      MCP server — {mcpToolCount} of {RESOURCES.length} resource
+                      groups unlock tools
+                    </summary>
+                    <ul className="mt-2 space-y-1">
+                      {RESOURCES.map((resource) => {
+                        const enabled = selectedResources.has(resource);
+                        return (
+                          <li
+                            key={resource}
+                            data-testid={`api-key-mcp-tools-${resource}`}
+                            className={`flex gap-2 text-xs ${
+                              enabled ? "text-ink-muted" : "text-ink-faint"
+                            }`}
+                          >
+                            <span
+                              className={
+                                enabled ? "text-accent" : "text-ink-faint"
+                              }
+                            >
+                              {enabled ? "✓" : "✗"}
+                            </span>
+                            <span>
+                              <span className="capitalize">{resource}</span> —{" "}
+                              <span className="font-mono">
+                                {MCP_RESOURCE_TOOLS[resource]}
+                              </span>
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </details>
+                  {!selectedResources.has("projects") && (
+                    <p
+                      data-testid="api-key-mcp-projects-warning"
+                      className="mt-2 flex items-start gap-2 text-xs text-warning"
+                    >
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      Without the projects resource, MCP clients cannot list or
+                      search projects — most assistants start there, so every
+                      session fails with a scope error. Enable projects for a
+                      usable MCP key.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <SettingsField label="Expiry" optional>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      { id: "none", label: "No expiry" },
+                      { id: "30d", label: "30 days" },
+                      { id: "90d", label: "90 days" },
+                      { id: "custom", label: "Custom date" },
+                    ] as const
+                  ).map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      aria-pressed={expiryMode === option.id}
+                      onClick={() => setExpiryMode(option.id)}
+                      className={`${CHIP_BASE} ${
+                        expiryMode === option.id
+                          ? CHIP_SELECTED_GENERIC
+                          : CHIP_UNSELECTED
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {expiryMode === "custom" && (
+                  <TerminalDatePicker
+                    id="api-key-expiry-custom"
+                    value={customExpiry}
+                    onChange={setCustomExpiry}
+                    min={new Date(Date.now() + 24 * 60 * 60 * 1000)
+                      .toISOString()
+                      .slice(0, 10)}
+                    placeholder="Pick an expiry date"
+                    className="mt-2"
+                  />
+                )}
+              </SettingsField>
             </div>
-            {expiryMode === "custom" && (
-              <TerminalDatePicker
-                id="api-key-expiry-custom"
-                value={customExpiry}
-                onChange={setCustomExpiry}
-                min={new Date(Date.now() + 24 * 60 * 60 * 1000)
-                  .toISOString()
-                  .slice(0, 10)}
-                placeholder="Pick an expiry date"
-                className="mt-2"
-              />
-            )}
-          </div>
+          </details>
 
           <div className="flex justify-end gap-3 pt-2">
             <TerminalButton
@@ -1119,7 +1326,7 @@ function CreateKeyDrawer({
             >
               Cancel
             </TerminalButton>
-            <TerminalButton type="submit" disabled={!canSubmit}>
+            <TerminalButton type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Creating..." : "Create Key"}
             </TerminalButton>
           </div>

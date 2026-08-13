@@ -107,7 +107,7 @@ function PricingCards({
             </div>
             <div className="mt-8 flex-1" />
             {isComingSoon ? (
-              <span className="block cursor-not-allowed rounded-md px-5 py-3 text-center font-sans text-[15px] text-ink-subtle ring-1 ring-white/[0.08]">
+              <span className="block cursor-not-allowed rounded-md px-5 py-3 text-center font-sans text-[15px] text-ink-subtle ring-1 ring-line">
                 {cta}
               </span>
             ) : (
@@ -115,8 +115,8 @@ function PricingCards({
                 href={ctaHref}
                 className={`block rounded-md px-5 py-3 text-center font-sans text-[15px] font-semibold transition-colors ${
                   isDefault
-                    ? "bg-accent text-chrome hover:bg-accent"
-                    : "text-ink ring-1 ring-white/[0.08] hover:ring-white/25"
+                    ? "bg-accent text-chrome hover:bg-accent-hover"
+                    : "text-ink ring-1 ring-line hover:ring-line-strong"
                 }`}
               >
                 {cta}

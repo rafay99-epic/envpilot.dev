@@ -242,7 +242,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                       data-testid="doc-title-edit"
                       aria-label="Page title"
                       placeholder="Page title"
-                      className="min-w-0 flex-1 border-0 bg-transparent p-0 text-2xl font-bold text-ink-inverse outline-none placeholder:text-ink"
+                      className="min-w-0 flex-1 border-0 bg-transparent p-0 text-2xl font-bold text-ink outline-none placeholder:text-ink-subtle"
                     />
                   ) : (
                     <h1

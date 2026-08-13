@@ -1,11 +1,6 @@
 import Image from "next/image";
 import type { Metadata } from "next";
-import {
-  GlowDivider,
-  MarketingShell,
-  PageHero,
-  Reveal,
-} from "@/components/marketing";
+import { MarketingShell, PageHero, terminal } from "@/components/marketing";
 
 export const metadata: Metadata = {
   title: "Brand Assets | Envpilot",
@@ -61,19 +56,15 @@ const DISCORD_TAGS = [
 export default function LogoPage() {
   return (
     <MarketingShell>
-      <PageHero eyebrow="brand" title="Envpilot brand assets" align="left">
-        <p className="max-w-2xl text-sm leading-relaxed text-ink-muted sm:text-base">
-          Official application icons and platform-ready artwork for Envpilot
-          integrations, marketplace listings, launch posts, and press
-          references.
-        </p>
-      </PageHero>
+      <PageHero
+        eyebrow="brand"
+        title="Envpilot brand assets"
+        description="Official application icons and platform-ready artwork for Envpilot integrations, marketplace listings, launch posts, and press references."
+      />
 
-      <GlowDivider />
-
-      <section className="relative py-16 sm:py-20">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <Reveal>
+      <section className="pb-16 sm:pb-20">
+        <div className={terminal.shell}>
+          <div>
             <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)]">
               <div className="relative mx-auto aspect-square w-full max-w-lg overflow-hidden rounded-[2rem] border border-info-line bg-black shadow-[0_0_100px_-35px_rgba(59,130,246,0.75)]">
                 <Image
@@ -87,13 +78,15 @@ export default function LogoPage() {
               </div>
 
               <div>
-                <p className="font-mono text-xs uppercase tracking-[0.22em] text-accent">
+                <p
+                  className={`${terminal.mono} text-[11px] tracking-[0.18em] text-accent uppercase`}
+                >
                   Primary application icon
                 </p>
-                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-ink">
+                <h2 className="mt-3 font-sans text-[clamp(1.75rem,3.5vw,2.25rem)] font-semibold tracking-[-0.03em] text-ink">
                   Envpilot logo
                 </h2>
-                <p className="mt-4 leading-relaxed text-ink-muted">
+                <p className="mt-4 font-sans text-[16px] leading-relaxed text-ink-muted">
                   This square asset is provided for official Envpilot Slack and
                   Discord application profiles and approved references. Preserve
                   the artwork, colors, proportions, and dark background without
@@ -101,7 +94,9 @@ export default function LogoPage() {
                   prior written consent.
                 </p>
 
-                <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 border-y border-line py-6 font-mono text-sm">
+                <dl
+                  className={`mt-7 grid grid-cols-2 gap-x-6 gap-y-5 border-y border-line py-6 ${terminal.mono} text-[13px]`}
+                >
                   <div>
                     <dt className="text-ink-subtle">Format</dt>
                     <dd className="mt-1 text-ink">PNG</dd>
@@ -124,43 +119,45 @@ export default function LogoPage() {
                   <a
                     href="/brand/envpilot-app-icon-1024.png"
                     download="envpilot-app-icon-1024.png"
-                    className="inline-flex items-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-5 py-3 font-mono text-sm font-medium text-accent transition-colors hover:border-accent-line hover:bg-accent-soft"
+                    className={terminal.cta}
                   >
                     Download 1024 PNG <span aria-hidden="true">↓</span>
                   </a>
                   <a
                     href="/brand/envpilot-slack-icon-512.png"
                     download="envpilot-slack-icon-512.png"
-                    className="inline-flex items-center gap-2 rounded-lg border border-line px-5 py-3 font-mono text-sm font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
+                    className={terminal.ctaGhost}
                   >
                     Slack 512 PNG <span aria-hidden="true">↓</span>
                   </a>
                 </div>
               </div>
             </div>
-          </Reveal>
+          </div>
         </div>
       </section>
 
-      <section className="border-y border-line bg-canvas/50 py-16 sm:py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <Reveal>
-            <p className="font-mono text-xs uppercase tracking-[0.22em] text-accent">
+      <section className="border-y border-line py-16 sm:py-20">
+        <div className={terminal.shell}>
+          <div>
+            <p
+              className={`${terminal.mono} text-[11px] tracking-[0.18em] text-accent uppercase`}
+            >
               Platform artwork
             </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-ink">
+            <h2 className="mt-3 font-sans text-[clamp(1.75rem,3.5vw,2.25rem)] font-semibold tracking-[-0.03em] text-ink">
               Covers for every surface
             </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-muted">
+            <p className="mt-3 max-w-2xl font-sans text-[16px] leading-relaxed text-ink-muted">
               Purpose-built exports with exact dimensions, consistent neon
               terminal styling, and clean crops that remain legible across
               marketplace and social layouts.
             </p>
-          </Reveal>
+          </div>
 
           <div className="mt-12 divide-y divide-line border-y border-line">
             {COVER_ASSETS.map((asset) => (
-              <Reveal key={asset.title}>
+              <div key={asset.title}>
                 <figure className="py-10 first:pt-8">
                   <div className="overflow-hidden rounded-2xl border border-info-line bg-black shadow-[0_0_80px_-45px_rgba(59,130,246,0.8)]">
                     <Image
@@ -175,16 +172,20 @@ export default function LogoPage() {
 
                   <figcaption className="mt-6 grid gap-5 md:grid-cols-[1fr_auto] md:items-end">
                     <div>
-                      <p className="font-mono text-xs uppercase tracking-[0.16em] text-accent">
+                      <p
+                        className={`${terminal.mono} text-[11px] tracking-[0.16em] text-accent uppercase`}
+                      >
                         {asset.use}
                       </p>
-                      <h3 className="mt-2 text-xl font-medium text-ink">
+                      <h3 className="mt-2 font-sans text-[19px] font-semibold tracking-[-0.02em] text-ink">
                         {asset.title}
                       </h3>
-                      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-muted">
+                      <p className="mt-2 max-w-2xl font-sans text-[15px] leading-relaxed text-ink-muted">
                         {asset.description}
                       </p>
-                      <p className="mt-3 font-mono text-xs text-ink-subtle">
+                      <p
+                        className={`mt-3 ${terminal.mono} text-[12px] text-ink-subtle`}
+                      >
                         {asset.width} × {asset.height} · {asset.format}
                       </p>
                     </div>
@@ -192,28 +193,30 @@ export default function LogoPage() {
                     <a
                       href={asset.src}
                       download={asset.download}
-                      className="inline-flex w-fit items-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-4 py-2.5 font-mono text-sm text-accent transition-colors hover:border-accent-line hover:bg-accent-soft"
+                      className="inline-flex w-fit items-center gap-2 rounded-md bg-accent-soft px-4 py-2.5 font-sans text-[14px] text-accent ring-1 ring-accent-line transition-colors hover:bg-accent-line"
                     >
                       Download {asset.format} <span aria-hidden="true">↓</span>
                     </a>
                   </figcaption>
                 </figure>
-              </Reveal>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
       <section className="py-16 sm:py-20">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <Reveal>
-            <p className="font-mono text-xs uppercase tracking-[0.22em] text-accent">
+        <div className={terminal.shell}>
+          <div>
+            <p
+              className={`${terminal.mono} text-[11px] tracking-[0.18em] text-accent uppercase`}
+            >
               Marketplace copy
             </p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-ink">
+            <h2 className="mt-3 font-sans text-[clamp(1.5rem,3vw,2rem)] font-semibold tracking-[-0.03em] text-ink">
               App profile descriptions
             </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-muted">
+            <p className="mt-3 max-w-2xl font-sans text-[16px] leading-relaxed text-ink-muted">
               Copy this language into the Slack and Discord developer portals.
               It describes the current notification-only integration without
               implying that either app reads channel messages.
@@ -221,22 +224,28 @@ export default function LogoPage() {
 
             <div className="mt-10 divide-y divide-line border-y border-line">
               <article className="grid gap-5 py-8 md:grid-cols-[10rem_1fr]">
-                <h3 className="text-lg font-medium text-ink">Slack</h3>
+                <h3 className="font-sans text-[17px] font-semibold text-ink">
+                  Slack
+                </h3>
                 <div className="space-y-5">
                   <div>
-                    <p className="font-mono text-xs uppercase tracking-wider text-ink-subtle">
+                    <p
+                      className={`${terminal.mono} text-[11px] tracking-[0.14em] text-ink-subtle uppercase`}
+                    >
                       Short description
                     </p>
-                    <p className="mt-2 leading-relaxed text-ink-muted">
+                    <p className="mt-2 font-sans text-[15px] leading-relaxed text-ink-muted">
                       Secure environment-variable and access-request
                       notifications for your team.
                     </p>
                   </div>
                   <div>
-                    <p className="font-mono text-xs uppercase tracking-wider text-ink-subtle">
+                    <p
+                      className={`${terminal.mono} text-[11px] tracking-[0.14em] text-ink-subtle uppercase`}
+                    >
                       Long description
                     </p>
-                    <p className="mt-2 leading-relaxed text-ink-muted">
+                    <p className="mt-2 font-sans text-[15px] leading-relaxed text-ink-muted">
                       Envpilot connects a selected Slack channel to your
                       organization so your team receives project activity where
                       it already works. Get environment-variable change and
@@ -251,13 +260,17 @@ export default function LogoPage() {
               </article>
 
               <article className="grid gap-5 py-8 md:grid-cols-[10rem_1fr]">
-                <h3 className="text-lg font-medium text-ink">Discord</h3>
+                <h3 className="font-sans text-[17px] font-semibold text-ink">
+                  Discord
+                </h3>
                 <div className="space-y-5">
                   <div>
-                    <p className="font-mono text-xs uppercase tracking-wider text-ink-subtle">
+                    <p
+                      className={`${terminal.mono} text-[11px] tracking-[0.14em] text-ink-subtle uppercase`}
+                    >
                       Description
                     </p>
-                    <p className="mt-2 leading-relaxed text-ink-muted">
+                    <p className="mt-2 font-sans text-[15px] leading-relaxed text-ink-muted">
                       Envpilot sends secure project activity notifications to a
                       selected Discord channel. Receive environment-variable
                       change and access-request updates for all projects or only
@@ -266,7 +279,9 @@ export default function LogoPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="font-mono text-xs uppercase tracking-wider text-ink-subtle">
+                    <p
+                      className={`${terminal.mono} text-[11px] tracking-[0.14em] text-ink-subtle uppercase`}
+                    >
                       Tags
                     </p>
                     <ul
@@ -276,7 +291,7 @@ export default function LogoPage() {
                       {DISCORD_TAGS.map((tag) => (
                         <li
                           key={tag}
-                          className="rounded-full border border-line px-3 py-1 font-mono text-xs text-ink-muted"
+                          className={`rounded-full px-3 py-1 ring-1 ring-line ${terminal.mono} text-[12px] text-ink-muted`}
                         >
                           {tag}
                         </li>
@@ -286,7 +301,7 @@ export default function LogoPage() {
                 </div>
               </article>
             </div>
-          </Reveal>
+          </div>
         </div>
       </section>
     </MarketingShell>

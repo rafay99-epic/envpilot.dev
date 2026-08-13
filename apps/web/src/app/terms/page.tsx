@@ -1,11 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import {
-  MarketingShell,
-  PageHero,
-  GlowDivider,
-  Reveal,
-} from "@/components/marketing";
+import { MarketingShell, PageHero, terminal } from "@/components/marketing";
 import { ScrollSpySidebar } from "@/components/ui/ScrollSpySidebar";
 
 export const metadata: Metadata = {
@@ -41,23 +36,25 @@ const SECTIONS = [
 export default function TermsOfServicePage() {
   return (
     <MarketingShell>
-      <PageHero eyebrow="terms" title="Terms of Service" align="left">
-        <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/60 px-3 py-1.5 font-mono text-xs text-ink-muted">
+      <PageHero eyebrow="terms" title="Terms of Service">
+        <span
+          className={`inline-flex items-center gap-2 ${terminal.mono} text-[12px] text-ink-subtle`}
+        >
           <span className="text-accent">&#10095;</span>
           Effective: March 10, 2026 &middot; Last updated: August 2, 2026
         </span>
       </PageHero>
 
-      <GlowDivider />
-
       {/* Content with sidebar */}
-      <section className="relative py-12 pb-24">
-        <div className="mx-auto grid max-w-5xl gap-12 px-4 sm:px-6 lg:grid-cols-[14rem_1fr]">
+      <section className="pb-24">
+        <div
+          className={`${terminal.shell} grid gap-12 lg:grid-cols-[14rem_1fr]`}
+        >
           {/* Sidebar TOC — client island for scroll-spy */}
           <ScrollSpySidebar sections={SECTIONS} />
 
           {/* Main content — fully server-rendered */}
-          <div className="min-w-0 font-mono text-sm leading-relaxed text-ink-muted">
+          <div className="min-w-0 font-sans text-[15px] leading-relaxed text-ink-muted">
             <Section id="acceptance" n={1} title="Acceptance of Terms">
               <p>
                 These Terms of Service (&ldquo;Terms&rdquo;) constitute a
@@ -76,7 +73,7 @@ export default function TermsOfServicePage() {
             </Section>
 
             <Section id="definitions" n={2} title="Definitions">
-              <div className="rounded-xl border border-line bg-surface/30 p-5">
+              <div className={`${terminal.panel} p-5`}>
                 <ul className="space-y-2 pl-4">
                   <Li>
                     <Term>&ldquo;Organization&rdquo;</Term> &mdash; a workspace
@@ -269,7 +266,7 @@ export default function TermsOfServicePage() {
                   select a brief cancellation reason (used solely to improve the
                   Service). Upon cancellation:
                 </p>
-                <div className="mt-3 rounded-xl border border-line bg-surface/30 p-5">
+                <div className={`mt-3 ${terminal.panel} p-5`}>
                   <ul className="space-y-2 pl-4">
                     <Li>
                       Your Pro access{" "}
@@ -446,7 +443,7 @@ export default function TermsOfServicePage() {
             </Section>
 
             <Section id="warranties" n={13} title="Disclaimer of Warranties">
-              <div className="rounded-xl border border-warning-line bg-warning-soft p-5">
+              <div className="rounded-panel border border-warning-line bg-warning-soft p-5">
                 <p className="text-xs uppercase tracking-wider text-warning">
                   THE SERVICE IS PROVIDED &ldquo;AS IS&rdquo; AND &ldquo;AS
                   AVAILABLE&rdquo; WITHOUT WARRANTIES OF ANY KIND, EITHER
@@ -464,7 +461,7 @@ export default function TermsOfServicePage() {
             </Section>
 
             <Section id="liability" n={14} title="Limitation of Liability">
-              <div className="rounded-xl border border-warning-line bg-warning-soft p-5">
+              <div className="rounded-panel border border-warning-line bg-warning-soft p-5">
                 <p className="text-xs uppercase tracking-wider text-warning">
                   TO THE MAXIMUM EXTENT PERMITTED BY LAW, ENVPILOT SHALL NOT BE
                   LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
@@ -601,7 +598,7 @@ export default function TermsOfServicePage() {
               </Subsection>
 
               <Subsection title="18.3 Class Action Waiver">
-                <div className="rounded-xl border border-warning-line bg-warning-soft p-5">
+                <div className="rounded-panel border border-warning-line bg-warning-soft p-5">
                   <p className="text-xs uppercase tracking-wider text-warning">
                     TO THE EXTENT PERMITTED BY LAW, YOU AND ENVPILOT EACH WAIVE
                     THE RIGHT TO PARTICIPATE IN A CLASS ACTION, COLLECTIVE
@@ -672,7 +669,7 @@ export default function TermsOfServicePage() {
 
             <Section id="contact" n={20} title="Contact">
               <p>For questions about these Terms:</p>
-              <div className="mt-4 rounded-xl border border-line bg-surface/30 p-5">
+              <div className={`mt-4 ${terminal.panel} p-5`}>
                 <p className="flex items-center gap-2 text-ink">
                   <span className="text-accent">&#10095;</span>
                   <strong className="font-semibold">Envpilot Legal</strong>
@@ -711,17 +708,17 @@ function Section({
       id={id}
       className="scroll-mt-24 border-b border-line py-10 first:pt-0 last:border-b-0"
     >
-      <Reveal>
-        <div className="flex items-baseline gap-3">
-          <span className="font-mono text-xs tracking-widest text-accent">
-            &sect; {String(n).padStart(2, "0")}
-          </span>
-          <h2 className="font-sans text-xl font-semibold tracking-tight text-ink">
-            {title}
-          </h2>
-        </div>
-        <div className="mt-4">{children}</div>
-      </Reveal>
+      <div className="flex items-baseline gap-3">
+        <span
+          className={`${terminal.mono} text-[12px] tracking-[0.14em] text-accent`}
+        >
+          &sect; {String(n).padStart(2, "0")}
+        </span>
+        <h2 className="font-sans text-[20px] font-semibold tracking-[-0.02em] text-ink">
+          {title}
+        </h2>
+      </div>
+      <div className="mt-4">{children}</div>
     </section>
   );
 }
@@ -735,7 +732,7 @@ function Subsection({
 }) {
   return (
     <div className="mt-6">
-      <h3 className="font-sans text-sm font-semibold text-ink">{title}</h3>
+      <h3 className="font-sans text-[16px] font-semibold text-ink">{title}</h3>
       <div className="mt-2">{children}</div>
     </div>
   );

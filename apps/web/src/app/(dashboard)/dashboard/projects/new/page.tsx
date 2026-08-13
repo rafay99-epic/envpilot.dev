@@ -209,7 +209,7 @@ export default function NewProjectPage() {
         </p>
         <Link
           href="/dashboard/projects"
-          className="mt-6 text-sm font-medium text-ink-inverse hover:text-ink-muted"
+          className="mt-6 text-sm font-medium text-ink hover:text-ink-muted"
         >
           Back to Projects
         </Link>
@@ -450,7 +450,7 @@ export default function NewProjectPage() {
                           }
                           className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
                             formData.icon === icon
-                              ? "bg-surface-raised"
+                              ? "bg-accent-soft ring-1 ring-accent-line"
                               : "bg-surface-raised hover:bg-surface-hover"
                           }`}
                         >
@@ -459,7 +459,7 @@ export default function NewProjectPage() {
                             size={14}
                             className={
                               formData.icon === icon
-                                ? "text-ink-inverse"
+                                ? "text-accent"
                                 : "text-ink-muted"
                             }
                           />
