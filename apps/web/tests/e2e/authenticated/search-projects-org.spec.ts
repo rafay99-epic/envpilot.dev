@@ -357,6 +357,18 @@ test.describe("project lifecycle", () => {
         page.locator(`a[href="/dashboard/projects/${projectSlug}"]`),
         "deleted project should no longer be present in the list"
       ).toHaveCount(0, { timeout: 20_000 });
+
+      // Deleted-project URLs must resolve to a clean empty state instead of
+      // rendering the settings form with a null project and crashing.
+      await page.goto(`/dashboard/projects/${projectSlug}/settings`, {
+        waitUntil: "domcontentloaded",
+      });
+      await expect(
+        page.getByRole("heading", { name: "Project not found" })
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(
+        page.getByText("Failed to load project", { exact: false })
+      ).toHaveCount(0);
     } catch (err) {
       // Best-effort cleanup so a failed assertion above doesn't leave a
       // stray project behind for subsequent runs.

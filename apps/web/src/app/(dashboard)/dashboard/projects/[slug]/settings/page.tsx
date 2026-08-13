@@ -183,7 +183,7 @@ export default function ProjectSettingsPage({
     return <TerminalLoading fullPage />;
   }
 
-  if (error && !project) {
+  if (!project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <div className="rounded-full bg-danger-soft p-3">
@@ -201,7 +201,19 @@ export default function ProjectSettingsPage({
             />
           </svg>
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-ink">{error}</h2>
+        <h2 className="mt-4 text-lg font-semibold text-ink">
+          {error ?? "Project not found"}
+        </h2>
+        <p className="mt-2 max-w-md text-center text-sm text-ink-muted">
+          This project does not exist or you no longer have access to it.
+        </p>
+        <TerminalButton
+          type="button"
+          className="mt-6"
+          onClick={() => router.replace("/dashboard/projects")}
+        >
+          Back to Projects
+        </TerminalButton>
       </div>
     );
   }
