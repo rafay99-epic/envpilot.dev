@@ -31,6 +31,13 @@
         "SENTRY_PROJECT",
         "SENTRY_CLI_DSN",
         "SENTRY_EXTENSION_DSN",
+        "NODE_ENV",
+        "UPTIMEROBOT_API_KEY",
+        "BILLING_WEBHOOK_BRIDGE_SECRET",
+        "SLACK_CLIENT_ID",
+        "SLACK_CLIENT_SECRET",
+        "DISCORD_CLIENT_ID",
+        "DISCORD_CLIENT_SECRET",
         "ENVPILOT_SERVER_URL",
         "VITE_CONVEX_URL"
       ],
