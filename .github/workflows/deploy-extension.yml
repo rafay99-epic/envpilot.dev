@@ -20,6 +20,9 @@ on:
       version:
         description: The local extension version
         value: ${{ jobs.publish.outputs.version }}
+    secrets:
+      ENVPILOT_TOKEN:
+        required: true
   workflow_dispatch:
     inputs:
       force:
@@ -39,10 +42,6 @@ jobs:
   publish:
     name: Publish extension
     runs-on: ubuntu-latest
-    env:
-      # secrets context is not allowed in step-level `if`, so surface
-      # token presence here for the optional Marketplace publish.
-      HAS_MARKETPLACE_TOKEN: ${{ secrets.VSCODE_MARKETPLACE_TOKEN != '' }}
     outputs:
       published: ${{ steps.guard.outputs.should_publish }}
       version: ${{ steps.guard.outputs.local_version }}
@@ -50,6 +49,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_TOKEN }}
+          required: |
+            ENVPILOT_SERVER_URL
+            WORKOS_CLIENT_ID
+            NEXT_PUBLIC_CONVEX_URL
+            SENTRY_EXTENSION_DSN
+            OPEN_VSX_TOKEN
 
       - uses: ./.github/actions/setup
 
@@ -100,11 +109,6 @@ jobs:
       - name: Package VSIX
         if: steps.guard.outputs.should_publish == 'true'
         working-directory: apps/vscode-extension
-        env:
-          ENVPILOT_SERVER_URL: https://www.envpilot.dev
-          WORKOS_CLIENT_ID: ${{ secrets.WORKOS_CLIENT_ID }}
-          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
-          SENTRY_EXTENSION_DSN: https://24f72269c7fbd01271c7df8c6bd50744@o4509762173009920.ingest.de.sentry.io/4511055962505296
         run: bunx @vscode/vsce package --no-dependencies
 
       # Verify the PACKAGED VSIX (the exact bytes we publish), not an
@@ -115,9 +119,6 @@ jobs:
       - name: Verify build-time secrets are embedded in the VSIX
         if: steps.guard.outputs.should_publish == 'true'
         working-directory: apps/vscode-extension
-        env:
-          WORKOS_CLIENT_ID: ${{ secrets.WORKOS_CLIENT_ID }}
-          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
         run: |
           if [ -z "$WORKOS_CLIENT_ID" ]; then
             echo "::error::WORKOS_CLIENT_ID secret is empty — refusing to publish."
@@ -146,16 +147,20 @@ jobs:
       - name: Publish to Open VSX
         if: steps.guard.outputs.should_publish == 'true'
         working-directory: apps/vscode-extension
-        run: bunx ovsx publish envpilot-*.vsix -p "${{ secrets.OPEN_VSX_TOKEN }}"
+        run: bunx ovsx publish envpilot-*.vsix -p "$OPEN_VSX_TOKEN"
 
       - name: Publish to VS Code Marketplace (optional)
-        if: steps.guard.outputs.should_publish == 'true' && env.HAS_MARKETPLACE_TOKEN == 'true'
+        if: steps.guard.outputs.should_publish == 'true'
         continue-on-error: true
         working-directory: apps/vscode-extension
         run: |
+          if [ -z "${VSCODE_MARKETPLACE_TOKEN:-}" ]; then
+            echo "VSCODE_MARKETPLACE_TOKEN is not configured — skipping optional Marketplace publish."
+            exit 0
+          fi
           bunx @vscode/vsce publish --no-dependencies \
             --packagePath envpilot-*.vsix \
-            -p "${{ secrets.VSCODE_MARKETPLACE_TOKEN }}"
+            -p "$VSCODE_MARKETPLACE_TOKEN"
 
       - name: Tag extension release
         if: steps.guard.outputs.should_publish == 'true'

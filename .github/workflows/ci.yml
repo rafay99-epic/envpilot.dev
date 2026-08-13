@@ -304,25 +304,34 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      # Real values override the workflow-level CI stubs (job env wins).
-      NEXT_PUBLIC_CONVEX_URL: ${{ secrets.E2E_CONVEX_URL }}
-      WORKOS_API_KEY: ${{ secrets.E2E_WORKOS_API_KEY }}
-      WORKOS_CLIENT_ID: ${{ secrets.E2E_WORKOS_CLIENT_ID }}
-      WORKOS_COOKIE_PASSWORD: ${{ secrets.E2E_WORKOS_COOKIE_PASSWORD }}
       NEXT_PUBLIC_APP_URL: http://localhost:3000
       WORKOS_REDIRECT_URI: http://localhost:3000/callback
-      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_TOKEN }}
+          required: |
+            E2E_CONVEX_DEPLOY_KEY
+            E2E_CONVEX_URL
+            E2E_WORKOS_API_KEY
+            E2E_WORKOS_CLIENT_ID
+            E2E_WORKOS_COOKIE_PASSWORD
+            E2E_TEST_EMAIL
+            E2E_TEST_PASSWORD
+      - name: Map e2e variables to application variables
+        run: |
+          {
+            echo "NEXT_PUBLIC_CONVEX_URL=$E2E_CONVEX_URL"
+            echo "WORKOS_API_KEY=$E2E_WORKOS_API_KEY"
+            echo "WORKOS_CLIENT_ID=$E2E_WORKOS_CLIENT_ID"
+            echo "WORKOS_COOKIE_PASSWORD=$E2E_WORKOS_COOKIE_PASSWORD"
+          } >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup
-
       # A gate that silently skips is fake safety: the authenticated specs
       # self-skip without credentials and the suite would go green having
-      # tested nothing. Fail loudly instead until the secrets exist.
-      - name: Verify e2e secrets are configured
-        env:
-          E2E_CONVEX_DEPLOY_KEY: ${{ secrets.E2E_CONVEX_DEPLOY_KEY }}
+      # tested nothing. Fail loudly instead until the variables exist.
+      - name: Verify e2e variables are configured
         run: |
           missing=""
           [ -z "$E2E_CONVEX_DEPLOY_KEY" ] && missing="$missing E2E_CONVEX_DEPLOY_KEY"
@@ -333,15 +342,13 @@ jobs:
           [ -z "$E2E_TEST_EMAIL" ] && missing="$missing E2E_TEST_EMAIL"
           [ -z "$E2E_TEST_PASSWORD" ] && missing="$missing E2E_TEST_PASSWORD"
           if [ -n "$missing" ]; then
-            echo "::error::E2E gate cannot run — missing repo secrets:$missing. Deploys are blocked until they are configured (isolated e2e Convex deployment + WorkOS test account)."
+            echo "::error::E2E gate cannot run — missing Envpilot variables:$missing. Deploys are blocked until they are configured (isolated e2e Convex deployment + WorkOS test account)."
             exit 1
           fi
-          echo "All e2e secrets present ✓"
+          echo "All e2e variables present ✓"
 
       - name: Push convex functions to the e2e deployment
-        run: bunx convex deploy --yes
-        env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.E2E_CONVEX_DEPLOY_KEY }}
+        run: CONVEX_DEPLOY_KEY="$E2E_CONVEX_DEPLOY_KEY" bunx convex deploy --yes
 
       # The suite runs parallel workers against per-worker fixture projects
       # (support.ts getWorkerProjectSlug). Free-tier caps (max_projects: 3,
@@ -350,9 +357,8 @@ jobs:
       # user hasn't signed in yet or is already pro.
       - name: Ensure the e2e account is on the pro tier
         run: |
-          bunx convex run features/admin/e2e:ensureE2EUserPro "{\"email\": \"$E2E_TEST_EMAIL\"}"
-        env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.E2E_CONVEX_DEPLOY_KEY }}
+          CONVEX_DEPLOY_KEY="$E2E_CONVEX_DEPLOY_KEY" \
+            bunx convex run features/admin/e2e:ensureE2EUserPro "{\"email\": \"$E2E_TEST_EMAIL\"}"
 
       - name: Install Playwright browsers
         working-directory: apps/web
@@ -489,10 +495,7 @@ jobs:
     uses: ./.github/workflows/deploy-vercel.yml
     with:
       app: web
-    secrets:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
+    secrets: inherit
 
   deploy-admin:
     name: Deploy admin (Vercel)
@@ -505,10 +508,7 @@ jobs:
     uses: ./.github/workflows/deploy-vercel.yml
     with:
       app: admin
-    secrets:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
+    secrets: inherit
 
   deploy-blog:
     name: Deploy blog (Vercel)
@@ -522,10 +522,7 @@ jobs:
     uses: ./.github/workflows/deploy-vercel.yml
     with:
       app: blog
-    secrets:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_BLOG }}
+    secrets: inherit
 
   deploy-docs:
     name: Deploy docs (Vercel)
@@ -539,10 +536,7 @@ jobs:
     uses: ./.github/workflows/deploy-vercel.yml
     with:
       app: docs
-    secrets:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DOCS }}
+    secrets: inherit
 
   deploy-cli:
     name: Deploy CLI

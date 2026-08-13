@@ -1,0 +1,58 @@
+scope:web:
+  - changed-files:
+      - any-glob-to-any-file: apps/web/**
+
+scope:admin:
+  - changed-files:
+      - any-glob-to-any-file: apps/admin/**
+
+scope:cli:
+  - changed-files:
+      - any-glob-to-any-file: apps/cli/**
+
+scope:extension:
+  - changed-files:
+      - any-glob-to-any-file: apps/vscode-extension/**
+
+scope:github-action:
+  - changed-files:
+      - any-glob-to-any-file: packages/github-action/**
+
+scope:mcp:
+  - changed-files:
+      - any-glob-to-any-file:
+          - apps/web/src/app/api/mcp/**
+          - apps/web/tests/e2e/**/*mcp*
+          - apps/docs/content/mcp/**
+
+scope:ui:
+  - changed-files:
+      - any-glob-to-any-file: packages/ui/**
+
+scope:docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - apps/docs/**
+          - docs/**
+
+scope:blog:
+  - changed-files:
+      - any-glob-to-any-file: apps/blog/**
+
+scope:convex:
+  - changed-files:
+      - any-glob-to-any-file: convex/**
+
+scope:ci:
+  - changed-files:
+      - any-glob-to-any-file: .github/**
+
+scope:repository:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "*"
+          - .github/**
+          - .agents/**
+          - .claude/**
+          - assets/**
+          - scripts/**

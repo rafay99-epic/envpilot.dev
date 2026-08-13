@@ -180,9 +180,10 @@ Only the built surface is ever published: `action.yml`, `dist/index.js`
 - **Ordering is STRICT — backend first**: when convex/ changed in the same
   merge, `publish-action` requires `deploy-convex` (same rule as
   CLI/extension: never ship a client before the backend contract it calls).
-- **Secret**: publishing needs the `ACTION_PUBLISH_TOKEN` GitHub Actions
-  secret — a fine-grained PAT with Contents read/write on the public repo
-  ONLY. The job fails loudly with instructions if it is missing.
+- **Secret**: publishing needs `ACTION_PUBLISH_TOKEN` in Envpilot — a
+  fine-grained PAT with Contents read/write on the public repo ONLY. The
+  workflow keeps only the bootstrap `ENVPILOT_TOKEN` in GitHub and fails
+  loudly if the publish token is missing from the pulled environment.
 - **Backend counterpart**: CI/CD service tokens (`convex/features/cicd/`) —
   read-only, SHA-256-hash-stored, project+environment scoped, pro-gated
   (`cicd_service_tokens`), managed in Project → Settings → CI/CD Tokens.
@@ -321,6 +322,16 @@ went public and Actions became free for it; do not re-add config there.
   `deploy-*.yml` to retry one surface.
 - **Adding a surface**: one path rule in the `changes` job, one output, one
   `if:`-gated job block.
+- **Deployment variables come from Envpilot**: deployment jobs call the
+  published `rafay99-epic/envpilot-action@v1` through
+  `.github/actions/load-env`. `ENVPILOT_TOKEN` is the sole bootstrap repository
+  secret; GitHub's generated `GITHUB_TOKEN` remains built in. Keep production
+  credentials, publish tokens, service identifiers, and Sentry DSNs in the
+  Envpilot production environment rather than duplicating them in GitHub.
+- **PR scope labels**: `.github/workflows/pr-labeler.yml` uses the official
+  `actions/labeler` action with `.github/labeler.yml`. It runs as
+  `pull_request_target` without checking out or executing PR code, so fork PRs
+  can be labeled safely. Keep its path taxonomy in sync when adding a surface.
 
 ## Architecture
 

@@ -4,7 +4,7 @@ name: Deploy GitHub Action
 # monorepo source) to the PUBLIC rafay99-epic/envpilot-action repo, which is
 # what `uses: rafay99-epic/envpilot-action@v1` resolves against.
 #
-# Requires the ACTION_PUBLISH_TOKEN repo secret: a fine-grained PAT with
+# ACTION_PUBLISH_TOKEN comes from Envpilot and remains a fine-grained PAT with
 # Contents read/write on rafay99-epic/envpilot-action only (the default
 # GITHUB_TOKEN cannot push to a different repository).
 #
@@ -14,6 +14,9 @@ name: Deploy GitHub Action
 
 on:
   workflow_call:
+    secrets:
+      ENVPILOT_TOKEN:
+        required: true
   workflow_dispatch:
 
 permissions:
@@ -30,14 +33,16 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_TOKEN }}
+          required: ACTION_PUBLISH_TOKEN
       - uses: ./.github/actions/setup
 
       - name: Verify publish token is configured
-        env:
-          ACTION_PUBLISH_TOKEN: ${{ secrets.ACTION_PUBLISH_TOKEN }}
         run: |
           if [ -z "$ACTION_PUBLISH_TOKEN" ]; then
-            echo "::error::ACTION_PUBLISH_TOKEN is missing — create a fine-grained PAT with Contents read/write on rafay99-epic/envpilot-action and add it as a repo secret."
+            echo "::error::ACTION_PUBLISH_TOKEN is missing — add a fine-grained PAT with Contents read/write on rafay99-epic/envpilot-action to the Envpilot production environment."
             exit 1
           fi
 
@@ -45,8 +50,6 @@ jobs:
         run: bunx turbo build --filter=@envpilot/github-action
 
       - name: Publish dist to the public repo
-        env:
-          ACTION_PUBLISH_TOKEN: ${{ secrets.ACTION_PUBLISH_TOKEN }}
         run: |
           set -euo pipefail
           VERSION=$(jq -r '.version' packages/github-action/package.json)
