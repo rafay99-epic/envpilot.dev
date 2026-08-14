@@ -6,14 +6,18 @@ import { Id } from "@convex/_generated/dataModel";
 
 /**
  * Hook for dashboard projects - returns all projects accessible to the current user
- * Filters by project membership for non-admin users
+ * Filters by project membership for non-admin users.
+ *
+ * Deliberately the stats-free list: no consumer renders `variableCount`, and
+ * the counted variant reads up to 500 variable docs per project and re-runs on
+ * every variable write in the org.
  */
 export function useProjects(
   organizationId: Id<"organizations"> | undefined,
   userId?: Id<"users">
 ) {
   const projects = useQuery(
-    api.features.projects.queries.listWithStats,
+    api.features.projects.queries.listByOrganization,
     // Identity is derived server-side from the attached JWT; `userId` gates the
     // query until the current user is known (auth ready).
     organizationId && userId ? { organizationId } : "skip"

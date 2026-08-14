@@ -63,23 +63,36 @@ export const listByOrganization = query({
     );
     if (!membership) return [];
 
-    const projects = await ctx.db
-      .query("projects")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
-
     const profile = await getRoleProfile(ctx, membership.role);
-    if (bypassesAssignment(profile)) return projects;
 
+    if (bypassesAssignment(profile)) {
+      // Trashed projects are skipped at the index, not read and discarded —
+      // a long-lived org's trash used to dominate this read.
+      return await ctx.db
+        .query("projects")
+        .withIndex("by_organization_and_deleted_at", (q) =>
+          q.eq("organizationId", args.organizationId).eq("deletedAt", undefined)
+        )
+        .collect();
+    }
+
+    // Assignment-scoped roles read only their own rows: this grows with the
+    // caller's assignments rather than with the whole organization.
     const assignments = await ctx.db
       .query("projectMembers")
       .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect();
-    const assigned = new Set(assignments.map((a) => a.projectId.toString()));
-    return projects.filter((p) => assigned.has(p._id.toString()));
+
+    const assigned = await Promise.all(
+      assignments.map((assignment) => ctx.db.get(assignment.projectId))
+    );
+
+    return assigned.filter(
+      (project): project is NonNullable<typeof project> =>
+        project !== null &&
+        project.deletedAt === undefined &&
+        project.organizationId === args.organizationId
+    );
   },
 });
 

@@ -1713,4 +1713,28 @@ Available on Pro.`,
 ### A Calmer MCP Section
 - The list of MCP tools a key unlocks is summarised in one line and expands on demand instead of filling the panel`,
   },
+
+  // ============================================================
+  // v1.63.0 — Environment comparison removed (2026-08-15)
+  // ============================================================
+  {
+    title: "Environment Comparison Has Been Removed",
+    version: "v1.63.0",
+    type: "breaking",
+    publishedAt: ts("2026-08-15T03:30:00Z"),
+    content: `The Compare screen and the \`envpilot diff\` CLI command are gone. Variable history is untouched.
+
+### What Was Removed
+- The **Compare** button on the project header, and the environment diff screen behind it
+- \`envpilot diff <envA> <envB>\` in the CLI, including its \`--values\` and \`--json\` output
+
+### Why
+- The dashboard comparison never read your values. It compared internal vault reference IDs, so two environments holding the identical secret were reported as "changed" whenever they were written separately
+- A variable you lacked permission to read was drawn the same as a variable that did not exist
+- Past 500 variables the comparison silently truncated, with nothing on screen to say so
+
+### What Still Works
+- **Variable history** is unchanged: every version, who changed it, and rollback
+- The version comparison inside a variable's history panel is a separate feature and stays`,
+  },
 ];

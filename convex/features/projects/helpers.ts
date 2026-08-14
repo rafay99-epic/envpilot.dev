@@ -22,11 +22,10 @@ export async function listWithStatsCore(
 ) {
   let projects = await ctx.db
     .query("projects")
-    .withIndex("by_organization", (q) =>
-      q.eq("organizationId", args.organizationId)
+    .withIndex("by_organization_and_deleted_at", (q) =>
+      q.eq("organizationId", args.organizationId).eq("deletedAt", undefined)
     )
-    .collect()
-    .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
+    .collect();
 
   // Resolve org membership and project assignments for visibility.
   // Owners see all org projects; everyone else only sees projects they
@@ -41,10 +40,6 @@ export async function listWithStatsCore(
     userId
   );
 
-  // Fail closed: a non-member of this org sees nothing (and a suspended
-  // member resolves to null here too). Previously the visibility filter was
-  // skipped when membership was absent, which returned the ENTIRE org project
-  // list to any authenticated non-member.
   if (!membership) {
     return [];
   }

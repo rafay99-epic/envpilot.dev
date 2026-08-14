@@ -7,17 +7,14 @@ import { requireAuthedUser } from "../../lib/identity";
  * Favorite Projects — user-specific project bookmarking
  */
 
+/**
+ * Favorited project ids for the caller. Only the ids are returned — callers
+ * use this as a membership set, and shipping the full rows made every
+ * favorite toggle push four unused fields per favorite over the socket.
+ */
 export const listByUser = query({
   args: {},
-  returns: v.array(
-    v.object({
-      _id: v.id("favoriteProjects"),
-      _creationTime: v.number(),
-      userId: v.id("users"),
-      projectId: v.id("projects"),
-      createdAt: v.number(),
-    })
-  ),
+  returns: v.array(v.id("projects")),
   handler: async (ctx) => {
     const actor = await requireAuthedUser(ctx);
 
@@ -26,7 +23,7 @@ export const listByUser = query({
       .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect();
 
-    return favorites;
+    return favorites.map((favorite) => favorite.projectId);
   },
 });
 

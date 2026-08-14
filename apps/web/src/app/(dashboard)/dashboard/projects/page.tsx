@@ -6,6 +6,7 @@ import {
   useProjects,
   useConvexUser,
   usePagination,
+  useAutoPageSize,
   useFavoriteProjects,
   useToggleFavorite,
 } from "@/hooks";
@@ -48,7 +49,10 @@ export default function ProjectsPage() {
       })
     : projects;
 
-  const pagination = usePagination(sortedProjects, { pageSize: 9 });
+  // Page size follows the space the grid actually has, so a tall window fills
+  // with cards instead of leaving a dead band above the pagination bar.
+  const { pageSize, gridRef, footerRef } = useAutoPageSize();
+  const pagination = usePagination(sortedProjects, { pageSize });
 
   if (!organization) {
     return (
@@ -118,8 +122,11 @@ export default function ProjectsPage() {
         </TerminalWindow>
       ) : (
         <>
+          {/* auto-rows-fr keeps every row the same height, which is what the
+              page-size measurement reads off the first card. */}
           <AnimatedGrid
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            ref={gridRef}
+            className="grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3"
             pageKey={pagination.currentPage}
           >
             {pagination.pageItems.map((project) => (
@@ -129,28 +136,26 @@ export default function ProjectsPage() {
                 isFavorite={favoriteProjectIds.has(project._id)}
                 onToggleFavorite={
                   convexUserId
-                    ? () =>
-                        toggleFavorite(
-                          convexUserId,
-                          project._id as Id<"projects">
-                        )
+                    ? () => toggleFavorite({ projectId: project._id })
                     : undefined
                 }
               />
             ))}
           </AnimatedGrid>
-          <Pagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.totalPages}
-            hasNextPage={pagination.hasNextPage}
-            hasPrevPage={pagination.hasPrevPage}
-            onNextPage={pagination.nextPage}
-            onPrevPage={pagination.prevPage}
-            onGoToPage={pagination.goToPage}
-            startIndex={pagination.startIndex}
-            endIndex={pagination.endIndex}
-            totalItems={pagination.totalItems}
-          />
+          <div ref={footerRef}>
+            <Pagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              hasNextPage={pagination.hasNextPage}
+              hasPrevPage={pagination.hasPrevPage}
+              onNextPage={pagination.nextPage}
+              onPrevPage={pagination.prevPage}
+              onGoToPage={pagination.goToPage}
+              startIndex={pagination.startIndex}
+              endIndex={pagination.endIndex}
+              totalItems={pagination.totalItems}
+            />
+          </div>
         </>
       )}
     </div>
@@ -158,7 +163,7 @@ export default function ProjectsPage() {
 }
 
 interface Project {
-  _id: string;
+  _id: Id<"projects">;
   name: string;
   slug: string;
   description?: string;
@@ -179,7 +184,7 @@ function ProjectCard({
   return (
     <Link
       href={`/dashboard/projects/${project.slug}`}
-      className="group flex flex-col overflow-hidden rounded-lg border border-line bg-surface/90 transition-all hover:border-accent-line hover:shadow-lg hover:shadow-accent-line"
+      className="group flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface/90 transition-all hover:border-accent-line hover:shadow-lg hover:shadow-accent-line"
     >
       <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2">
         <div className="h-2.5 w-2.5 rounded-full bg-danger/80" />

@@ -19,7 +19,6 @@ import { createUICommand } from "../commands/ui.js";
 import { requestCommand } from "../commands/request.js";
 import { requestsCommand } from "../commands/requests.js";
 import { secretsCommand } from "../commands/secrets.js";
-import { diffCommand } from "../commands/diff.js";
 
 export type CommandCategory =
   | "Get Started"
@@ -276,26 +275,6 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     keywords: ["secrets", "var", "set", "delete", "remove", "variable", "edit"],
     topLevel: true,
     createCommand: () => secretsCommand,
-  },
-  {
-    id: "diff",
-    title: "Compare two environments",
-    category: "Browse",
-    description:
-      "Show which variable keys differ between two environments (add --values to compare values).",
-    argv: ["diff"],
-    args: "<envA> <envB> [--values] [--project <name-or-id>] [--json]",
-    examples: [
-      ["diff", "staging", "production"],
-      ["diff", "development", "staging", "--values"],
-    ],
-    websiteSurface: "Convex features/variables (client-side compare).",
-    notes: [
-      "Default is a metadata-only key comparison; --values decrypts both environments.",
-    ],
-    keywords: ["diff", "compare", "environments", "drift"],
-    topLevel: true,
-    createCommand: () => diffCommand,
   },
   {
     id: "run",

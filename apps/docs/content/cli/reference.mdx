@@ -34,7 +34,6 @@ Run `envpilot man <command>` for the same information offline.
 | `envpilot request`            | Sync        | Submit a request to create a new environment variable for review (developers only).                                                                |
 | `envpilot requests`           | Browse      | List variable requests, or approve/reject/cancel them without leaving the terminal.                                                                |
 | `envpilot secrets`            | Sync        | Change one secret without pull/edit/push. Two-step by default: key first, value prompted MASKED (never in shell history). Aliases: `envpilot var`. |
-| `envpilot diff`               | Browse      | Show which variable keys differ between two environments (add --values to compare values).                                                         |
 | `envpilot run`                | Sync        | Inject project secrets into a child process without writing a .env file (envpilot run -- bun dev).                                                 |
 | `envpilot list`               | Browse      | List organizations, projects, variables, or linked projects from the terminal.                                                                     |
 | `envpilot list organizations` | Browse      | List organizations available to the current user. Aliases: `envpilot list orgs`.                                                                   |
@@ -215,19 +214,6 @@ envpilot secrets rm OLD_FLAG --env staging --yes
 - set upserts one key in one environment (merge); updating a value shared across environments requires confirmation (--all-envs non-interactively).
 - rm on a single-environment secret moves it to trash (recoverable from the dashboard); on a shared secret it only removes THIS environment — the value stays live in the others.
 - `envpilot var …` still works as an alias.
-
-### `envpilot diff`
-
-Show which variable keys differ between two environments (add --values to compare values).
-
-**Arguments** — `<envA> <envB> [--values] [--project <name-or-id>] [--json]`
-
-```bash
-envpilot diff staging production
-envpilot diff development staging --values
-```
-
-- Default is a metadata-only key comparison; --values decrypts both environments.
 
 ### `envpilot run`
 

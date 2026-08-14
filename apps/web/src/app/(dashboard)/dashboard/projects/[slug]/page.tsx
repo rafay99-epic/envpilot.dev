@@ -610,30 +610,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         actions={
           <>
             <Link
-              href={`/dashboard/projects/${project.slug}/diff`}
-              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 5l7 7-7 7"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4 5l7 7-7 7"
-                />
-              </svg>
-              Compare
-            </Link>
-            <Link
               href={`/dashboard/projects/${project.slug}/members`}
               className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
             >
