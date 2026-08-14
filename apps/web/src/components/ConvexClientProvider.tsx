@@ -210,6 +210,22 @@ const queryClient = new QueryClient({
   }),
 });
 
+/**
+ * AuthKitProvider owns the WorkOS session/token state (server-action backed);
+ * ConvexProviderWithAuth attaches the AuthKit JWT to the Convex WebSocket so
+ * every query/mutation runs with a server-verified identity
+ * (convex/auth.config.ts + ctx.auth.getUserIdentity()).
+ */
+function ConvexBoundaryProvider({ children }: { children: ReactNode }) {
+  return (
+    <AuthKitProvider>
+      <ConvexProviderWithAuth client={convex} useAuth={useConvexAuthFromWorkOS}>
+        {children}
+      </ConvexProviderWithAuth>
+    </AuthKitProvider>
+  );
+}
+
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
@@ -217,21 +233,5 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
       <Toaster theme="dark" position="bottom-right" richColors closeButton />
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
-  );
-}
-
-/**
- * AuthKitProvider owns the WorkOS session/token state (server-action backed);
- * ConvexProviderWithAuth attaches the AuthKit JWT to the Convex WebSocket so
- * every query/mutation runs with a server-verified identity
- * (convex/auth.config.ts + ctx.auth.getUserIdentity()).
- */
-export function ConvexBoundaryProvider({ children }: { children: ReactNode }) {
-  return (
-    <AuthKitProvider>
-      <ConvexProviderWithAuth client={convex} useAuth={useConvexAuthFromWorkOS}>
-        {children}
-      </ConvexProviderWithAuth>
-    </AuthKitProvider>
   );
 }

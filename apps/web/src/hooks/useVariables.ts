@@ -30,18 +30,6 @@ export function useProjectVariables(
 }
 
 /**
- * Hook for getting a single variable
- */
-export function useVariable(
-  variableId: Id<"environmentVariables"> | undefined
-) {
-  return useQuery(
-    api.features.variables.queries.getById,
-    variableId ? { variableId } : "skip"
-  );
-}
-
-/**
  * Hook for getting variable version history.
  * Requires the current Convex user id — the query is access-gated on the
  * caller's effective access to the variable (version rows carry vaultRefs).
@@ -56,20 +44,5 @@ export function useVariableHistory(
     // Identity is derived server-side from the attached JWT; `userId` gates the
     // query until the current user is known (auth ready).
     variableId && userId ? { variableId, limit } : "skip"
-  );
-}
-
-/**
- * Hook for listing variables with access info for a user
- */
-export function useVariablesWithAccess(
-  projectId: Id<"projects"> | undefined,
-  userId: Id<"users"> | undefined
-) {
-  return useQuery(
-    api.features.variables.queries.listWithAccess,
-    // Identity is derived server-side from the attached JWT; `userId` gates the
-    // query until the current user is known (auth ready).
-    projectId && userId ? { projectId } : "skip"
   );
 }

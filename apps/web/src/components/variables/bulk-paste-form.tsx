@@ -184,8 +184,8 @@ export function BulkPasteForm({
         <div className="rounded-lg border p-3 border-warning-line bg-warning-soft">
           <p className="text-xs font-medium text-warning">Parse warnings:</p>
           <ul className="mt-1 space-y-0.5">
-            {errors.slice(0, 5).map((err, i) => (
-              <li key={i} className="text-xs text-warning">
+            {errors.slice(0, 5).map((err) => (
+              <li key={err.line} className="text-xs text-warning">
                 Line {err.line}: {err.reason}
               </li>
             ))}
@@ -311,8 +311,8 @@ export function BulkPasteForm({
           </div>
           {progress.failures.length > 0 && (
             <div className="mt-2 space-y-1">
-              {progress.failures.map((f, i) => (
-                <p key={i} className="text-xs text-danger">
+              {progress.failures.map((f) => (
+                <p key={f.key} className="text-xs text-danger">
                   {f.key}: {f.error}
                 </p>
               ))}

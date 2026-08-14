@@ -81,21 +81,17 @@ export default function ShareViewerPage() {
       setStep("error");
       setErrorMessage("Invalid decryption key in URL.");
     }
-  }, []);
+  }, [token]);
 
   // OTP countdown timer
   useEffect(() => {
     if (step !== "otp") return;
     if (otpCountdown <= 0) return;
 
+    // No clearInterval here: the updater must stay pure. Reaching 0 re-runs the
+    // effect, and the `otpCountdown <= 0` guard above stops the next tick.
     const interval = setInterval(() => {
-      setOtpCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setOtpCountdown((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
 
     return () => clearInterval(interval);

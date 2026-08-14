@@ -67,15 +67,13 @@ export function AccountListItem({
     if (!revealedValue && !isRevealing && onReveal) {
       onReveal();
       setIsVisible(true);
-    } else {
-      setIsVisible((prev) => {
-        // Re-mask the password whenever the block is hidden, so a prior unmask
-        // doesn't persist into the next reveal (credentials should default to
-        // masked every time they reappear).
-        if (prev) setShowPassword(false);
-        return !prev;
-      });
+      return;
     }
+    // Re-mask the password whenever the block is hidden, so a prior unmask
+    // doesn't persist into the next reveal (credentials should default to
+    // masked every time they reappear).
+    if (isVisible) setShowPassword(false);
+    setIsVisible(!isVisible);
   };
 
   const handleCopy = async (field: "username" | "password", value: string) => {

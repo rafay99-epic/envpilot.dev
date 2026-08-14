@@ -29,43 +29,6 @@ interface VersionRecord {
   changedByUser: { name?: string; email: string } | null;
 }
 
-export function useVariablesList(
-  projectId: string | undefined,
-  options?: { enabled?: boolean }
-) {
-  return useQuery({
-    queryKey: queryKeys.variables.list(projectId!),
-    queryFn: () =>
-      api.get<{ variables: Variable[] }>(
-        `/api/variables?projectId=${projectId}`
-      ),
-    enabled: !!projectId && (options?.enabled ?? true),
-  });
-}
-
-export function useVariableDetail(
-  id: string | undefined,
-  options?: { enabled?: boolean }
-) {
-  return useQuery({
-    queryKey: queryKeys.variables.detail(id!),
-    queryFn: () => api.get<{ variable: Variable }>(`/api/variables/${id}`),
-    enabled: !!id && (options?.enabled ?? true),
-  });
-}
-
-export function useVariableHistory(
-  id: string | undefined,
-  options?: { enabled?: boolean }
-) {
-  return useQuery({
-    queryKey: queryKeys.variables.history(id!),
-    queryFn: () =>
-      api.get<{ history: VersionRecord[] }>(`/api/variables/${id}/history`),
-    enabled: !!id && (options?.enabled ?? true),
-  });
-}
-
 export function useCreateVariable() {
   const queryClient = useQueryClient();
 

@@ -68,13 +68,6 @@ export function useSecretFileUploadQuota(
   ) as { allowed: boolean; current: number; limit: number | null } | undefined;
 }
 
-export function useDeletedSecretFiles(projectId: Id<"projects"> | undefined) {
-  return useQuery(
-    convexApi.features.files.queries.getDeleted,
-    projectId ? { projectId } : "skip"
-  ) as DeletedSecretFile[] | undefined;
-}
-
 export function useSecretFileGrants(fileId: Id<"projectFiles"> | undefined) {
   return useQuery(
     convexApi.features.files.queries.listPermissions,
@@ -99,10 +92,6 @@ export function useUpdateSecretFile() {
 
 export function useDeleteSecretFile() {
   return useMutation(convexApi.features.files.mutations.remove);
-}
-
-export function useRestoreSecretFile() {
-  return useMutation(convexApi.features.files.mutations.restore);
 }
 
 export function useGrantSecretFileAccess() {

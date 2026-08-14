@@ -30,18 +30,6 @@ export function useCreateOrganization() {
     create(input);
 }
 
-/**
- * Hook for getting a single organization by ID
- */
-export function useOrganization(
-  organizationId: Id<"organizations"> | undefined
-) {
-  return useQuery(
-    api.features.organizations.queries.getById,
-    organizationId ? { organizationId } : "skip"
-  );
-}
-
 /** A registry role the caller may assign — see listAssignableRoles. */
 export interface AssignableRole {
   slug: string;

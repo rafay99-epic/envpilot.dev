@@ -139,7 +139,7 @@ export default function OrganizationsPage() {
               <Link
                 key={org._id}
                 href={`/organizations/${org.slug}`}
-                className="group flex flex-col rounded-xl border border-line bg-surface p-6 transition-all hover:border-line-strong hover:bg-surface-hover/80"
+                className="group flex flex-col rounded-xl border border-line bg-surface p-6 transition-colors hover:border-line-strong hover:bg-surface-hover/80"
               >
                 <div className="flex items-start gap-4">
                   {org.logoUrl ? (

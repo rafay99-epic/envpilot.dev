@@ -107,7 +107,11 @@ export function BillingSettings({
     if (!organizationId) return;
     try {
       const data = await portalMutation.mutateAsync({ organizationId });
-      if (data.portalUrl) window.open(data.portalUrl, "_blank");
+      if (data.portalUrl) {
+        // "noopener": the billing portal must not be able to redirect
+        // this tab through window.opener.
+        window.open(data.portalUrl, "_blank", "noopener");
+      }
     } catch {
       // Error is handled by mutation state
     }

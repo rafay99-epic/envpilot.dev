@@ -48,16 +48,25 @@ test.describe("billing", () => {
   }) => {
     test.setTimeout(60_000);
 
-    // Drive the real route as the browser would (redirects followed).
+    // Drive the real route the way the app does: a same-origin form POST
+    // (startCheckout in @/lib/checkout), redirects followed. The route is
+    // POST-only — as a GET it created Polar customers and checkout sessions
+    // on prefetch or a forged cross-site request.
     // Payments disabled → route bounces to /pricing (self-skip). Enabled →
     // an unknown tier must land on checkout-success with an error message,
     // proving the product is resolved server-side from the tier name and a
     // client-supplied value can't buy an unmapped product.
-    const response = await page.goto(
-      "/api/checkout?tier=e2e-nonexistent-tier",
-      { waitUntil: "domcontentloaded" }
-    );
-    expect(response, "checkout route should respond").not.toBeNull();
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    await Promise.all([
+      page.waitForURL(/checkout-success|pricing/, { timeout: 30_000 }),
+      page.evaluate(() => {
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "/api/checkout?tier=e2e-nonexistent-tier";
+        document.body.appendChild(form);
+        form.submit();
+      }),
+    ]);
 
     const landedOn = new URL(page.url());
     test.skip(

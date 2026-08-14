@@ -35,6 +35,7 @@ import {
   parseFrameworkType,
   toFrameworkIcon,
 } from "@/constants/framework-logos";
+import { startCheckout } from "@/lib/checkout";
 
 export default function NewProjectPage() {
   const router = useRouter();

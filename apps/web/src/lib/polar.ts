@@ -65,10 +65,3 @@ export const getPolarWebhookSecret = (): string | null => {
   }
   return process.env.POLAR_WEBHOOK_SECRET || null;
 };
-
-/**
- * Get Polar configuration status
- */
-export const getPolarConfigStatus = () => {
-  return validatePolarConfig();
-};

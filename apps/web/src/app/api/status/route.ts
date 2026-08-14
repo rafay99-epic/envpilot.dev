@@ -21,6 +21,10 @@ const UP = 2;
 const PAUSED = 0;
 const NOT_CHECKED = 1;
 
+// react-doctor flags the POST below as a GET-handler side effect. It isn't:
+// UptimeRobot's getMonitors is a read that its API only exposes over POST, and
+// nothing here mutates state on our side. Nothing to move to a POST handler.
+// oxlint-disable-next-line react-doctor/nextjs-no-side-effect-in-get-handler
 export async function GET() {
   const apiKey = process.env.UPTIMEROBOT_API_KEY;
   if (!apiKey) {

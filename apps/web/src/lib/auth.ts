@@ -1,12 +1,4 @@
-import {
-  authkitMiddleware,
-  withAuth,
-  signOut,
-} from "@workos-inc/authkit-nextjs";
 import type { OrgRole, LegacyProjectRole } from "./roles";
-
-// Re-export auth utilities for consistent imports
-export { authkitMiddleware, withAuth, signOut };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // These types are used for data modeling and API response shapes.

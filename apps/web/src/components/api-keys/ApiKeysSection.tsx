@@ -544,6 +544,10 @@ function CreateKeyDrawer({
   );
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [customExpiry, setCustomExpiry] = useState("");
+  // Earliest selectable expiry (tomorrow). Seeded when the drawer opens rather
+  // than derived in JSX: `Date.now()` during render resolves differently on the
+  // server than in the browser, which is a hydration mismatch.
+  const [minExpiry, setMinExpiry] = useState("");
 
   const [preset, setPreset] = useState<PresetId>("agent");
   // Problems are computed on every render but only SHOWN once the user has
@@ -570,6 +574,9 @@ function CreateKeyDrawer({
     setSelectedSurfaces(new Set<Surface>(["mcp_server"]));
     setExpiryMode("none");
     setCustomExpiry("");
+    setMinExpiry(
+      new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    );
     setIsSubmitting(false);
     setError(null);
     setCreatedToken(null);
@@ -1306,9 +1313,7 @@ function CreateKeyDrawer({
                     id="api-key-expiry-custom"
                     value={customExpiry}
                     onChange={setCustomExpiry}
-                    min={new Date(Date.now() + 24 * 60 * 60 * 1000)
-                      .toISOString()
-                      .slice(0, 10)}
+                    min={minExpiry}
                     placeholder="Pick an expiry date"
                     className="mt-2"
                   />

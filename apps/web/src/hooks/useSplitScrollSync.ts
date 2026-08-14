@@ -156,12 +156,21 @@ export function useSplitScrollSync(enabled: boolean) {
       owner.current = event.currentTarget === preview ? "preview" : "editor";
     };
 
-    textarea.addEventListener("input", onInput);
-    textarea.addEventListener("scroll", onEditorScroll);
+    // One AbortController owns every listener: aborting it detaches all of
+    // them at once, so an added listener can't drift out of sync with a
+    // hand-written removeEventListener.
+    const listeners = new AbortController();
+    const { signal } = listeners;
+
+    textarea.addEventListener("input", onInput, { signal });
+    textarea.addEventListener("scroll", onEditorScroll, { signal });
     for (const el of [pane, preview]) {
-      el.addEventListener("wheel", manualIntent, { passive: true });
-      el.addEventListener("touchstart", manualIntent, { passive: true });
-      el.addEventListener("pointerdown", manualIntent);
+      el.addEventListener("wheel", manualIntent, { passive: true, signal });
+      el.addEventListener("touchstart", manualIntent, {
+        passive: true,
+        signal,
+      });
+      el.addEventListener("pointerdown", manualIntent, { signal });
     }
 
     // The deferred re-render changes height after the keystroke.
@@ -174,16 +183,11 @@ export function useSplitScrollSync(enabled: boolean) {
     const inner = preview.firstElementChild;
     if (inner) observer.observe(inner);
 
+    const frame = followFrame;
     return () => {
-      textarea.removeEventListener("input", onInput);
-      textarea.removeEventListener("scroll", onEditorScroll);
-      for (const el of [pane, preview]) {
-        el.removeEventListener("wheel", manualIntent);
-        el.removeEventListener("touchstart", manualIntent);
-        el.removeEventListener("pointerdown", manualIntent);
-      }
+      listeners.abort();
       observer.disconnect();
-      cancelAnimationFrame(followFrame.current);
+      cancelAnimationFrame(frame.current);
     };
   }, [
     enabled,

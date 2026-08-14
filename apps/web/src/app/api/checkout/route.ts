@@ -6,18 +6,28 @@ import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { isPaymentsEnabled } from "@/lib/polar";
 import { sanitizeConvexError } from "@/lib/error-messages";
+import { isSameOrigin } from "@/lib/same-origin";
 
 /**
- * GET /api/checkout?tier=<tier-name>   (default: "pro")
+ * 303, not the 307 `NextResponse.redirect` defaults to: 307 preserves the
+ * method, which would re-POST this handler's body to Polar's hosted checkout.
+ * 303 tells the browser to follow up with a GET.
+ */
+function seeOther(url: string | URL): NextResponse {
+  return NextResponse.redirect(url, 303);
+}
+
+/**
+ * POST /api/checkout?tier=<tier-name>   (default: "pro")
  *
  * THE single checkout entry point. Authenticated Polar checkout with
- * customer pre-creation.
+ * customer pre-creation. Call it through `startCheckout()` in
+ * `@/lib/checkout` — never a link, since it creates real Polar resources.
  *
  * The Polar product is resolved SERVER-SIDE from the tier name
  * (paymentProducts, then legacy tierDefinitions.polarProductId) — a
- * client-supplied product id is never trusted. The legacy
- * `?products=<id>` form is accepted for old links but the id itself is
- * ignored; it simply means "the default paid tier".
+ * client-supplied product id is never trusted, and `?products=<id>` on an old
+ * link is ignored outright.
  *
  * Flow:
  * 1. Authenticate user
@@ -29,12 +39,16 @@ import { sanitizeConvexError } from "@/lib/error-messages";
  * This prevents "CheckoutCustomerDeleted" errors and ensures the customer
  * binding is always established before payment begins.
  */
-export async function GET(req: Request) {
+export async function POST(req: Request) {
   const url = new URL(req.url);
+
+  if (!isSameOrigin(req, url.origin)) {
+    return NextResponse.json({ error: "Cross-site request" }, { status: 403 });
+  }
 
   // Check if payments are enabled (env var = outer gate)
   if (!isPaymentsEnabled()) {
-    return NextResponse.redirect(new URL("/pricing", url.origin));
+    return seeOther(new URL("/pricing", url.origin));
   }
 
   // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
@@ -43,7 +57,7 @@ export async function GET(req: Request) {
     {}
   );
   if (!dbPaymentsEnabled) {
-    return NextResponse.redirect(new URL("/pricing", url.origin));
+    return seeOther(new URL("/pricing", url.origin));
   }
 
   const tierName = url.searchParams.get("tier") ?? "pro";
@@ -52,10 +66,11 @@ export async function GET(req: Request) {
   const { user, accessToken: workosAccessToken } = await withAuth();
 
   if (!user) {
-    // Redirect unauthenticated users to sign-in, then back to checkout
+    // Return to /pricing, not back here: this route is POST-only, and a
+    // post-sign-in `returnTo` is followed as a GET.
     const signInUrl = new URL("/sign-in", url.origin);
-    signInUrl.searchParams.set("returnTo", url.pathname + url.search);
-    return NextResponse.redirect(signInUrl.toString());
+    signInUrl.searchParams.set("returnTo", "/pricing");
+    return seeOther(signInUrl.toString());
   }
 
   const accessToken = process.env.POLAR_ACCESS_TOKEN;
@@ -104,7 +119,7 @@ export async function GET(req: Request) {
   const redirectWithError = (message: string) => {
     const errorUrl = new URL("/dashboard/checkout-success", origin);
     errorUrl.searchParams.set("error", message);
-    return NextResponse.redirect(errorUrl.toString());
+    return seeOther(errorUrl.toString());
   };
 
   // Resolve the Polar product from the tier SERVER-SIDE:
@@ -149,7 +164,7 @@ export async function GET(req: Request) {
       organizationId: primaryOrg._id,
     });
     if (checkoutState.status === "already_subscribed") {
-      return NextResponse.redirect(
+      return seeOther(
         new URL("/dashboard/settings?tab=billing&notice=already-pro", origin)
       );
     }
@@ -252,7 +267,7 @@ export async function GET(req: Request) {
 
     const result = await polar.checkouts.create(checkoutParams);
 
-    return NextResponse.redirect(result.url);
+    return seeOther(result.url);
   } catch (error) {
     console.error("Polar checkout error:", error);
     Sentry.captureException(error, {

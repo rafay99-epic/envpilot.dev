@@ -119,7 +119,7 @@ export function UpgradePrompt({
             <p className="mt-1 text-sm text-ink-muted">{reason}</p>
             <button
               onClick={handleUpgradeClick}
-              className="mt-3 inline-flex items-center gap-2 rounded-md border border-accent-line bg-accent-soft px-4 py-2 text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
+              className="mt-3 inline-flex items-center gap-2 rounded-md border border-accent-line bg-accent-soft px-4 py-2 text-sm font-medium text-accent transition-colors hover:border-accent-line hover:bg-accent-soft"
             >
               Upgrade to {upgradeName}
               <ArrowRight className="h-4 w-4" />
@@ -164,7 +164,7 @@ export function UpgradePrompt({
           </ul>
           <button
             onClick={handleUpgradeClick}
-            className="mt-6 w-full rounded-lg border border-accent-line bg-accent-soft py-2 px-4 text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
+            className="mt-6 w-full rounded-lg border border-accent-line bg-accent-soft py-2 px-4 text-sm font-medium text-accent transition-colors hover:border-accent-line hover:bg-accent-soft"
           >
             Upgrade Now
           </button>
@@ -205,7 +205,7 @@ export function UpgradePrompt({
             </button>
             <button
               onClick={handleUpgradeClick}
-              className="flex-1 rounded-lg border border-accent-line bg-accent-soft py-2 px-4 text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
+              className="flex-1 rounded-lg border border-accent-line bg-accent-soft py-2 px-4 text-sm font-medium text-accent transition-colors hover:border-accent-line hover:bg-accent-soft"
             >
               Upgrade Now
             </button>

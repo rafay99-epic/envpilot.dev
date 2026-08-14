@@ -12,11 +12,27 @@ import {
   oauthStateCookie,
   parseIntegrationAppUrl,
 } from "@/lib/integration-oauth";
+import { isSameOrigin } from "@/lib/same-origin";
 
-export async function GET(
+/**
+ * POST /api/integrations/<provider>/start?organizationId=<id>
+ *
+ * Begins the Slack/Discord OAuth flow: mints the signed state, stores it in an
+ * httpOnly cookie, and returns the provider's authorize URL for the caller to
+ * navigate to.
+ *
+ * POST, not GET: it writes a cookie, so as a GET a prefetch or a forged
+ * cross-site request could plant OAuth state in the user's browser.
+ */
+export async function POST(
   request: Request,
   { params }: { params: Promise<{ provider: string }> }
 ) {
+  const requestUrl = new URL(request.url);
+  if (!isSameOrigin(request, requestUrl.origin)) {
+    return NextResponse.json({ error: "Cross-site request" }, { status: 403 });
+  }
+
   const { user, accessToken } = await withAuth();
   if (!user || !accessToken) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -29,9 +45,7 @@ export async function GET(
     return NextResponse.json({ error: "Unknown provider" }, { status: 404 });
   }
   const provider = providerResult.data;
-  const requestUrl = new URL(request.url);
   const organizationId = requestUrl.searchParams.get("organizationId");
-  const wantsJson = requestUrl.searchParams.get("format") === "json";
   if (!organizationId || organizationId.length > 100) {
     return NextResponse.json(
       { error: "A valid organizationId is required" },
@@ -132,9 +146,7 @@ export async function GET(
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
   authorizeUrl.searchParams.set("state", state);
 
-  const response = wantsJson
-    ? NextResponse.json({ url: authorizeUrl.toString() })
-    : NextResponse.redirect(authorizeUrl);
+  const response = NextResponse.json({ url: authorizeUrl.toString() });
   // Store the exact state in an httpOnly cookie. Matching the whole value,
   // rather than only its nonce, prevents organization/slug tampering.
   response.cookies.set(oauthStateCookie(provider, oauthState.nonce), state, {

@@ -27,6 +27,10 @@ const ENV_COLORS: Record<string, string> = {
   production: "bg-accent-soft text-accent border-accent-line",
 };
 
+// Stable empty reference: a fresh `[]` on every render would change identity
+// each pass and defeat the navItems memo below.
+const NO_DOCS: never[] = [];
+
 export function CommandPalette() {
   const [isOpen, setIsOpen] = useState(false);
   const [envFilter, setEnvFilter] = useState<EnvFilter>("all");
@@ -56,14 +60,14 @@ export function CommandPalette() {
     useQuery(
       convexApi.features.docs.queries.globalSearch,
       convexUserId && docTerm.length >= 2 ? { searchTerm: docTerm } : "skip"
-    ) ?? [];
+    ) ?? NO_DOCS;
 
   // Gated on the CURRENT term, not the debounced one. `docTerm` lags 300ms,
   // so clearing the box left the previous hits in `navCount` and reachable by
   // Enter while the section itself had already stopped rendering — Enter
   // opened an invisible document. Everything below uses this, never the raw
   // query result.
-  const visibleDocs = searchTerm.trim().length >= 2 ? docResults : [];
+  const visibleDocs = searchTerm.trim().length >= 2 ? docResults : NO_DOCS;
 
   // Collect unique tags from results for tag filter chips
   const availableTags = useMemo(() => {
@@ -163,6 +167,9 @@ export function CommandPalette() {
     setSelectedIndex(0);
   }
 
+  // Declared plainly, not wrapped in useCallback: React Compiler is enabled for
+  // this app and memoizes it, so the listener effect below can depend on it
+  // without re-subscribing every render.
   function openPalette() {
     setSearchTerm("");
     setEnvFilter("all");
@@ -221,7 +228,7 @@ export function CommandPalette() {
     window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, handleOpen);
     return () =>
       window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, handleOpen);
-  }, []);
+  }, [openPalette]);
 
   // Rows tag themselves with their nav index, so headings between groups no
   // longer shift the lookup.

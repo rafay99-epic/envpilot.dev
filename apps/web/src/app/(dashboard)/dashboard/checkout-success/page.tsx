@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import confetti from "canvas-confetti";
 import {
   TerminalWindow,
@@ -39,7 +40,19 @@ async function syncBilling(checkoutId: string): Promise<boolean> {
   }
 }
 
+/**
+ * useSearchParams() suspends, so its caller needs its own <Suspense> boundary —
+ * without one Next opts the whole route out of static rendering.
+ */
 export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={<TerminalLoading />}>
+      <CheckoutSuccessContent />
+    </Suspense>
+  );
+}
+
+function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const checkoutId = searchParams.get("checkout_id");
@@ -74,35 +87,35 @@ export default function CheckoutSuccessPage() {
 
   // Fire confetti when sync completes successfully
   useEffect(() => {
-    if (syncStatus === "success" && !confettiFired.current && !errorParam) {
-      confettiFired.current = true;
+    if (syncStatus !== "success" || confettiFired.current || errorParam) return;
+    confettiFired.current = true;
 
-      // Initial burst
+    // Initial burst
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ["#00ff41", "#39ff14", "#32cd32", "#7fff00", "#adff2f"],
+    });
+
+    // Side cannons after a short delay
+    const cannons = setTimeout(() => {
       confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ["#00ff41", "#39ff14", "#32cd32", "#7fff00", "#adff2f"],
+        particleCount: 50,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0 },
+        colors: ["#00ff41", "#39ff14", "#ffffff"],
       });
-
-      // Side cannons after a short delay
-      setTimeout(() => {
-        confetti({
-          particleCount: 50,
-          angle: 60,
-          spread: 55,
-          origin: { x: 0 },
-          colors: ["#00ff41", "#39ff14", "#ffffff"],
-        });
-        confetti({
-          particleCount: 50,
-          angle: 120,
-          spread: 55,
-          origin: { x: 1 },
-          colors: ["#00ff41", "#39ff14", "#ffffff"],
-        });
-      }, 300);
-    }
+      confetti({
+        particleCount: 50,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1 },
+        colors: ["#00ff41", "#39ff14", "#ffffff"],
+      });
+    }, 300);
+    return () => clearTimeout(cannons);
   }, [syncStatus, errorParam]);
 
   // --- Error State ---
@@ -140,12 +153,12 @@ export default function CheckoutSuccessPage() {
                 <li>&bull; Try again in a few moments</li>
                 <li>
                   &bull; Contact support if the issue persists:{" "}
-                  <a
+                  <Link
                     href="/support"
                     className="text-accent underline hover:text-accent"
                   >
                     /support
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>
@@ -153,14 +166,14 @@ export default function CheckoutSuccessPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => router.push("/pricing")}
-                className="group flex flex-1 items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-6 py-3 font-mono text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
+                className="group flex flex-1 items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-6 py-3 font-mono text-sm font-medium text-accent transition-colors hover:border-accent-line hover:bg-accent-soft"
               >
                 <RefreshCw className="h-4 w-4" />
                 Try Again
               </button>
               <button
                 onClick={() => router.push("/dashboard")}
-                className="group flex flex-1 items-center justify-center gap-2 rounded-lg border border-line bg-surface-raised/50 px-6 py-3 font-mono text-sm font-medium text-ink-muted transition-all hover:border-line-strong hover:bg-surface-hover"
+                className="group flex flex-1 items-center justify-center gap-2 rounded-lg border border-line bg-surface-raised/50 px-6 py-3 font-mono text-sm font-medium text-ink-muted transition-colors hover:border-line-strong hover:bg-surface-hover"
               >
                 Dashboard
                 <ArrowRight className="h-4 w-4" />
@@ -247,7 +260,7 @@ export default function CheckoutSuccessPage() {
           {/* CTA Button */}
           <button
             onClick={() => router.push("/dashboard")}
-            className="group flex w-full items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-6 py-3 font-mono text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
+            className="group flex w-full items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-6 py-3 font-mono text-sm font-medium text-accent transition-colors hover:border-accent-line hover:bg-accent-soft"
           >
             Continue to Dashboard
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />

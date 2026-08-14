@@ -14,6 +14,7 @@ import {
   PricingContent,
   type PricingData,
 } from "@/components/pricing/PricingContent";
+import { jsonLd } from "@/lib/json-ld";
 
 export const metadata: Metadata = {
   title: "Pricing | Envpilot",
@@ -76,7 +77,7 @@ export default async function PricingPage() {
     <MarketingShell>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(faqSchema) }}
       />
       <PageHero
         eyebrow="pricing"

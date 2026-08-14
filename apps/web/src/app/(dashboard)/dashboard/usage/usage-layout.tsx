@@ -214,7 +214,7 @@ export function UsageLayout(props: UsageLayoutProps) {
             {enforcementEnabled && isFree && onUpgrade && (
               <button
                 onClick={onUpgrade}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-4 py-2.5 text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-4 py-2.5 text-sm font-medium text-accent transition-colors hover:border-accent-line hover:bg-accent-soft"
               >
                 <Crown className="h-4 w-4" />
                 Upgrade
@@ -264,7 +264,7 @@ export function UsageLayout(props: UsageLayoutProps) {
               onUpgrade && (
                 <button
                   onClick={onUpgrade}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-3 py-1.5 text-xs font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:border-accent-line hover:bg-accent-soft"
                 >
                   <Crown className="h-3.5 w-3.5" />
                   Upgrade
@@ -430,7 +430,7 @@ export function UsageLayout(props: UsageLayoutProps) {
                 </p>
                 <button
                   onClick={onUpgrade}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-4 py-2.5 text-sm font-medium text-accent transition-all hover:border-accent-line hover:bg-accent-soft"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-accent-line bg-accent-soft px-4 py-2.5 text-sm font-medium text-accent transition-colors hover:border-accent-line hover:bg-accent-soft"
                 >
                   <Crown className="h-4 w-4" />
                   Upgrade

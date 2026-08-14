@@ -25,6 +25,7 @@ import { AnimatedList } from "@/components/dashboard/animated-list";
 import { SharedSecretsWidget } from "@/components/dashboard/shared-secrets-widget";
 import { normalizeOrgRole, roleLabel } from "@/lib/roles";
 import { Plus, ChevronRight, Check, RotateCcw } from "lucide-react";
+import Image from "next/image";
 
 export default function DashboardPage() {
   const { user, organization } = useAuthContext();
@@ -508,9 +509,11 @@ function TeamMemberRow({
       <div className="flex items-center gap-3">
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-raised text-xs font-medium text-ink-muted">
           {member.user.avatarUrl ? (
-            <img
+            <Image
               src={member.user.avatarUrl}
               alt={member.user.name || member.user.email}
+              width={28}
+              height={28}
               className="h-7 w-7 rounded-full"
             />
           ) : (

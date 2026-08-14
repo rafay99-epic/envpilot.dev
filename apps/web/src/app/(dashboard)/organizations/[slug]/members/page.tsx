@@ -39,6 +39,7 @@ import {
   type OrgRole,
 } from "@/lib/roles";
 import { createLogger } from "@/lib/logger";
+import Image from "next/image";
 
 const log = createLogger("app/dashboard/organization-members");
 
@@ -749,9 +750,11 @@ function OrganizationMembersPageContent({
               <div className="flex items-center justify-between px-6 py-4">
                 <div className="flex items-center gap-4">
                   {member.user.avatarUrl ? (
-                    <img
+                    <Image
                       src={member.user.avatarUrl}
                       alt={member.user.name || member.user.email}
+                      width={40}
+                      height={40}
                       className="h-10 w-10 rounded-full object-cover"
                     />
                   ) : (
@@ -1283,9 +1286,11 @@ function OrganizationMembersPageContent({
                         className="flex w-full items-center gap-3 px-4 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50 hover:bg-surface-hover"
                       >
                         {user.avatarUrl ? (
-                          <img
+                          <Image
                             src={user.avatarUrl}
                             alt={user.name || user.email}
+                            width={32}
+                            height={32}
                             className="h-8 w-8 rounded-full object-cover"
                           />
                         ) : (

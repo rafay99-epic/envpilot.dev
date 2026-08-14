@@ -179,7 +179,7 @@ function ProjectCard({
   return (
     <Link
       href={`/dashboard/projects/${project.slug}`}
-      className="group flex flex-col overflow-hidden rounded-lg border border-line bg-surface/90 transition-all hover:border-accent-line hover:shadow-lg hover:shadow-accent-line"
+      className="group flex flex-col overflow-hidden rounded-lg border border-line bg-surface/90 transition-[color,background-color,border-color,box-shadow] hover:border-accent-line hover:shadow-lg hover:shadow-accent-line"
     >
       <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2">
         <div className="h-2.5 w-2.5 rounded-full bg-danger/80" />

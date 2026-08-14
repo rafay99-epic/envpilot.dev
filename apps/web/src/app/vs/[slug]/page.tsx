@@ -10,6 +10,7 @@ import {
   terminal,
 } from "@/components/marketing";
 import { COMPARISONS, getComparisonBySlug } from "@/lib/comparisons";
+import { jsonLd } from "@/lib/json-ld";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -59,7 +60,7 @@ export default async function ComparisonPage({ params }: PageProps) {
     <MarketingShell>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(faqSchema) }}
       />
 
       <PageHero

@@ -1,5 +1,6 @@
 "use client";
 
+import { Children } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface AnimatedListProps {
@@ -42,9 +43,8 @@ export function AnimatedList({
         animate="visible"
         exit="exit"
       >
-        {children.map((child, i) => (
+        {Children.map(children, (child, i) => (
           <motion.div
-            key={i}
             custom={i}
             variants={itemVariants}
             initial="hidden"
@@ -74,9 +74,8 @@ export function AnimatedGrid({
         animate="visible"
         exit="exit"
       >
-        {children.map((child, i) => (
+        {Children.map(children, (child, i) => (
           <motion.div
-            key={i}
             custom={i}
             variants={itemVariants}
             initial="hidden"

@@ -33,40 +33,12 @@ export function usePlannedFeatures() {
 }
 
 /**
- * Hook for getting a single feature request
- */
-export function useFeatureRequest(
-  featureRequestId: Id<"featureRequests"> | undefined
-) {
-  return useQuery(
-    api.features.community.featureRequests.queries.getById,
-    featureRequestId ? { featureRequestId } : "skip"
-  );
-}
-
-/**
  * Hook for getting all categories
  */
 export function useFeatureCategories() {
   return useQuery(
     api.features.community.featureRequests.queries.listCategories,
     {}
-  );
-}
-
-/**
- * Hook to check if a user has voted for a feature
- */
-export function useHasVoted(
-  featureRequestId: Id<"featureRequests"> | undefined,
-  _userId?: Id<"users">,
-  voterEmail?: string
-) {
-  // Identity (for signed-in voters) is derived server-side from the attached
-  // JWT; only the anonymous `voterEmail` fallback is still passed.
-  return useQuery(
-    api.features.community.featureRequests.queries.hasVoted,
-    featureRequestId ? { featureRequestId, voterEmail } : "skip"
   );
 }
 
@@ -88,27 +60,5 @@ export function useFeatureRequestMutations() {
     submit,
     vote,
     unvote,
-  };
-}
-
-/**
- * Hook for admin feature request mutations
- * These require admin privileges on the server-side
- */
-export function useAdminFeatureRequestMutations() {
-  const updateStatus = useMutation(
-    api.features.community.featureRequests.mutations.updateStatus
-  );
-  const update = useMutation(
-    api.features.community.featureRequests.mutations.update
-  );
-  const remove = useMutation(
-    api.features.community.featureRequests.mutations.remove
-  );
-
-  return {
-    updateStatus,
-    update,
-    remove,
   };
 }

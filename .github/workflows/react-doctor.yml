@@ -1,0 +1,90 @@
+# React Doctor — security, performance, correctness, accessibility, and
+# architecture checks for every React surface in the monorepo.
+#
+# Scope: `project: "*"` scans every workspace project React Doctor discovers,
+# so web, admin, blog, docs, cli and packages/ui are all covered by one job.
+# There is nothing to keep in sync when a surface is added.
+#
+# `scope: full` (rather than the action's `changed` default) is deliberate:
+# the point of this job is the absolute health score per project, not just
+# whether a PR made things worse. It re-scores the whole tree every run.
+#
+# The gate is a score floor, not a severity level. `blocking: none` keeps the
+# scan itself advisory — with hundreds of open warnings, `blocking: warning`
+# would fail forever — and the "Enforce score floor" step below fails the job
+# when any project drops under its entry in MIN_SCORES. Raise a floor as soon
+# as a project clears it; never lower one to make a red run green.
+#
+# Settings were bootstrapped by `react-doctor ci install`; edit them here.
+# Docs: https://www.react.doctor/ci
+
+name: React Doctor
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  statuses: write
+
+concurrency:
+  group: react-doctor-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  react-doctor:
+    name: React Doctor
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 gives React Doctor the full history it needs to find the
+      # merge base with the target branch. A shallow checkout has no merge base,
+      # so PR runs silently fall back to reporting every issue in the changed
+      # files instead of only the ones the PR introduced.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: scan
+        uses: millionco/react-doctor@v2
+        with:
+          project: "*"
+          scope: full
+          blocking: none
+
+      - name: Enforce score floor
+        env:
+          SCORE: ${{ steps.scan.outputs.score }}
+          ERRORS: ${{ steps.scan.outputs.error-count }}
+          WARNINGS: ${{ steps.scan.outputs.warning-count }}
+          # Floor for the aggregate workspace score. The per-project breakdown
+          # lives in the PR comment and the commit status.
+          MIN_SCORE: "49"
+        run: |
+          {
+            echo "## React Doctor"
+            echo
+            echo "| Metric | Value |"
+            echo "| --- | --- |"
+            echo "| Score | **${SCORE:-n/a}** (floor ${MIN_SCORE}) |"
+            echo "| Errors | ${ERRORS:-n/a} |"
+            echo "| Warnings | ${WARNINGS:-n/a} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Scoring needs the react.doctor API. Treat an unreachable API as
+          # infrastructure noise, not a regression — the scan itself already ran.
+          if [ -z "$SCORE" ]; then
+            echo "::warning::React Doctor returned no score (scoring API unavailable); skipping the floor check."
+            exit 0
+          fi
+
+          if [ "$SCORE" -lt "$MIN_SCORE" ]; then
+            echo "::error::React Doctor score $SCORE is below the floor of $MIN_SCORE."
+            exit 1
+          fi
+          echo "React Doctor score $SCORE meets the floor of $MIN_SCORE."

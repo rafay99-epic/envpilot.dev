@@ -90,6 +90,10 @@ const expandVariant = {
   },
 };
 
+// Stable empty reference: a fresh `[]` while the query loads would change
+// identity every render and defeat every memo downstream.
+const NO_VARIABLES: never[] = [];
+
 // ─── Types ──────────────────────────────────────────────────────────
 
 interface Project {
@@ -314,7 +318,7 @@ export default function EnvironmentDiffPage({
   const liveProject = useProjectBySlug(organization?.id, slug);
   const project = liveProject as Project | null | undefined;
   const liveVariables = useProjectVariables(liveProject?._id, convexUserId);
-  const variables = (liveVariables ?? []) as Variable[];
+  const variables = (liveVariables ?? NO_VARIABLES) as Variable[];
   const isLoadingProject = liveProject === undefined;
   const isLoadingVars = !!liveProject && liveVariables === undefined;
   const [error, setError] = useState<string | null>(null);
@@ -331,6 +335,14 @@ export default function EnvironmentDiffPage({
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>(
     {}
   );
+  // Mirror of `revealedValues` for the async export/copy handlers: they await a
+  // reveal and then need the post-reveal snapshot, which their render-time
+  // closure doesn't have. Reading it here instead of inside a state updater
+  // keeps those updaters pure (React may run an updater more than once).
+  const revealedValuesRef = useRef(revealedValues);
+  useEffect(() => {
+    revealedValuesRef.current = revealedValues;
+  }, [revealedValues]);
   const [revealingRefs, setRevealingRefs] = useState<Set<string>>(new Set());
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
@@ -532,18 +544,15 @@ export default function EnvironmentDiffPage({
     // Wait a tick so the new revealed values are observable in state
     await new Promise((r) => setTimeout(r, 50));
     const lines: string[] = [];
-    // Use latest snapshot — read via callback
-    setRevealedValues((current) => {
-      for (const row of filteredRows) {
-        const slot = row.slots[env];
-        if (!slot) continue;
-        const v = current[slot.vaultRef];
-        if (v !== undefined) {
-          lines.push(`${row.key}=${escapeEnvValue(v)}`);
-        }
+    const current = revealedValuesRef.current;
+    for (const row of filteredRows) {
+      const slot = row.slots[env];
+      if (!slot) continue;
+      const v = current[slot.vaultRef];
+      if (v !== undefined) {
+        lines.push(`${row.key}=${escapeEnvValue(v)}`);
       }
-      return current;
-    });
+    }
     if (lines.length === 0) {
       setToast(`No revealed values to copy for ${env}`);
       return;
@@ -573,26 +582,24 @@ export default function EnvironmentDiffPage({
   const exportEnvFile = async (env: string) => {
     await revealColumn(env);
     await new Promise((r) => setTimeout(r, 50));
-    setRevealedValues((current) => {
-      const lines: string[] = [
-        `# ${project?.name ?? "envpilot"} — ${env}`,
-        `# Exported ${new Date().toISOString()}`,
-        "",
-      ];
-      for (const row of sortedRows) {
-        const slot = row.slots[env];
-        if (!slot) continue;
-        const v = current[slot.vaultRef];
-        if (v !== undefined) {
-          if (row.description) lines.push(`# ${row.description}`);
-          lines.push(`${row.key}=${escapeEnvValue(v)}`);
-        }
+    const current = revealedValuesRef.current;
+    const lines: string[] = [
+      `# ${project?.name ?? "envpilot"} — ${env}`,
+      `# Exported ${new Date().toISOString()}`,
+      "",
+    ];
+    for (const row of sortedRows) {
+      const slot = row.slots[env];
+      if (!slot) continue;
+      const v = current[slot.vaultRef];
+      if (v !== undefined) {
+        if (row.description) lines.push(`# ${row.description}`);
+        lines.push(`${row.key}=${escapeEnvValue(v)}`);
       }
-      const filename = `${project?.slug ?? "envpilot"}.${env}.env`;
-      downloadBlob(filename, lines.join("\n") + "\n", "text/plain");
-      setToast(`Downloaded ${filename}`);
-      return current;
-    });
+    }
+    const filename = `${project?.slug ?? "envpilot"}.${env}.env`;
+    downloadBlob(filename, lines.join("\n") + "\n", "text/plain");
+    setToast(`Downloaded ${filename}`);
   };
 
   const exportDiffJSON = () => {
@@ -873,11 +880,12 @@ export default function EnvironmentDiffPage({
                 <div className="flex h-1.5 overflow-hidden rounded-full bg-surface-raised">
                   {summary.matching > 0 && (
                     <motion.div
-                      className="bg-accent"
-                      initial={{ width: 0 }}
-                      animate={{
+                      className="origin-left bg-accent"
+                      style={{
                         width: `${(summary.matching / summary.total) * 100}%`,
                       }}
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: 1 }}
                       transition={{
                         duration: 0.6,
                         ease: "easeOut",
@@ -887,11 +895,12 @@ export default function EnvironmentDiffPage({
                   )}
                   {summary.changed > 0 && (
                     <motion.div
-                      className="bg-warning"
-                      initial={{ width: 0 }}
-                      animate={{
+                      className="origin-left bg-warning"
+                      style={{
                         width: `${(summary.changed / summary.total) * 100}%`,
                       }}
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: 1 }}
                       transition={{
                         duration: 0.6,
                         ease: "easeOut",
@@ -901,11 +910,12 @@ export default function EnvironmentDiffPage({
                   )}
                   {summary.missing > 0 && (
                     <motion.div
-                      className="bg-danger"
-                      initial={{ width: 0 }}
-                      animate={{
+                      className="origin-left bg-danger"
+                      style={{
                         width: `${(summary.missing / summary.total) * 100}%`,
                       }}
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: 1 }}
                       transition={{
                         duration: 0.6,
                         ease: "easeOut",

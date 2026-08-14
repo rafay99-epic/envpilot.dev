@@ -20,24 +20,6 @@ export function useProjectMembers(projectId: Id<"projects"> | undefined) {
 }
 
 /**
- * Hook to check if a user has membership in a project
- */
-export function useProjectMembership(
-  projectId: Id<"projects"> | undefined,
-  userId: Id<"users"> | undefined
-) {
-  const membership = useQuery(
-    api.features.projects.members.getProjectMembership,
-    projectId && userId ? { projectId } : "skip"
-  );
-
-  return {
-    membership: membership ?? null,
-    isLoading: projectId && userId ? membership === undefined : false,
-  };
-}
-
-/**
  * Hook to get org members who can be assigned to a project
  */
 export function useAssignableProjectMembers(

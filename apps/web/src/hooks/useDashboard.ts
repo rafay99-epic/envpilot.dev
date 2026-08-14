@@ -26,28 +26,6 @@ export function useProjects(
 }
 
 /**
- * Hook for dashboard variables - returns only the variables the current user
- * can access (env scope + per-variable grants applied), never leaking vault
- * refs for inaccessible variables. Requires the current Convex user id.
- */
-export function useVariables(
-  organizationId: Id<"organizations"> | undefined,
-  userId: Id<"users"> | undefined
-) {
-  const variables = useQuery(
-    api.features.variables.queries.listOrgVariablesWithAccess,
-    // Identity is derived server-side from the attached JWT; `userId` gates the
-    // query until the current user is known (auth ready).
-    organizationId && userId ? { organizationId } : "skip"
-  );
-
-  return {
-    variables: variables ?? [],
-    isLoading: organizationId && userId ? variables === undefined : false,
-  };
-}
-
-/**
  * Hook for dashboard statistics
  */
 export function useDashboardStats(
