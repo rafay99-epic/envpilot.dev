@@ -1062,27 +1062,6 @@ export class APIClient {
   }
 
   /**
-   * Metadata-only variable listing for an environment (no vault reads, no
-   * value-access audit entries). Used by `diff` without --values.
-   */
-  async listVariableKeys(
-    projectId: string,
-    environment: string
-  ): Promise<{ keys: string[]; truncated: boolean }> {
-    const limit = 5000;
-    const rows = await convexQuery(refs.listVariablesWithAccess, {
-      projectId,
-      limit,
-    });
-    return {
-      keys: rows
-        .filter((row) => row.environments.includes(environment))
-        .map((row) => row.key),
-      truncated: rows.length >= limit,
-    };
-  }
-
-  /**
    * Re-scope a shared variable: atomically detach `environment` from it
    * server-side (the mutation re-reads the row, so a concurrent edit can't
    * be clobbered by a stale client-side array).

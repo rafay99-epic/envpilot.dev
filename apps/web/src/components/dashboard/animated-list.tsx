@@ -59,15 +59,22 @@ export function AnimatedList({
   );
 }
 
+interface AnimatedGridProps extends AnimatedListProps {
+  /** Forwarded to the grid container so callers can measure the laid-out grid. */
+  ref?: React.Ref<HTMLDivElement>;
+}
+
 /** Animated grid for card layouts - wraps each child in a motion.div */
 export function AnimatedGrid({
   children,
   className = "",
   pageKey = "default",
-}: AnimatedListProps) {
+  ref,
+}: AnimatedGridProps) {
   return (
     <AnimatePresence mode="wait">
       <motion.div
+        ref={ref}
         key={pageKey}
         className={className}
         initial="hidden"

@@ -39,10 +39,10 @@ const SCENES: TerminalScene[] = [
     ],
   },
   {
-    command: "envpilot diff --env production",
+    command: "envpilot run --env production -- bun start",
     output: [
-      { text: "~ 2 values differ, 1 missing locally", tone: "warn" },
-      { text: "  compared by digest — no value ever printed", tone: "dim" },
+      { text: "✓ 24 secrets injected into the child process", tone: "ok" },
+      { text: "  nothing written to disk, no value ever printed", tone: "dim" },
     ],
   },
 ];

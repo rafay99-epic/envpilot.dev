@@ -19,6 +19,7 @@ export {
   useUserProjects,
   useProjectBySlug,
 } from "./useProjects";
+export { useAutoPageSize } from "./useAutoPageSize";
 export {
   useCreateProject,
   useUpdateProject,
