@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useRef, type ReactNode } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 
 interface DrawerPanelProps {
   isOpen: boolean;
@@ -120,69 +120,77 @@ export function DrawerPanel({
   }, [isOpen]);
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50">
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-black/50"
-            onClick={safeClose}
-            aria-hidden="true"
-          />
+    // 14 components import DrawerPanel, so it sits on the always-loaded
+    // dashboard path. LazyMotion + `m` keeps the full Motion bundle off that
+    // path; `domAnimation` is enough here (opacity and transform only, no
+    // layout projection).
+    <LazyMotion features={domAnimation}>
+      <AnimatePresence>
+        {isOpen && (
+          <div className="fixed inset-0 z-50">
+            {/* Backdrop */}
+            <m.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/50"
+              onClick={safeClose}
+              aria-hidden="true"
+            />
 
-          {/* Panel */}
-          <motion.div
-            initial={{ x: side === "left" ? "-100%" : "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: side === "left" ? "-100%" : "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className={`fixed inset-y-0 ${side === "left" ? "left-0" : "right-0"} ${widthClasses[width]} max-w-full`}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="drawer-title"
-            ref={panelRef}
-            tabIndex={-1}
-          >
-            <div className="flex h-full flex-col shadow-xl bg-surface">
-              {/* Header */}
-              <div className="flex items-center justify-between border-b px-6 py-4 border-line">
-                <h2
-                  id="drawer-title"
-                  className="text-lg font-semibold text-ink"
-                >
-                  {title}
-                </h2>
-                <button
-                  onClick={safeClose}
-                  disabled={preventClose}
-                  className="rounded-lg p-1 text-ink-muted disabled:cursor-not-allowed disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
-                >
-                  <svg
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+            {/* Panel */}
+            <m.div
+              initial={{ x: side === "left" ? "-100%" : "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: side === "left" ? "-100%" : "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className={`fixed inset-y-0 ${side === "left" ? "left-0" : "right-0"} ${widthClasses[width]} max-w-full`}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="drawer-title"
+              ref={panelRef}
+              tabIndex={-1}
+            >
+              <div className="flex h-full flex-col shadow-xl bg-surface">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b px-6 py-4 border-line">
+                  <h2
+                    id="drawer-title"
+                    className="text-lg font-semibold text-ink"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
+                    {title}
+                  </h2>
+                  <button
+                    onClick={safeClose}
+                    disabled={preventClose}
+                    className="rounded-lg p-1 text-ink-muted disabled:cursor-not-allowed disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
+                  >
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
 
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto px-6 py-4">{children}</div>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto px-6 py-4">
+                  {children}
+                </div>
+              </div>
+            </m.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </LazyMotion>
   );
 }

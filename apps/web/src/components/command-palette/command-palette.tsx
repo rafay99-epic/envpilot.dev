@@ -4,7 +4,7 @@ import { useState, useEffect, useId, useReducer, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
 import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 import { useQuery } from "convex/react";
 import { Search, Lock, X, Tag, SlidersHorizontal } from "lucide-react";
 import { api as convexApi } from "@convex/_generated/api";
@@ -270,305 +270,310 @@ export function CommandPalette() {
   }
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[60]" onKeyDown={handleKeyDown}>
-          {/* Backdrop */}
-          <motion.button
-            type="button"
-            aria-label="Dismiss"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => closePalette()}
-          />
+    // The palette mounts with the dashboard shell, so `m` + LazyMotion keeps
+    // the unused Motion features out of that bundle. `domAnimation` covers
+    // everything here: opacity, scale and y.
+    <LazyMotion features={domAnimation}>
+      <AnimatePresence>
+        {isOpen && (
+          <div className="fixed inset-0 z-[60]" onKeyDown={handleKeyDown}>
+            {/* Backdrop */}
+            <m.button
+              type="button"
+              aria-label="Dismiss"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => closePalette()}
+            />
 
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: -10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -10 }}
-            transition={{ duration: 0.15 }}
-            className="relative mx-4 mt-[15vh] sm:mx-auto sm:max-w-2xl"
-          >
-            <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
-              {/* Search Input */}
-              <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-                <Search className="h-5 w-5 shrink-0 text-ink-subtle" />
-                {/* The Search glyph is the palette's visible affordance; the
+            {/* Modal */}
+            <m.div
+              initial={{ opacity: 0, scale: 0.96, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: -10 }}
+              transition={{ duration: 0.15 }}
+              className="relative mx-4 mt-[15vh] sm:mx-auto sm:max-w-2xl"
+            >
+              <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
+                {/* Search Input */}
+                <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+                  <Search className="h-5 w-5 shrink-0 text-ink-subtle" />
+                  {/* The Search glyph is the palette's visible affordance; the
                     label carries the same name for assistive tech. */}
-                <label htmlFor={searchInputId} className="sr-only">
-                  Search variables across all projects
-                </label>
-                <input
-                  id={searchInputId}
-                  ref={inputRef}
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  placeholder="Search variables across all projects..."
-                  className="flex-1 bg-transparent text-sm text-ink placeholder-ink-subtle outline-none"
-                />
-                <kbd className="hidden shrink-0 rounded border border-line bg-surface-raised px-1.5 py-0.5 text-[10px] font-medium text-ink-subtle sm:inline-block">
-                  ESC
-                </kbd>
-                <button
-                  onClick={() => closePalette()}
-                  aria-label="Close"
-                  className="rounded p-0.5 text-ink-subtle hover:text-ink-muted sm:hidden"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Environment Filter Chips */}
-              <div className="flex flex-wrap gap-1.5 border-b border-line px-4 py-2">
-                {ENV_FILTERS.map((env) => (
+                  <label htmlFor={searchInputId} className="sr-only">
+                    Search variables across all projects
+                  </label>
+                  <input
+                    id={searchInputId}
+                    ref={inputRef}
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    placeholder="Search variables across all projects..."
+                    className="flex-1 bg-transparent text-sm text-ink placeholder-ink-subtle outline-none"
+                  />
+                  <kbd className="hidden shrink-0 rounded border border-line bg-surface-raised px-1.5 py-0.5 text-[10px] font-medium text-ink-subtle sm:inline-block">
+                    ESC
+                  </kbd>
                   <button
-                    key={env}
-                    onClick={() => handleFilterChange(env)}
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
-                      envFilter === env
-                        ? "bg-accent-soft text-accent border border-accent-line"
-                        : "text-ink-subtle hover:text-ink-muted border border-line hover:border-line-strong"
-                    }`}
+                    onClick={() => closePalette()}
+                    aria-label="Close"
+                    className="rounded p-0.5 text-ink-subtle hover:text-ink-muted sm:hidden"
                   >
-                    {env}
+                    <X className="h-4 w-4" />
                   </button>
-                ))}
-                {/* Tag filter chips */}
-                {availableTags.length > 0 && (
-                  <>
-                    <span className="mx-1 self-center text-ink-faint">|</span>
-                    {availableTags.map((tag) => {
-                      // Every tag here is by construction in `availableTagIds`,
-                      // so the pruned Set answers this exactly.
-                      const isSelected = activeTagFilter.has(tag._id);
-                      return (
-                        <button
-                          key={tag._id}
-                          onClick={() =>
-                            dispatch({ kind: "tag-toggled", tagId: tag._id })
-                          }
-                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                            isSelected
-                              ? "text-white"
-                              : "text-ink-subtle hover:text-ink-muted border-line hover:border-line-strong"
-                          }`}
-                          style={
-                            isSelected
-                              ? {
-                                  backgroundColor: tag.color,
-                                  borderColor: tag.color,
-                                }
-                              : undefined
-                          }
-                        >
-                          <Tag className="h-2.5 w-2.5" />
-                          {tag.name}
-                        </button>
-                      );
-                    })}
-                  </>
-                )}
-              </div>
+                </div>
 
-              {/* Results */}
-              <div
-                ref={listRef}
-                className="max-h-[50vh] overflow-y-auto sm:max-h-[400px]"
-              >
-                {searchTerm.length < 2 ? (
-                  <div className="px-4 py-8 text-center text-sm text-ink-subtle">
-                    Type at least 2 characters to search...
-                  </div>
-                ) : isLoading ? (
-                  <div className="px-4 py-8 text-center text-sm text-ink-subtle">
-                    Searching...
-                  </div>
-                ) : navCount === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-ink-subtle">
-                    Nothing found for &ldquo;{searchTerm}&rdquo;
-                  </div>
-                ) : (
-                  filteredResults.map((result, index) => (
+                {/* Environment Filter Chips */}
+                <div className="flex flex-wrap gap-1.5 border-b border-line px-4 py-2">
+                  {ENV_FILTERS.map((env) => (
                     <button
-                      key={result._id}
-                      data-nav-index={index}
-                      onClick={() => navigateToResult(result)}
-                      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
-                        index === clampedIndex
-                          ? "bg-accent-soft"
-                          : "hover:bg-surface-hover/50"
+                      key={env}
+                      onClick={() => handleFilterChange(env)}
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
+                        envFilter === env
+                          ? "bg-accent-soft text-accent border border-accent-line"
+                          : "text-ink-subtle hover:text-ink-muted border border-line hover:border-line-strong"
                       }`}
                     >
-                      {/* Project color dot */}
-                      <div
-                        className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{
-                          backgroundColor: result.projectColor || "#71717a",
-                        }}
-                      />
-
-                      <div className="min-w-0 flex-1">
-                        {/* Variable key */}
-                        <div className="flex items-center gap-2">
-                          <span className="truncate font-mono text-sm font-medium text-ink">
-                            {result.key}
-                          </span>
-                          {result.isSensitive && (
-                            <Lock className="h-3 w-3 shrink-0 text-warning" />
-                          )}
-                        </div>
-
-                        {/* Project + Org */}
-                        <p className="mt-0.5 truncate text-xs text-ink-subtle">
-                          {result.projectName}
-                          <span className="mx-1.5 text-ink-faint">/</span>
-                          {result.organizationName}
-                        </p>
-
-                        {/* Environment + tag badges */}
-                        {((result.environments &&
-                          result.environments.length > 0) ||
-                          (result.tags && result.tags.length > 0)) && (
-                          <div className="mt-1.5 flex flex-wrap gap-1">
-                            {result.environments?.map((env) => (
-                              <span
-                                key={env}
-                                className={`inline-block rounded-full border px-1.5 py-0 text-[10px] font-medium ${
-                                  ENV_COLORS[env] ||
-                                  "bg-surface-hover/10 text-ink-muted border-line-strong"
-                                }`}
-                              >
-                                {env}
-                              </span>
-                            ))}
-                            {result.tags?.map((tag) => (
-                              <TagBadge
-                                key={tag._id}
-                                name={tag.name}
-                                color={tag.color}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      {env}
                     </button>
-                  ))
-                )}
+                  ))}
+                  {/* Tag filter chips */}
+                  {availableTags.length > 0 && (
+                    <>
+                      <span className="mx-1 self-center text-ink-faint">|</span>
+                      {availableTags.map((tag) => {
+                        // Every tag here is by construction in `availableTagIds`,
+                        // so the pruned Set answers this exactly.
+                        const isSelected = activeTagFilter.has(tag._id);
+                        return (
+                          <button
+                            key={tag._id}
+                            onClick={() =>
+                              dispatch({ kind: "tag-toggled", tagId: tag._id })
+                            }
+                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                              isSelected
+                                ? "text-white"
+                                : "text-ink-subtle hover:text-ink-muted border-line hover:border-line-strong"
+                            }`}
+                            style={
+                              isSelected
+                                ? {
+                                    backgroundColor: tag.color,
+                                    borderColor: tag.color,
+                                  }
+                                : undefined
+                            }
+                          >
+                            <Tag className="h-2.5 w-2.5" />
+                            {tag.name}
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
 
-                {/* Documentation — published pages across every visible
-                    project. Appended rather than given its own palette so
-                    there is one Cmd+K and one shortcut. Metadata only; the
-                    body is loaded when the page opens. */}
-                {visibleDocs.length > 0 && (
-                  <>
-                    <div className="border-t border-line px-4 pt-3 pb-1 font-mono text-[10px] tracking-wider text-ink-faint uppercase">
-                      Documentation
+                {/* Results */}
+                <div
+                  ref={listRef}
+                  className="max-h-[50vh] overflow-y-auto sm:max-h-[400px]"
+                >
+                  {searchTerm.length < 2 ? (
+                    <div className="px-4 py-8 text-center text-sm text-ink-subtle">
+                      Type at least 2 characters to search...
                     </div>
-                    {visibleDocs.map((doc, index) => (
+                  ) : isLoading ? (
+                    <div className="px-4 py-8 text-center text-sm text-ink-subtle">
+                      Searching...
+                    </div>
+                  ) : navCount === 0 ? (
+                    <div className="px-4 py-8 text-center text-sm text-ink-subtle">
+                      Nothing found for &ldquo;{searchTerm}&rdquo;
+                    </div>
+                  ) : (
+                    filteredResults.map((result, index) => (
                       <button
-                        key={doc._id}
-                        data-testid={`palette-doc-${doc.slug}`}
-                        data-nav-index={filteredResults.length + index}
-                        onClick={() => navigateToDoc(doc)}
+                        key={result._id}
+                        data-nav-index={index}
+                        onClick={() => navigateToResult(result)}
                         className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
-                          filteredResults.length + index === clampedIndex
+                          index === clampedIndex
                             ? "bg-accent-soft"
                             : "hover:bg-surface-hover/50"
                         }`}
                       >
+                        {/* Project color dot */}
                         <div
                           className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{
-                            backgroundColor: doc.projectColor || "#71717a",
+                            backgroundColor: result.projectColor || "#71717a",
                           }}
                         />
+
                         <div className="min-w-0 flex-1">
-                          <span className="truncate text-sm font-medium text-ink">
-                            {doc.title}
-                          </span>
+                          {/* Variable key */}
+                          <div className="flex items-center gap-2">
+                            <span className="truncate font-mono text-sm font-medium text-ink">
+                              {result.key}
+                            </span>
+                            {result.isSensitive && (
+                              <Lock className="h-3 w-3 shrink-0 text-warning" />
+                            )}
+                          </div>
+
+                          {/* Project + Org */}
                           <p className="mt-0.5 truncate text-xs text-ink-subtle">
-                            {doc.projectName}
+                            {result.projectName}
                             <span className="mx-1.5 text-ink-faint">/</span>
-                            {doc.module}
+                            {result.organizationName}
                           </p>
+
+                          {/* Environment + tag badges */}
+                          {((result.environments &&
+                            result.environments.length > 0) ||
+                            (result.tags && result.tags.length > 0)) && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {result.environments?.map((env) => (
+                                <span
+                                  key={env}
+                                  className={`inline-block rounded-full border px-1.5 py-0 text-[10px] font-medium ${
+                                    ENV_COLORS[env] ||
+                                    "bg-surface-hover/10 text-ink-muted border-line-strong"
+                                  }`}
+                                >
+                                  {env}
+                                </span>
+                              ))}
+                              {result.tags?.map((tag) => (
+                                <TagBadge
+                                  key={tag._id}
+                                  name={tag.name}
+                                  color={tag.color}
+                                />
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </button>
-                    ))}
-                  </>
-                )}
+                    ))
+                  )}
 
-                {/* Settings — three scopes, one search box. Entries are the
-                    static index in @/settings/settings-index, so a tab that
-                    moves does not silently strand its keywords. */}
-                {settingsHits.length > 0 && (
-                  <>
-                    <div className="border-t border-line px-4 pt-3 pb-1 font-mono text-[10px] tracking-wider text-ink-faint uppercase">
-                      Settings
-                    </div>
-                    {settingsHits.map((hit, index) => {
-                      const navIndex =
-                        filteredResults.length + visibleDocs.length + index;
-                      return (
+                  {/* Documentation — published pages across every visible
+                    project. Appended rather than given its own palette so
+                    there is one Cmd+K and one shortcut. Metadata only; the
+                    body is loaded when the page opens. */}
+                  {visibleDocs.length > 0 && (
+                    <>
+                      <div className="border-t border-line px-4 pt-3 pb-1 font-mono text-[10px] tracking-wider text-ink-faint uppercase">
+                        Documentation
+                      </div>
+                      {visibleDocs.map((doc, index) => (
                         <button
-                          key={`${hit.entry.scope}-${hit.entry.tab}-${hit.entry.label}`}
-                          data-nav-index={navIndex}
-                          data-testid={`palette-setting-${hit.entry.scope}-${hit.entry.tab}`}
-                          onClick={() => navigateTo(hit.href)}
-                          className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
-                            navIndex === clampedIndex
+                          key={doc._id}
+                          data-testid={`palette-doc-${doc.slug}`}
+                          data-nav-index={filteredResults.length + index}
+                          onClick={() => navigateToDoc(doc)}
+                          className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
+                            filteredResults.length + index === clampedIndex
                               ? "bg-accent-soft"
                               : "hover:bg-surface-hover/50"
                           }`}
                         >
-                          <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-ink-subtle" />
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
-                            {hit.entry.label}
-                          </span>
-                          <span className="shrink-0 font-mono text-[10px] text-ink-faint">
-                            {hit.entry.scope}
-                          </span>
+                          <div
+                            className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{
+                              backgroundColor: doc.projectColor || "#71717a",
+                            }}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <span className="truncate text-sm font-medium text-ink">
+                              {doc.title}
+                            </span>
+                            <p className="mt-0.5 truncate text-xs text-ink-subtle">
+                              {doc.projectName}
+                              <span className="mx-1.5 text-ink-faint">/</span>
+                              {doc.module}
+                            </p>
+                          </div>
                         </button>
-                      );
-                    })}
-                  </>
+                      ))}
+                    </>
+                  )}
+
+                  {/* Settings — three scopes, one search box. Entries are the
+                    static index in @/settings/settings-index, so a tab that
+                    moves does not silently strand its keywords. */}
+                  {settingsHits.length > 0 && (
+                    <>
+                      <div className="border-t border-line px-4 pt-3 pb-1 font-mono text-[10px] tracking-wider text-ink-faint uppercase">
+                        Settings
+                      </div>
+                      {settingsHits.map((hit, index) => {
+                        const navIndex =
+                          filteredResults.length + visibleDocs.length + index;
+                        return (
+                          <button
+                            key={`${hit.entry.scope}-${hit.entry.tab}-${hit.entry.label}`}
+                            data-nav-index={navIndex}
+                            data-testid={`palette-setting-${hit.entry.scope}-${hit.entry.tab}`}
+                            onClick={() => navigateTo(hit.href)}
+                            className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+                              navIndex === clampedIndex
+                                ? "bg-accent-soft"
+                                : "hover:bg-surface-hover/50"
+                            }`}
+                          >
+                            <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-ink-subtle" />
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
+                              {hit.entry.label}
+                            </span>
+                            <span className="shrink-0 font-mono text-[10px] text-ink-faint">
+                              {hit.entry.scope}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+
+                {/* Footer */}
+                {navCount > 0 && (
+                  <div className="flex items-center gap-4 border-t border-line px-4 py-2 text-[10px] text-ink-faint">
+                    <span>
+                      <kbd className="rounded border border-line bg-surface-raised px-1 py-0.5 font-mono">
+                        ↑↓
+                      </kbd>{" "}
+                      navigate
+                    </span>
+                    <span>
+                      <kbd className="rounded border border-line bg-surface-raised px-1 py-0.5 font-mono">
+                        ↵
+                      </kbd>{" "}
+                      open
+                    </span>
+                    <span>
+                      <kbd className="rounded border border-line bg-surface-raised px-1 py-0.5 font-mono">
+                        esc
+                      </kbd>{" "}
+                      close
+                    </span>
+                    <span className="ml-auto text-ink-faint">
+                      {navCount} result{navCount !== 1 ? "s" : ""}
+                    </span>
+                  </div>
                 )}
               </div>
-
-              {/* Footer */}
-              {navCount > 0 && (
-                <div className="flex items-center gap-4 border-t border-line px-4 py-2 text-[10px] text-ink-faint">
-                  <span>
-                    <kbd className="rounded border border-line bg-surface-raised px-1 py-0.5 font-mono">
-                      ↑↓
-                    </kbd>{" "}
-                    navigate
-                  </span>
-                  <span>
-                    <kbd className="rounded border border-line bg-surface-raised px-1 py-0.5 font-mono">
-                      ↵
-                    </kbd>{" "}
-                    open
-                  </span>
-                  <span>
-                    <kbd className="rounded border border-line bg-surface-raised px-1 py-0.5 font-mono">
-                      esc
-                    </kbd>{" "}
-                    close
-                  </span>
-                  <span className="ml-auto text-ink-faint">
-                    {navCount} result{navCount !== 1 ? "s" : ""}
-                  </span>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+            </m.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </LazyMotion>
   );
 }

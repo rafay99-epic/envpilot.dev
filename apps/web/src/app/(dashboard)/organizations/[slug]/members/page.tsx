@@ -163,9 +163,12 @@ function OrganizationMembersPageContent({
   const [inviteError, setInviteError] = useState<string | null>(null);
 
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  // The invite panel renders one checkbox per project and asks each one
+  // whether it is selected, so the lookup happens once per row.
+  const selectedProjectIdSet = new Set(selectedProjectIds);
   // Environment scope for developer invites — all checked = unrestricted.
   const [inviteEnvScope, setInviteEnvScope] =
-    useState<string[]>(allEnvironments());
+    useState<string[]>(allEnvironments);
 
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -1388,7 +1391,7 @@ function OrganizationMembersPageContent({
                     >
                       <input
                         type="checkbox"
-                        checked={selectedProjectIds.includes(project._id)}
+                        checked={selectedProjectIdSet.has(project._id)}
                         onChange={(e) => {
                           if (e.target.checked) {
                             setSelectedProjectIds([

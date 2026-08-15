@@ -62,7 +62,7 @@ export function TerminalDatePicker({
   const selectedDate = value ? parseISO(value) : null;
   const minDate = min ? startOfDay(parseISO(min)) : null;
 
-  const [viewMonth, setViewMonth] = useState<Date>(
+  const [viewMonth, setViewMonth] = useState<Date>(() =>
     startOfMonth(selectedDate ?? new Date())
   );
 

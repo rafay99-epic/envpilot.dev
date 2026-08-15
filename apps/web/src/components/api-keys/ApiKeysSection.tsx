@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import {
@@ -451,59 +451,65 @@ function KeyRow({
       </div>
 
       {!isRevoked && (
-        <AnimatePresence initial={false}>
-          {confirming && (
-            <motion.div
-              key="confirm"
-              // The row expands by interpolating the grid track, not `height`
-              // — animating height forces a full layout pass every frame and
-              // makes Motion measure the element to resolve "auto".
-              initial={{ opacity: 0, gridTemplateRows: "0fr" }}
-              animate={{ opacity: 1, gridTemplateRows: "1fr" }}
-              exit={{ opacity: 0, gridTemplateRows: "0fr" }}
-              transition={{ duration: 0.15 }}
-              className="grid"
-            >
-              <div className="overflow-hidden">
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-danger-line/40 pt-3">
-                  <div className="min-w-0">
-                    <p className="flex items-start gap-2 text-xs text-danger">
-                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      Revoke this key? Anything using it will stop working
-                      immediately.
-                    </p>
-                    {rowError && (
-                      <p className="mt-1 text-xs font-medium text-danger">
-                        {rowError}
+        // `m` + LazyMotion keeps the unused Motion features (drag, layout
+        // projection) out of the bundle; this row only animates opacity and a
+        // grid track, both covered by `domAnimation`.
+        <LazyMotion features={domAnimation}>
+          <AnimatePresence initial={false}>
+            {confirming && (
+              <m.div
+                key="confirm"
+                // The row expands by interpolating the grid track, not
+                // `height` — animating height forces a full layout pass every
+                // frame and makes Motion measure the element to resolve
+                // "auto".
+                initial={{ opacity: 0, gridTemplateRows: "0fr" }}
+                animate={{ opacity: 1, gridTemplateRows: "1fr" }}
+                exit={{ opacity: 0, gridTemplateRows: "0fr" }}
+                transition={{ duration: 0.15 }}
+                className="grid"
+              >
+                <div className="overflow-hidden">
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-danger-line/40 pt-3">
+                    <div className="min-w-0">
+                      <p className="flex items-start gap-2 text-xs text-danger">
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        Revoke this key? Anything using it will stop working
+                        immediately.
                       </p>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <TerminalButton
-                      type="button"
-                      variant="danger"
-                      onClick={handleConfirmRevoke}
-                      disabled={isRevoking}
-                    >
-                      {isRevoking ? "Revoking..." : "Revoke"}
-                    </TerminalButton>
-                    <TerminalButton
-                      type="button"
-                      variant="secondary"
-                      onClick={() => {
-                        setConfirming(false);
-                        setRowError(null);
-                      }}
-                      disabled={isRevoking}
-                    >
-                      Cancel
-                    </TerminalButton>
+                      {rowError && (
+                        <p className="mt-1 text-xs font-medium text-danger">
+                          {rowError}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <TerminalButton
+                        type="button"
+                        variant="danger"
+                        onClick={handleConfirmRevoke}
+                        disabled={isRevoking}
+                      >
+                        {isRevoking ? "Revoking..." : "Revoke"}
+                      </TerminalButton>
+                      <TerminalButton
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          setConfirming(false);
+                          setRowError(null);
+                        }}
+                        disabled={isRevoking}
+                      >
+                        Cancel
+                      </TerminalButton>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </m.div>
+            )}
+          </AnimatePresence>
+        </LazyMotion>
       )}
     </li>
   );
@@ -893,38 +899,40 @@ function CreateKeyDrawer({
                 }`}
               />
             </button>
-            <AnimatePresence initial={false}>
-              {showSnippet && (
-                <motion.div
-                  key="snippet"
-                  // Grid track instead of `height` — see the revoke strip in
-                  // KeyRow for why.
-                  initial={{ gridTemplateRows: "0fr", opacity: 0 }}
-                  animate={{ gridTemplateRows: "1fr", opacity: 1 }}
-                  exit={{ gridTemplateRows: "0fr", opacity: 0 }}
-                  transition={{ duration: 0.2, ease: "easeInOut" }}
-                  className="grid"
-                >
-                  <div className="overflow-hidden">
-                    <pre className="mt-2 overflow-x-auto rounded-panel bg-canvas px-3 py-3 text-xs text-ink-muted">
-                      {`curl -H "Authorization: Bearer $ENVPILOT_API_KEY" \\
+            <LazyMotion features={domAnimation}>
+              <AnimatePresence initial={false}>
+                {showSnippet && (
+                  <m.div
+                    key="snippet"
+                    // Grid track instead of `height` — see the revoke strip in
+                    // KeyRow for why.
+                    initial={{ gridTemplateRows: "0fr", opacity: 0 }}
+                    animate={{ gridTemplateRows: "1fr", opacity: 1 }}
+                    exit={{ gridTemplateRows: "0fr", opacity: 0 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    className="grid"
+                  >
+                    <div className="overflow-hidden">
+                      <pre className="mt-2 overflow-x-auto rounded-panel bg-canvas px-3 py-3 text-xs text-ink-muted">
+                        {`curl -H "Authorization: Bearer $ENVPILOT_API_KEY" \\
   "https://www.envpilot.dev/api/v1/projects/{slug}/variables?environment=production"`}
-                    </pre>
-                    <p className="mt-1 text-xs text-ink-subtle">
-                      Store the key as the{" "}
-                      <code className="rounded bg-surface-raised px-1 py-0.5">
-                        ENVPILOT_API_KEY
-                      </code>{" "}
-                      environment variable, and replace{" "}
-                      <code className="rounded bg-surface-raised px-1 py-0.5">
-                        {"{slug}"}
-                      </code>{" "}
-                      with your project&apos;s slug.
-                    </p>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                      </pre>
+                      <p className="mt-1 text-xs text-ink-subtle">
+                        Store the key as the{" "}
+                        <code className="rounded bg-surface-raised px-1 py-0.5">
+                          ENVPILOT_API_KEY
+                        </code>{" "}
+                        environment variable, and replace{" "}
+                        <code className="rounded bg-surface-raised px-1 py-0.5">
+                          {"{slug}"}
+                        </code>{" "}
+                        with your project&apos;s slug.
+                      </p>
+                    </div>
+                  </m.div>
+                )}
+              </AnimatePresence>
+            </LazyMotion>
           </div>
 
           <div className="flex justify-end">
