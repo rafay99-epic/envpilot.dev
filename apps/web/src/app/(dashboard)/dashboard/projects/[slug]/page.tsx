@@ -40,6 +40,7 @@ import {
 } from "@/components/variables";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
+import { useIsMacPlatform } from "@/hooks/useIsMacPlatform";
 import { ApiError } from "@/lib/api-client";
 import { createLogger } from "@/lib/logger";
 // Variable CRUD mutations MUST stay as API routes (WorkOS Vault integration)
@@ -255,14 +256,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   );
   const [revealingIds, setRevealingIds] = useState<Set<string>>(new Set());
 
-  // Resolved post-hydration only: `navigator` is undefined during SSR, so
-  // branching on it inline guarantees a server/client hydration mismatch on
-  // every Mac client. Server and first client render both show the
-  // Windows/Linux label; Macs update right after mount.
-  const [isMacPlatform, setIsMacPlatform] = useState(false);
-  useEffect(() => {
-    setIsMacPlatform(/Mac/.test(navigator.userAgent));
-  }, []);
+  // Server render and hydration both read the Ctrl label, then React swaps in
+  // the real platform as part of the hydration commit. An effect would do the
+  // same swap one paint later, which every Mac user would see.
+  const isMacPlatform = useIsMacPlatform();
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0 || !projectId) return;
