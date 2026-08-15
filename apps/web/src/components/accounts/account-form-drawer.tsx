@@ -113,7 +113,9 @@ function AccountForm({
   );
 
   const [showPassword, setShowPassword] = useState(false);
-  const [credentialsDirty, setCredentialsDirty] = useState(false);
+  // Read only by submit, never by render, so a ref avoids a render on the first
+  // credential keystroke.
+  const credentialsDirty = useRef(false);
   // The prefill starts with the mount, so the fields read as loading on the
   // first frame instead of flashing as editable and then locking.
   const [isPrefilling, setIsPrefilling] = useState(
@@ -186,7 +188,7 @@ function AccountForm({
     }
 
     // Credentials are required on create; on edit they only matter when changed.
-    const credentialsChanged = !isEditing || credentialsDirty;
+    const credentialsChanged = !isEditing || credentialsDirty.current;
     if (credentialsChanged) {
       if (!username.trim() || !password.trim()) {
         setError(
@@ -272,7 +274,7 @@ function AccountForm({
           value={username}
           onChange={(e) => {
             setUsername(e.target.value);
-            setCredentialsDirty(true);
+            credentialsDirty.current = true;
           }}
           disabled={isPrefilling}
           placeholder={isPrefilling ? "Loading…" : "user@example.com"}
@@ -295,7 +297,7 @@ function AccountForm({
             value={password}
             onChange={(e) => {
               setPassword(e.target.value);
-              setCredentialsDirty(true);
+              credentialsDirty.current = true;
             }}
             disabled={isPrefilling}
             placeholder={isPrefilling ? "Loading…" : "••••••••"}

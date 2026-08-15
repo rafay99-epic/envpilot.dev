@@ -138,7 +138,7 @@ export default function OrganizationPage({
         {isTeamLeadPlus && (
           <Link
             href={`/organizations/${slug}/members`}
-            className="group flex items-center gap-4 rounded-xl border p-6 transition-all hover:shadow-md border-line bg-surface hover:border-line"
+            className="group flex items-center gap-4 rounded-xl border p-6 transition-shadow hover:shadow-md border-line bg-surface hover:border-line"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-info-soft text-info">
               <svg
@@ -180,7 +180,7 @@ export default function OrganizationPage({
         {isOwner && (
           <Link
             href={`/organizations/${slug}/settings`}
-            className="group flex items-center gap-4 rounded-xl border p-6 transition-all hover:shadow-md border-line bg-surface hover:border-line"
+            className="group flex items-center gap-4 rounded-xl border p-6 transition-shadow hover:shadow-md border-line bg-surface hover:border-line"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-surface-raised text-ink-muted">
               <svg
@@ -230,7 +230,7 @@ export default function OrganizationPage({
             router.push("/dashboard/projects");
             router.refresh();
           }}
-          className="group flex items-center gap-4 rounded-xl border p-6 text-left transition-all hover:shadow-md border-line bg-surface hover:border-line"
+          className="group flex items-center gap-4 rounded-xl border p-6 text-left transition-shadow hover:shadow-md border-line bg-surface hover:border-line"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-accent-soft text-accent">
             <svg

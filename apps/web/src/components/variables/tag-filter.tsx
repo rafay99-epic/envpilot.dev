@@ -19,6 +19,8 @@ export function TagFilter({
   if (tags.length === 0) return null;
 
   const hasSelection = selectedTagIds.length > 0;
+  // Built once, probed O(1) per chip: both lists grow with the tag registry.
+  const selectedIds = new Set(selectedTagIds);
 
   return (
     <>
@@ -36,7 +38,7 @@ export function TagFilter({
           All
         </button>
         {tags.map((tag) => {
-          const isSelected = selectedTagIds.includes(tag._id);
+          const isSelected = selectedIds.has(tag._id);
           const safeColor = /^#[0-9a-fA-F]{6}$/.test(tag.color)
             ? tag.color
             : "#6b7280";

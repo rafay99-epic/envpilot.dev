@@ -48,7 +48,6 @@ export default function ShareViewerPage() {
   const token = params.token;
 
   const [step, setStep] = useState<ViewerStep>("email");
-  const [clientKey, setClientKey] = useState<Uint8Array | null>(null);
   const [email, setEmail] = useState("");
   const [maskedEmail, setMaskedEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -67,6 +66,9 @@ export default function ShareViewerPage() {
 
   // Store encrypted payload in memory only (not sessionStorage) to prevent XSS exposure
   const encryptedPayloadRef = useRef<string | null>(null);
+  // The URL-hash key is only ever read by the verify/decrypt handlers, never
+  // during render, so it lives in a ref and its arrival costs no render.
+  const clientKeyRef = useRef<Uint8Array | null>(null);
   // The viewer is a linear flow, so at most one mutating request is ever
   // legitimate at a time. A ref closes the double-submit window that
   // `isPending` leaves open, since that flag only flips on the next render.
@@ -91,7 +93,7 @@ export default function ShareViewerPage() {
       if (key.length !== 32) {
         throw new Error("Invalid key length");
       }
-      setClientKey(key);
+      clientKeyRef.current = key;
     } catch (error) {
       log.warn("share_key_invalid", {
         token,
@@ -145,6 +147,7 @@ export default function ShareViewerPage() {
 
   const handleVerifyOtp = async () => {
     if (otp.length !== 6) return;
+    const clientKey = clientKeyRef.current;
     if (!clientKey) return;
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -215,6 +218,7 @@ export default function ShareViewerPage() {
   };
 
   const handleDecryptWithPassphrase = async () => {
+    const clientKey = clientKeyRef.current;
     if (!passphrase || !clientKey) return;
 
     try {
