@@ -14,6 +14,14 @@ const blogUrl = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.envpilot.dev";
 const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.envpilot.dev";
 
 const nextConfig: NextConfig = {
+  // `next build` and `next dev` share this directory, including its
+  // `node_modules` symlink farm. A build run while the dev server is up
+  // rewrites that farm underneath it, and the dev server then fails to
+  // resolve packages from the wrong base directory ("resolve 'tailwindcss'
+  // in .../apps"). Set NEXT_DIST_DIR to verify a build without touching a
+  // running dev server. Unset everywhere else, so CI and Vercel are
+  // unaffected.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   reactCompiler: true,
   transpilePackages: ["@envpilot/ui"],
   env: {

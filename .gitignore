@@ -4,6 +4,9 @@ node_modules/
 # build outputs
 dist/
 .next/
+# Scratch build dirs from NEXT_DIST_DIR, used to verify a build without
+# clobbering a running dev server's .next
+.next-*/
 out/
 build/
 
