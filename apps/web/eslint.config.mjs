@@ -37,7 +37,16 @@ const eslintConfig = defineConfig([
       ],
     },
   },
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+  // `.next-*` covers the scratch dirs NEXT_DIST_DIR writes to. ESLint does
+  // not read .gitignore, so without this a verification build leaves tens of
+  // thousands of lint errors in generated output.
+  globalIgnores([
+    ".next/**",
+    ".next-*/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
 ]);
 
 export default eslintConfig;
