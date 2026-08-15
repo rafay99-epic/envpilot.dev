@@ -115,6 +115,13 @@ export function VariableHistory({
 
   const compareVersions = getCompareVersions();
 
+  // Built once per render and probed per row, rather than rescanned inside
+  // each loop. `filteredHistory` grows with the variable's history, and each
+  // row asks about the selection twice.
+  const selectedVersionSet = new Set(selectedVersions);
+  const olderEnvironmentSet = new Set(compareVersions?.older.environments);
+  const newerEnvironmentSet = new Set(compareVersions?.newer.environments);
+
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
@@ -212,7 +219,7 @@ export function VariableHistory({
                       <span
                         key={env}
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          !compareVersions.newer.environments.includes(env)
+                          !newerEnvironmentSet.has(env)
                             ? "bg-danger-soft text-danger"
                             : "bg-surface-hover text-ink-muted"
                         }`}
@@ -244,7 +251,7 @@ export function VariableHistory({
                       <span
                         key={env}
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          !compareVersions.older.environments.includes(env)
+                          !olderEnvironmentSet.has(env)
                             ? "bg-accent-soft text-accent"
                             : "bg-surface-hover text-ink-muted"
                         }`}
@@ -330,7 +337,7 @@ export function VariableHistory({
               <div
                 key={record._id}
                 className={`flex items-start justify-between py-4 transition-colors ${
-                  compareMode && selectedVersions.includes(record.version)
+                  compareMode && selectedVersionSet.has(record.version)
                     ? "bg-info-soft"
                     : ""
                 }`}
@@ -344,7 +351,7 @@ export function VariableHistory({
                       disabled={!compareMode}
                       className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
                         compareMode
-                          ? selectedVersions.includes(record.version)
+                          ? selectedVersionSet.has(record.version)
                             ? "bg-info text-white ring-2 ring-info-line"
                             : "bg-surface-raised text-ink-muted hover:bg-info-soft hover:text-info"
                           : "bg-surface-raised text-ink-muted"

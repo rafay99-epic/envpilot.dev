@@ -286,6 +286,9 @@ export function IntegrationsSection({
 
   const [editingId, setEditingId] = useState<Id<"orgWebhooks"> | null>(null);
   const [editGroups, setEditGroups] = useState<EventGroup[]>([]);
+  // Built once per render and probed once per event-group checkbox, rather
+  // than rescanned inside the loop that renders them.
+  const editGroupSet = new Set(editGroups);
   const [editAllProjects, setEditAllProjects] = useState(true);
   const [editProjectIds, setEditProjectIds] = useState<Id<"projects">[]>([]);
   const [savingId, setSavingId] = useState<Id<"orgWebhooks"> | null>(null);
@@ -784,7 +787,7 @@ export function IntegrationsSection({
                               >
                                 <input
                                   type="checkbox"
-                                  checked={editGroups.includes(group.key)}
+                                  checked={editGroupSet.has(group.key)}
                                   onChange={() =>
                                     setEditGroups((current) =>
                                       toggleGroup(current, group.key)
