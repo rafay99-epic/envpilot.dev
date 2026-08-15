@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -33,6 +33,8 @@ import {
   useDeleteDoc,
 } from "@/hooks";
 import { sanitizeConvexError } from "@/lib/error-messages";
+import { formatDate } from "@/lib/format";
+import { useTimeZone } from "@/hooks/useTimeZone";
 
 // Read mode is the common case and is the only one that renders markdown;
 // the module index never loads this chunk at all.
@@ -54,7 +56,16 @@ interface DocPageProps {
  */
 export default function DocDetailPage({ params }: DocPageProps) {
   const { slug, docSlug } = use(params);
+  // Everything below is per-page state — the editor draft, the notice, the
+  // open share drawer. Keying on the slug restarts it when another page is
+  // opened, which the App Router does not do on its own because the route
+  // stays the same.
+  return <DocDetailView key={docSlug} slug={slug} docSlug={docSlug} />;
+}
+
+function DocDetailView({ slug, docSlug }: { slug: string; docSlug: string }) {
   const router = useRouter();
+  const timeZone = useTimeZone();
   const { organization } = useAuthContext();
   const orgId = organization?.id as Id<"organizations"> | undefined;
 
@@ -89,17 +100,6 @@ export default function DocDetailPage({ params }: DocPageProps) {
     docAccess?.canShare === true ||
     docAccess?.canShareExternal === true ||
     docAccess?.externalUpgradeRequired === true;
-
-  // Seed the editor when a different page loads. Guarded on docSlug rather
-  // than the doc object so a live update from another tab cannot overwrite
-  // what the user is currently typing.
-  useEffect(() => {
-    setIsEditing(false);
-    setWarnings([]);
-    setError(null);
-    setNotice(null);
-    setShareOpen(false);
-  }, [docSlug]);
 
   const beginEdit = () => {
     if (!doc) return;
@@ -260,7 +260,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
                   <span aria-hidden>·</span>
                   <span>{doc.authorName}</span>
                   <span aria-hidden>·</span>
-                  <span>{new Date(doc.updatedAt).toLocaleDateString()}</span>
+                  <span>{formatDate(doc.updatedAt, timeZone)}</span>
                   {doc.prUrl && (
                     <>
                       <span aria-hidden>·</span>

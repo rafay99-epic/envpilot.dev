@@ -12,6 +12,15 @@ import {
   sanitizeConvexError,
 } from "@/lib/error-messages";
 
+function generateSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 50);
+}
+
 export default function NewOrganizationPage() {
   const router = useRouter();
   const createOrganization = useCreateOrganization();
@@ -22,15 +31,6 @@ export default function NewOrganizationPage() {
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
-
-  function generateSlug(value: string): string {
-    return value
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .slice(0, 50);
-  }
 
   function handleNameChange(value: string) {
     setName(value);

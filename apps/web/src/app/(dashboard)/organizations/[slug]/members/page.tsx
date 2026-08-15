@@ -39,6 +39,8 @@ import {
   type OrgRole,
 } from "@/lib/roles";
 import { createLogger } from "@/lib/logger";
+import { formatDate } from "@/lib/format";
+import { useTimeZone } from "@/hooks/useTimeZone";
 
 const log = createLogger("app/dashboard/organization-members");
 
@@ -69,6 +71,7 @@ function OrganizationMembersPageContent({
   const { slug } = use(params);
   const { user } = useAuthContext();
   const { convexUserId } = useConvexUser(user?.id);
+  const timeZone = useTimeZone();
 
   // ---------------------------------------------------------------------------
   // Convex queries — real-time via WebSocket, no fetch() round-trip
@@ -153,6 +156,10 @@ function OrganizationMembersPageContent({
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<OrgRole>("developer");
   const [isInviting, setIsInviting] = useState(false);
+  // Re-entry guard for the submit handler. `isInviting` disables the button,
+  // but only from the next render, so a second submit in the same tick still
+  // reads the stale `false` and sends a duplicate invitation.
+  const invitingRef = useRef(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
@@ -237,6 +244,8 @@ function OrganizationMembersPageContent({
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
+    if (invitingRef.current) return;
+    invitingRef.current = true;
     setIsInviting(true);
     setInviteError(null);
 
@@ -294,6 +303,7 @@ function OrganizationMembersPageContent({
       );
       setInviteError(err instanceof Error ? err.message : "An error occurred");
     } finally {
+      invitingRef.current = false;
       setIsInviting(false);
     }
   }
@@ -492,15 +502,19 @@ function OrganizationMembersPageContent({
       );
       setTimeout(() => setNotice(null), 5000);
 
-      // Refresh the sessions list without closing the panel
+      // Refresh the sessions list without closing the panel. Its own
+      // try/finally: a failed refresh must not leave the list spinning.
       setIsLoadingSessions(true);
-      const refreshRes = await fetch(
-        `/api/organizations/${slug}/members/${userId}/sessions`
-      );
-      if (refreshRes.ok) {
-        setMemberSessions(await refreshRes.json());
+      try {
+        const refreshRes = await fetch(
+          `/api/organizations/${slug}/members/${userId}/sessions`
+        );
+        if (refreshRes.ok) {
+          setMemberSessions(await refreshRes.json());
+        }
+      } finally {
+        setIsLoadingSessions(false);
       }
-      setIsLoadingSessions(false);
     } catch (err) {
       log.error(
         "member_session_revoke_failed",
@@ -937,11 +951,9 @@ function OrganizationMembersPageContent({
                                     </p>
                                     <p className="text-xs text-ink-muted">
                                       Created{" "}
-                                      {new Date(
-                                        token.createdAt
-                                      ).toLocaleDateString()}
+                                      {formatDate(token.createdAt, timeZone)}
                                       {token.lastUsedAt &&
-                                        ` · Last used ${new Date(token.lastUsedAt).toLocaleDateString()}`}
+                                        ` · Last used ${formatDate(token.lastUsedAt, timeZone)}`}
                                       {" · "}
                                       <span className="font-mono">
                                         {token.tokenPreview}
@@ -1011,11 +1023,9 @@ function OrganizationMembersPageContent({
                                     </p>
                                     <p className="text-xs text-ink-muted">
                                       {session.deviceName} · Linked{" "}
-                                      {new Date(
-                                        session.createdAt
-                                      ).toLocaleDateString()}
+                                      {formatDate(session.createdAt, timeZone)}
                                       {session.lastUsedAt &&
-                                        ` · Last used ${new Date(session.lastUsedAt).toLocaleDateString()}`}
+                                        ` · Last used ${formatDate(session.lastUsedAt, timeZone)}`}
                                     </p>
                                   </div>
                                 </div>
@@ -1124,10 +1134,8 @@ function OrganizationMembersPageContent({
                   <div>
                     <p className="font-medium text-ink">{invitation.email}</p>
                     <p className="text-sm text-ink-muted">
-                      Invited{" "}
-                      {new Date(invitation.createdAt).toLocaleDateString()} ·
-                      Expires{" "}
-                      {new Date(invitation.expiresAt).toLocaleDateString()}
+                      Invited {formatDate(invitation.createdAt, timeZone)} ·
+                      Expires {formatDate(invitation.expiresAt, timeZone)}
                     </p>
                   </div>
                 </div>

@@ -69,6 +69,19 @@ function providerName(provider: Provider): string {
   return provider === "slack" ? "Slack" : "Discord";
 }
 
+const toggleGroup = (groups: EventGroup[], key: EventGroup): EventGroup[] =>
+  groups.includes(key)
+    ? groups.filter((group) => group !== key)
+    : [...groups, key];
+
+const toggleProject = (
+  projectsInScope: Id<"projects">[],
+  projectId: Id<"projects">
+): Id<"projects">[] =>
+  projectsInScope.includes(projectId)
+    ? projectsInScope.filter((id) => id !== projectId)
+    : [...projectsInScope, projectId];
+
 function relativeTime(timestamp: number): string {
   const minutes = Math.round((Date.now() - timestamp) / 60_000);
   if (minutes < 1) return "just now";
@@ -280,19 +293,6 @@ export function IntegrationsSection({
   const [removingId, setRemovingId] = useState<Id<"orgWebhooks"> | null>(null);
   const [testingId, setTestingId] = useState<Id<"orgWebhooks"> | null>(null);
   const [togglingId, setTogglingId] = useState<Id<"orgWebhooks"> | null>(null);
-
-  const toggleGroup = (groups: EventGroup[], key: EventGroup): EventGroup[] =>
-    groups.includes(key)
-      ? groups.filter((group) => group !== key)
-      : [...groups, key];
-
-  const toggleProject = (
-    projectsInScope: Id<"projects">[],
-    projectId: Id<"projects">
-  ): Id<"projects">[] =>
-    projectsInScope.includes(projectId)
-      ? projectsInScope.filter((id) => id !== projectId)
-      : [...projectsInScope, projectId];
 
   const startConnect = async (provider: Provider) => {
     setConnectingProvider(provider);
@@ -919,6 +919,8 @@ function ProjectChecklist({
   if (projects.length === 0) {
     return <p className="mt-3 text-xs text-ink-subtle">No active projects.</p>;
   }
+  // Every row asks about the selection twice, so scan the list once.
+  const selectedIds = new Set(selected);
   return (
     <div className="mt-3 max-h-40 space-y-2 overflow-y-auto pr-2">
       {projects.map((project) => (
@@ -928,12 +930,12 @@ function ProjectChecklist({
         >
           <input
             type="checkbox"
-            checked={selected.includes(project._id)}
+            checked={selectedIds.has(project._id)}
             onChange={() => onToggle(project._id)}
             className="accent-accent"
           />
           <span className="truncate">{project.name}</span>
-          {selected.includes(project._id) && (
+          {selectedIds.has(project._id) && (
             <Check className="ml-auto h-3.5 w-3.5 text-accent" />
           )}
         </label>
