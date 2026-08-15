@@ -33,3 +33,22 @@ predicate is about the detector, not the route: the effect does return a
 cleanup that removes every listener and disconnects the ResizeObserver, but
 the add and remove calls sit inside a `for (const el of [pane, preview])`
 loop that the detector cannot pair.
+
+## `exhaustive-deps` — `apps/web/src/components/command-palette/command-palette.tsx`
+
+**Predicate:** the finding's stated reason is that `openPalette` "is rebuilt
+every render, so useEffect runs every time." This app sets
+`reactCompiler: true`, and the component is compiler-managed, so the compiler
+caches the function declaration and the identity is stable. The dependency is
+already listed; the effect does not re-subscribe per render.
+
+The obvious remedy is worse than the finding: wrapping `openPalette` in
+`useCallback` is exactly the manual memoization that
+`preserve-manual-memoization` flags as an error elsewhere in this codebase,
+and CLAUDE.md rules it out because React Compiler is enabled.
+
+**Invalidated if:** React Compiler is disabled for this app, or the component
+starts bailing out again (any `try` with a finalizer, or without a `catch`,
+anywhere in its body). Re-check with the CI scan, not a local one: the local
+scan does not load the `react-hooks-js` plugin that reports compiler
+bailouts.

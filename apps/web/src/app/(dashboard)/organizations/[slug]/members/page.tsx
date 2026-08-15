@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use, useCallback, useRef } from "react";
+import { useState, use, useRef } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -395,35 +395,35 @@ function OrganizationMembersPageContent({
     });
   }
 
-  const searchUsers = useCallback(
-    async (query: string) => {
-      if (query.length < 2) {
-        setSearchResults([]);
-        setShowSearchResults(false);
-        return;
-      }
+  // Called straight from the input's change handler, never from a dependency
+  // array, so there is nothing for a useCallback to stabilise. React Compiler
+  // caches it anyway.
+  async function searchUsers(query: string) {
+    if (query.length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
 
-      setIsSearching(true);
-      try {
-        const response = await fetch(
-          `/api/users/search?q=${encodeURIComponent(query)}&organizationId=${orgId}&limit=5`
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setSearchResults(data.users || []);
-          setShowSearchResults(true);
-        }
-      } catch (err) {
-        log.error(
-          "member_search_failed",
-          { slug, organizationId: orgId, query },
-          err
-        );
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `/api/users/search?q=${encodeURIComponent(query)}&organizationId=${orgId}&limit=5`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data.users || []);
+        setShowSearchResults(true);
       }
-      setIsSearching(false);
-    },
-    [slug, orgId]
-  );
+    } catch (err) {
+      log.error(
+        "member_search_failed",
+        { slug, organizationId: orgId, query },
+        err
+      );
+    }
+    setIsSearching(false);
+  }
 
   function handleEmailChange(value: string) {
     setInviteEmail(value);
