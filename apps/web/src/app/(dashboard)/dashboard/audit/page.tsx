@@ -267,9 +267,11 @@ function AuditPageContent() {
         { organizationId: activeOrganizationId, format: params.format },
         err
       );
-    } finally {
-      setIsExporting(false);
     }
+    // Cleared after the try/catch rather than in a finally block: the catch
+    // swallows, so this runs on both paths, and React Compiler bails on any
+    // function containing a try statement with a finalizer.
+    setIsExporting(false);
   };
 
   return (

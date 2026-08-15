@@ -62,9 +62,11 @@ export function TagSelector({
       setShowCreate(false);
     } catch {
       // Error handled by parent
-    } finally {
-      setIsCreating(false);
     }
+    // Not a finally block: the catch above swallows, so this runs on both
+    // paths anyway, and React Compiler bails on any function containing a
+    // try statement with a finalizer.
+    setIsCreating(false);
   };
 
   return (

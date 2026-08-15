@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useId, useRef, useMemo } from "react";
+import { useState, useEffect, useId, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
 import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
@@ -67,7 +67,7 @@ export function CommandPalette() {
   const visibleDocs = searchTerm.trim().length >= 2 ? docResults : [];
 
   // Collect unique tags from results for tag filter chips
-  const availableTags = useMemo(() => {
+  const availableTags = (() => {
     const tagMap = new Map<
       string,
       { _id: string; name: string; color: string }
@@ -82,17 +82,15 @@ export function CommandPalette() {
     return Array.from(tagMap.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     );
-  }, [results]);
+  })();
 
-  // Prune stale tag IDs from filter — computed inline to avoid setState-in-effect
-  const availableTagIds = useMemo(
-    () => new Set(availableTags.map((t) => t._id)),
-    [availableTags]
-  );
+  // Stale tag IDs are pruned in render rather than by an effect. React
+  // Compiler caches both, so useMemo here would only restate what it already
+  // does.
+  const availableTagIds = new Set(availableTags.map((t) => t._id));
   // A Set, not an array: it is probed once per result AND once per chip.
-  const activeTagFilter = useMemo(
-    () => new Set(tagFilter.filter((id) => availableTagIds.has(id))),
-    [tagFilter, availableTagIds]
+  const activeTagFilter = new Set(
+    tagFilter.filter((id) => availableTagIds.has(id))
   );
 
   // Gated on the CURRENT term for the same reason `visibleDocs` is: the
@@ -125,14 +123,10 @@ export function CommandPalette() {
   // is the create form, so its "settings" would be a dead link.
   const pathSlug = pathname?.match(/^\/dashboard\/projects\/([^/]+)/)?.[1];
   const projectSlug = pathSlug && pathSlug !== "new" ? pathSlug : null;
-  const settingsHits = useMemo(
-    () =>
-      searchSettings(searchTerm, {
-        orgSlug: organization?.slug ?? null,
-        projectSlug,
-      }),
-    [searchTerm, organization?.slug, projectSlug]
-  );
+  const settingsHits = searchSettings(searchTerm, {
+    orgSlug: organization?.slug ?? null,
+    projectSlug,
+  });
 
   // ONE navigable list — variables, then docs, then settings. Every row
   // carries its own nav index, so adding a group never re-opens the

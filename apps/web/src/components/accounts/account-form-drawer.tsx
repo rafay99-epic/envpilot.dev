@@ -50,13 +50,12 @@ export function AccountFormDrawer({
   // stays out here with the panel it locks.
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (data: AccountFormData) => {
+  // Promise.finally rather than a finally block: React Compiler cannot lower
+  // a try statement with a finalizer, and it bails on the whole component
+  // when it hits one, so the component loses automatic memoization.
+  const handleSubmit = (data: AccountFormData) => {
     setIsSubmitting(true);
-    try {
-      await onSubmit(data);
-    } finally {
-      setIsSubmitting(false);
-    }
+    return onSubmit(data).finally(() => setIsSubmitting(false));
   };
 
   return (

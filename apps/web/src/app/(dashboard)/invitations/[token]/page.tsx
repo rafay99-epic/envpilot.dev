@@ -72,9 +72,11 @@ export default function InvitationAcceptPage({
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        if (!cancelled) setIsLoading(false);
       }
+      // Not a finally block: the catch swallows, so this runs on both paths,
+      // and React Compiler bails on any function containing a try statement
+      // with a finalizer.
+      if (!cancelled) setIsLoading(false);
     }
 
     fetchInvitation();

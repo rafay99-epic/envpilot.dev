@@ -269,27 +269,29 @@ function OrganizationMembersPageContent({
 
       const data = await response.json();
 
+      // Falls through rather than returning early: the guard and the
+      // submitting flag are released after this try/catch, and an early
+      // return would skip both and leave the form permanently disabled.
       if (!response.ok) {
-        if (data.code === "TIER_LIMIT_REACHED") {
-          setInviteError(
-            "Team member limit reached. Upgrade to Pro for unlimited team members."
-          );
-          return;
+        if (data.code !== "TIER_LIMIT_REACHED") {
+          throw new Error(data.error || "Failed to send invitation");
         }
-        throw new Error(data.error || "Failed to send invitation");
-      }
-
-      resetInviteForm();
-
-      if (data.emailSent) {
-        setNotice("Invitation sent successfully! Email delivered.");
-      } else {
-        setNotice(
-          `Invitation created, but email could not be sent${data.emailError ? `: ${data.emailError}` : ""}. Share the invitation link manually.`
+        setInviteError(
+          "Team member limit reached. Upgrade to Pro for unlimited team members."
         );
+      } else {
+        resetInviteForm();
+
+        if (data.emailSent) {
+          setNotice("Invitation sent successfully! Email delivered.");
+        } else {
+          setNotice(
+            `Invitation created, but email could not be sent${data.emailError ? `: ${data.emailError}` : ""}. Share the invitation link manually.`
+          );
+        }
+        setTimeout(() => setNotice(null), 8000);
+        // No manual refetch — Convex reactivity updates invitations query automatically
       }
-      setTimeout(() => setNotice(null), 8000);
-      // No manual refetch — Convex reactivity updates invitations query automatically
     } catch (err) {
       log.error(
         "organization_invite_failed",
@@ -302,10 +304,12 @@ function OrganizationMembersPageContent({
         err
       );
       setInviteError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      invitingRef.current = false;
-      setIsInviting(false);
     }
+    // Released after the try/catch rather than in a finally block: the catch
+    // swallows, so this runs on both paths, and React Compiler bails on any
+    // function containing a try statement with a finalizer.
+    invitingRef.current = false;
+    setIsInviting(false);
   }
 
   async function handleRoleChange(userId: string, newRole: OrgRole) {
@@ -415,9 +419,8 @@ function OrganizationMembersPageContent({
           { slug, organizationId: orgId, query },
           err
         );
-      } finally {
-        setIsSearching(false);
       }
+      setIsSearching(false);
     },
     [slug, orgId]
   );
@@ -469,9 +472,8 @@ function OrganizationMembersPageContent({
         err
       );
       setError(err instanceof Error ? err.message : "Failed to fetch sessions");
-    } finally {
-      setIsLoadingSessions(false);
     }
+    setIsLoadingSessions(false);
   }
 
   async function handleRevokeSession(
@@ -502,8 +504,9 @@ function OrganizationMembersPageContent({
       );
       setTimeout(() => setNotice(null), 5000);
 
-      // Refresh the sessions list without closing the panel. Its own
-      // try/finally: a failed refresh must not leave the list spinning.
+      // Refresh the sessions list without closing the panel. Its own catch:
+      // the revoke already succeeded, so a failed refresh must neither leave
+      // the list spinning nor report the revoke as failed.
       setIsLoadingSessions(true);
       try {
         const refreshRes = await fetch(
@@ -512,9 +515,14 @@ function OrganizationMembersPageContent({
         if (refreshRes.ok) {
           setMemberSessions(await refreshRes.json());
         }
-      } finally {
-        setIsLoadingSessions(false);
+      } catch (refreshErr) {
+        log.error(
+          "member_sessions_refresh_failed",
+          { slug, userId, organizationId: orgId },
+          refreshErr
+        );
       }
+      setIsLoadingSessions(false);
     } catch (err) {
       log.error(
         "member_session_revoke_failed",
@@ -522,9 +530,8 @@ function OrganizationMembersPageContent({
         err
       );
       setError(err instanceof Error ? err.message : "Failed to revoke session");
-    } finally {
-      setIsRevokingSession(false);
     }
+    setIsRevokingSession(false);
   }
 
   function handleCancelInvitation(invitationId: string) {

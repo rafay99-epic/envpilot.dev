@@ -136,9 +136,11 @@ export default function ShareViewerPage() {
       setErrorMessage(
         err instanceof Error ? err.message : "Failed to verify email"
       );
-    } finally {
-      submittingRef.current = false;
     }
+    // Released after the try/catch rather than in a finally block. The catch
+    // swallows, so this runs on both paths, and React Compiler bails on any
+    // function containing a try statement with a finalizer.
+    submittingRef.current = false;
   };
 
   const handleVerifyOtp = async () => {
@@ -206,9 +208,10 @@ export default function ShareViewerPage() {
         });
         setErrorMessage(message);
       }
-    } finally {
-      submittingRef.current = false;
     }
+    // Released after the try/catch, not in a finally block. See
+    // handleVerifyEmail.
+    submittingRef.current = false;
   };
 
   const handleDecryptWithPassphrase = async () => {
@@ -254,9 +257,10 @@ export default function ShareViewerPage() {
       setErrorMessage(
         err instanceof Error ? err.message : "Failed to resend code"
       );
-    } finally {
-      submittingRef.current = false;
     }
+    // Released after the try/catch, not in a finally block. See
+    // handleVerifyEmail.
+    submittingRef.current = false;
   };
 
   const handleCopy = async () => {
