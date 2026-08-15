@@ -4,6 +4,7 @@ import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { PricingData } from "@/components/pricing/PricingContent";
 import { FAQ_ITEMS } from "@/components/landing/faq-data";
+import { jsonLdScript } from "@/lib/json-ld";
 
 export const revalidate = 300; // refresh pricing data every 5 minutes
 
@@ -64,11 +65,11 @@ export default async function HomePage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(softwareAppSchema) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(faqSchema) }}
       />
       <LandingPage
         pricingData={pricingData}

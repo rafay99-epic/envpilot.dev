@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { MarketingShell, PageHero, terminal } from "@/components/marketing";
 import { ScrollSpySidebar } from "@/components/ui/ScrollSpySidebar";
 import { FAQAccordion } from "@/components/faq/FAQAccordion";
+import { jsonLdScript } from "@/lib/json-ld";
 
 export const metadata: Metadata = {
   title: "FAQ | Envpilot",
@@ -214,7 +215,7 @@ export default function FAQPage() {
     <MarketingShell>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(faqSchema) }}
       />
       <PageHero
         eyebrow="faq"
