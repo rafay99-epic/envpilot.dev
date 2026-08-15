@@ -61,11 +61,13 @@ export default function OrganizationsPage() {
         }
       : "skip"
   );
-  const proOrgIds = new Set(
-    organizations
-      .filter((o, i) => orgTiers?.[i]?.tierName === "pro")
-      .map((o) => o._id)
-  );
+  // One pass straight into the Set. The chain built a filtered array and a
+  // mapped array on the way, and `orgTiers` is index-aligned with
+  // `organizations`, so the index has to survive either way.
+  const proOrgIds = new Set<string>();
+  for (const [i, o] of organizations.entries()) {
+    if (orgTiers?.[i]?.tierName === "pro") proOrgIds.add(o._id);
+  }
 
   // Check if org creation is blocked based on tier limits.
   const ownedOrgs = organizations.filter(

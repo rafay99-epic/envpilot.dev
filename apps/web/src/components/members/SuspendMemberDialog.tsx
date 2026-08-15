@@ -61,9 +61,14 @@ export function SuspendMemberDialog({
   async function handleSuspend() {
     setSubmitting(true);
     try {
-      const revokeCredentials = (credentials ?? [])
-        .filter((c) => selectedCreds.has(c.id))
-        .map((c) => ({ type: c.type, id: c.id }));
+      // One pass: the chain built a filtered array of full credential rows
+      // before narrowing each to the two fields the request sends.
+      const revokeCredentials: { type: string; id: string }[] = [];
+      for (const c of credentials ?? []) {
+        if (selectedCreds.has(c.id)) {
+          revokeCredentials.push({ type: c.type, id: c.id });
+        }
+      }
 
       const response = await fetch(
         `/api/organizations/${slug}/members/${targetUserId}/suspend`,

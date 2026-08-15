@@ -83,12 +83,11 @@ export async function GET(request: Request) {
       projectId: projectId as Id<"projects">,
     });
 
-    const variables = variablesWithAccess
-      .filter((variable) => variable.hasAccess)
-      .filter(
-        (variable) =>
-          !environment || variable.environments.includes(environment)
-      );
+    const variables = variablesWithAccess.filter(
+      (variable) =>
+        variable.hasAccess &&
+        (!environment || variable.environments.includes(environment))
+    );
 
     return NextResponse.json({ variables });
   } catch {
