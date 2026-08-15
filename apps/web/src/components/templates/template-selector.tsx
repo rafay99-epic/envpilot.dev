@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useId, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BUILT_IN_TEMPLATES,
@@ -52,6 +52,7 @@ export function TemplateSelector({
   selectedTemplateId,
   onSelectTemplate,
 }: TemplateSelectorProps) {
+  const searchId = useId();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<
     TemplateCategory | "all"
@@ -95,8 +96,12 @@ export function TemplateSelector({
     <div className="space-y-4">
       {/* Search */}
       <div className="relative">
+        <label htmlFor={searchId} className="sr-only">
+          Search templates
+        </label>
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
         <input
+          id={searchId}
           type="text"
           placeholder="Search templates..."
           value={searchQuery}

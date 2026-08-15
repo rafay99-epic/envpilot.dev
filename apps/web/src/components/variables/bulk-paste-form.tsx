@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useId } from "react";
 import {
   ENVIRONMENTS,
   type Environment,
@@ -24,6 +24,9 @@ interface BulkPasteFormProps {
   onCreateTag?: (name: string, color: string) => Promise<void>;
 }
 
+/** Stable identity so an omitted `availableTags` never re-renders TagSelector. */
+const NO_TAGS: Tag[] = [];
+
 interface SubmitProgress {
   total: number;
   completed: number;
@@ -36,9 +39,10 @@ export function BulkPasteForm({
   onCancel,
   submitLabel = "Create All",
   onSubmittingChange,
-  availableTags = [],
+  availableTags = NO_TAGS,
   onCreateTag,
 }: BulkPasteFormProps) {
+  const environmentsLabelId = useId();
   const [rawText, setRawText] = useState("");
   const [entries, setEntries] = useState<ParsedEnvEntry[]>([]);
   const [errors, setErrors] = useState<EnvParseError[]>([]);
@@ -163,7 +167,7 @@ export function BulkPasteForm({
           onChange={(e) => handleTextChange(e.target.value)}
           placeholder={`# Paste your .env file here\nDATABASE_URL=postgres://localhost:5432/mydb\nAPI_KEY=sk-1234567890\nNEXT_PUBLIC_APP_URL=http://localhost:3000`}
           rows={8}
-          className="mt-1 block w-full rounded-lg border px-4 py-3 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+          className="mt-1 block w-full rounded-lg border px-4 py-3 font-mono text-base focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong sm:text-sm border-line bg-surface-raised text-ink placeholder-ink-subtle"
           disabled={isSubmitting}
         />
         {rawText.trim() && (
@@ -184,8 +188,11 @@ export function BulkPasteForm({
         <div className="rounded-lg border p-3 border-warning-line bg-warning-soft">
           <p className="text-xs font-medium text-warning">Parse warnings:</p>
           <ul className="mt-1 space-y-0.5">
-            {errors.slice(0, 5).map((err, i) => (
-              <li key={i} className="text-xs text-warning">
+            {errors.slice(0, 5).map((err) => (
+              <li
+                key={`${err.line}-${err.reason}`}
+                className="text-xs text-warning"
+              >
                 Line {err.line}: {err.reason}
               </li>
             ))}
@@ -200,13 +207,20 @@ export function BulkPasteForm({
 
       {/* Environments */}
       <div>
-        <label className="block text-sm font-medium text-ink-muted">
+        <div
+          id={environmentsLabelId}
+          className="block text-sm font-medium text-ink-muted"
+        >
           Environments <span className="text-danger">*</span>
-        </label>
+        </div>
         <p className="mt-0.5 text-xs text-ink-muted">
           Applied to all variables
         </p>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div
+          role="group"
+          aria-labelledby={environmentsLabelId}
+          className="mt-2 flex flex-wrap gap-2"
+        >
           {ENVIRONMENTS.map((env) => (
             <button
               key={env}
@@ -252,9 +266,9 @@ export function BulkPasteForm({
       {/* Preview list */}
       {entries.length > 0 && (
         <div>
-          <label className="block text-sm font-medium text-ink-muted">
+          <p className="block text-sm font-medium text-ink-muted">
             Preview ({entries.length})
-          </label>
+          </p>
           <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2 border-line">
             {entries.map((entry) => (
               <div
@@ -278,9 +292,11 @@ export function BulkPasteForm({
                   type="button"
                   onClick={() => handleRemoveEntry(entry.key)}
                   disabled={isSubmitting}
+                  aria-label={`Remove ${entry.key}`}
                   className="ml-2 shrink-0 rounded p-1 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
                 >
                   <svg
+                    aria-hidden="true"
                     className="h-3.5 w-3.5"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -311,8 +327,8 @@ export function BulkPasteForm({
           </div>
           {progress.failures.length > 0 && (
             <div className="mt-2 space-y-1">
-              {progress.failures.map((f, i) => (
-                <p key={i} className="text-xs text-danger">
+              {progress.failures.map((f) => (
+                <p key={f.key} className="text-xs text-danger">
                   {f.key}: {f.error}
                 </p>
               ))}

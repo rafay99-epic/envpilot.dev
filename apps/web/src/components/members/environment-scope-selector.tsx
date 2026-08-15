@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 import { ENVIRONMENTS } from "@/constants/project";
 
 /** All environments checked — the default, meaning unrestricted access. */
@@ -51,6 +53,10 @@ export function EnvironmentScopeSelector({
   disabled = false,
   helperText = "Developers only see and edit variables in the selected environments. Production access can be withheld here.",
 }: EnvironmentScopeSelectorProps) {
+  const uid = useId();
+  const labelId = `${uid}-label`;
+  const helpId = `${uid}-help`;
+
   function toggle(env: string, checked: boolean) {
     if (checked) {
       onChange([...selected, env]);
@@ -61,14 +67,19 @@ export function EnvironmentScopeSelector({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-ink">
+      <div id={labelId} className="block text-sm font-medium text-ink">
         Environment access
-      </label>
-      <p className="mt-1 text-xs text-ink-muted">
+      </div>
+      <p id={helpId} className="mt-1 text-xs text-ink-muted">
         {helperText} A variable is visible only when all of its environments
         fall within this scope.
       </p>
-      <div className="mt-2 space-y-1 rounded-lg border p-2 border-line">
+      <div
+        role="group"
+        aria-labelledby={labelId}
+        aria-describedby={helpId}
+        className="mt-2 space-y-1 rounded-lg border p-2 border-line"
+      >
         {ENVIRONMENTS.map((env) => (
           <label
             key={env}

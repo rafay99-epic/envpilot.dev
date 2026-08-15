@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { X, Copy, Check, Loader2, Mail, AlertTriangle } from "lucide-react";
 import * as Sentry from "@sentry/nextjs";
 import {
@@ -67,6 +67,11 @@ export function ShareLinkForm({
 }: ShareLinkFormProps) {
   const createShare = useCreateShare();
   const { user } = useAuth();
+  const uid = useId();
+  const emailFieldId = `${uid}-email`;
+  const passphraseFieldId = `${uid}-passphrase`;
+  const modeLabelId = `${uid}-mode`;
+  const ttlLabelId = `${uid}-ttl`;
   // Prop wins when provided (e.g. tests); otherwise fall back to the signed-in
   // user's email so we can block self-sharing before the request is sent.
   const selfEmail = (currentUserEmail ?? user?.email)?.trim().toLowerCase();
@@ -216,15 +221,16 @@ export function ShareLinkForm({
         )}
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+          <div className="mb-1.5 block text-xs font-medium text-ink-muted">
             Share Link
-          </label>
+          </div>
           <div className="flex items-center gap-2">
             <code className="flex-1 truncate rounded-lg px-3 py-2 font-mono text-xs bg-surface-raised text-ink-muted">
               {generatedUrl}
             </code>
             <button
               onClick={handleCopyUrl}
+              aria-label="Copy share link"
               className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent"
             >
               {copied ? (
@@ -269,11 +275,15 @@ export function ShareLinkForm({
     <div className="space-y-5">
       {/* Recipient Emails */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+        <label
+          htmlFor={emailFieldId}
+          className="mb-1.5 block text-xs font-medium text-ink-muted"
+        >
           Recipient Emails
         </label>
         <div className="flex gap-2">
           <input
+            id={emailFieldId}
             type="email"
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
@@ -284,7 +294,7 @@ export function ShareLinkForm({
               }
             }}
             placeholder="Enter email and press Enter"
-            className="flex-1 rounded-lg border px-3 py-2 text-sm placeholder:text-ink-muted focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line border-line bg-surface text-ink"
+            className="flex-1 rounded-lg border px-3 py-2 text-base placeholder:text-ink-muted focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line sm:text-sm border-line bg-surface text-ink"
           />
           <button
             type="button"
@@ -306,6 +316,7 @@ export function ShareLinkForm({
                 <button
                   type="button"
                   onClick={() => setEmails(emails.filter((e) => e !== email))}
+                  aria-label={`Remove ${email}`}
                   className="ml-0.5 rounded-full p-0.5 hover:bg-accent"
                 >
                   <X className="h-3 w-3" />
@@ -318,10 +329,13 @@ export function ShareLinkForm({
 
       {/* Mode */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+        <div
+          id={modeLabelId}
+          className="mb-1.5 block text-xs font-medium text-ink-muted"
+        >
           Share Mode
-        </label>
-        <div className="flex gap-2">
+        </div>
+        <div role="group" aria-labelledby={modeLabelId} className="flex gap-2">
           <button
             type="button"
             onClick={() => setMode("one_time")}
@@ -352,10 +366,13 @@ export function ShareLinkForm({
 
       {/* TTL */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+        <div
+          id={ttlLabelId}
+          className="mb-1.5 block text-xs font-medium text-ink-muted"
+        >
           Expires After
-        </label>
-        <div className="flex gap-2">
+        </div>
+        <div role="group" aria-labelledby={ttlLabelId} className="flex gap-2">
           {TTL_OPTIONS.map((opt) => (
             <button
               key={opt.label}
@@ -387,13 +404,19 @@ export function ShareLinkForm({
           </span>
         </label>
         {usePassphrase && (
-          <input
-            type="password"
-            value={passphrase}
-            onChange={(e) => setPassphrase(e.target.value)}
-            placeholder="Enter a passphrase"
-            className="mt-2 w-full rounded-lg border px-3 py-2 text-sm placeholder:text-ink-muted focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line border-line bg-surface text-ink"
-          />
+          <>
+            <label className="sr-only" htmlFor={passphraseFieldId}>
+              Passphrase
+            </label>
+            <input
+              id={passphraseFieldId}
+              type="password"
+              value={passphrase}
+              onChange={(e) => setPassphrase(e.target.value)}
+              placeholder="Enter a passphrase"
+              className="mt-2 w-full rounded-lg border px-3 py-2 text-base placeholder:text-ink-muted focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line sm:text-sm border-line bg-surface text-ink"
+            />
+          </>
         )}
       </div>
 

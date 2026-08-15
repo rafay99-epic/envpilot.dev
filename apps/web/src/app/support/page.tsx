@@ -267,10 +267,17 @@ export default function SupportPage() {
 
                     {/* Category */}
                     <div>
-                      <label className={`mb-1.5 block ${terminal.label}`}>
+                      <span
+                        id="support-category-label"
+                        className={`mb-1.5 block ${terminal.label}`}
+                      >
                         <span className="mr-1.5 text-accent">❯</span> category
-                      </label>
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      </span>
+                      <div
+                        role="group"
+                        aria-labelledby="support-category-label"
+                        className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+                      >
                         {CATEGORIES.map((cat) => (
                           <button
                             key={cat.value}
@@ -288,10 +295,17 @@ export default function SupportPage() {
 
                     {/* Priority */}
                     <div>
-                      <label className={`mb-1.5 block ${terminal.label}`}>
+                      <span
+                        id="support-priority-label"
+                        className={`mb-1.5 block ${terminal.label}`}
+                      >
                         <span className="mr-1.5 text-accent">❯</span> priority
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
+                      </span>
+                      <div
+                        role="group"
+                        aria-labelledby="support-priority-label"
+                        className="grid grid-cols-3 gap-2"
+                      >
                         {PRIORITIES.map((p) => (
                           <button
                             key={p.value}

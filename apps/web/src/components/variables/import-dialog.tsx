@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { DrawerPanel } from "@/components/ui";
 import { Upload, Loader2, FileUp } from "lucide-react";
 import {
@@ -30,6 +30,12 @@ export function ImportDialog({
   onImported,
 }: ImportDrawerProps) {
   const { allowed, tierName } = useFeatureGate(organizationId, "bulk_import");
+  const uid = useId();
+  const formatFieldId = `${uid}-format`;
+  const environmentFieldId = `${uid}-environment`;
+  const modeFieldId = `${uid}-mode`;
+  const sourceLabelId = `${uid}-source`;
+  const contentFieldId = `${uid}-content`;
   const [format, setFormat] = useState<FormatType>("env");
   const [environment, setEnvironment] = useState("development");
   const [mode, setMode] = useState<"merge" | "replace">("merge");
@@ -183,15 +189,19 @@ export function ImportDialog({
           <>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink-muted">
+                <label
+                  htmlFor={formatFieldId}
+                  className="mb-1.5 block text-sm font-medium text-ink-muted"
+                >
                   Format
                 </label>
                 <select
+                  id={formatFieldId}
                   value={format}
                   onChange={(e) =>
                     handleFormatChange(e.target.value as FormatType)
                   }
-                  className="w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
+                  className="w-full rounded-lg border px-3 py-2 text-base transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong sm:text-sm border-line-strong bg-surface-raised text-ink"
                 >
                   {ALL_FORMATS.map((f) => (
                     <option key={f} value={f}>
@@ -201,13 +211,17 @@ export function ImportDialog({
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink-muted">
+                <label
+                  htmlFor={environmentFieldId}
+                  className="mb-1.5 block text-sm font-medium text-ink-muted"
+                >
                   Target Environment
                 </label>
                 <select
+                  id={environmentFieldId}
                   value={environment}
                   onChange={(e) => setEnvironment(e.target.value)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
+                  className="w-full rounded-lg border px-3 py-2 text-base transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong sm:text-sm border-line-strong bg-surface-raised text-ink"
                 >
                   <option value="development">Development</option>
                   <option value="staging">Staging</option>
@@ -217,13 +231,17 @@ export function ImportDialog({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-muted">
+              <label
+                htmlFor={modeFieldId}
+                className="mb-1.5 block text-sm font-medium text-ink-muted"
+              >
                 Mode
               </label>
               <select
+                id={modeFieldId}
                 value={mode}
                 onChange={(e) => setMode(e.target.value as "merge" | "replace")}
-                className="w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
+                className="w-full rounded-lg border px-3 py-2 text-base transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong sm:text-sm border-line-strong bg-surface-raised text-ink"
               >
                 <option value="merge">Merge (add/update, keep existing)</option>
                 <option value="replace">
@@ -233,10 +251,17 @@ export function ImportDialog({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-muted">
+              <div
+                id={sourceLabelId}
+                className="mb-1.5 block text-sm font-medium text-ink-muted"
+              >
                 File or Content
-              </label>
-              <div className="space-y-2">
+              </div>
+              <div
+                role="group"
+                aria-labelledby={sourceLabelId}
+                className="space-y-2"
+              >
                 <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-line p-3 text-sm transition-colors text-ink-muted hover:border-line-strong">
                   <FileUp className="h-4 w-4 shrink-0" />
                   <span className="truncate">
@@ -249,13 +274,17 @@ export function ImportDialog({
                     accept=".env,.json,.yaml,.yml,.toml"
                   />
                 </label>
-                <div className="text-center text-xs text-ink-subtle">
+                <label
+                  htmlFor={contentFieldId}
+                  className="block cursor-pointer text-center text-xs text-ink-subtle"
+                >
                   or paste content below
-                </div>
+                </label>
                 <textarea
+                  id={contentFieldId}
                   value={content}
                   onChange={(e) => handleContentChange(e.target.value)}
-                  className="h-32 w-full rounded-lg border px-3 py-2 font-mono text-sm transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line-strong bg-surface-raised text-ink"
+                  className="h-32 w-full rounded-lg border px-3 py-2 font-mono text-base transition-colors focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong sm:text-sm border-line-strong bg-surface-raised text-ink"
                   placeholder={`Paste your ${FORMAT_LABELS[format]} content here...`}
                 />
               </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useId, useRef, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
 import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
@@ -34,6 +34,7 @@ export function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const searchInputId = useId();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -88,8 +89,9 @@ export function CommandPalette() {
     () => new Set(availableTags.map((t) => t._id)),
     [availableTags]
   );
+  // A Set, not an array: it is probed once per result AND once per chip.
   const activeTagFilter = useMemo(
-    () => tagFilter.filter((id) => availableTagIds.has(id)),
+    () => new Set(tagFilter.filter((id) => availableTagIds.has(id))),
     [tagFilter, availableTagIds]
   );
 
@@ -109,8 +111,8 @@ export function CommandPalette() {
       return false;
     }
     // Tag filter (OR logic within selected tags)
-    if (activeTagFilter.length > 0) {
-      if (!r.tags || !r.tags.some((t) => activeTagFilter.includes(t._id))) {
+    if (activeTagFilter.size > 0) {
+      if (!r.tags || !r.tags.some((t) => activeTagFilter.has(t._id))) {
         return false;
       }
     }
@@ -135,17 +137,16 @@ export function CommandPalette() {
   // ONE navigable list — variables, then docs, then settings. Every row
   // carries its own nav index, so adding a group never re-opens the
   // off-by-one arithmetic this used to do by hand.
-  const navItems = useMemo(
-    () => [
-      ...filteredResults.map((_, index) => ({
-        kind: "variable" as const,
-        index,
-      })),
-      ...visibleDocs.map((_, index) => ({ kind: "doc" as const, index })),
-      ...settingsHits.map((_, index) => ({ kind: "setting" as const, index })),
-    ],
-    [filteredResults, visibleDocs, settingsHits]
-  );
+  // Not memoised: every input is rebuilt each render anyway, so a `useMemo`
+  // here only added a dependency compare. React Compiler handles the rest.
+  const navItems = [
+    ...filteredResults.map((_, index) => ({
+      kind: "variable" as const,
+      index,
+    })),
+    ...visibleDocs.map((_, index) => ({ kind: "doc" as const, index })),
+    ...settingsHits.map((_, index) => ({ kind: "setting" as const, index })),
+  ];
   const navCount = navItems.length;
   // ArrowUp on an empty list wraps to `navCount - 1` === -1; clamp the low end
   // too, or the next batch of results arrives with nothing highlighted and
@@ -221,7 +222,7 @@ export function CommandPalette() {
     window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, handleOpen);
     return () =>
       window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, handleOpen);
-  }, []);
+  }, [openPalette]);
 
   // Rows tag themselves with their nav index, so headings between groups no
   // longer shift the lookup.
@@ -272,7 +273,9 @@ export function CommandPalette() {
       {isOpen && (
         <div className="fixed inset-0 z-[60]" onKeyDown={handleKeyDown}>
           {/* Backdrop */}
-          <motion.div
+          <motion.button
+            type="button"
+            aria-label="Dismiss"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -293,7 +296,13 @@ export function CommandPalette() {
               {/* Search Input */}
               <div className="flex items-center gap-3 border-b border-line px-4 py-3">
                 <Search className="h-5 w-5 shrink-0 text-ink-subtle" />
+                {/* The Search glyph is the palette's visible affordance; the
+                    label carries the same name for assistive tech. */}
+                <label htmlFor={searchInputId} className="sr-only">
+                  Search variables across all projects
+                </label>
                 <input
+                  id={searchInputId}
                   ref={inputRef}
                   type="text"
                   value={searchTerm}
@@ -306,6 +315,7 @@ export function CommandPalette() {
                 </kbd>
                 <button
                   onClick={() => closePalette()}
+                  aria-label="Close"
                   className="rounded p-0.5 text-ink-subtle hover:text-ink-muted sm:hidden"
                 >
                   <X className="h-4 w-4" />
@@ -332,7 +342,9 @@ export function CommandPalette() {
                   <>
                     <span className="mx-1 self-center text-ink-faint">|</span>
                     {availableTags.map((tag) => {
-                      const isSelected = tagFilter.includes(tag._id);
+                      // Every tag here is by construction in `availableTagIds`,
+                      // so the pruned Set answers this exactly.
+                      const isSelected = activeTagFilter.has(tag._id);
                       return (
                         <button
                           key={tag._id}
@@ -378,9 +390,7 @@ export function CommandPalette() {
                   </div>
                 ) : isLoading ? (
                   <div className="px-4 py-8 text-center text-sm text-ink-subtle">
-                    <span className="inline-block animate-pulse">
-                      Searching...
-                    </span>
+                    Searching...
                   </div>
                 ) : navCount === 0 ? (
                   <div className="px-4 py-8 text-center text-sm text-ink-subtle">

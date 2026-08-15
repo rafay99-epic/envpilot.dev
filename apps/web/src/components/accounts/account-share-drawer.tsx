@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { Id } from "@convex/_generated/dataModel";
 import { X, Loader2, UserPlus, Link2 } from "lucide-react";
 import { DrawerPanel } from "@/components/ui/drawer-panel";
+import { formatDateWith } from "@/lib/format";
+import { useTimeZone } from "@/hooks/useTimeZone";
 import { serializeAccountShare } from "@/lib/account-payload";
 import type { AccountVaultPayload } from "@/lib/account-payload";
 import { ShareLinkForm } from "@/components/shared/share-link-form";
@@ -83,9 +85,9 @@ export function AccountShareDrawer({
       <div className="space-y-5">
         {/* Account label */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+          <div className="mb-1.5 block text-xs font-medium text-ink-muted">
             Account
-          </label>
+          </div>
           <div className="rounded-lg px-3 py-2 text-sm font-semibold bg-surface-raised text-ink">
             {account.name}
           </div>
@@ -163,6 +165,10 @@ function TeamMemberMode({
   const [isGranting, setIsGranting] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const timeZone = useTimeZone();
+  const uid = useId();
+  const permissionLabelId = `${uid}-permission`;
+  const expiryLabelId = `${uid}-expiry`;
 
   const activeGrants = (grants ?? []).filter((g) => g.isActive);
 
@@ -221,7 +227,7 @@ function TeamMemberMode({
             setError(null);
           }}
           disabled={members === undefined}
-          className="block w-full rounded-lg border px-3 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong disabled:opacity-50 border-line bg-surface-raised text-ink"
+          className="block w-full rounded-lg border px-3 py-2 text-base focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong disabled:opacity-50 sm:text-sm border-line bg-surface-raised text-ink"
         >
           <option value="">
             {members === undefined
@@ -240,10 +246,17 @@ function TeamMemberMode({
 
       {/* Permission */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+        <div
+          id={permissionLabelId}
+          className="mb-1.5 block text-xs font-medium text-ink-muted"
+        >
           Permission
-        </label>
-        <div className="flex gap-2">
+        </div>
+        <div
+          role="group"
+          aria-labelledby={permissionLabelId}
+          className="flex gap-2"
+        >
           {(["read", "write"] as GrantPermission[]).map((p) => (
             <button
               key={p}
@@ -263,10 +276,17 @@ function TeamMemberMode({
 
       {/* Expiry */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+        <div
+          id={expiryLabelId}
+          className="mb-1.5 block text-xs font-medium text-ink-muted"
+        >
           Expires
-        </label>
-        <div className="flex flex-wrap gap-2">
+        </div>
+        <div
+          role="group"
+          aria-labelledby={expiryLabelId}
+          className="flex flex-wrap gap-2"
+        >
           {EXPIRY_OPTIONS.map((opt) => (
             <button
               key={opt.label}
@@ -321,7 +341,7 @@ function TeamMemberMode({
                   <p className="text-xs text-ink-subtle">
                     <span className="capitalize">{g.permission}</span>
                     {g.expiresAt
-                      ? ` · expires ${new Date(g.expiresAt).toLocaleDateString()}`
+                      ? ` · expires ${formatDateWith(g.expiresAt, { dateStyle: "short" }, timeZone)}`
                       : " · no expiry"}
                   </p>
                 </div>

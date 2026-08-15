@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import {
   useFeatureRequests,
   usePlannedFeatures,
   useFeatureCategories,
   useFeatureRequestMutations,
 } from "@/hooks";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDate, formatDateWith } from "@/lib/format";
 import { Id } from "@convex/_generated/dataModel";
 import { ChevronUp, Plus, X, AlertTriangle } from "lucide-react";
 import {
@@ -85,10 +87,12 @@ export default function WishlistPage() {
   const [votedFeatures, setVotedFeatures] = useState<Set<string>>(new Set());
   const [voterEmail, setVoterEmail] = useState("");
   const [showEmailPrompt, setShowEmailPrompt] = useState(false);
-  const [pendingVoteId, setPendingVoteId] =
-    useState<Id<"featureRequests"> | null>(null);
+  // Read only inside handlers, never rendered, so a ref keeps the extra
+  // render out of the vote path.
+  const pendingVoteId = useRef<Id<"featureRequests"> | null>(null);
   const [emailInput, setEmailInput] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const emailPromptId = useId();
 
   const featureRequests = useFeatureRequests(
     statusFilter === "all" ? undefined : statusFilter,
@@ -100,7 +104,7 @@ export default function WishlistPage() {
 
   const handleVote = async (featureId: Id<"featureRequests">) => {
     if (!voterEmail) {
-      setPendingVoteId(featureId);
+      pendingVoteId.current = featureId;
       setShowEmailPrompt(true);
       return;
     }
@@ -127,21 +131,22 @@ export default function WishlistPage() {
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const email = emailInput.trim();
-    if (!email || !pendingVoteId) return;
+    const featureId = pendingVoteId.current;
+    if (!email || !featureId) return;
 
     setVoterEmail(email);
     setShowEmailPrompt(false);
     setEmailInput("");
 
     try {
-      await vote({ featureRequestId: pendingVoteId, voterEmail: email });
-      setVotedFeatures((prev) => new Set([...prev, pendingVoteId]));
+      await vote({ featureRequestId: featureId, voterEmail: email });
+      setVotedFeatures((prev) => new Set([...prev, featureId]));
     } catch {
       setToastMessage(
         "Failed to vote. You may have already voted for this feature."
       );
     }
-    setPendingVoteId(null);
+    pendingVoteId.current = null;
   };
 
   return (
@@ -283,21 +288,28 @@ export default function WishlistPage() {
               <p className="font-sans text-[15px] leading-relaxed text-ink-muted">
                 Your email tracks your votes and prevents duplicates.
               </p>
+              <label
+                htmlFor={emailPromptId}
+                className={`mt-4 block ${terminal.label}`}
+              >
+                email
+              </label>
               <input
+                id={emailPromptId}
                 type="email"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
                 placeholder="you@example.com"
                 required
                 autoFocus
-                className={`mt-4 ${terminal.input}`}
+                className={`mt-1.5 ${terminal.input}`}
               />
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setShowEmailPrompt(false);
-                    setPendingVoteId(null);
+                    pendingVoteId.current = null;
                     setEmailInput("");
                   }}
                   className="rounded-md px-4 py-2 font-sans text-[14px] text-ink-muted ring-1 ring-line transition-colors hover:text-ink hover:ring-line-strong"
@@ -324,6 +336,7 @@ export default function WishlistPage() {
             <span>{toastMessage}</span>
             <button
               onClick={() => setToastMessage(null)}
+              aria-label="Dismiss"
               className="ml-2 opacity-60 transition-opacity hover:opacity-100"
             >
               <X className="h-3 w-3" />
@@ -383,6 +396,7 @@ interface FeatureCardProps {
 
 function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
   const status = statusConfig[feature.status] ?? statusConfig.submitted;
+  const timeZone = useTimeZone();
 
   return (
     <div
@@ -425,11 +439,7 @@ function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
             {feature.description}
           </p>
           <p className={`mt-2 ${terminal.mono} text-[11px] text-ink-faint`}>
-            {new Date(feature.createdAt).toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            })}
+            {formatDate(feature.createdAt, timeZone)}
           </p>
         </div>
       </div>
@@ -484,6 +494,7 @@ const INITIAL_VISIBLE = 4;
 
 function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const timeZone = useTimeZone();
 
   if (!plannedFeatures) {
     return (
@@ -591,12 +602,11 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
                           "updatedAt" in feature &&
                           typeof feature.updatedAt === "number" && (
                             <span>
-                              {new Date(
-                                feature.updatedAt as number
-                              ).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                              })}
+                              {formatDateWith(
+                                feature.updatedAt,
+                                { month: "short", day: "numeric" },
+                                timeZone
+                              )}
                             </span>
                           )}
                       </div>
@@ -665,6 +675,7 @@ function SubmitFeatureModal({
   const [category, setCategory] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const fieldId = useId();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -712,7 +723,9 @@ function SubmitFeatureModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div
+      <button
+        type="button"
+        aria-label="Dismiss"
         className="fixed inset-0 bg-overlay backdrop-blur-sm"
         onClick={onClose}
       />
@@ -742,8 +755,14 @@ function SubmitFeatureModal({
           )}
 
           <div>
-            <label className={`block ${terminal.label}`}>title *</label>
+            <label
+              htmlFor={`${fieldId}-title`}
+              className={`block ${terminal.label}`}
+            >
+              title *
+            </label>
             <input
+              id={`${fieldId}-title`}
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -753,8 +772,14 @@ function SubmitFeatureModal({
           </div>
 
           <div>
-            <label className={`block ${terminal.label}`}>description *</label>
+            <label
+              htmlFor={`${fieldId}-description`}
+              className={`block ${terminal.label}`}
+            >
+              description *
+            </label>
             <textarea
+              id={`${fieldId}-description`}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -765,8 +790,14 @@ function SubmitFeatureModal({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className={`block ${terminal.label}`}>email *</label>
+              <label
+                htmlFor={`${fieldId}-email`}
+                className={`block ${terminal.label}`}
+              >
+                email *
+              </label>
               <input
+                id={`${fieldId}-email`}
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -775,8 +806,14 @@ function SubmitFeatureModal({
               />
             </div>
             <div>
-              <label className={`block ${terminal.label}`}>name</label>
+              <label
+                htmlFor={`${fieldId}-name`}
+                className={`block ${terminal.label}`}
+              >
+                name
+              </label>
               <input
+                id={`${fieldId}-name`}
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -787,8 +824,14 @@ function SubmitFeatureModal({
           </div>
 
           <div>
-            <label className={`block ${terminal.label}`}>category</label>
+            <label
+              htmlFor={`${fieldId}-category`}
+              className={`block ${terminal.label}`}
+            >
+              category
+            </label>
             <input
+              id={`${fieldId}-category`}
               type="text"
               value={category}
               onChange={(e) => setCategory(e.target.value)}

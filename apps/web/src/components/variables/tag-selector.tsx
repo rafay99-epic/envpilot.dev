@@ -1,21 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Tag, Plus, Check } from "lucide-react";
 import type { Tag as TagType } from "@/hooks/useTags";
 import { TagBadge } from "./tag-badge";
 
+// Named so each swatch button has an accessible name a screen reader can say.
 const TAG_COLORS = [
-  "#3b82f6",
-  "#ef4444",
-  "#f59e0b",
-  "#10b981",
-  "#8b5cf6",
-  "#ec4899",
-  "#06b6d4",
-  "#f97316",
-  "#6366f1",
-  "#84cc16",
+  { name: "Blue", value: "#3b82f6" },
+  { name: "Red", value: "#ef4444" },
+  { name: "Amber", value: "#f59e0b" },
+  { name: "Green", value: "#10b981" },
+  { name: "Violet", value: "#8b5cf6" },
+  { name: "Pink", value: "#ec4899" },
+  { name: "Cyan", value: "#06b6d4" },
+  { name: "Orange", value: "#f97316" },
+  { name: "Indigo", value: "#6366f1" },
+  { name: "Lime", value: "#84cc16" },
 ];
 
 interface TagSelectorProps {
@@ -35,8 +36,12 @@ export function TagSelector({
 }: TagSelectorProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [newTagName, setNewTagName] = useState("");
-  const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0]);
+  const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0].value);
   const [isCreating, setIsCreating] = useState(false);
+  const uid = useId();
+  const tagsLabelId = `${uid}-tags`;
+  const newTagFieldId = `${uid}-new-tag`;
+  const selectedSet = new Set(selectedTagIds);
 
   const toggleTag = (tagId: string) => {
     if (disabled) return;
@@ -53,7 +58,7 @@ export function TagSelector({
     try {
       await onCreateTag(newTagName.trim(), newTagColor);
       setNewTagName("");
-      setNewTagColor(TAG_COLORS[0]);
+      setNewTagColor(TAG_COLORS[0].value);
       setShowCreate(false);
     } catch {
       // Error handled by parent
@@ -64,12 +69,15 @@ export function TagSelector({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-ink-muted">
+      <div
+        id={tagsLabelId}
+        className="block text-sm font-medium text-ink-muted"
+      >
         <span className="flex items-center gap-1.5">
           <Tag className="h-3.5 w-3.5" />
           Tags
         </span>
-      </label>
+      </div>
 
       {/* Selected tags display */}
       {selectedTagIds.length > 0 && (
@@ -91,9 +99,13 @@ export function TagSelector({
       )}
 
       {/* Tag toggle chips */}
-      <div className="flex flex-wrap gap-1.5">
+      <div
+        role="group"
+        aria-labelledby={tagsLabelId}
+        className="flex flex-wrap gap-1.5"
+      >
         {availableTags.map((tag) => {
-          const isSelected = selectedTagIds.includes(tag._id);
+          const isSelected = selectedSet.has(tag._id);
           const safeColor = /^#[0-9a-fA-F]{6}$/.test(tag.color)
             ? tag.color
             : "#6b7280";
@@ -149,13 +161,17 @@ export function TagSelector({
       {/* Inline create form */}
       {showCreate && onCreateTag && (
         <div className="space-y-3 rounded-lg border p-3 border-line bg-surface-raised/50">
+          <label className="sr-only" htmlFor={newTagFieldId}>
+            Tag name
+          </label>
           <input
+            id={newTagFieldId}
             type="text"
             value={newTagName}
             onChange={(e) => setNewTagName(e.target.value)}
             placeholder="Tag name"
             maxLength={50}
-            className="w-full rounded border px-2.5 py-1.5 text-sm focus:border-line-strong focus:outline-none border-line-strong bg-surface-raised text-ink placeholder-ink-subtle"
+            className="w-full rounded border px-2.5 py-1.5 text-base focus:border-line-strong focus:outline-none sm:text-sm border-line-strong bg-surface-raised text-ink placeholder-ink-subtle"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -168,15 +184,17 @@ export function TagSelector({
           <div className="flex flex-wrap gap-1.5">
             {TAG_COLORS.map((color) => (
               <button
-                key={color}
+                key={color.value}
                 type="button"
-                onClick={() => setNewTagColor(color)}
+                onClick={() => setNewTagColor(color.value)}
+                aria-label={color.name}
+                aria-pressed={newTagColor === color.value}
                 className={`h-6 w-6 rounded-full border-2 transition-transform ${
-                  newTagColor === color
+                  newTagColor === color.value
                     ? "scale-110 border-white"
                     : "border-transparent hover:scale-105"
                 }`}
-                style={{ backgroundColor: color }}
+                style={{ backgroundColor: color.value }}
               />
             ))}
           </div>
