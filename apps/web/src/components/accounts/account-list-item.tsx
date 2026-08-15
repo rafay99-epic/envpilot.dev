@@ -11,6 +11,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import type { Account } from "@/hooks";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateTimeShort } from "@/lib/format";
 import { isSafeHttpUrl } from "@/lib/account-payload";
 import type { AccountVaultPayload } from "@/lib/account-payload";
 
@@ -56,26 +58,19 @@ export function AccountListItem({
   const [copiedField, setCopiedField] = useState<
     "username" | "password" | null
   >(null);
-
-  const formatDate = (timestamp: number) =>
-    new Intl.DateTimeFormat("en-US", {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(new Date(timestamp));
+  const timeZone = useTimeZone();
 
   const handleToggleReveal = () => {
     if (!revealedValue && !isRevealing && onReveal) {
       onReveal();
       setIsVisible(true);
-    } else {
-      setIsVisible((prev) => {
-        // Re-mask the password whenever the block is hidden, so a prior unmask
-        // doesn't persist into the next reveal (credentials should default to
-        // masked every time they reappear).
-        if (prev) setShowPassword(false);
-        return !prev;
-      });
+      return;
     }
+    // Re-mask the password whenever the block is hidden, so a prior unmask
+    // doesn't persist into the next reveal (credentials should default to
+    // masked every time they reappear).
+    if (isVisible) setShowPassword(false);
+    setIsVisible(!isVisible);
   };
 
   const handleCopy = async (field: "username" | "password", value: string) => {
@@ -143,7 +138,7 @@ export function AccountListItem({
                 ))}
               </div>
               <span className="text-xs text-ink-subtle">
-                Updated {formatDate(account.updatedAt)}
+                Updated {formatDateTimeShort(account.updatedAt, timeZone)}
               </span>
             </div>
           </div>

@@ -111,8 +111,12 @@ function PricingCards({
                 {cta}
               </span>
             ) : (
+              // The paid CTA points at /api/checkout, a GET that mints a Polar
+              // checkout session. Prefetching it on hover would create sessions
+              // nobody asked for.
               <Link
                 href={ctaHref}
+                prefetch={false}
                 className={`block rounded-md px-5 py-3 text-center font-sans text-[15px] font-semibold transition-colors ${
                   isDefault
                     ? "bg-accent text-chrome hover:bg-accent-hover"

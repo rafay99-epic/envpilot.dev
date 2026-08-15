@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
@@ -221,6 +221,15 @@ function ApiKeysSectionInner({
   );
 
   const [showCreate, setShowCreate] = useState(false);
+  // Every open gets a fresh drawer instance. Remounting IS the form reset —
+  // including the one-time plaintext key, which must never survive into the
+  // next run. The drawer stays rendered while closed so DrawerPanel can play
+  // its slide-out.
+  const [createSession, setCreateSession] = useState(0);
+  const openCreate = () => {
+    setCreateSession((n) => n + 1);
+    setShowCreate(true);
+  };
 
   return (
     <SettingsSection
@@ -228,17 +237,14 @@ function ApiKeysSectionInner({
       description="Scoped keys for the public REST API, MCP server, and GitHub Action. Read-only — except keys with the requests resource, which may file variable requests for human approval."
     >
       <div className="flex justify-end">
-        <TerminalButton
-          type="button"
-          variant="primary"
-          onClick={() => setShowCreate(true)}
-        >
+        <TerminalButton type="button" variant="primary" onClick={openCreate}>
           New Key
         </TerminalButton>
       </div>
 
       {organizationId && (
         <CreateKeyDrawer
+          key={createSession}
           organizationId={organizationId}
           isOwner={isOwner}
           isOpen={showCreate}
@@ -449,45 +455,50 @@ function KeyRow({
           {confirming && (
             <motion.div
               key="confirm"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
+              // The row expands by interpolating the grid track, not `height`
+              // — animating height forces a full layout pass every frame and
+              // makes Motion measure the element to resolve "auto".
+              initial={{ opacity: 0, gridTemplateRows: "0fr" }}
+              animate={{ opacity: 1, gridTemplateRows: "1fr" }}
+              exit={{ opacity: 0, gridTemplateRows: "0fr" }}
               transition={{ duration: 0.15 }}
-              className="overflow-hidden"
+              className="grid"
             >
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-danger-line/40 pt-3">
-                <div className="min-w-0">
-                  <p className="flex items-start gap-2 text-xs text-danger">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    Revoke this key? Anything using it will stop working
-                    immediately.
-                  </p>
-                  {rowError && (
-                    <p className="mt-1 text-xs font-medium text-danger">
-                      {rowError}
+              <div className="overflow-hidden">
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-danger-line/40 pt-3">
+                  <div className="min-w-0">
+                    <p className="flex items-start gap-2 text-xs text-danger">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      Revoke this key? Anything using it will stop working
+                      immediately.
                     </p>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <TerminalButton
-                    type="button"
-                    variant="danger"
-                    onClick={handleConfirmRevoke}
-                    disabled={isRevoking}
-                  >
-                    {isRevoking ? "Revoking..." : "Revoke"}
-                  </TerminalButton>
-                  <TerminalButton
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setConfirming(false);
-                      setRowError(null);
-                    }}
-                    disabled={isRevoking}
-                  >
-                    Cancel
-                  </TerminalButton>
+                    {rowError && (
+                      <p className="mt-1 text-xs font-medium text-danger">
+                        {rowError}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <TerminalButton
+                      type="button"
+                      variant="danger"
+                      onClick={handleConfirmRevoke}
+                      disabled={isRevoking}
+                    >
+                      {isRevoking ? "Revoking..." : "Revoke"}
+                    </TerminalButton>
+                    <TerminalButton
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setConfirming(false);
+                        setRowError(null);
+                      }}
+                      disabled={isRevoking}
+                    >
+                      Cancel
+                    </TerminalButton>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -509,6 +520,12 @@ type ExpiryMode = "none" | "30d" | "90d" | "custom";
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 
+/**
+ * CALLER CONTRACT: pass a fresh `key` on every open. Mounting is what resets
+ * this form, including the one-time plaintext key, which must never survive
+ * into the next run. Nothing here copies defaults back over the previous
+ * run's state, so there is no window where a stale value is on screen.
+ */
 function CreateKeyDrawer({
   organizationId,
   isOwner,
@@ -539,8 +556,10 @@ function CreateKeyDrawer({
   const [selectedResources, setSelectedResources] = useState<Set<Resource>>(
     new Set<Resource>(["variables", "projects"])
   );
+  // Seeded from the default preset ("agent"), so the chips the form opens on
+  // and the preset it says it is on cannot disagree.
   const [selectedSurfaces, setSelectedSurfaces] = useState<Set<Surface>>(
-    new Set<Surface>(["rest_api", "mcp_server"])
+    new Set<Surface>(["mcp_server"])
   );
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [customExpiry, setCustomExpiry] = useState("");
@@ -554,28 +573,6 @@ function CreateKeyDrawer({
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showSnippet, setShowSnippet] = useState(false);
-
-  // Fresh form every open — the drawer only unmounts its children, so the
-  // previous run's state (including a revealed key) must not linger.
-  useEffect(() => {
-    if (!isOpen) return;
-    setName("");
-    setPreset("agent");
-    setTriedSubmit(false);
-    setProjectMode("specific");
-    setSelectedProjectIds(new Set());
-    setEnvMode("specific");
-    setSelectedEnvs(new Set<Environment>(["production"]));
-    setSelectedResources(new Set<Resource>(["variables", "projects"]));
-    setSelectedSurfaces(new Set<Surface>(["mcp_server"]));
-    setExpiryMode("none");
-    setCustomExpiry("");
-    setIsSubmitting(false);
-    setError(null);
-    setCreatedToken(null);
-    setCopied(false);
-    setShowSnippet(false);
-  }, [isOpen]);
 
   const toggleProject = (id: Id<"projects">) => {
     setSelectedProjectIds((prev) => {
@@ -834,7 +831,7 @@ function CreateKeyDrawer({
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               <span className="font-semibold">
-                Copy it now — you won&apos;t see this key again.
+                Copy it now. You won&apos;t see this key again.
               </span>{" "}
               Envpilot only stores its hash.
             </span>
@@ -873,7 +870,7 @@ function CreateKeyDrawer({
                 ENVPILOT_API_KEY
               </code>
               ), confirm a tool call works, then revoke the old key below.
-              Claude Code refuses to re-add an existing server — run{" "}
+              Claude Code refuses to re-add an existing server, so run{" "}
               <code className="rounded bg-surface-raised px-1 py-0.5">
                 claude mcp remove envpilot
               </code>{" "}
@@ -900,27 +897,31 @@ function CreateKeyDrawer({
               {showSnippet && (
                 <motion.div
                   key="snippet"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
+                  // Grid track instead of `height` — see the revoke strip in
+                  // KeyRow for why.
+                  initial={{ gridTemplateRows: "0fr", opacity: 0 }}
+                  animate={{ gridTemplateRows: "1fr", opacity: 1 }}
+                  exit={{ gridTemplateRows: "0fr", opacity: 0 }}
                   transition={{ duration: 0.2, ease: "easeInOut" }}
-                  className="overflow-hidden"
+                  className="grid"
                 >
-                  <pre className="mt-2 overflow-x-auto rounded-panel bg-canvas px-3 py-3 text-xs text-ink-muted">
-                    {`curl -H "Authorization: Bearer $ENVPILOT_API_KEY" \\
+                  <div className="overflow-hidden">
+                    <pre className="mt-2 overflow-x-auto rounded-panel bg-canvas px-3 py-3 text-xs text-ink-muted">
+                      {`curl -H "Authorization: Bearer $ENVPILOT_API_KEY" \\
   "https://www.envpilot.dev/api/v1/projects/{slug}/variables?environment=production"`}
-                  </pre>
-                  <p className="mt-1 text-xs text-ink-subtle">
-                    Store the key as the{" "}
-                    <code className="rounded bg-surface-raised px-1 py-0.5">
-                      ENVPILOT_API_KEY
-                    </code>{" "}
-                    environment variable, and replace{" "}
-                    <code className="rounded bg-surface-raised px-1 py-0.5">
-                      {"{slug}"}
-                    </code>{" "}
-                    with your project&apos;s slug.
-                  </p>
+                    </pre>
+                    <p className="mt-1 text-xs text-ink-subtle">
+                      Store the key as the{" "}
+                      <code className="rounded bg-surface-raised px-1 py-0.5">
+                        ENVPILOT_API_KEY
+                      </code>{" "}
+                      environment variable, and replace{" "}
+                      <code className="rounded bg-surface-raised px-1 py-0.5">
+                        {"{slug}"}
+                      </code>{" "}
+                      with your project&apos;s slug.
+                    </p>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -960,9 +961,9 @@ function CreateKeyDrawer({
                     className="text-sm text-ink-muted"
                   >
                     <span className="font-mono text-[12px] text-ink-subtle">
-                      {problem.field}
+                      {problem.field}:
                     </span>{" "}
-                    — {problem.message}
+                    {problem.message}
                   </li>
                 ))}
               </ul>
@@ -1134,7 +1135,7 @@ function CreateKeyDrawer({
               <span aria-hidden className="mr-2 text-accent">
                 &#9656;
               </span>
-              Advanced — surfaces, resources, expiry
+              Advanced: surfaces, resources, expiry
             </summary>
 
             <div className="mt-4 space-y-5">
@@ -1229,7 +1230,7 @@ function CreateKeyDrawer({
                       <span aria-hidden className="mr-1.5 text-accent">
                         &#9656;
                       </span>
-                      MCP server — {mcpToolCount} of {RESOURCES.length} resource
+                      MCP server: {mcpToolCount} of {RESOURCES.length} resource
                       groups unlock tools
                     </summary>
                     <ul className="mt-2 space-y-1">
@@ -1251,7 +1252,7 @@ function CreateKeyDrawer({
                               {enabled ? "✓" : "✗"}
                             </span>
                             <span>
-                              <span className="capitalize">{resource}</span> —{" "}
+                              <span className="capitalize">{resource}</span>:{" "}
                               <span className="font-mono">
                                 {MCP_RESOURCE_TOOLS[resource]}
                               </span>
@@ -1268,7 +1269,7 @@ function CreateKeyDrawer({
                     >
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       Without the projects resource, MCP clients cannot list or
-                      search projects — most assistants start there, so every
+                      search projects. Most assistants start there, so every
                       session fails with a scope error. Enable projects for a
                       usable MCP key.
                     </p>

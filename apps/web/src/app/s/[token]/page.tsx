@@ -27,6 +27,22 @@ import { createLogger } from "@/lib/logger";
 type ViewerStep = "email" | "otp" | "passphrase" | "revealed" | "error";
 const log = createLogger("app/share-viewer");
 
+function maskEmail(address: string) {
+  const [local, domain] = address.split("@");
+  if (!domain) return address;
+  const masked =
+    local.length <= 2
+      ? local[0] + "***"
+      : local[0] + "***" + local[local.length - 1];
+  return `${masked}@${domain}`;
+}
+
+function formatCountdown(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 export default function ShareViewerPage() {
   const params = useParams<{ token: string }>();
   const token = params.token;
@@ -43,7 +59,6 @@ export default function ShareViewerPage() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [showAccountPassword, setShowAccountPassword] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(300); // 5 minutes
-  const [hasPassphrase, setHasPassphrase] = useState(false);
   // one-time shares are destroyed on view; time-limited shares stay available
   // until they expire — drives the reveal-screen copy so it isn't misleading.
   const [shareMode, setShareMode] = useState<"one_time" | "time_limited">(
@@ -52,6 +67,10 @@ export default function ShareViewerPage() {
 
   // Store encrypted payload in memory only (not sessionStorage) to prevent XSS exposure
   const encryptedPayloadRef = useRef<string | null>(null);
+  // The viewer is a linear flow, so at most one mutating request is ever
+  // legitimate at a time. A ref closes the double-submit window that
+  // `isPending` leaves open, since that flag only flips on the next render.
+  const submittingRef = useRef(false);
 
   const verifyEmail = useVerifyShareEmail();
   const verifyOtp = useVerifyShareOtp();
@@ -81,38 +100,26 @@ export default function ShareViewerPage() {
       setStep("error");
       setErrorMessage("Invalid decryption key in URL.");
     }
-  }, []);
+  }, [token]);
 
-  // OTP countdown timer
+  // One interval per active countdown: the tick lives in the functional
+  // updater and the effect owns teardown, so the timer is not rebuilt each
+  // second. Flipping to inactive at zero stops it.
+  const countdownActive = step === "otp" && otpCountdown > 0;
   useEffect(() => {
-    if (step !== "otp") return;
-    if (otpCountdown <= 0) return;
+    if (!countdownActive) return;
 
     const interval = setInterval(() => {
-      setOtpCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setOtpCountdown((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [step, otpCountdown]);
-
-  const maskEmail = (email: string) => {
-    const [local, domain] = email.split("@");
-    if (!domain) return email;
-    const masked =
-      local.length <= 2
-        ? local[0] + "***"
-        : local[0] + "***" + local[local.length - 1];
-    return `${masked}@${domain}`;
-  };
+  }, [countdownActive]);
 
   const handleVerifyEmail = async () => {
     if (!email.trim()) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
 
     try {
       await verifyEmail.mutateAsync({ token, email: email.trim() });
@@ -129,12 +136,16 @@ export default function ShareViewerPage() {
       setErrorMessage(
         err instanceof Error ? err.message : "Failed to verify email"
       );
+    } finally {
+      submittingRef.current = false;
     }
   };
 
   const handleVerifyOtp = async () => {
     if (otp.length !== 6) return;
     if (!clientKey) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
 
     try {
       // Hash the OTP client-side for comparison
@@ -147,7 +158,6 @@ export default function ShareViewerPage() {
         otpHash,
       });
 
-      setHasPassphrase(result.hasPassphrase);
       if (result.mode) setShareMode(result.mode);
 
       if (result.hasPassphrase) {
@@ -196,6 +206,8 @@ export default function ShareViewerPage() {
         });
         setErrorMessage(message);
       }
+    } finally {
+      submittingRef.current = false;
     }
   };
 
@@ -230,6 +242,8 @@ export default function ShareViewerPage() {
 
   const handleResendOtp = async () => {
     if (!email.trim()) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setErrorMessage("");
     try {
       await verifyEmail.mutateAsync({ token, email: email.trim() });
@@ -240,6 +254,8 @@ export default function ShareViewerPage() {
       setErrorMessage(
         err instanceof Error ? err.message : "Failed to resend code"
       );
+    } finally {
+      submittingRef.current = false;
     }
   };
 
@@ -270,12 +286,6 @@ export default function ShareViewerPage() {
           clipErr instanceof Error ? clipErr.message : "restricted_context",
       });
     }
-  };
-
-  const formatCountdown = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
   return (
@@ -313,23 +323,32 @@ export default function ShareViewerPage() {
                 Enter your email to verify access.
               </p>
               <div className="space-y-3">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setErrorMessage("");
-                  }}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" &&
-                    !verifyEmail.isPending &&
-                    handleVerifyEmail()
-                  }
-                  disabled={verifyEmail.isPending}
-                  placeholder="your@email.com"
-                  className="w-full rounded-lg border border-line bg-surface-raised px-3 py-2.5 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
-                  autoFocus
-                />
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="share-email"
+                    className="block text-[10px] font-medium uppercase tracking-wide text-ink-subtle"
+                  >
+                    Email
+                  </label>
+                  <input
+                    id="share-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setErrorMessage("");
+                    }}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" &&
+                      !verifyEmail.isPending &&
+                      handleVerifyEmail()
+                    }
+                    disabled={verifyEmail.isPending}
+                    placeholder="your@email.com"
+                    className="w-full rounded-lg border border-line bg-surface-raised px-3 py-2.5 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
+                    autoFocus
+                  />
+                </div>
                 <button
                   onClick={handleVerifyEmail}
                   disabled={!email.trim() || verifyEmail.isPending}
@@ -363,26 +382,37 @@ export default function ShareViewerPage() {
                 <span className="text-ink">{maskedEmail}</span>
               </p>
               <div className="space-y-3">
-                <input
-                  type="text"
-                  value={otp}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, "").slice(0, 6);
-                    setOtp(val);
-                    setErrorMessage("");
-                  }}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" &&
-                    otp.length === 6 &&
-                    !verifyOtp.isPending &&
-                    handleVerifyOtp()
-                  }
-                  disabled={verifyOtp.isPending}
-                  placeholder="000000"
-                  className="w-full rounded-lg border border-line bg-surface-raised px-3 py-2.5 text-center font-mono text-2xl tracking-[0.3em] text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
-                  maxLength={6}
-                  autoFocus
-                />
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="share-otp"
+                    className="block text-[10px] font-medium uppercase tracking-wide text-ink-subtle"
+                  >
+                    6-digit code
+                  </label>
+                  <input
+                    id="share-otp"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={otp}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                      setOtp(val);
+                      setErrorMessage("");
+                    }}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" &&
+                      otp.length === 6 &&
+                      !verifyOtp.isPending &&
+                      handleVerifyOtp()
+                    }
+                    disabled={verifyOtp.isPending}
+                    placeholder="000000"
+                    className="w-full rounded-lg border border-line bg-surface-raised px-3 py-2.5 text-center font-mono text-2xl tracking-[0.3em] text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
+                    maxLength={6}
+                    autoFocus
+                  />
+                </div>
                 <button
                   onClick={handleVerifyOtp}
                   disabled={otp.length !== 6 || verifyOtp.isPending}
@@ -436,22 +466,31 @@ export default function ShareViewerPage() {
                 This secret is protected with an additional passphrase.
               </p>
               <div className="space-y-3">
-                <input
-                  type="password"
-                  value={passphrase}
-                  onChange={(e) => {
-                    setPassphrase(e.target.value);
-                    setErrorMessage("");
-                  }}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" &&
-                    passphrase &&
-                    handleDecryptWithPassphrase()
-                  }
-                  placeholder="Enter passphrase"
-                  className="w-full rounded-lg border border-line bg-surface-raised px-3 py-2.5 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
-                  autoFocus
-                />
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="share-passphrase"
+                    className="block text-[10px] font-medium uppercase tracking-wide text-ink-subtle"
+                  >
+                    Passphrase
+                  </label>
+                  <input
+                    id="share-passphrase"
+                    type="password"
+                    value={passphrase}
+                    onChange={(e) => {
+                      setPassphrase(e.target.value);
+                      setErrorMessage("");
+                    }}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" &&
+                      passphrase &&
+                      handleDecryptWithPassphrase()
+                    }
+                    placeholder="Enter passphrase"
+                    className="w-full rounded-lg border border-line bg-surface-raised px-3 py-2.5 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line"
+                    autoFocus
+                  />
+                </div>
                 <button
                   onClick={handleDecryptWithPassphrase}
                   disabled={!passphrase}
