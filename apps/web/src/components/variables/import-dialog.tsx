@@ -339,7 +339,7 @@ function ImportPreview({ keys }: { keys: string[] }) {
         {keys.length !== 1 ? "s" : ""} found
       </p>
       <div className="max-h-32 space-y-0.5 overflow-y-auto font-mono text-xs text-ink-muted">
-        {[...keys].sort().map((key) => (
+        {keys.toSorted().map((key) => (
           <div key={key} className="truncate">
             {key}
           </div>
