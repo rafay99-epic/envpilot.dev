@@ -43,10 +43,18 @@ import {
 } from "lucide-react";
 import { createLogger } from "@/lib/logger";
 import { PageHeader } from "@envpilot/ui";
+import { formatDateWith } from "@/lib/format";
+import { useTimeZone } from "@/hooks/useTimeZone";
 
 const log = createLogger("app/dashboard/variables");
 
 const PAGE_SIZE = 50;
+
+const UPDATED_AT_OPTIONS: Intl.DateTimeFormatOptions = {
+  month: "numeric",
+  day: "numeric",
+  year: "numeric",
+};
 
 interface Variable {
   _id: Id<"environmentVariables">;
@@ -130,6 +138,10 @@ export default function VariablesPage() {
     new Set((variables as Variable[]).flatMap((v) => v.environments))
   ).sort();
 
+  // Built once instead of scanning the tag list per tag per rendered row.
+  const tagsById = new Map(orgTags.map((tag) => [tag._id, tag]));
+  const selectedTagIds = new Set(selectedTags);
+
   const filteredVariables = (variables as Variable[]).filter((variable) => {
     const matchesSearch =
       searchQuery === "" ||
@@ -147,8 +159,8 @@ export default function VariablesPage() {
       variable.environments.includes(selectedEnvironment);
 
     const matchesTags =
-      selectedTags.length === 0 ||
-      (variable.tagIds?.some((id) => selectedTags.includes(id)) ?? false);
+      selectedTagIds.size === 0 ||
+      (variable.tagIds?.some((id) => selectedTagIds.has(id)) ?? false);
 
     return matchesSearch && matchesProject && matchesEnvironment && matchesTags;
   });
@@ -448,14 +460,18 @@ export default function VariablesPage() {
                     }
                     tags={
                       showTags && variable.tagIds
-                        ? variable.tagIds
-                            .map((id) => orgTags.find((t) => t._id === id))
-                            .filter(Boolean)
-                            .map((t) => ({
-                              _id: t!._id,
-                              name: t!.name,
-                              color: t!.color,
-                            }))
+                        ? variable.tagIds.flatMap((id) => {
+                            const tag = tagsById.get(id);
+                            return tag
+                              ? [
+                                  {
+                                    _id: tag._id,
+                                    name: tag.name,
+                                    color: tag.color,
+                                  },
+                                ]
+                              : [];
+                          })
                         : undefined
                     }
                   />
@@ -557,6 +573,7 @@ function VariableRow({
 }) {
   const [isValueVisible, setIsValueVisible] = useState(false);
   const [copied, setCopied] = useState(false);
+  const timeZone = useTimeZone();
 
   const handleToggleReveal = () => {
     if (!revealedValue && !isRevealing) {
@@ -637,7 +654,7 @@ function VariableRow({
           </div>
         </td>
         <td className="whitespace-nowrap px-5 py-3 text-sm text-ink-subtle">
-          {new Date(variable.updatedAt).toLocaleDateString()}
+          {formatDateWith(variable.updatedAt, UPDATED_AT_OPTIONS, timeZone)}
         </td>
         <td className="whitespace-nowrap px-5 py-3 text-right">
           <div className="flex items-center justify-end gap-1">

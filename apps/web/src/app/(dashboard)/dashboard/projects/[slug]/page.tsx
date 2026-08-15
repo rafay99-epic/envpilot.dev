@@ -537,6 +537,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const baseVariables = isSearching
     ? ((searchData?.results ?? []) as Variable[])
     : variables;
+  // Built once instead of scanning the tag list per tag per rendered row.
+  const tagsById = new Map(orgTags.map((tag) => [tag._id, tag]));
+  const selectedTagIds = new Set(selectedTags);
+
   const filteredVariables = baseVariables.filter((v) => {
     // Environment filter
     if (
@@ -546,8 +550,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       return false;
     }
     // Tag filter (OR logic within selected tags)
-    if (selectedTags.length > 0) {
-      if (!v.tagIds || !v.tagIds.some((id) => selectedTags.includes(id))) {
+    if (selectedTagIds.size > 0) {
+      if (!v.tagIds || !v.tagIds.some((id) => selectedTagIds.has(id))) {
         return false;
       }
     }
@@ -666,10 +670,19 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       )}
 
       <div className="flex flex-wrap items-center gap-4">
-        <label className="text-sm font-medium text-ink-muted">
+        {/* A button group, not a form control, so it gets a labelled group
+            rather than a <label htmlFor>. */}
+        <span
+          id="environment-filter-label"
+          className="text-sm font-medium text-ink-muted"
+        >
           Environment:
-        </label>
-        <div className="flex gap-2">
+        </span>
+        <div
+          role="group"
+          aria-labelledby="environment-filter-label"
+          className="flex gap-2"
+        >
           <button
             onClick={() => setSelectedEnvironment("all")}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -906,11 +919,12 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                     key={variable._id}
                     variable={{
                       ...variable,
-                      tags: variable.tagIds
-                        ?.map((id) => orgTags.find((t) => t._id === id))
-                        .filter(Boolean) as
-                        | Array<{ _id: string; name: string; color: string }>
-                        | undefined,
+                      tags: variable.tagIds?.flatMap((id) => {
+                        const tag = tagsById.get(id);
+                        return tag
+                          ? [{ _id: tag._id, name: tag.name, color: tag.color }]
+                          : [];
+                      }),
                     }}
                     onEdit={() => setEditingVariable(variable)}
                     onDelete={() => setDeletingVariable(variable)}

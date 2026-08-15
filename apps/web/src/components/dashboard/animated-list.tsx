@@ -1,6 +1,15 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { isValidElement } from "react";
+import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
+
+/**
+ * Reuse the caller's key so a reorder or filter keeps each wrapper attached to
+ * its own child. Callers that render keyless children fall back to the index.
+ */
+function childKey(child: React.ReactNode, index: number) {
+  return isValidElement(child) && child.key !== null ? child.key : index;
+}
 
 interface AnimatedListProps {
   children: React.ReactNode[];
@@ -34,28 +43,30 @@ export function AnimatedList({
   pageKey = "default",
 }: AnimatedListProps) {
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={pageKey}
-        className={className}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-      >
-        {children.map((child, i) => (
-          <motion.div
-            key={i}
-            custom={i}
-            variants={itemVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-          >
-            {child}
-          </motion.div>
-        ))}
-      </motion.div>
-    </AnimatePresence>
+    <LazyMotion features={domAnimation}>
+      <AnimatePresence mode="wait">
+        <m.div
+          key={pageKey}
+          className={className}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
+          {children.map((child, i) => (
+            <m.div
+              key={childKey(child, i)}
+              custom={i}
+              variants={itemVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              {child}
+            </m.div>
+          ))}
+        </m.div>
+      </AnimatePresence>
+    </LazyMotion>
   );
 }
 
@@ -72,29 +83,31 @@ export function AnimatedGrid({
   ref,
 }: AnimatedGridProps) {
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        ref={ref}
-        key={pageKey}
-        className={className}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-      >
-        {children.map((child, i) => (
-          <motion.div
-            key={i}
-            custom={i}
-            variants={itemVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-          >
-            {child}
-          </motion.div>
-        ))}
-      </motion.div>
-    </AnimatePresence>
+    <LazyMotion features={domAnimation}>
+      <AnimatePresence mode="wait">
+        <m.div
+          ref={ref}
+          key={pageKey}
+          className={className}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
+          {children.map((child, i) => (
+            <m.div
+              key={childKey(child, i)}
+              custom={i}
+              variants={itemVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              {child}
+            </m.div>
+          ))}
+        </m.div>
+      </AnimatePresence>
+    </LazyMotion>
   );
 }
 
