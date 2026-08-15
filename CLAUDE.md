@@ -278,6 +278,9 @@ bunx prettier --check .                            # prettier check (no standalo
 bun run format:fix                                 # prettier fix
 bun run check:all                                  # full CI check
 
+# React Compiler health (apps/web) — NOT covered by lint or typecheck
+cd apps/web && bunx react-compiler-healthcheck@latest --src "src/**/*.{ts,tsx}"
+
 # E2E tests (Playwright, Chromium only, auto-starts dev server)
 bun run test:e2e
 cd apps/web && bunx playwright test tests/e2e/specific.spec.ts
@@ -450,7 +453,14 @@ of bug is invisible until deployed.
 
 - **Package manager**: bun (workspaces), with Turborepo for task orchestration
 - **Path aliases**: `@/*` maps to `./src/*` in the web app; `@convex/*` maps to `../../convex/*`
-- React Compiler is enabled (Next.js `reactCompiler: true`) — avoid manual `useMemo`/`useCallback`
+- React Compiler is enabled (Next.js `reactCompiler: true`) — avoid manual
+  `useMemo`/`useCallback`. **The compiler bails on a whole function when it
+  meets a `try` with a `finally`, or a `try` with no `catch`**, and that
+  component silently loses all automatic memoization. Put the cleanup after
+  the `try/catch` when the catch swallows, or use `Promise.finally`. Nothing
+  in `bun run lint`, `typecheck` or the local `react-doctor` CLI reports this
+  (the local scan only loads the `deslop` and `react-doctor` plugins) — only
+  the React Doctor GitHub Action and `react-compiler-healthcheck` do.
 - Zod v4 for input validation in API routes and CLI
 - Convex validators (`v.*`) for backend function args, separate from Zod
 - Tailwind CSS v4 via PostCSS
