@@ -170,23 +170,37 @@ export function TagsTab({ organizationId }: { organizationId: string }) {
     };
     setBulkProgress(progress);
 
-    for (const entry of bulkEntries) {
-      try {
-        await createTagMut.mutateAsync({
-          organizationId,
-          name: entry.name,
-          color: entry.color,
-        });
-        progress.completed++;
-      } catch (err) {
-        progress.completed++;
-        progress.failures.push({
-          name: entry.name,
-          error: err instanceof Error ? err.message : "Failed",
-        });
-      }
-      setBulkProgress({ ...progress });
-    }
+    // Tag creation is an independent Convex mutation per entry: no ordering,
+    // no cumulative state, and no rate-limited service behind it, so the
+    // entries go out together instead of one round trip at a time.
+    //
+    // The counter still ticks as each one settles, and failures are read back
+    // from the resolved array rather than pushed on completion, so the list
+    // stays in the order the user typed rather than the order the server
+    // happened to answer.
+    const outcomes = await Promise.all(
+      bulkEntries.map((entry) =>
+        createTagMut
+          .mutateAsync({
+            organizationId,
+            name: entry.name,
+            color: entry.color,
+          })
+          .then(() => null)
+          .catch((err: unknown) => ({
+            name: entry.name,
+            error: err instanceof Error ? err.message : "Failed",
+          }))
+          .then((failure) => {
+            progress.completed++;
+            setBulkProgress({ ...progress, failures: [...progress.failures] });
+            return failure;
+          })
+      )
+    );
+
+    progress.failures.push(...outcomes.filter((o) => o !== null));
+    setBulkProgress({ ...progress });
 
     setIsBulkCreating(false);
     setBulkProgress(null);
