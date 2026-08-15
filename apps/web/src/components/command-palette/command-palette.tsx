@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useId, useRef } from "react";
+import { useState, useEffect, useId, useReducer, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
 import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
@@ -10,16 +10,18 @@ import { Search, Lock, X, Tag, SlidersHorizontal } from "lucide-react";
 import { api as convexApi } from "@convex/_generated/api";
 import { useAuthContext } from "@/components/auth";
 import { useConvexUser, useGlobalSearch } from "@/hooks";
-import { ENVIRONMENTS } from "@/constants/project";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { SHORTCUTS, parseBinding } from "@/hooks/useKeyboardShortcuts";
 import { TagBadge } from "@/components/variables/tag-badge";
 import { searchSettings } from "@/settings/settings-index";
+import {
+  ENV_FILTERS,
+  initialPaletteState,
+  paletteReducer,
+  type EnvFilter,
+} from "./palette-state";
 
 export const OPEN_COMMAND_PALETTE_EVENT = "open-command-palette";
-
-const ENV_FILTERS = ["all", ...ENVIRONMENTS] as const;
-type EnvFilter = (typeof ENV_FILTERS)[number];
 
 const ENV_COLORS: Record<string, string> = {
   development: "bg-info-soft text-info border-info-line",
@@ -28,10 +30,8 @@ const ENV_COLORS: Record<string, string> = {
 };
 
 export function CommandPalette() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [envFilter, setEnvFilter] = useState<EnvFilter>("all");
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [palette, dispatch] = useReducer(paletteReducer, initialPaletteState);
+  const { isOpen, envFilter, tagFilter, selectedIndex } = palette;
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const searchInputId = useId();
@@ -150,25 +150,20 @@ export function CommandPalette() {
 
   function handleSearch(value: string) {
     setSearchTerm(value);
-    setSelectedIndex(0);
+    dispatch({ kind: "selection-reset" });
   }
 
   function handleFilterChange(filter: EnvFilter) {
-    setEnvFilter(filter);
-    setSelectedIndex(0);
+    dispatch({ kind: "env-filter-changed", filter });
   }
 
   function openPalette() {
     setSearchTerm("");
-    setEnvFilter("all");
-    setTagFilter([]);
-    setSelectedIndex(0);
-    setIsOpen(true);
-    setTimeout(() => inputRef.current?.focus(), 50);
+    dispatch({ kind: "opened" });
   }
 
   function closePalette() {
-    setIsOpen(false);
+    dispatch({ kind: "closed" });
   }
 
   // Global hotkey — respects custom bindings
@@ -208,15 +203,27 @@ export function CommandPalette() {
       : { enabled: false, conflictBehavior: "allow" }
   );
 
-  // Listen for custom open event (from search trigger button)
+  // Focus follows opening, rather than a timer fired from the click handler
+  // that nothing cleaned up. The delay lets the panel mount first.
+  useEffect(() => {
+    if (!isOpen) return;
+    const focusTimer = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(focusTimer);
+  }, [isOpen]);
+
+  // Listen for custom open event (from search trigger button). Both calls in
+  // the handler are stable — dispatch by React's guarantee, setSearchTerm
+  // because it is a useState setter — so the listener is registered once
+  // rather than on every render.
   useEffect(() => {
     function handleOpen() {
-      openPalette();
+      setSearchTerm("");
+      dispatch({ kind: "opened" });
     }
     window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, handleOpen);
     return () =>
       window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, handleOpen);
-  }, [openPalette]);
+  }, [setSearchTerm]);
 
   // Rows tag themselves with their nav index, so headings between groups no
   // longer shift the lookup.
@@ -230,10 +237,10 @@ export function CommandPalette() {
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev < navCount - 1 ? prev + 1 : 0));
+      dispatch({ kind: "selection-moved", delta: 1, navCount });
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : navCount - 1));
+      dispatch({ kind: "selection-moved", delta: -1, navCount });
     } else if (e.key === "Enter" && navCount > 0) {
       e.preventDefault();
       const item = navItems[clampedIndex];
@@ -342,14 +349,9 @@ export function CommandPalette() {
                       return (
                         <button
                           key={tag._id}
-                          onClick={() => {
-                            setTagFilter((prev) =>
-                              isSelected
-                                ? prev.filter((id) => id !== tag._id)
-                                : [...prev, tag._id]
-                            );
-                            setSelectedIndex(0);
-                          }}
+                          onClick={() =>
+                            dispatch({ kind: "tag-toggled", tagId: tag._id })
+                          }
                           className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
                             isSelected
                               ? "text-white"
