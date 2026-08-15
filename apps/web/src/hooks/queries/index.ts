@@ -1,8 +1,4 @@
-export { useAuthQuery } from "./useAuthQuery";
-
 export {
-  useVariablesList,
-  useVariableDetail,
   useVariableHistory,
   useCreateVariable,
   useUpdateVariable,

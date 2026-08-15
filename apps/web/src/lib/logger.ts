@@ -176,7 +176,7 @@ export interface Logger {
    * @example
    * try { ... }
    * catch (err) {
-   *   log.error("convex_write_failed", { duration_ms: since(start) }, err);
+   *   log.error("convex_write_failed", { duration_ms: Date.now() - start }, err);
    * }
    */
   error(event: string, data?: LogData, cause?: unknown): void;
@@ -202,23 +202,6 @@ export function createLogger(module: string, base: LogData = {}): Logger {
 export function tokenPrefix(token: string | null | undefined): string {
   if (!token) return "none";
   return token.slice(0, 8);
-}
-
-/** Milliseconds since `startedAt`. Use as `duration_ms: since(start)`. */
-export function since(startedAt: number): number {
-  return Date.now() - startedAt;
-}
-
-/**
- * Extract a client IP from a Next.js Request. Respects the standard proxy
- * headers Vercel sets. Falls back to "unknown".
- */
-export function clientIp(request: Request): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-  );
 }
 
 /**
