@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { createLogger } from "@/lib/logger";
 import { PageHeader } from "@envpilot/ui";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDate } from "@/lib/format";
 
 const log = createLogger("app/dashboard/requests");
 
@@ -401,6 +403,7 @@ function RequestRow({
   onAccept: (environments: string[], suppliedValue?: string) => void;
   onReject: () => void;
 }) {
+  const timeZone = useTimeZone();
   const [isValueVisible, setIsValueVisible] = useState(false);
   // Reviewer's environment override, pre-selected to the requested set.
   const [selectedEnvironments, setSelectedEnvironments] = useState<string[]>(
@@ -553,7 +556,7 @@ function RequestRow({
 
       {/* Requested date */}
       <td className="whitespace-nowrap px-5 py-3 text-sm text-ink-subtle">
-        {new Date(request.createdAt).toLocaleDateString()}
+        {formatDate(request.createdAt, timeZone)}
       </td>
 
       {/* Actions (pending) or review info (resolved) */}
@@ -612,7 +615,7 @@ function RequestRow({
             )}
             {request.reviewedAt && (
               <span className="text-xs text-ink-faint">
-                {new Date(request.reviewedAt).toLocaleDateString()}
+                {formatDate(request.reviewedAt, timeZone)}
               </span>
             )}
             {request.reviewReason && (

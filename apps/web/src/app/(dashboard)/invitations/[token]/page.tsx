@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { roleLabel } from "@/lib/roles";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateWith } from "@/lib/format";
 
 interface InvitationDetails {
   email: string;
@@ -37,14 +39,23 @@ export default function InvitationAcceptPage({
   const [status, setStatus] = useState<
     "pending" | "accepted" | "declined" | "expired" | "error"
   >("pending");
+  const timeZone = useTimeZone();
+
+  // Accept and decline both mutate the invitation, and state only flips on
+  // the next render — the ref closes the double-click window in between.
+  const inFlight = useRef(false);
 
   useEffect(() => {
+    // A second token would otherwise race the first response into state.
+    let cancelled = false;
+
     async function fetchInvitation() {
       try {
         const response = await fetch(`/api/invitations/${token}`);
 
         if (!response.ok) {
           const data = await response.json();
+          if (cancelled) return;
           if (data.status === "expired") {
             setStatus("expired");
           } else if (data.status) {
@@ -56,18 +67,26 @@ export default function InvitationAcceptPage({
         }
 
         const data = await response.json();
+        if (cancelled) return;
         setInvitation(data.invitation);
       } catch (err) {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
 
     fetchInvitation();
+
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   async function handleAccept() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setIsAccepting(true);
     setError(null);
 
@@ -92,12 +111,15 @@ export default function InvitationAcceptPage({
         router.push(`/organizations/${data.organization.slug}`);
       }, 2000);
     } catch (err) {
+      inFlight.current = false;
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsAccepting(false);
     }
   }
 
   async function handleDecline() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setIsDeclining(true);
     setError(null);
 
@@ -113,6 +135,7 @@ export default function InvitationAcceptPage({
 
       setStatus("declined");
     } catch (err) {
+      inFlight.current = false;
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsDeclining(false);
     }
@@ -326,11 +349,11 @@ export default function InvitationAcceptPage({
 
           <p className="mt-4 text-xs text-ink-muted">
             Expires{" "}
-            {new Date(invitation.expiresAt).toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
+            {formatDateWith(
+              invitation.expiresAt,
+              { year: "numeric", month: "long", day: "numeric" },
+              timeZone
+            )}
           </p>
         </div>
       </div>

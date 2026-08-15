@@ -9,6 +9,8 @@ import type { Id } from "@convex/_generated/dataModel";
 import { Building2 } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateWith } from "@/lib/format";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { useOrganizationBySlug, useOrganizationMemberCount } from "@/hooks";
 import {
@@ -28,6 +30,7 @@ export default function OrganizationPage({
   const { slug } = use(params);
   const router = useRouter();
   const organization = useOrganizationBySlug(slug);
+  const timeZone = useTimeZone();
   const memberCount = useOrganizationMemberCount(organization?._id) ?? 0;
 
   const tierData = useQuery(
@@ -271,11 +274,11 @@ export default function OrganizationPage({
           <div className="flex justify-between border-b pb-4 border-line">
             <dt className="text-sm text-ink-muted">Created</dt>
             <dd className="text-sm text-ink">
-              {new Date(organization.createdAt).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              {formatDateWith(
+                organization.createdAt,
+                { year: "numeric", month: "long", day: "numeric" },
+                timeZone
+              )}
             </dd>
           </div>
           <div className="flex justify-between border-b pb-4 border-line">
@@ -287,11 +290,11 @@ export default function OrganizationPage({
           <div className="flex justify-between">
             <dt className="text-sm text-ink-muted">Last Updated</dt>
             <dd className="text-sm text-ink">
-              {new Date(organization.updatedAt).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              {formatDateWith(
+                organization.updatedAt,
+                { year: "numeric", month: "long", day: "numeric" },
+                timeZone
+              )}
             </dd>
           </div>
         </dl>

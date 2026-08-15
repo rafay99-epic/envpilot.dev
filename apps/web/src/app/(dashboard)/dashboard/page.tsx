@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import {
   useDashboardStats,
   useRecentActivity,
@@ -24,6 +25,8 @@ import { PageHeader } from "@envpilot/ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { SharedSecretsWidget } from "@/components/dashboard/shared-secrets-widget";
 import { normalizeOrgRole, roleLabel } from "@/lib/roles";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateWith } from "@/lib/format";
 import { Plus, ChevronRight, Check, RotateCcw } from "lucide-react";
 
 export default function DashboardPage() {
@@ -459,8 +462,9 @@ const actionLabels: Record<string, string> = {
 };
 
 function ActivityRow({ activity }: { activity: ActivityItem }) {
+  const timeZone = useTimeZone();
   const actionLabel = actionLabels[activity.action] || activity.action;
-  const time = formatTimestamp(activity.createdAt);
+  const time = formatTimestamp(activity.createdAt, timeZone);
 
   return (
     <div className="flex items-start gap-3 px-5 py-3 font-mono text-xs">
@@ -508,9 +512,11 @@ function TeamMemberRow({
       <div className="flex items-center gap-3">
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-raised text-xs font-medium text-ink-muted">
           {member.user.avatarUrl ? (
-            <img
+            <Image
               src={member.user.avatarUrl}
               alt={member.user.name || member.user.email}
+              width={28}
+              height={28}
               className="h-7 w-7 rounded-full"
             />
           ) : (
@@ -537,11 +543,11 @@ function ExpiringSecretRow({
     rotationStatus: string;
   };
 }) {
+  const timeZone = useTimeZone();
   const isExpired = variable.rotationStatus === "expired";
-  const expiresDate = new Date(variable.expiresAt);
   const label = isExpired
     ? "expired"
-    : `expires ${expiresDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+    : `expires ${formatDateWith(variable.expiresAt, { month: "short", day: "numeric" }, timeZone)}`;
 
   return (
     <div className="flex items-center justify-between px-5 py-3 font-mono text-xs">
@@ -557,17 +563,19 @@ function ExpiringSecretRow({
   );
 }
 
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = Date.now();
-  const diff = now - timestamp;
-  const hours = Math.floor(diff / (1000 * 60 * 60));
+function formatTimestamp(timestamp: number, timeZone: string): string {
+  const hours = Math.floor((Date.now() - timestamp) / (1000 * 60 * 60));
 
   if (hours < 24) {
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateWith(
+      timestamp,
+      { hour: "2-digit", minute: "2-digit" },
+      timeZone
+    );
   }
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return formatDateWith(
+    timestamp,
+    { month: "short", day: "numeric" },
+    timeZone
+  );
 }

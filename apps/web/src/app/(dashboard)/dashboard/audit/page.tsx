@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { usePaginatedQuery } from "convex/react";
+import { useConvex, usePaginatedQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "@convex/_generated/api";
 import { RequireRole, useAuthContext } from "@/components/auth";
-import { useAuditLogSummary, useAuditLogsForExport } from "@/hooks";
+import { useAuditLogSummary } from "@/hooks";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   TerminalWindow,
@@ -26,8 +27,27 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import { AuditExportDialog } from "@/components/audit/export-dialog";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateWith, formatNumber } from "@/lib/format";
+import { createLogger } from "@/lib/logger";
+
+// Named `logger` because `log` is the audit-row variable throughout this file.
+const logger = createLogger("app/dashboard/audit");
 
 const PAGE_SIZE = 25;
+
+const CSV_HEADERS = [
+  "Timestamp",
+  "Action",
+  "User",
+  "Email",
+  "Severity",
+  "IP Address",
+];
+
+type AuditExportData = FunctionReturnType<
+  typeof api.features.audit.compliance.getForExport
+>["data"];
 
 const actionLabels: Record<string, string> = {
   "org.created": "Organization created",
@@ -132,7 +152,45 @@ export default function AuditPage() {
   );
 }
 
+/**
+ * Serializes a fetched export and hands the file to the browser. The CSV
+ * columns read the export payload's own field names (`timestamp`, not
+ * `createdAt`) — the shape the query actually returns.
+ */
+function downloadExport(data: AuditExportData, format: "csv" | "json") {
+  const dateStr = new Date().toISOString().split("T")[0];
+  const body =
+    format === "json"
+      ? JSON.stringify(data, null, 2)
+      : [
+          CSV_HEADERS,
+          ...data.map((row) => [
+            row.timestamp,
+            actionLabels[row.action] ?? row.action,
+            row.userName,
+            row.userEmail,
+            row.severity,
+            row.ipAddress ?? "",
+          ]),
+        ]
+          .map((row) =>
+            row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+          )
+          .join("\n");
+
+  const blob = new Blob([body], {
+    type: format === "json" ? "application/json" : "text/csv",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `audit-logs-${dateStr}.${format}`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function AuditPageContent() {
+  const convex = useConvex();
   const { organization } = useAuthContext();
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
@@ -143,11 +201,6 @@ function AuditPageContent() {
   const [dateRange, setDateRange] = useState("30d");
   const [isExporting, setIsExporting] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
-  const [exportFormat, setExportFormat] = useState<"csv" | "json">("json");
-  const [exportRange, setExportRange] = useState<{
-    start: number;
-    end: number;
-  } | null>(null);
 
   // Fetch logs via Convex cursor pagination (incremental "load more").
   // `results` accumulates every loaded page; client-side filters below
@@ -167,15 +220,6 @@ function AuditPageContent() {
     dateRange === "24h" ? 1 : parseInt(dateRange.replace("d", ""));
   const summary = useAuditLogSummary(activeOrganizationId, daysBack);
 
-  // Export data - only fetched when exporting
-  const exportData = useAuditLogsForExport(
-    isExporting && exportRange ? activeOrganizationId : undefined,
-    exportRange?.start ?? 0,
-    exportRange?.end ?? 0,
-    "json",
-    true
-  );
-
   const isLoading = logsStatus === "LoadingFirstPage";
 
   // Client-side filtering over the accumulated (multi-page) results
@@ -193,74 +237,40 @@ function AuditPageContent() {
     return matchesSearch && matchesCategory;
   });
 
-  const handleExport = (params: {
+  // The export is a one-shot read, not a subscription: fetching it from the
+  // handler keeps the blob and the download click out of render, where they
+  // leaked an object URL (and re-downloaded) on every re-render.
+  const handleExport = async (params: {
     startTime: number;
     endTime: number;
     format: "csv" | "json";
   }) => {
-    setExportFormat(params.format);
-    setExportRange({ start: params.startTime, end: params.endTime });
+    if (!activeOrganizationId || isExporting) return;
     setIsExporting(true);
     setShowExportDialog(false);
-  };
 
-  // Trigger download once export data is ready
-  if (isExporting && exportData) {
-    const dateStr = new Date().toISOString().split("T")[0];
-
-    if (exportFormat === "json") {
-      const blob = new Blob([JSON.stringify(exportData.data, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `audit-logs-${dateStr}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } else {
-      // CSV from full export data
-      const exportLogs = exportData.data as unknown as Array<{
-        createdAt: number;
-        action: string;
-        userName: string;
-        userEmail: string;
-        severity?: string;
-        ipAddress?: string;
-      }>;
-      const headers = [
-        "Timestamp",
-        "Action",
-        "User",
-        "Email",
-        "Severity",
-        "IP Address",
-      ];
-      const rows = exportLogs.map((log) => [
-        new Date(log.createdAt).toISOString(),
-        actionLabels[log.action] ?? log.action,
-        log.userName,
-        log.userEmail,
-        log.severity ?? "info",
-        log.ipAddress ?? "",
-      ]);
-      const csvContent = [headers, ...rows]
-        .map((row) =>
-          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-        )
-        .join("\n");
-      const blob = new Blob([csvContent], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `audit-logs-${dateStr}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+    try {
+      const exportData = await convex.query(
+        api.features.audit.compliance.getForExport,
+        {
+          organizationId: activeOrganizationId,
+          startTime: params.startTime,
+          endTime: params.endTime,
+          format: "json",
+          includeDetails: true,
+        }
+      );
+      downloadExport(exportData.data, params.format);
+    } catch (err) {
+      logger.error(
+        "audit_export_failed",
+        { organizationId: activeOrganizationId, format: params.format },
+        err
+      );
+    } finally {
+      setIsExporting(false);
     }
-
-    setIsExporting(false);
-    setExportRange(null);
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -292,7 +302,7 @@ function AuditPageContent() {
               <p className="text-xs text-ink-subtle">Total Events</p>
               {summary ? (
                 <p className="text-lg font-bold text-ink">
-                  {summary.totalEvents.toLocaleString()}
+                  {formatNumber(summary.totalEvents)}
                 </p>
               ) : (
                 <div className="mt-1 h-5 w-10 animate-pulse rounded bg-surface-raised" />
@@ -481,8 +491,21 @@ interface AuditLogData {
 }
 
 function AuditLogRow({ log }: { log: AuditLogData }) {
+  const timeZone = useTimeZone();
   const actionLabel = actionLabels[log.action] || log.action;
-  const time = new Date(log.createdAt).toLocaleString();
+  // Seconds are kept: this row is the forensic record of when something ran.
+  const time = formatDateWith(
+    log.createdAt,
+    {
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+    },
+    timeZone
+  );
   const severityClass =
     severityColors[log.severity ?? "info"] ?? "text-ink-subtle";
 

@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui";
 import type { Id } from "@convex/_generated/dataModel";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateTime } from "@/lib/format";
 
 interface VersionRecord {
   _id: Id<"variableVersions">;
@@ -28,6 +30,10 @@ interface VariableHistoryProps {
 
 type FilterType = "all" | "updates" | "rollbacks";
 
+/** A rollback records itself in the change reason; nothing else does. */
+const isRollback = (changeReason?: string) =>
+  changeReason?.toLowerCase().includes("rolled back") || false;
+
 export function VariableHistory({
   isOpen,
   onClose,
@@ -45,12 +51,7 @@ export function VariableHistory({
   const [compareMode, setCompareMode] = useState(false);
   const [selectedVersions, setSelectedVersions] = useState<number[]>([]);
 
-  const formatDate = (timestamp: number) => {
-    return new Intl.DateTimeFormat("en-US", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(timestamp));
-  };
+  const timeZone = useTimeZone();
 
   const formatRelativeTime = (timestamp: number) => {
     const now = Date.now();
@@ -60,15 +61,11 @@ export function VariableHistory({
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
-    if (days > 7) return formatDate(timestamp);
+    if (days > 7) return formatDateTime(timestamp, timeZone);
     if (days > 0) return `${days} day${days > 1 ? "s" : ""} ago`;
     if (hours > 0) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
     if (minutes > 0) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
     return "Just now";
-  };
-
-  const isRollback = (changeReason?: string) => {
-    return changeReason?.toLowerCase().includes("rolled back") || false;
   };
 
   const filteredHistory = history.filter((record) => {
@@ -412,7 +409,7 @@ export function VariableHistory({
                         d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    <span title={formatDate(record.createdAt)}>
+                    <span title={formatDateTime(record.createdAt, timeZone)}>
                       {formatRelativeTime(record.createdAt)}
                     </span>
                     {record.changedByUser && (
