@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { X, Copy, Check, Loader2, Mail, AlertTriangle } from "lucide-react";
 import * as Sentry from "@sentry/nextjs";
 import {
@@ -83,6 +83,10 @@ export function ShareLinkForm({
   const [usePassphrase, setUsePassphrase] = useState(false);
   const [passphrase, setPassphrase] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  // `disabled` only applies after the next render, so a fast double click
+  // would create two shares and send two notification emails. The ref shuts
+  // the window in the same tick.
+  const isGeneratingRef = useRef(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,42 +117,47 @@ export function ShareLinkForm({
   };
 
   const handleGenerate = async () => {
+    if (isGeneratingRef.current) return;
     if (emails.length === 0) {
       setError("Add at least one recipient email");
       return;
     }
 
+    isGeneratingRef.current = true;
     setIsGenerating(true);
     setError(null);
 
     try {
       const payload = await buildPayload();
-      if (payload == null) return;
+      // A null payload aborts silently, per the buildPayload contract. Kept as
+      // a skipped block instead of an early return so the guard below always
+      // runs and the button can never latch disabled.
+      if (payload != null) {
+        const clientKey = generateClientKey();
+        const encryptedPayload = await encryptForShare(
+          payload,
+          clientKey,
+          usePassphrase ? passphrase : undefined
+        );
 
-      const clientKey = generateClientKey();
-      const encryptedPayload = await encryptForShare(
-        payload,
-        clientKey,
-        usePassphrase ? passphrase : undefined
-      );
+        const result = await createShare.mutateAsync({
+          ...extraShareArgs,
+          organizationId,
+          projectId,
+          encryptedPayload,
+          mode,
+          ttlMs,
+          hasPassphrase: usePassphrase,
+          recipientEmails: emails,
+          clientKeyBase64Url: clientKeyToBase64Url(clientKey),
+        } as Parameters<typeof createShare.mutateAsync>[0]);
 
-      const result = await createShare.mutateAsync({
-        ...extraShareArgs,
-        organizationId,
-        projectId,
-        encryptedPayload,
-        mode,
-        ttlMs,
-        hasPassphrase: usePassphrase,
-        recipientEmails: emails,
-        clientKeyBase64Url: clientKeyToBase64Url(clientKey),
-      } as Parameters<typeof createShare.mutateAsync>[0]);
-
-      const origin = window.location.origin;
-      setEmailsFailed(result.emailsFailed ?? []);
-      setGeneratedUrl(
-        `${origin}/s/${result.token}#${clientKeyToBase64Url(clientKey)}`
-      );
+        const origin = window.location.origin;
+        setEmailsFailed(result.emailsFailed ?? []);
+        setGeneratedUrl(
+          `${origin}/s/${result.token}#${clientKeyToBase64Url(clientKey)}`
+        );
+      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to create share";
@@ -168,9 +177,12 @@ export function ShareLinkForm({
           },
         });
       }
-    } finally {
-      setIsGenerating(false);
     }
+    // Released after the try/catch rather than in a `finally` — the compiler
+    // bails on a component containing one. The catch swallows and no branch
+    // returns early, so every path reaches here.
+    isGeneratingRef.current = false;
+    setIsGenerating(false);
   };
 
   const handleCopyUrl = async () => {

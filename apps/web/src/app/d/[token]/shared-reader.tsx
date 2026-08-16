@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
@@ -84,43 +84,54 @@ export function SharedDocReader({
   const [passphrase, setPassphrase] = useState("");
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const [isUnlocking, setIsUnlocking] = useState(false);
+  // The state flag only lands on the next render, so a double submit would
+  // send two unlock attempts against the rate-limited endpoint. The ref shuts
+  // the window in the same tick.
+  const isUnlockingRef = useRef(false);
 
-  const load = useCallback(async () => {
+  // Fetching is separated from applying so the effect below never calls a
+  // setter itself: it awaits a plain result and writes it from the promise
+  // callback, which is where React expects external data to land.
+  const fetchReaderState = useCallback(async (): Promise<{
+    step: Step;
+    payload?: Payload;
+  }> => {
     try {
       const query = docSlug ? `?docSlug=${encodeURIComponent(docSlug)}` : "";
       // Credentials included so the unlock cookie travels once it exists.
       const response = await fetch(`/api/doc-shares/${token}${query}`, {
         credentials: "same-origin",
       });
-      if (response.status === 401) {
-        setStep("locked");
-        return;
-      }
+      if (response.status === 401) return { step: "locked" };
       // Kept apart from the uniform failure screen: the link is still valid,
       // it is only the view bucket that is empty, and it refills.
-      if (response.status === 429) {
-        setStep("rate_limited");
-        return;
-      }
-      if (!response.ok) {
-        setStep("unavailable");
-        return;
-      }
-      const data = await response.json();
-      setPayload(data);
-      setStep("ready");
+      if (response.status === 429) return { step: "rate_limited" };
+      if (!response.ok) return { step: "unavailable" };
+      return { step: "ready", payload: await response.json() };
     } catch {
-      setStep("unavailable");
+      return { step: "unavailable" };
     }
   }, [token, docSlug]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    // A changed token or slug must not let a late response overwrite the view
+    // the reader is now on.
+    let cancelled = false;
+    void fetchReaderState().then((next) => {
+      if (cancelled) return;
+      if (next.payload) setPayload(next.payload);
+      setStep(next.step);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchReaderState]);
 
   const submitPassphrase = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (passphrase.length < MIN_PASSPHRASE_LENGTH || isUnlocking) return;
+    if (passphrase.length < MIN_PASSPHRASE_LENGTH || isUnlockingRef.current)
+      return;
+    isUnlockingRef.current = true;
     setIsUnlocking(true);
     setUnlockError(null);
     try {
@@ -130,19 +141,24 @@ export function SharedDocReader({
         credentials: "same-origin",
         body: JSON.stringify({ passphrase }),
       });
-      if (!response.ok) {
+      if (response.ok) {
+        setPassphrase("");
+        setStep("loading");
+        const next = await fetchReaderState();
+        if (next.payload) setPayload(next.payload);
+        setStep(next.step);
+      } else {
         const data = await response.json().catch(() => ({}));
         setUnlockError(data.error ?? "Incorrect passphrase.");
-        return;
       }
-      setPassphrase("");
-      setStep("loading");
-      await load();
     } catch {
       setUnlockError("Something went wrong. Please try again.");
-    } finally {
-      setIsUnlocking(false);
     }
+    // Released after the try/catch rather than in a `finally` — the compiler
+    // bails on a component containing one. The catch swallows and no branch
+    // returns early, so every path reaches here.
+    isUnlockingRef.current = false;
+    setIsUnlocking(false);
   };
 
   if (step === "loading") {
