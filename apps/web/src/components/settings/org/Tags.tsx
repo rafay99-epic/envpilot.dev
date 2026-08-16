@@ -443,8 +443,8 @@ export function TagsTab({ organizationId }: { organizationId: string }) {
               <div>
                 <p className="text-xs font-medium text-danger">Failed tags:</p>
                 <ul className="mt-1 space-y-0.5">
-                  {bulkProgress.failures.map((f, i) => (
-                    <li key={i} className="text-xs text-danger/80">
+                  {bulkProgress.failures.map((f) => (
+                    <li key={f.name} className="text-xs text-danger/80">
                       {f.name}: {f.error}
                     </li>
                   ))}

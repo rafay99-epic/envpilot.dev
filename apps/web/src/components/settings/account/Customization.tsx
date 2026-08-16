@@ -285,14 +285,24 @@ export function CustomizationSettings() {
   );
 }
 
+// A binding can repeat a key ("g then g"), so the token alone is not unique.
+// The prefix up to and including this token is.
+const prefixKey = (parts: string[], upTo: number, join: string) =>
+  parts.slice(0, upTo + 1).join(join);
+
 function ShortcutKeyDisplay({ keys }: { keys: string }) {
   const isSequence = keys.includes(" then ");
+  const segments = keys.split(" then ");
+  const chord = keys.split("+");
 
   if (isSequence) {
     return (
       <div className="flex items-center gap-1">
-        {keys.split(" then ").map((k, i) => (
-          <span key={i} className="flex items-center gap-1">
+        {segments.map((k, i) => (
+          <span
+            key={prefixKey(segments, i, " then ")}
+            className="flex items-center gap-1"
+          >
             {i > 0 && <span className="text-[10px] text-ink-faint">then</span>}
             <kbd className="rounded border border-line bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-ink-muted">
               {k.trim()}
@@ -305,8 +315,11 @@ function ShortcutKeyDisplay({ keys }: { keys: string }) {
 
   return (
     <div className="flex items-center gap-1">
-      {keys.split("+").map((key, i) => (
-        <span key={i} className="flex items-center gap-1">
+      {chord.map((key, i) => (
+        <span
+          key={prefixKey(chord, i, "+")}
+          className="flex items-center gap-1"
+        >
           {i > 0 && <span className="text-[10px] text-ink-faint">+</span>}
           <kbd className="rounded border border-line bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-ink-muted">
             {key.trim() === "Mod"
