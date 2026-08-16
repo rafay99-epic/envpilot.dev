@@ -95,9 +95,12 @@ export function SuspendMemberDialog({
       onClose();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to suspend member");
-    } finally {
-      setSubmitting(false);
     }
+    // Cleared after the try/catch rather than in a finally block: React
+    // Compiler cannot lower a try with a finalizer and bails on the whole
+    // component. The catch swallows and the try has no early return, so this
+    // runs on both paths.
+    setSubmitting(false);
   }
 
   return (
