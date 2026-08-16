@@ -569,6 +569,14 @@ function CreateKeyDrawer({
   );
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [customExpiry, setCustomExpiry] = useState("");
+  // The earliest expiry a key may carry: tomorrow, resolved once when the
+  // drawer mounts. Reading Date.now() from JSX recomputes it on every render,
+  // which reads differently on the server than in the browser and drifts if
+  // the form is left open across midnight. The drawer is keyed per open, so
+  // mounting is the right moment to fix "tomorrow".
+  const [minExpiryDate] = useState(() =>
+    new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  );
 
   const [preset, setPreset] = useState<PresetId>("agent");
   // Problems are computed on every render but only SHOWN once the user has
@@ -1315,9 +1323,7 @@ function CreateKeyDrawer({
                     id="api-key-expiry-custom"
                     value={customExpiry}
                     onChange={setCustomExpiry}
-                    min={new Date(Date.now() + 24 * 60 * 60 * 1000)
-                      .toISOString()
-                      .slice(0, 10)}
+                    min={minExpiryDate}
                     placeholder="Pick an expiry date"
                     className="mt-2"
                   />
