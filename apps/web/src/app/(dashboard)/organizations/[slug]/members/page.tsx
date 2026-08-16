@@ -7,11 +7,11 @@ import { api } from "@convex/_generated/api";
 import { Users } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import { ConfirmDialog, DrawerPanel, ProjectIcon } from "@/components/ui";
+import { EnvironmentScopeSelector } from "@/components/members/environment-scope-selector";
 import {
-  EnvironmentScopeSelector,
   allEnvironments,
   scopeToPayload,
-} from "@/components/members/environment-scope-selector";
+} from "@/components/members/environment-scope";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import {

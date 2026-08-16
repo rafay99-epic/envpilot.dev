@@ -5,7 +5,7 @@ import {
   formatEnvironmentScope,
   isUnrestrictedScope,
   scopeToPayload,
-} from "@/components/members/environment-scope-selector";
+} from "@/components/members/environment-scope";
 import { ENVIRONMENTS } from "@/constants/project";
 
 describe("allEnvironments", () => {

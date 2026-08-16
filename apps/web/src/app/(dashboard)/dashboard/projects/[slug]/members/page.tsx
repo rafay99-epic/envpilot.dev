@@ -18,12 +18,12 @@ import { sanitizeConvexError } from "@/lib/error-messages";
 import { DrawerPanel } from "@/components/ui";
 import { PageHeader } from "@envpilot/ui";
 import type { Id } from "@convex/_generated/dataModel";
+import { EnvironmentScopeSelector } from "@/components/members/environment-scope-selector";
 import {
-  EnvironmentScopeSelector,
   allEnvironments,
   formatEnvironmentScope,
   scopeToPayload,
-} from "@/components/members/environment-scope-selector";
+} from "@/components/members/environment-scope";
 import {
   normalizeOrgRole,
   roleLevel,

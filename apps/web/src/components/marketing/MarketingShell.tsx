@@ -7,11 +7,6 @@ import {
 } from "@envpilot/ui";
 import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
 
-// Re-export the rest of the shared UI package unchanged. MarketingShell below
-// shadows the package's Shell with a web-wired version that injects this
-// app's nav links, footer links, and auth buttons.
-export * from "@envpilot/ui";
-
 // Nav destinations. docs + blog point at their subdomains; the rest stay
 // in-app.
 const NAV_LINKS: NavLink[] = [
