@@ -450,67 +450,70 @@ function KeyRow({
         )}
       </div>
 
-      {!isRevoked && (
-        // `m` + LazyMotion keeps the unused Motion features (drag, layout
-        // projection) out of the bundle; this row only animates opacity and a
-        // grid track, both covered by `domAnimation`.
-        <LazyMotion features={domAnimation}>
-          <AnimatePresence initial={false}>
-            {confirming && (
-              <m.div
-                key="confirm"
-                // The row expands by interpolating the grid track, not
-                // `height` — animating height forces a full layout pass every
-                // frame and makes Motion measure the element to resolve
-                // "auto".
-                initial={{ opacity: 0, gridTemplateRows: "0fr" }}
-                animate={{ opacity: 1, gridTemplateRows: "1fr" }}
-                exit={{ opacity: 0, gridTemplateRows: "0fr" }}
-                transition={{ duration: 0.15 }}
-                className="grid"
-              >
-                <div className="overflow-hidden">
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-danger-line/40 pt-3">
-                    <div className="min-w-0">
-                      <p className="flex items-start gap-2 text-xs text-danger">
-                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        Revoke this key? Anything using it will stop working
-                        immediately.
+      {/* `m` + LazyMotion keeps the unused Motion features (drag, layout
+          projection) out of the bundle; this row only animates opacity and a
+          grid track, both covered by `domAnimation`.
+
+          The boundary stays mounted and both conditions sit on the child:
+          revoking a key while its confirm strip is open used to unmount
+          AnimatePresence along with the strip, so it never saw the child
+          leave and the strip vanished instead of animating out. */}
+      <LazyMotion features={domAnimation}>
+        <AnimatePresence initial={false}>
+          {!isRevoked && confirming && (
+            <m.div
+              key="confirm"
+              // The row expands by interpolating the grid track, not
+              // `height` — animating height forces a full layout pass every
+              // frame and makes Motion measure the element to resolve
+              // "auto".
+              initial={{ opacity: 0, gridTemplateRows: "0fr" }}
+              animate={{ opacity: 1, gridTemplateRows: "1fr" }}
+              exit={{ opacity: 0, gridTemplateRows: "0fr" }}
+              transition={{ duration: 0.15 }}
+              className="grid"
+            >
+              <div className="overflow-hidden">
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-danger-line/40 pt-3">
+                  <div className="min-w-0">
+                    <p className="flex items-start gap-2 text-xs text-danger">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      Revoke this key? Anything using it will stop working
+                      immediately.
+                    </p>
+                    {rowError && (
+                      <p className="mt-1 text-xs font-medium text-danger">
+                        {rowError}
                       </p>
-                      {rowError && (
-                        <p className="mt-1 text-xs font-medium text-danger">
-                          {rowError}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <TerminalButton
-                        type="button"
-                        variant="danger"
-                        onClick={handleConfirmRevoke}
-                        disabled={isRevoking}
-                      >
-                        {isRevoking ? "Revoking..." : "Revoke"}
-                      </TerminalButton>
-                      <TerminalButton
-                        type="button"
-                        variant="secondary"
-                        onClick={() => {
-                          setConfirming(false);
-                          setRowError(null);
-                        }}
-                        disabled={isRevoking}
-                      >
-                        Cancel
-                      </TerminalButton>
-                    </div>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <TerminalButton
+                      type="button"
+                      variant="danger"
+                      onClick={handleConfirmRevoke}
+                      disabled={isRevoking}
+                    >
+                      {isRevoking ? "Revoking..." : "Revoke"}
+                    </TerminalButton>
+                    <TerminalButton
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setConfirming(false);
+                        setRowError(null);
+                      }}
+                      disabled={isRevoking}
+                    >
+                      Cancel
+                    </TerminalButton>
                   </div>
                 </div>
-              </m.div>
-            )}
-          </AnimatePresence>
-        </LazyMotion>
-      )}
+              </div>
+            </m.div>
+          )}
+        </AnimatePresence>
+      </LazyMotion>
     </li>
   );
 }
