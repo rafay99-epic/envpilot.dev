@@ -29,18 +29,6 @@ interface VersionRecord {
   changedByUser: { name?: string; email: string } | null;
 }
 
-export function useVariableHistory(
-  id: string | undefined,
-  options?: { enabled?: boolean }
-) {
-  return useQuery({
-    queryKey: queryKeys.variables.history(id!),
-    queryFn: () =>
-      api.get<{ history: VersionRecord[] }>(`/api/variables/${id}/history`),
-    enabled: !!id && (options?.enabled ?? true),
-  });
-}
-
 export function useCreateVariable() {
   const queryClient = useQueryClient();
 

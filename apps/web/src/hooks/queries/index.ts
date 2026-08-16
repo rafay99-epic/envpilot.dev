@@ -1,5 +1,4 @@
 export {
-  useVariableHistory,
   useCreateVariable,
   useUpdateVariable,
   useDeleteVariable,

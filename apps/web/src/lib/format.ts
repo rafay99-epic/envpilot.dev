@@ -41,17 +41,6 @@ export function formatDateTime(
   }).format(toDate(value));
 }
 
-/** "3:04 PM" */
-export function formatTime(
-  value: DateInput,
-  timeZone: string = SERVER_TIME_ZONE
-) {
-  return new Intl.DateTimeFormat(LOCALE, {
-    timeStyle: "short",
-    timeZone,
-  }).format(toDate(value));
-}
-
 /** "01/05/26, 3:04 PM" — the compact form used in dense tables. */
 export function formatDateTimeShort(
   value: DateInput,

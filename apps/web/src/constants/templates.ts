@@ -2415,34 +2415,3 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
     ],
   },
 ];
-
-/**
- * Get a template by its ID
- */
-export function getTemplateById(id: string): EnvironmentTemplate | undefined {
-  return BUILT_IN_TEMPLATES.find((template) => template.id === id);
-}
-
-/**
- * Get templates by project type
- */
-export function getTemplatesByProjectType(
-  projectType: ProjectType
-): EnvironmentTemplate[] {
-  return BUILT_IN_TEMPLATES.filter(
-    (template) => template.projectType === projectType
-  );
-}
-
-/**
- * Search templates by tags or name
- */
-export function searchTemplates(query: string): EnvironmentTemplate[] {
-  const normalizedQuery = query.toLowerCase();
-  return BUILT_IN_TEMPLATES.filter(
-    (template) =>
-      template.name.toLowerCase().includes(normalizedQuery) ||
-      template.description.toLowerCase().includes(normalizedQuery) ||
-      template.tags.some((tag) => tag.toLowerCase().includes(normalizedQuery))
-  );
-}

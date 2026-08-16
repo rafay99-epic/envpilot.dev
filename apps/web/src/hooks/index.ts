@@ -59,14 +59,13 @@ export {
 // Tier limits hooks and utilities
 export {
   useTierLimitCheck,
-  getLimitDescription,
   calculateLimitPercentage,
   type Tier,
   type TierAction,
 } from "./useTierLimits";
 
 // Dynamic feature gate hooks (new — preferred)
-export { useFeatureGate, useUserTier, useAllFeatures } from "./useFeatureGate";
+export { useFeatureGate, useAllFeatures } from "./useFeatureGate";
 
 // Global search hook
 export { useGlobalSearch } from "./useGlobalSearch";
@@ -107,11 +106,7 @@ export {
 } from "./useVariableRequests";
 
 // Audit log hooks
-export {
-  useAuditLogSummary,
-  useAuditLogsForExport,
-  useAuditMutations,
-} from "./useAuditLogs";
+export { useAuditLogSummary } from "./useAuditLogs";
 
 // Secret file hooks
 export {

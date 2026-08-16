@@ -203,19 +203,3 @@ export function tokenPrefix(token: string | null | undefined): string {
   if (!token) return "none";
   return token.slice(0, 8);
 }
-
-/**
- * Inspect an arbitrary error and guess whether it represents an upstream
- * rate limit. Matches both our Convex rate limiter messages and common
- * HTTP-level 429 signals.
- */
-export function isRateLimitError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const msg = error.message.toLowerCase();
-  return (
-    msg.includes("rate limit") ||
-    msg.includes("ratelimit") ||
-    msg.includes("too many requests") ||
-    msg.includes("429")
-  );
-}

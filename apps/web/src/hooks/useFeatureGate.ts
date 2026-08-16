@@ -137,27 +137,6 @@ export function useFeatureGate(
 }
 
 /**
- * Hook to get the current user's tier, grace period status, and tier
- * definition. The user is derived server-side from the verified JWT; the
- * `userId` param remains only as a readiness gate (skip until the Convex
- * user is known).
- */
-export function useUserTier(userId: Id<"users"> | undefined) {
-  const data = useQuery(
-    api.features.featureRegistry.queries.getMyTierInfo,
-    userId ? {} : "skip"
-  );
-
-  return {
-    isLoading: data === undefined,
-    tier: data?.tier,
-    tierDefinition: data?.tierDefinition,
-    graceActive: data?.graceActive ?? false,
-    gracePeriodEnd: data?.gracePeriodEnd,
-  };
-}
-
-/**
  * Hook to get all resolved features for an organization (bulk check).
  * Returns a features map and helper functions.
  */

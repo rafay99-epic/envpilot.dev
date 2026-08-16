@@ -71,24 +71,6 @@ export function useTierLimitCheck(
 // ==========================================
 
 /**
- * Get a user-friendly description of limit usage
- */
-export function getLimitDescription(
-  current: number,
-  limit: number | null,
-  itemName: string
-): string {
-  if (limit === null) {
-    return `Unlimited ${itemName}`;
-  }
-  const remaining = limit - current;
-  if (remaining <= 0) {
-    return `${itemName} limit reached (${current}/${limit})`;
-  }
-  return `${current}/${limit} ${itemName} used`;
-}
-
-/**
  * Calculate percentage of limit used
  */
 export function calculateLimitPercentage(
