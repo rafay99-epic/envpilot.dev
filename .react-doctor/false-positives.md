@@ -7,6 +7,27 @@ config ignore would hide that.
 
 Re-verify the predicate before dismissing the finding again.
 
+## `nextjs-no-img-element` — the three organization-logo sites
+
+`apps/web/src/app/(dashboard)/invitations/[token]/page.tsx`,
+`app/(dashboard)/organizations/[slug]/page.tsx`,
+`app/(dashboard)/organizations/page.tsx`
+
+**Predicate:** all three render `organization.logoUrl`, which the update
+route validates only as `z.string().url()` with no host restriction, so it
+can be any https origin an owner pastes in. `next/image` refuses a `src`
+whose hostname is not in `images.remotePatterns` and throws rather than
+degrading, so converting these would break every org using a host we have
+not listed. Widening `remotePatterns` to `**` is not an option either: that
+turns the optimizer into an open image proxy.
+
+The three sites that could convert did: the two member avatars and the
+framework logos all come from hosts already in `remotePatterns`.
+
+**Invalidated if:** logo uploads move to our own storage, or `logoUrl` gains
+a host allowlist at the write path. Either would make these convertible, and
+that is the real fix rather than a rendering change.
+
 ## `nextjs-no-side-effect-in-get-handler` — `apps/web/src/app/api/status/route.ts`
 
 **Predicate:** the flagged side effect is an outbound `fetch` to the

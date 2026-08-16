@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { FRAMEWORK_LOGOS } from "@/constants/framework-logos";
 import { PROJECT_TYPES, type ProjectType } from "@/constants/templates";
 import {
@@ -335,13 +336,12 @@ export function FrameworkLogo({
   }
 
   return (
-    <img
+    <Image
       src={url}
       alt={PROJECT_TYPES[projectType]?.label ?? projectType}
       width={size}
       height={size}
       className={className}
-      loading="lazy"
       onError={() => setImgError(true)}
     />
   );
