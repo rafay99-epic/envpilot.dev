@@ -302,7 +302,7 @@ export function IntegrationsSection({
     try {
       const response = await fetch(
         `/api/integrations/${provider}/start?organizationId=${encodeURIComponent(organizationId)}&format=json`,
-        { cache: "no-store" }
+        { method: "POST", cache: "no-store" }
       );
       const data = (await response.json().catch(() => null)) as {
         url?: unknown;
