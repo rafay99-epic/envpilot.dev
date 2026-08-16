@@ -10,6 +10,8 @@ import {
   useFavoriteProjects,
   useToggleFavorite,
 } from "@/hooks";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDate } from "@/lib/format";
 import { useAuthContext } from "@/components/auth";
 import type { Id } from "@convex/_generated/dataModel";
 import {
@@ -181,6 +183,8 @@ function ProjectCard({
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
 }) {
+  const timeZone = useTimeZone();
+
   return (
     <Link
       href={`/dashboard/projects/${project.slug}`}
@@ -227,7 +231,7 @@ function ProjectCard({
         )}
         <div className="mt-3 flex items-center text-xs text-ink-faint">
           <Clock className="mr-1.5 h-3 w-3" />
-          Created {new Date(project.createdAt).toLocaleDateString()}
+          Created {formatDate(project.createdAt, timeZone)}
         </div>
       </div>
     </Link>

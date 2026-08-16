@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Globe, Lock, Trash2, Users } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
 import { useDocShares, useRevokeDocShare } from "@/hooks";
+import { useTimeZone } from "@/hooks/useTimeZone";
 import { sanitizeConvexError } from "@/lib/error-messages";
+import { formatDate } from "@/lib/format";
 
 /**
  * Who this page is currently shared with, and the one control that matters:
@@ -20,6 +22,7 @@ export function DocSharesList({ docId }: { docId: Id<"docs"> }) {
   const [copiedId, setCopiedId] = useState<Id<"docShares"> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeZone = useTimeZone();
 
   useEffect(() => {
     return () => {
@@ -78,7 +81,7 @@ export function DocSharesList({ docId }: { docId: Id<"docs"> }) {
               <p className="truncate text-[11px] text-ink-subtle">
                 {share.isExpired
                   ? "Expired"
-                  : `Expires ${new Date(share.expiresAt).toLocaleDateString()}`}
+                  : `Expires ${formatDate(share.expiresAt, timeZone)}`}
                 {" · "}
                 {share.viewCount === 0
                   ? "not opened yet"

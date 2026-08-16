@@ -18,6 +18,8 @@ import {
   groupDocsByModule,
   type DocSummary,
 } from "@/hooks";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDate } from "@/lib/format";
 
 /** Mirrors SEARCH_LIMIT in convex/features/docs/queries.ts. */
 const SEARCH_LIMIT = 20;
@@ -218,6 +220,8 @@ function DocRow({
   doc: DocSummary & { matchedBody?: boolean };
   projectSlug: string;
 }) {
+  const timeZone = useTimeZone();
+
   return (
     <Link
       href={`/dashboard/projects/${projectSlug}/docs/${doc.slug}`}
@@ -253,7 +257,7 @@ function DocRow({
       </div>
       <span className="hidden shrink-0 items-center gap-1 text-[11px] text-ink-muted sm:flex">
         <Clock className="h-3 w-3" />
-        {new Date(doc.updatedAt).toLocaleDateString()}
+        {formatDate(doc.updatedAt, timeZone)}
       </span>
     </Link>
   );
