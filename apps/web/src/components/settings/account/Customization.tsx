@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useReducer, useState } from "react";
 import { Pencil, RotateCcw, X } from "lucide-react";
 import { SettingsSection } from "@envpilot/ui";
 import { TerminalButton } from "@/components/dashboard/terminal-ui";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { getEffectiveShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { validateBinding } from "@/lib/shortcut-validation";
+import {
+  initialShortcutRecorderState,
+  shortcutRecorderReducer,
+} from "./shortcut-recorder-state";
 
 const shortcutCategories = [
   { key: "navigation" as const, label: "Navigation" },
@@ -20,34 +24,27 @@ export function CustomizationSettings() {
   const removeBinding = useKeyboardStore((s) => s.removeBinding);
   const resetAllBindings = useKeyboardStore((s) => s.resetAllBindings);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [recordedKeys, setRecordedKeys] = useState<string[]>([]);
-  const [isRecordingSequence, setIsRecordingSequence] = useState(false);
-  const [sequenceStep, setSequenceStep] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [recorder, dispatch] = useReducer(
+    shortcutRecorderReducer,
+    initialShortcutRecorderState
+  );
+  // A transient confirmation, also raised by "Reset all" on its own — not part
+  // of the recorder's lifecycle.
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const effectiveShortcuts = getEffectiveShortcuts(customBindings);
   const hasCustomBindings = Object.keys(customBindings).length > 0;
 
   function startEditing(shortcutId: string) {
-    setEditingId(shortcutId);
-    setRecordedKeys([]);
-    setIsRecordingSequence(false);
-    setSequenceStep(0);
-    setError(null);
+    dispatch({ kind: "editing-started", shortcutId });
   }
 
   function cancelEditing() {
-    setEditingId(null);
-    setRecordedKeys([]);
-    setIsRecordingSequence(false);
-    setSequenceStep(0);
-    setError(null);
+    dispatch({ kind: "editing-cancelled" });
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    const editingId = recorder.editingId;
     if (!editingId) return;
     e.preventDefault();
     e.stopPropagation();
@@ -69,16 +66,19 @@ export function CustomizationSettings() {
 
     const binding = parts.join("+");
 
-    if (isRecordingSequence && sequenceStep === 1) {
+    if (recorder.isRecordingSequence && recorder.sequenceStep === 1) {
       // Second key of sequence
-      const fullBinding = `${recordedKeys[0]} then ${binding}`;
+      const fullBinding = `${recorder.recordedKeys[0]} then ${binding}`;
       const validation = validateBinding(
         customBindings,
         editingId,
         fullBinding
       );
       if (!validation.valid) {
-        setError(validation.reason ?? "Invalid binding");
+        dispatch({
+          kind: "binding-rejected",
+          error: validation.reason ?? "Invalid binding",
+        });
         return;
       }
       saveBinding(editingId, fullBinding);
@@ -90,26 +90,26 @@ export function CustomizationSettings() {
       parts.length === 1 &&
       key.length === 1 &&
       /^[A-Z]$/i.test(key) &&
-      !isRecordingSequence
+      !recorder.isRecordingSequence
     ) {
-      // Start sequence recording
-      setIsRecordingSequence(true);
-      setSequenceStep(1);
-      setRecordedKeys([binding]);
+      dispatch({ kind: "sequence-started", firstKey: binding });
       return;
     }
 
     // Regular single shortcut
     const validation = validateBinding(customBindings, editingId, binding);
     if (!validation.valid) {
-      setError(validation.reason ?? "Invalid binding");
+      dispatch({
+        kind: "binding-rejected",
+        error: validation.reason ?? "Invalid binding",
+      });
       return;
     }
     saveBinding(editingId, binding);
   }
 
   async function saveBinding(shortcutId: string, binding: string) {
-    setIsSaving(true);
+    dispatch({ kind: "save-started" });
     const newBindings = { ...customBindings, [shortcutId]: binding };
     updateBinding(shortcutId, binding);
 
@@ -124,14 +124,11 @@ export function CustomizationSettings() {
     } catch {
       // Revert on error
       removeBinding(shortcutId);
-    } finally {
-      setIsSaving(false);
-      setEditingId(null);
-      setRecordedKeys([]);
-      setIsRecordingSequence(false);
-      setSequenceStep(0);
-      setError(null);
     }
+    // Closed after the try/catch rather than in a finally block: the catch
+    // swallows and neither path returns early, so this runs either way, and
+    // React Compiler bails on any function whose try has a finalizer.
+    dispatch({ kind: "save-settled" });
   }
 
   async function handleRemoveBinding(shortcutId: string) {
@@ -175,7 +172,7 @@ export function CustomizationSettings() {
               <TerminalButton
                 variant="secondary"
                 onClick={handleResetAll}
-                disabled={isSaving}
+                disabled={recorder.isSaving}
               >
                 <RotateCcw className="h-3 w-3" />
                 Reset all
@@ -200,7 +197,7 @@ export function CustomizationSettings() {
               </h3>
               <ul>
                 {items.map(([id, def]) => {
-                  const isEditing = editingId === id;
+                  const isEditing = recorder.editingId === id;
                   const isCustomized = id in customBindings;
 
                   return (
@@ -228,9 +225,10 @@ export function CustomizationSettings() {
                             autoFocus
                           >
                             <span className="rounded-panel border border-premium-line bg-surface px-3 py-1.5">
-                              {isRecordingSequence && sequenceStep === 1 ? (
+                              {recorder.isRecordingSequence &&
+                              recorder.sequenceStep === 1 ? (
                                 <span className="font-mono text-xs text-warning">
-                                  {recordedKeys[0]} then ...
+                                  {recorder.recordedKeys[0]} then ...
                                 </span>
                               ) : (
                                 <span className="font-mono text-xs text-ink-subtle">
@@ -238,9 +236,9 @@ export function CustomizationSettings() {
                                 </span>
                               )}
                             </span>
-                            {error && (
+                            {recorder.error && (
                               <span className="text-xs text-danger">
-                                {error}
+                                {recorder.error}
                               </span>
                             )}
                             <button

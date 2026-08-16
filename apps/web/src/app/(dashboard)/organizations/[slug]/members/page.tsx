@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use, useRef } from "react";
+import { useState, use, useReducer, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQuery } from "convex/react";
@@ -9,10 +9,16 @@ import { Users } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import { ConfirmDialog, DrawerPanel, ProjectIcon } from "@/components/ui";
 import { EnvironmentScopeSelector } from "@/components/members/environment-scope-selector";
+import { scopeToPayload } from "@/components/members/environment-scope";
 import {
-  allEnvironments,
-  scopeToPayload,
-} from "@/components/members/environment-scope";
+  initialInvitePanelState,
+  invitePanelReducer,
+  type SearchUser,
+} from "@/components/members/invite-panel-state";
+import {
+  initialMemberSessionsState,
+  memberSessionsReducer,
+} from "@/components/members/member-sessions-state";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import {
@@ -44,15 +50,6 @@ import { formatDate } from "@/lib/format";
 import { useTimeZone } from "@/hooks/useTimeZone";
 
 const log = createLogger("app/dashboard/organization-members");
-
-interface SearchUser {
-  _id: string;
-  email: string;
-  name?: string;
-  avatarUrl?: string;
-  isMember?: boolean;
-  hasPendingInvitation?: boolean;
-}
 
 export default function OrganizationMembersPage(props: {
   params: Promise<{ slug: string }>;
@@ -153,55 +150,29 @@ function OrganizationMembersPageContent({
     name: string;
   } | null>(null);
 
+  // Open/closed is a toggle the header button owns — the drawer's contents are
+  // the machine below.
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<OrgRole>("developer");
-  const [isInviting, setIsInviting] = useState(false);
-  // Re-entry guard for the submit handler. `isInviting` disables the button,
-  // but only from the next render, so a second submit in the same tick still
-  // reads the stale `false` and sends a duplicate invitation.
+  // Every field of the invite drawer: form, submission and email typeahead.
+  const [invite, dispatchInvite] = useReducer(
+    invitePanelReducer,
+    initialInvitePanelState
+  );
+  // Re-entry guard for the submit handler. `invite.isSubmitting` disables the
+  // button, but only from the next render, so a second submit in the same tick
+  // still reads the stale `false` and sends a duplicate invitation.
   const invitingRef = useRef(false);
-  const [inviteError, setInviteError] = useState<string | null>(null);
-
-  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   // The invite panel renders one checkbox per project and asks each one
   // whether it is selected, so the lookup happens once per row.
-  const selectedProjectIdSet = new Set(selectedProjectIds);
-  // Environment scope for developer invites — all checked = unrestricted.
-  const [inviteEnvScope, setInviteEnvScope] =
-    useState<string[]>(allEnvironments);
+  const selectedProjectIdSet = new Set(invite.projectIds);
 
-  const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showSearchResults, setShowSearchResults] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const [expandedSessionsUserId, setExpandedSessionsUserId] = useState<
-    string | null
-  >(null);
-  const [memberSessions, setMemberSessions] = useState<{
-    cliTokens: Array<{
-      _id: string;
-      deviceName: string;
-      lastUsedAt?: number;
-      createdAt: number;
-      expiresAt: number;
-      tokenPreview: string;
-    }>;
-    extensionSessions: Array<{
-      _id: string;
-      projectId: string;
-      projectName: string;
-      deviceName: string;
-      lastUsedAt?: number;
-      createdAt: number;
-      expiresAt: number;
-      tokenPreview: string;
-    }>;
-  } | null>(null);
-  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
-  const [isRevokingSession, setIsRevokingSession] = useState(false);
+  const [sessions, dispatchSessions] = useReducer(
+    memberSessionsReducer,
+    initialMemberSessionsState
+  );
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -230,31 +201,24 @@ function OrganizationMembersPageContent({
   // capability access.env_scoped) with project assignments. All environments
   // checked = unrestricted = send nothing.
   const inviteRoleEnvScoped =
-    roleMetaBySlug.get(inviteRole)?.envScoped ??
-    ENV_SCOPED_ROLE_FALLBACK.has(inviteRole);
+    roleMetaBySlug.get(invite.role)?.envScoped ??
+    ENV_SCOPED_ROLE_FALLBACK.has(invite.role);
   const inviteEnvScopeApplies =
-    inviteRoleEnvScoped && selectedProjectIds.length > 0;
+    inviteRoleEnvScoped && invite.projectIds.length > 0;
 
   function resetInviteForm() {
     setShowInviteModal(false);
-    setInviteEmail("");
-    setInviteRole("developer");
-    setSelectedProjectIds([]);
-    setInviteEnvScope(allEnvironments());
-    setInviteError(null);
-    setSearchResults([]);
-    setShowSearchResults(false);
+    dispatchInvite({ kind: "form-reset" });
   }
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
     if (invitingRef.current) return;
     invitingRef.current = true;
-    setIsInviting(true);
-    setInviteError(null);
+    dispatchInvite({ kind: "submit-started" });
 
     const environments = inviteEnvScopeApplies
-      ? scopeToPayload(inviteEnvScope)
+      ? scopeToPayload(invite.environmentScope)
       : undefined;
 
     try {
@@ -262,10 +226,10 @@ function OrganizationMembersPageContent({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: inviteEmail,
-          role: inviteRole,
-          ...(inviteRole !== "owner" && selectedProjectIds.length > 0
-            ? { projectIds: selectedProjectIds }
+          email: invite.email,
+          role: invite.role,
+          ...(invite.role !== "owner" && invite.projectIds.length > 0
+            ? { projectIds: invite.projectIds }
             : {}),
           ...(environments ? { environments } : {}),
         }),
@@ -280,9 +244,11 @@ function OrganizationMembersPageContent({
         if (data.code !== "TIER_LIMIT_REACHED") {
           throw new Error(data.error || "Failed to send invitation");
         }
-        setInviteError(
-          "Team member limit reached. Upgrade to Pro for unlimited team members."
-        );
+        dispatchInvite({
+          kind: "submit-failed",
+          error:
+            "Team member limit reached. Upgrade to Pro for unlimited team members.",
+        });
       } else {
         resetInviteForm();
 
@@ -301,19 +267,22 @@ function OrganizationMembersPageContent({
         "organization_invite_failed",
         {
           slug,
-          email: inviteEmail,
-          inviteRole,
-          projectIds: selectedProjectIds,
+          email: invite.email,
+          inviteRole: invite.role,
+          projectIds: invite.projectIds,
         },
         err
       );
-      setInviteError(err instanceof Error ? err.message : "An error occurred");
+      dispatchInvite({
+        kind: "submit-failed",
+        error: err instanceof Error ? err.message : "An error occurred",
+      });
     }
     // Released after the try/catch rather than in a finally block: the catch
     // swallows, so this runs on both paths, and React Compiler bails on any
     // function containing a try statement with a finalizer.
     invitingRef.current = false;
-    setIsInviting(false);
+    dispatchInvite({ kind: "submit-settled" });
   }
 
   async function handleRoleChange(userId: string, newRole: OrgRole) {
@@ -404,20 +373,21 @@ function OrganizationMembersPageContent({
   // caches it anyway.
   async function searchUsers(query: string) {
     if (query.length < 2) {
-      setSearchResults([]);
-      setShowSearchResults(false);
+      dispatchInvite({ kind: "search-cleared" });
       return;
     }
 
-    setIsSearching(true);
+    dispatchInvite({ kind: "search-started" });
     try {
       const response = await fetch(
         `/api/users/search?q=${encodeURIComponent(query)}&organizationId=${orgId}&limit=5`
       );
       if (response.ok) {
         const data = await response.json();
-        setSearchResults(data.users || []);
-        setShowSearchResults(true);
+        dispatchInvite({
+          kind: "search-succeeded",
+          results: data.users || [],
+        });
       }
     } catch (err) {
       log.error(
@@ -426,11 +396,11 @@ function OrganizationMembersPageContent({
         err
       );
     }
-    setIsSearching(false);
+    dispatchInvite({ kind: "search-settled" });
   }
 
   function handleEmailChange(value: string) {
-    setInviteEmail(value);
+    dispatchInvite({ kind: "email-changed", email: value });
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -442,21 +412,16 @@ function OrganizationMembersPageContent({
   }
 
   function selectUser(user: SearchUser) {
-    setInviteEmail(user.email);
-    setShowSearchResults(false);
-    setSearchResults([]);
+    dispatchInvite({ kind: "suggestion-selected", email: user.email });
   }
 
   async function toggleSessions(userId: string) {
-    if (expandedSessionsUserId === userId) {
-      setExpandedSessionsUserId(null);
-      setMemberSessions(null);
+    if (sessions.expandedUserId === userId) {
+      dispatchSessions({ kind: "panel-collapsed" });
       return;
     }
 
-    setExpandedSessionsUserId(userId);
-    setIsLoadingSessions(true);
-    setMemberSessions(null);
+    dispatchSessions({ kind: "panel-expanded", userId });
 
     try {
       const response = await fetch(
@@ -464,7 +429,7 @@ function OrganizationMembersPageContent({
       );
       if (response.ok) {
         const data = await response.json();
-        setMemberSessions(data);
+        dispatchSessions({ kind: "sessions-loaded", sessions: data });
       } else {
         const data = await response.json();
         setError(data.error || "Failed to fetch sessions");
@@ -477,7 +442,7 @@ function OrganizationMembersPageContent({
       );
       setError(err instanceof Error ? err.message : "Failed to fetch sessions");
     }
-    setIsLoadingSessions(false);
+    dispatchSessions({ kind: "load-settled" });
   }
 
   async function handleRevokeSession(
@@ -485,7 +450,7 @@ function OrganizationMembersPageContent({
     type: "cli" | "extension" | "all",
     sessionId?: string
   ) {
-    setIsRevokingSession(true);
+    dispatchSessions({ kind: "revoke-started" });
     try {
       const response = await fetch(
         `/api/organizations/${slug}/members/${userId}/sessions`,
@@ -511,13 +476,16 @@ function OrganizationMembersPageContent({
       // Refresh the sessions list without closing the panel. Its own catch:
       // the revoke already succeeded, so a failed refresh must neither leave
       // the list spinning nor report the revoke as failed.
-      setIsLoadingSessions(true);
+      dispatchSessions({ kind: "reload-started" });
       try {
         const refreshRes = await fetch(
           `/api/organizations/${slug}/members/${userId}/sessions`
         );
         if (refreshRes.ok) {
-          setMemberSessions(await refreshRes.json());
+          dispatchSessions({
+            kind: "sessions-loaded",
+            sessions: await refreshRes.json(),
+          });
         }
       } catch (refreshErr) {
         log.error(
@@ -526,7 +494,7 @@ function OrganizationMembersPageContent({
           refreshErr
         );
       }
-      setIsLoadingSessions(false);
+      dispatchSessions({ kind: "load-settled" });
     } catch (err) {
       log.error(
         "member_session_revoke_failed",
@@ -535,7 +503,7 @@ function OrganizationMembersPageContent({
       );
       setError(err instanceof Error ? err.message : "Failed to revoke session");
     }
-    setIsRevokingSession(false);
+    dispatchSessions({ kind: "revoke-settled" });
   }
 
   function handleCancelInvitation(invitationId: string) {
@@ -835,7 +803,7 @@ function OrganizationMembersPageContent({
                     <button
                       onClick={() => toggleSessions(member.user._id)}
                       className={`rounded-md p-1.5 transition-colors ${
-                        expandedSessionsUserId === member.user._id
+                        sessions.expandedUserId === member.user._id
                           ? "bg-surface-raised text-ink"
                           : "text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
                       }`}
@@ -917,29 +885,29 @@ function OrganizationMembersPageContent({
               </div>
 
               {/* Expandable Sessions Panel */}
-              {expandedSessionsUserId === member.user._id && (
+              {sessions.expandedUserId === member.user._id && (
                 <div className="border-t px-6 py-4 border-line bg-canvas">
-                  {isLoadingSessions ? (
+                  {sessions.isLoading ? (
                     <div className="flex items-center justify-center py-4">
                       <div className="h-5 w-5 animate-spin rounded-full border-2 border-line border-t-line-strong" />
                       <span className="ml-2 text-sm text-ink-subtle">
                         Loading sessions...
                       </span>
                     </div>
-                  ) : memberSessions ? (
+                  ) : sessions.data ? (
                     <div className="space-y-4">
                       {/* CLI Tokens */}
                       <div>
                         <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                          CLI Tokens ({memberSessions.cliTokens.length})
+                          CLI Tokens ({sessions.data.cliTokens.length})
                         </h4>
-                        {memberSessions.cliTokens.length === 0 ? (
+                        {sessions.data.cliTokens.length === 0 ? (
                           <p className="mt-2 text-sm text-ink-subtle">
                             No active CLI sessions.
                           </p>
                         ) : (
                           <div className="mt-2 space-y-2">
-                            {memberSessions.cliTokens.map((token) => (
+                            {sessions.data.cliTokens.map((token) => (
                               <div
                                 key={token._id}
                                 className="flex items-center justify-between rounded-lg border px-4 py-3 border-line bg-surface"
@@ -988,7 +956,7 @@ function OrganizationMembersPageContent({
                                         ),
                                     })
                                   }
-                                  disabled={isRevokingSession}
+                                  disabled={sessions.isRevoking}
                                   className="rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 text-danger hover:bg-danger-soft"
                                 >
                                   Revoke
@@ -1003,15 +971,15 @@ function OrganizationMembersPageContent({
                       <div>
                         <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
                           VS Code Extension (
-                          {memberSessions.extensionSessions.length})
+                          {sessions.data.extensionSessions.length})
                         </h4>
-                        {memberSessions.extensionSessions.length === 0 ? (
+                        {sessions.data.extensionSessions.length === 0 ? (
                           <p className="mt-2 text-sm text-ink-subtle">
                             No active extension sessions.
                           </p>
                         ) : (
                           <div className="mt-2 space-y-2">
-                            {memberSessions.extensionSessions.map((session) => (
+                            {sessions.data.extensionSessions.map((session) => (
                               <div
                                 key={session._id}
                                 className="flex items-center justify-between rounded-lg border px-4 py-3 border-line bg-surface"
@@ -1056,7 +1024,7 @@ function OrganizationMembersPageContent({
                                         ),
                                     })
                                   }
-                                  disabled={isRevokingSession}
+                                  disabled={sessions.isRevoking}
                                   className="rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 text-danger hover:bg-danger-soft"
                                 >
                                   Revoke
@@ -1068,8 +1036,8 @@ function OrganizationMembersPageContent({
                       </div>
 
                       {/* Revoke All Button */}
-                      {(memberSessions.cliTokens.length > 0 ||
-                        memberSessions.extensionSessions.length > 0) && (
+                      {(sessions.data.cliTokens.length > 0 ||
+                        sessions.data.extensionSessions.length > 0) && (
                         <div className="flex justify-end border-t pt-3 border-line">
                           <button
                             onClick={() =>
@@ -1081,10 +1049,10 @@ function OrganizationMembersPageContent({
                                   handleRevokeSession(member.user._id, "all"),
                               })
                             }
-                            disabled={isRevokingSession}
+                            disabled={sessions.isRevoking}
                             className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 bg-danger hover:bg-danger"
                           >
-                            {isRevokingSession
+                            {sessions.isRevoking
                               ? "Revoking..."
                               : "Revoke All Sessions"}
                           </button>
@@ -1253,12 +1221,12 @@ function OrganizationMembersPageContent({
         title="Invite Team Member"
         side="right"
         width="md"
-        preventClose={isInviting}
+        preventClose={invite.isSubmitting}
       >
         <form onSubmit={handleInvite} className="space-y-4">
-          {inviteError && (
+          {invite.error && (
             <div className="rounded-lg border p-3 border-danger-line bg-danger-soft">
-              <p className="text-sm text-danger">{inviteError}</p>
+              <p className="text-sm text-danger">{invite.error}</p>
             </div>
           )}
           <div className="relative">
@@ -1273,29 +1241,33 @@ function OrganizationMembersPageContent({
                 ref={searchInputRef}
                 type="email"
                 id="email"
-                value={inviteEmail}
+                value={invite.email}
                 onChange={(e) => handleEmailChange(e.target.value)}
                 onFocus={() =>
-                  inviteEmail.length >= 2 && setShowSearchResults(true)
+                  invite.email.length >= 2 &&
+                  dispatchInvite({ kind: "suggestions-shown" })
                 }
                 onBlur={() =>
-                  setTimeout(() => setShowSearchResults(false), 200)
+                  setTimeout(
+                    () => dispatchInvite({ kind: "suggestions-hidden" }),
+                    200
+                  )
                 }
                 placeholder="Search by email or name..."
                 required
                 autoComplete="off"
                 className="block w-full rounded-lg border px-4 py-2.5 placeholder:text-ink-muted focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
               />
-              {isSearching && (
+              {invite.isSearching && (
                 <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-line-strong" />
                 </div>
               )}
             </div>
-            {showSearchResults && searchResults.length > 0 && (
+            {invite.showSearchResults && invite.searchResults.length > 0 && (
               <div className="absolute z-10 mt-1 w-full rounded-lg border shadow-lg border-line bg-surface-raised">
                 <ul className="max-h-60 overflow-auto py-1">
-                  {searchResults.map((user) => (
+                  {invite.searchResults.map((user) => (
                     <li key={user._id}>
                       <button
                         type="button"
@@ -1354,8 +1326,13 @@ function OrganizationMembersPageContent({
             </label>
             <select
               id="role"
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as OrgRole)}
+              value={invite.role}
+              onChange={(e) =>
+                dispatchInvite({
+                  kind: "role-changed",
+                  role: e.target.value as OrgRole,
+                })
+              }
               className="mt-2 block w-full rounded-lg border px-4 py-2.5 focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
             >
               {inviteRoleOptions.map((role) => (
@@ -1365,12 +1342,12 @@ function OrganizationMembersPageContent({
               ))}
             </select>
             <p className="mt-1.5 text-xs text-ink-muted">
-              {roleMetaBySlug.get(inviteRole)?.description ??
-                ORG_ROLE_DESCRIPTIONS[inviteRole] ??
+              {roleMetaBySlug.get(invite.role)?.description ??
+                ORG_ROLE_DESCRIPTIONS[invite.role] ??
                 ""}
             </p>
           </div>
-          {inviteRole !== "owner" && projects.length === 0 && (
+          {invite.role !== "owner" && projects.length === 0 && (
             <div className="rounded-lg border p-3 border-line bg-surface-raised">
               <p className="text-xs text-ink-muted">
                 No projects available. Create a project first to assign
@@ -1378,7 +1355,7 @@ function OrganizationMembersPageContent({
               </p>
             </div>
           )}
-          {inviteRole !== "owner" && projects.length > 0 && (
+          {invite.role !== "owner" && projects.length > 0 && (
             <>
               <div>
                 <label className="block text-sm font-medium text-ink">
@@ -1397,20 +1374,13 @@ function OrganizationMembersPageContent({
                       <input
                         type="checkbox"
                         checked={selectedProjectIdSet.has(project._id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedProjectIds([
-                              ...selectedProjectIds,
-                              project._id,
-                            ]);
-                          } else {
-                            setSelectedProjectIds(
-                              selectedProjectIds.filter(
-                                (id) => id !== project._id
-                              )
-                            );
-                          }
-                        }}
+                        onChange={(e) =>
+                          dispatchInvite({
+                            kind: "project-toggled",
+                            projectId: project._id,
+                            selected: e.target.checked,
+                          })
+                        }
                         className="h-4 w-4"
                       />
                       <div className="flex items-center gap-2">
@@ -1432,9 +1402,11 @@ function OrganizationMembersPageContent({
           )}
           {inviteEnvScopeApplies && (
             <EnvironmentScopeSelector
-              selected={inviteEnvScope}
-              onChange={setInviteEnvScope}
-              disabled={isInviting}
+              selected={invite.environmentScope}
+              onChange={(environments) =>
+                dispatchInvite({ kind: "environments-changed", environments })
+              }
+              disabled={invite.isSubmitting}
             />
           )}
           <div className="flex justify-end gap-3 pt-4">
@@ -1448,13 +1420,13 @@ function OrganizationMembersPageContent({
             <button
               type="submit"
               disabled={
-                isInviting ||
-                !inviteEmail ||
-                (inviteEnvScopeApplies && inviteEnvScope.length === 0)
+                invite.isSubmitting ||
+                !invite.email ||
+                (inviteEnvScopeApplies && invite.environmentScope.length === 0)
               }
               className="rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
             >
-              {isInviting ? "Sending..." : "Send Invitation"}
+              {invite.isSubmitting ? "Sending..." : "Send Invitation"}
             </button>
           </div>
         </form>
