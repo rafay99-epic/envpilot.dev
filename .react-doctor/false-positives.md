@@ -7,6 +7,65 @@ config ignore would hide that.
 
 Re-verify the predicate before dismissing the finding again.
 
+## `no-loading-flag-reset-outside-finally` — three navigation handlers
+
+`app/(dashboard)/dashboard/projects/[slug]/docs/new/page.tsx`,
+`app/(dashboard)/organizations/new/page.tsx`,
+`components/settings/project/Danger.tsx`
+
+**Predicate:** all three already reset the flag inside `catch`, which is the
+rule's own stated alternative ("or mirror it on every catch"). The stuck-flag
+harm it describes cannot happen. On the success path the flag deliberately
+stays set while `router.push`/`replace` navigates away, so the button cannot
+re-fire mid-navigation.
+
+Moving these into `finally` would be actively worse twice over: it would
+re-enable the control during navigation, and React Compiler cannot lower a
+`try` with a finalizer, so each one would bail the compiler out of its whole
+component. That class of regression is what most of this branch was spent
+removing.
+
+**Invalidated if:** a `catch` stops resetting the flag, or the success path
+stops navigating away.
+
+## `motion-animate-presence-must-outlive-child` — `ApiKeysSection.tsx` snippet block
+
+**Predicate:** `AnimatePresence` only tracks its DIRECT children. The
+`m.div key="snippet"` is a direct child of this boundary, and the boundary
+outlives every transition of the child's own condition (`showSnippet`), so
+the exit animation runs correctly for every user-visible toggle.
+
+The boundary is nested inside the `createdToken ? ... : ...` branch, which is
+what the detector sees. Hoisting it above that ternary to satisfy the rule
+would put four levels of markup between `AnimatePresence` and the `m.div`,
+which stops it tracking the child at all and breaks the very animation the
+rule exists to protect.
+
+The sibling finding in `KeyRow` WAS real and is fixed: there the boundary was
+gated on `!isRevoked` while its child was gated on `confirming`, so revoking a
+key with the confirm strip open unmounted the boundary and the strip vanished
+instead of animating out. Both conditions sit on the child now.
+
+**Invalidated if:** the snippet stops being a direct child of its
+`AnimatePresence`.
+
+## `no-fetch-response-used-without-status-check` — five sites, all already handled
+
+`app/api/integrations/[provider]/callback/route.ts` (x2),
+`app/(dashboard)/dashboard/projects/[slug]/page.tsx`,
+`app/(dashboard)/dashboard/variables/page.tsx`,
+`components/integrations/IntegrationsSection.tsx`
+
+**Predicate:** every one reads the body and then guards before using it, which
+is the rule's own "deliberately handle the API's error payload" case. The
+OAuth callback has to parse first: Slack returns HTTP 200 with `ok: false` on
+rejection, so `response.ok` alone would miss it, and both providers carry the
+message in `data.error`. All the parses use `.catch(() => null)` so a non-JSON
+error page cannot throw past the guard. The project page additionally checks
+`content-type` and `res.redirected` for the expired-session HTML redirect.
+
+**Invalidated if:** any of these starts using a parsed field before its guard.
+
 ## `nextjs-no-img-element` — the three organization-logo sites
 
 `apps/web/src/app/(dashboard)/invitations/[token]/page.tsx`,
