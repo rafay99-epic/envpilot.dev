@@ -15,6 +15,7 @@ import {
 } from "@/lib/error-messages";
 import { LimitWarning } from "@/components/tier/FeatureGate";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
+import { createLogger } from "@/lib/logger";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import type { Id } from "@convex/_generated/dataModel";
 import {
@@ -43,6 +44,8 @@ const generateSlug = (name: string) =>
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .slice(0, 50);
+
+const log = createLogger("app/projects-new");
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -154,6 +157,18 @@ export default function NewProjectPage() {
       router.push(`/dashboard/projects/${formData.slug}`);
     } catch (err) {
       const message = sanitizeConvexError(err);
+      // Restores the reporting this page had before the rewrite: the create is
+      // now one call, so a failure here means no project AND no variables.
+      log.error(
+        "project_create_failed",
+        {
+          organizationId: organization?.id,
+          slug: formData.slug,
+          template: selectedTemplate?.id,
+          variableCount: selectedTemplate?.variables.length ?? 0,
+        },
+        err
+      );
       if (isRateLimitError(err)) setError(message);
       else if (isTierLimitError(message)) {
         setError(

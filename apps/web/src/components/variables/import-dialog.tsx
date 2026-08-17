@@ -15,7 +15,10 @@ import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { sanitizeConvexError } from "@/lib/error-messages";
+import { createLogger } from "@/lib/logger";
 import type { Id } from "@convex/_generated/dataModel";
+
+const log = createLogger("variables/import");
 
 interface ImportDrawerProps {
   isOpen: boolean;
@@ -141,6 +144,11 @@ export function ImportDialog({
 
       onImported?.();
     } catch (err) {
+      log.error(
+        "variable_import_failed",
+        { projectId, organizationId, environment, mode, format },
+        err
+      );
       setParseError(sanitizeConvexError(err) || "Import failed");
     }
     // Runs on both paths: the catch above swallows, and neither branch returns early.

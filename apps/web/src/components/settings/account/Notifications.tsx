@@ -5,6 +5,9 @@ import { SettingsRow, SettingsSection } from "@envpilot/ui";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useSavePreferences } from "@/hooks/usePreferences";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("settings/notifications");
 
 interface NotificationPrefs {
   variableChanges: boolean;
@@ -85,7 +88,8 @@ export function NotificationSettings() {
       await savePreferences({ emailNotifications: next });
       // Keep the override: it already equals what was stored, so holding it
       // avoids a flicker back to the old value while the query catches up.
-    } catch {
+    } catch (err) {
+      log.error("notification_preference_save_failed", { key }, err);
       // Drop it and fall back to whatever storage actually says.
       setOptimistic(null);
     }

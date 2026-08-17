@@ -8,10 +8,13 @@ import { useKeyboardStore } from "@/stores/keyboard-store";
 import { getEffectiveShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { validateBinding } from "@/lib/shortcut-validation";
 import { useSavePreferences } from "@/hooks/usePreferences";
+import { createLogger } from "@/lib/logger";
 import {
   initialShortcutRecorderState,
   shortcutRecorderReducer,
 } from "./shortcut-recorder-state";
+
+const log = createLogger("settings/customization");
 
 const shortcutCategories = [
   { key: "navigation" as const, label: "Navigation" },
@@ -119,7 +122,8 @@ export function CustomizationSettings() {
       await savePreferences({ keyboardShortcuts: newBindings });
       setSaveMessage("Saved");
       setTimeout(() => setSaveMessage(null), 2000);
-    } catch {
+    } catch (err) {
+      log.error("shortcut_save_failed", { shortcutId, binding }, err);
       // Revert on error
       removeBinding(shortcutId);
     }
@@ -134,7 +138,8 @@ export function CustomizationSettings() {
     const { [shortcutId]: _, ...rest } = customBindings;
     try {
       await savePreferences({ keyboardShortcuts: rest });
-    } catch {
+    } catch (err) {
+      log.error("shortcut_remove_failed", { shortcutId }, err);
       // Revert
       updateBinding(shortcutId, customBindings[shortcutId]);
     }
@@ -146,8 +151,10 @@ export function CustomizationSettings() {
       await savePreferences({ keyboardShortcuts: {} });
       setSaveMessage("All shortcuts reset to defaults");
       setTimeout(() => setSaveMessage(null), 2000);
-    } catch {
-      // Silently fail
+    } catch (err) {
+      // Was "silently fail". A reset that does not persist looks identical to
+      // one that did until the next reload.
+      log.error("shortcut_reset_all_failed", {}, err);
     }
   }
 

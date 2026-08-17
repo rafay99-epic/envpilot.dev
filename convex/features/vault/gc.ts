@@ -7,6 +7,7 @@ import {
 } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { requireAuthedUser } from "../../lib/identity";
+import { reportToSentry } from "../../lib/sentry";
 import { del as blobStoreDel } from "../files/blobStore";
 import { assertProjectAction } from "../../lib/authz";
 
@@ -247,34 +248,9 @@ export const hardDeleteFile = internalMutation({
 // VAULT + OBSERVABILITY HELPERS (action runtime)
 // ==========================================
 
-/**
- * Best-effort error report to Sentry's store endpoint. Never throws.
- * Parses the standard DSN shape `https://<key>[:secret]@<host>/<projectId>`.
- */
-async function reportToSentry(message: string): Promise<void> {
-  const dsn = process.env.SENTRY_DSN;
-  if (!dsn) return;
-  try {
-    const match = /^https:\/\/([^@]+)@([^/]+)\/(.+)$/.exec(dsn);
-    if (!match) return;
-    const key = match[1].split(":")[0];
-    const host = match[2];
-    const projectId = match[3];
-    await fetch(`https://${host}/api/${projectId}/store/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Sentry-Auth": `Sentry sentry_version=7, sentry_key=${key}`,
-      },
-      body: JSON.stringify({
-        message,
-        level: "error",
-        tags: { surface: "convex", source: "vault-gc" },
-      }),
-    });
-  } catch {
-    // Swallow — observability must never break the purge.
-  }
+/** Sentry reporting for this cron, through the shared Convex reporter. */
+function reportVaultGcError(message: string): Promise<void> {
+  return reportToSentry(message, { source: "vault-gc" });
 }
 
 /**
@@ -307,7 +283,7 @@ export async function deleteVaultObject(
       status: res.status,
       body,
     });
-    await reportToSentry(
+    await reportVaultGcError(
       `vault-gc: Vault DELETE ${vaultRef} returned ${res.status} ${body}`
     );
     return false;
@@ -316,7 +292,7 @@ export async function deleteVaultObject(
       vaultRef,
       error: String(err),
     });
-    await reportToSentry(
+    await reportVaultGcError(
       `vault-gc: Vault DELETE ${vaultRef} threw ${String(err)}`
     );
     return false;

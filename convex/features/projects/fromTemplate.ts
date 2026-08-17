@@ -12,6 +12,7 @@ import { rateLimiter } from "../../lib/rateLimits";
 import { MAX_BATCH_VARIABLES } from "../../lib/batchLimits";
 import { pool, throttleProgress, VAULT_POOL_WIDTH } from "../../lib/pool";
 import { vaultCreate, vaultDelete } from "../vault/vault";
+import { reportToSentry } from "../../lib/sentry";
 import { findBatchInternalConflicts } from "../variables/helpers";
 import { openBulkJob } from "../variables/bulkJobs";
 import { createProjectCore, projectCreateArgs } from "./mutations";
@@ -211,6 +212,18 @@ export const provisionVariables = workflow.define({
         status: "failed",
         error: messageOf(error),
       });
+      await step.runAction(
+        internal.features.projects.fromTemplate.reportProvisionFailure,
+        {
+          projectId: args.projectId,
+          organizationId: args.organizationId,
+          jobId: args.jobId,
+          stage: "vault",
+          reason: messageOf(error),
+          total: args.variables.length,
+        },
+        { name: "report-failure" }
+      );
       throw error;
     }
 
@@ -239,6 +252,18 @@ export const provisionVariables = workflow.define({
         status: "failed",
         error: messageOf(error),
       });
+      await step.runAction(
+        internal.features.projects.fromTemplate.reportProvisionFailure,
+        {
+          projectId: args.projectId,
+          organizationId: args.organizationId,
+          jobId: args.jobId,
+          stage: "persist",
+          reason: messageOf(error),
+          total: args.variables.length,
+        },
+        { name: "report-failure" }
+      );
       throw error;
     }
 
@@ -356,6 +381,45 @@ export const writeTemplateSecrets = internalAction({
 
     await Promise.allSettled(pending);
     return refs;
+  },
+});
+
+/**
+ * Report a provisioning failure to Sentry.
+ *
+ * The bulkJobs row already carries the reason for the USER, but that row is
+ * dismissible and project-scoped: nobody operating the service ever sees it.
+ * A batch that dies partway is exactly the class of failure that should page
+ * someone, so it goes to the same place the vault GC cron reports to.
+ *
+ * An action, not inline in the workflow, because reportToSentry does network
+ * I/O and workflow handlers are not the place for it.
+ */
+export const reportProvisionFailure = internalAction({
+  args: {
+    projectId: v.id("projects"),
+    organizationId: v.id("organizations"),
+    jobId: v.id("bulkJobs"),
+    stage: v.union(v.literal("vault"), v.literal("persist")),
+    reason: v.string(),
+    total: v.number(),
+  },
+  returns: v.null(),
+  handler: async (_ctx, args) => {
+    await reportToSentry(
+      `template provisioning failed at the ${args.stage} stage: ${args.reason}`,
+      {
+        source: "template-provision",
+        tags: {
+          stage: args.stage,
+          projectId: args.projectId,
+          organizationId: args.organizationId,
+          jobId: args.jobId,
+          total: String(args.total),
+        },
+      }
+    );
+    return null;
   },
 });
 

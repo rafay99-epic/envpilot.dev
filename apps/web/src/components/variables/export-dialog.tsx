@@ -16,7 +16,10 @@ import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { sanitizeConvexError } from "@/lib/error-messages";
+import { createLogger } from "@/lib/logger";
 import type { Id } from "@convex/_generated/dataModel";
+
+const log = createLogger("variables/export");
 
 interface ExportDrawerProps {
   isOpen: boolean;
@@ -74,6 +77,11 @@ export function ExportDialog({
 
       setNotice(`Exported as ${FORMAT_LABELS[format]}`);
     } catch (err) {
+      log.error(
+        "variable_export_failed",
+        { projectId, organizationId, environment, format },
+        err
+      );
       setNotice(`Error: ${sanitizeConvexError(err) || "Export failed"}`);
     }
     // After the try/catch, not in a `finally`: React Compiler bails on the

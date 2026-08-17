@@ -11,6 +11,9 @@ import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { sanitizeConvexError } from "@/lib/error-messages";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("settings/org-danger");
 
 export function DangerTab({
   slug,
@@ -58,6 +61,7 @@ export function DangerTab({
       router.refresh();
       router.push("/organizations");
     } catch (err) {
+      log.error("organization_transfer_failed", { slug }, err);
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsTransferring(false);
     }
@@ -79,6 +83,7 @@ export function DangerTab({
       // transition rather than flicker back to "Delete".
       router.push("/organizations");
     } catch (err) {
+      log.error("organization_delete_failed", { organizationId }, err);
       setError(sanitizeConvexError(err) || "An error occurred");
       // The rejection path DOES reset, which is what the rule is protecting
       // against; it cannot see the router.push above. A `finally` is not an

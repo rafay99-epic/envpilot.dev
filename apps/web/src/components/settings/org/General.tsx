@@ -13,6 +13,9 @@ import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { sanitizeConvexError } from "@/lib/error-messages";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("settings/org-general");
 
 // A type alias, not an interface: only aliases get the implicit index
 // signature `useUnsavedChanges<T extends Record<string, unknown>>` needs.
@@ -90,6 +93,11 @@ export function GeneralTab({
       setSnapshot(sent);
       setSuccessMessage("Organization settings updated successfully");
     } catch (err) {
+      log.error(
+        "organization_update_failed",
+        { organizationId: organization._id },
+        err
+      );
       setError(sanitizeConvexError(err) || "An error occurred");
     }
     // After the try/catch, not in a `finally`: React Compiler bails on the

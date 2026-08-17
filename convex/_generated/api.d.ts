@@ -139,6 +139,7 @@ import type * as lib_rateLimits from "../lib/rateLimits.js";
 import type * as lib_roleCompat from "../lib/roleCompat.js";
 import type * as lib_roleProfiles from "../lib/roleProfiles.js";
 import type * as lib_seedData from "../lib/seedData.js";
+import type * as lib_sentry from "../lib/sentry.js";
 import type * as lib_urlValidation from "../lib/urlValidation.js";
 import type * as lib_users from "../lib/users.js";
 
@@ -280,6 +281,7 @@ declare const fullApi: ApiFromModules<{
   "lib/roleCompat": typeof lib_roleCompat;
   "lib/roleProfiles": typeof lib_roleProfiles;
   "lib/seedData": typeof lib_seedData;
+  "lib/sentry": typeof lib_sentry;
   "lib/urlValidation": typeof lib_urlValidation;
   "lib/users": typeof lib_users;
 }>;

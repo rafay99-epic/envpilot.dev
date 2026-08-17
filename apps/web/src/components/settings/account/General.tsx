@@ -11,7 +11,10 @@ import { useUnsavedChanges } from "@/hooks";
 import { useTimeZone } from "@/hooks/useTimeZone";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
+import { createLogger } from "@/lib/logger";
 import { formatDateWith } from "@/lib/format";
+
+const log = createLogger("settings/account-general");
 
 /** "August 2026" — the member-since line. */
 const MEMBER_SINCE_OPTIONS: Intl.DateTimeFormatOptions = {
@@ -70,6 +73,7 @@ export function GeneralSettings({ user }: { user: AccountUser | null }) {
       setSaveMessage({ type: "success", text: "Profile updated" });
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (err) {
+      log.error("profile_update_failed", {}, err);
       setSaveMessage({
         type: "error",
         text: err instanceof Error ? err.message : "Failed to save",
