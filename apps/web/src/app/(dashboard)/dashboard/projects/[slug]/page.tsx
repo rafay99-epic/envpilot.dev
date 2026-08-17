@@ -123,6 +123,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     setShowConfirmDialog: setShowBulkDeleteConfirm,
   } = useVariableSelectionStore();
 
+  // Declared above the hotkey registrations that call it: the handlers
+  // close over the setter, so keeping the declaration below them reads as
+  // use-before-declare even though it only runs on a key press.
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
   // Keyboard shortcut: Cmd/Ctrl+Shift+K to open Add Variable drawer (respects custom bindings)
   const customBindings = useKeyboardStore((s) => s.customBindings);
   const addVarKeys = customBindings.ADD_VARIABLE ?? SHORTCUTS.ADD_VARIABLE.keys;
@@ -223,7 +228,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const isSearchLoading = isSearching && searchData === undefined;
 
   // Modal states
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showExportDrawer, setShowExportDrawer] = useState(false);
   const [showImportDrawer, setShowImportDrawer] = useState(false);
   const [editingVariable, setEditingVariable] = useState<Variable | null>(null);
@@ -293,10 +297,13 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       setError(
         err instanceof Error ? err.message : "Failed to delete variables"
       );
-    } finally {
-      setBulkDeleting(false);
-      setShowBulkDeleteConfirm(false);
     }
+    // After the try/catch, not in a `finally`. One finalizer anywhere in this
+    // component makes React Compiler bail on the WHOLE component, so the two
+    // handlers here have to agree. The catch swallows and no branch inside
+    // the try returns early.
+    setBulkDeleting(false);
+    setShowBulkDeleteConfirm(false);
   };
 
   const handleCreateVariable = async (data: VariableFormData) => {
@@ -498,13 +505,16 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         err
       );
       setError("Failed to reveal variable value.");
-    } finally {
-      setRevealingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(variable._id);
-        return next;
-      });
     }
+    // Cleared after the try/catch rather than in a `finally`: React Compiler
+    // bails on the whole component when a try carries a finalizer. The catch
+    // swallows and no branch inside the try returns early, so both paths
+    // reach here.
+    setRevealingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(variable._id);
+      return next;
+    });
   };
 
   // Search mode swaps the source to server results (already env-filtered by

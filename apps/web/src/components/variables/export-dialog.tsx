@@ -75,9 +75,11 @@ export function ExportDialog({
       setNotice(`Exported as ${FORMAT_LABELS[format]}`);
     } catch (err) {
       setNotice(`Error: ${sanitizeConvexError(err) || "Export failed"}`);
-    } finally {
-      setIsExporting(false);
     }
+    // After the try/catch, not in a `finally`: React Compiler bails on the
+    // whole component when a try carries a finalizer. The catch swallows, so
+    // this clears on both paths.
+    setIsExporting(false);
   };
 
   const handleClose = () => {

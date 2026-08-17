@@ -74,9 +74,17 @@ export function DangerTab({
         organizationId: organizationId as Id<"organizations">,
       });
 
+      // No reset on this path on purpose: the organization is gone and we
+      // are navigating away, so the button must stay disabled through the
+      // transition rather than flicker back to "Delete".
       router.push("/organizations");
     } catch (err) {
       setError(sanitizeConvexError(err) || "An error occurred");
+      // The rejection path DOES reset, which is what the rule is protecting
+      // against; it cannot see the router.push above. A `finally` is not an
+      // option here either, since one makes React Compiler bail on the whole
+      // component.
+      // react-doctor-disable-next-line react-doctor/no-loading-flag-reset-outside-finally
       setIsDeleting(false);
     }
   }

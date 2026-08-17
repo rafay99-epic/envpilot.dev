@@ -74,9 +74,11 @@ export function GeneralSettings({ user }: { user: AccountUser | null }) {
         type: "error",
         text: err instanceof Error ? err.message : "Failed to save",
       });
-    } finally {
-      setIsSaving(false);
     }
+    // After the try/catch, not in a `finally`: React Compiler bails on the
+    // whole component when a try carries a finalizer. The catch swallows, so
+    // this clears on both the success and the failure path.
+    setIsSaving(false);
   }
 
   return (

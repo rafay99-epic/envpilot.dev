@@ -194,13 +194,15 @@ export default function VariablesPage() {
       );
       setError("Failed to reveal variable value.");
       setTimeout(() => setError(null), 3000);
-    } finally {
-      setRevealingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(variable._id);
-        return next;
-      });
     }
+    // Cleared after the try/catch rather than in a `finally`: React Compiler
+    // bails on the whole component when a try carries a finalizer. The catch
+    // swallows and no branch inside the try returns early.
+    setRevealingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(variable._id);
+      return next;
+    });
   };
 
   const handleUpdateVariable = async (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { SaveBar, SettingsField, SettingsSection } from "@envpilot/ui";
 import { SectionProvenance } from "@/components/settings/SectionProvenance";
 import {
@@ -41,23 +41,30 @@ export function GeneralTab({
     description: "",
   });
   const [snapshot, setSnapshot] = useState<ProfileValues | null>(null);
-  const seededOrganizationId = useRef<string | null>(null);
+  const [seededOrganizationId, setSeededOrganizationId] = useState<
+    string | null
+  >(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Seed once per organization: the query is reactive, so re-seeding on every
   // result would discard in-flight edits when someone else writes.
-  useEffect(() => {
-    if (seededOrganizationId.current === organization._id) return;
-    seededOrganizationId.current = organization._id;
+  //
+  // Adjusted DURING render rather than in an effect. This is the documented
+  // shape for "reset state when a prop changes": React re-runs the component
+  // immediately without committing the first pass, so it costs less than the
+  // extra render an effect would schedule, and the form is never briefly
+  // shown with the previous organization's values.
+  if (seededOrganizationId !== organization._id) {
     const seeded = {
       name: organization.name,
       description: organization.description || "",
     };
+    setSeededOrganizationId(organization._id);
     setValues(seeded);
     setSnapshot(seeded);
-  }, [organization]);
+  }
 
   const { dirtyCount } = useUnsavedChanges(values, snapshot);
 
@@ -84,9 +91,11 @@ export function GeneralTab({
       setSuccessMessage("Organization settings updated successfully");
     } catch (err) {
       setError(sanitizeConvexError(err) || "An error occurred");
-    } finally {
-      setIsSaving(false);
     }
+    // After the try/catch, not in a `finally`: React Compiler bails on the
+    // whole component when a try carries a finalizer. The catch swallows, so
+    // this clears on both paths.
+    setIsSaving(false);
   }
 
   return (
