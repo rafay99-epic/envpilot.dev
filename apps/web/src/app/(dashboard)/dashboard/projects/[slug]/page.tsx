@@ -195,8 +195,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const revealSecret = useRevealSecret();
 
   // --- Local UI state ---
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [selectedEnvironment, setSelectedEnvironment] = useState<string>("all");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
@@ -271,16 +269,13 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     if (selectedIds.size === 0 || !projectId) return;
 
     setBulkDeleting(true);
-    setNotice(null);
-    setError(null);
-
     try {
       const result = await bulkDelete.mutateAsync({
         variableIds: Array.from(selectedIds),
         projectId,
       });
 
-      setNotice(
+      toast.success(
         `Successfully deleted ${result.deletedCount} variable${result.deletedCount !== 1 ? "s" : ""}.`
       );
       exitSelectionMode();
@@ -294,7 +289,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         },
         err
       );
-      setError(
+      toast.error(
         err instanceof Error ? err.message : "Failed to delete variables"
       );
     }
@@ -308,9 +303,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
   const handleCreateVariable = async (data: VariableFormData) => {
     if (!projectId) return;
-    setNotice(null);
-    setError(null);
-
     try {
       const result = await createVariable.mutateAsync({
         key: data.key,
@@ -324,9 +316,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       });
 
       if (result.requested) {
-        setNotice("Variable request submitted for admin approval.");
+        toast.success("Variable request submitted for admin approval.");
       } else {
-        setNotice("Variable created successfully.");
+        toast.success("Variable created successfully.");
       }
     } catch (err) {
       // Convex redacts plain Error messages to "Server Error" in production,
@@ -348,7 +340,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         },
         err
       );
-      setError(message);
+      toast.error(message);
       // Re-throw with the friendly message — the create drawer's form shows
       // err.message in its inline banner, never the raw backend text.
       throw new Error(message);
@@ -360,9 +352,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     data: VariableFormData
   ) => {
     if (!projectId) return;
-    setNotice(null);
-    setError(null);
-
     try {
       await updateVariable.mutateAsync({
         variableId,
@@ -378,7 +367,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         tagIds: data.tagIds,
       });
 
-      setNotice("Variable updated successfully.");
+      toast.success("Variable updated successfully.");
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to update variable";
@@ -392,7 +381,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         },
         err
       );
-      setError(message);
+      toast.error(message);
       throw err;
     }
   };
@@ -400,8 +389,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const handleDeleteVariable = async () => {
     if (!deletingVariable || !projectId) return;
 
-    setNotice(null);
-    setError(null);
     try {
       await deleteVariable.mutateAsync({
         variableId: deletingVariable._id,
@@ -409,7 +396,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       });
 
       setDeletingVariable(null);
-      setNotice("Variable deleted successfully.");
+      toast.success("Variable deleted successfully.");
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to delete variable";
@@ -422,7 +409,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         },
         err
       );
-      setError(message);
+      toast.error(message);
       throw err;
     }
   };
@@ -443,7 +430,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         targetVersion,
       });
 
-      setNotice(
+      toast.success(
         `Rolled back ${historyVariableKey} to version ${targetVersion}.`
       );
 
@@ -473,7 +460,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       );
       const message =
         err instanceof Error ? err.message : "Failed to rollback variable";
-      setError(message);
+      toast.error(message);
       toast.error(message);
     }
   };
@@ -504,7 +491,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         },
         err
       );
-      setError("Failed to reveal variable value.");
+      toast.error("Failed to reveal variable value.");
     }
     // Cleared after the try/catch rather than in a `finally`: React Compiler
     // bails on the whole component when a try carries a finalizer. The catch
@@ -642,18 +629,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           </>
         }
       />
-
-      {notice && (
-        <div className="rounded-lg border p-4 border-accent-line bg-accent-soft">
-          <p className="text-sm text-accent">{notice}</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded-lg border p-4 border-danger-line bg-danger-soft">
-          <p className="text-sm text-danger">{error}</p>
-        </div>
-      )}
 
       <div className="flex flex-wrap items-center gap-4">
         {/* A button group, not a form control, so it gets a labelled group
@@ -994,10 +969,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         isOpen={!!deletingVariable}
         onClose={() => setDeletingVariable(null)}
         onConfirm={handleDeleteVariable}
-        title="Delete Variable"
-        message={`Are you sure you want to delete "${deletingVariable?.key}"? You can restore it for 7 days. After that it is permanently deleted, including the stored secret value.`}
+        title="delete variable"
+        message={`Recoverable from trash for 7 days, then the stored secret value is destroyed.`}
         confirmText="Delete"
         variant="danger"
+        confirmPhrase={deletingVariable?.key}
       />
 
       {projectId && (
@@ -1023,8 +999,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         isOpen={showBulkDeleteConfirm}
         onClose={() => setShowBulkDeleteConfirm(false)}
         onConfirm={handleBulkDelete}
-        title="Bulk Delete Variables"
-        message={`Are you sure you want to delete ${selectedIds.size} variable${selectedIds.size !== 1 ? "s" : ""}? You can restore them for 7 days. After that they are permanently deleted, including the stored secret values.`}
+        title="delete variables"
+        message={`${selectedIds.size} variable${selectedIds.size !== 1 ? "s" : ""}. Recoverable from trash for 7 days, then the stored secret values are destroyed.`}
         confirmText={isBulkDeleting ? "Deleting..." : "Delete All"}
         variant="danger"
       />

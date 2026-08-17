@@ -234,32 +234,13 @@ export default function NewProjectPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link
-          href="/dashboard/projects"
-          className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover"
-        >
-          <svg
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            />
-          </svg>
-        </Link>
-        <PageHeader
-          icon={FolderPlus}
-          title="Create New Project"
-          description={organization ? `in ${organization.name}` : undefined}
-        />
-      </div>
+      {/* No back arrow here any more: the shell renders breadcrumbs with a
+          history-back control above every dashboard page. */}
+      <PageHeader
+        icon={FolderPlus}
+        title="Create New Project"
+        description={organization ? `in ${organization.name}` : undefined}
+      />
 
       {/* Tier limit warning */}
       {enforcing &&

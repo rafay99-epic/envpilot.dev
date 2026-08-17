@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePaginatedQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
+import { toast } from "sonner";
 import { useProjects, useConvexUser, useFeatureGate } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import type { Id } from "@convex/_generated/dataModel";
@@ -130,8 +131,6 @@ export default function VariablesPage() {
   );
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   // Reveal value state
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>(
@@ -192,8 +191,8 @@ export default function VariablesPage() {
         },
         err
       );
-      setError("Failed to reveal variable value.");
-      setTimeout(() => setError(null), 3000);
+      toast.error("Failed to reveal variable value.");
+      setTimeout(() => toast.error(null), 3000);
     }
     // Cleared after the try/catch rather than in a `finally`: React Compiler
     // bails on the whole component when a try carries a finalizer. The catch
@@ -209,9 +208,6 @@ export default function VariablesPage() {
     variableId: Id<"environmentVariables">,
     data: VariableFormData
   ) => {
-    setNotice(null);
-    setError(null);
-
     try {
       await updateVariable.mutateAsync({
         variableId,
@@ -227,8 +223,8 @@ export default function VariablesPage() {
         changeReason: "Updated via dashboard",
       });
 
-      setNotice("Variable updated successfully.");
-      setTimeout(() => setNotice(null), 3000);
+      toast.success("Variable updated successfully.");
+      setTimeout(() => toast.success(null), 3000);
       // Clear cached revealed value since it may have changed
       setRevealedValues((prev) => {
         const next = { ...prev };
@@ -248,7 +244,7 @@ export default function VariablesPage() {
         },
         err
       );
-      setError(message);
+      toast.error(message);
       throw err;
     }
   };
@@ -256,8 +252,6 @@ export default function VariablesPage() {
   const handleDeleteVariable = async () => {
     if (!deletingVariable) return;
 
-    setNotice(null);
-    setError(null);
     try {
       await deleteVariable.mutateAsync({
         variableId: deletingVariable._id,
@@ -265,8 +259,8 @@ export default function VariablesPage() {
       });
 
       setDeletingVariable(null);
-      setNotice("Variable deleted successfully.");
-      setTimeout(() => setNotice(null), 3000);
+      toast.success("Variable deleted successfully.");
+      setTimeout(() => toast.success(null), 3000);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to delete variable";
@@ -279,7 +273,7 @@ export default function VariablesPage() {
         },
         err
       );
-      setError(message);
+      toast.error(message);
     }
   };
 
@@ -331,16 +325,6 @@ export default function VariablesPage() {
       </div>
 
       {/* Notices */}
-      {notice && (
-        <div className="rounded-lg border border-accent-line bg-accent-soft px-4 py-3">
-          <p className="text-sm text-accent">{notice}</p>
-        </div>
-      )}
-      {error && (
-        <div className="rounded-lg border border-danger-line bg-danger-soft px-4 py-3">
-          <p className="text-sm text-danger">{error}</p>
-        </div>
-      )}
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

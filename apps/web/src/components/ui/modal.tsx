@@ -17,6 +17,9 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
+  variant?: "danger" | "warning" | "default";
+  /** Overrides the header chrome so severity can live in the frame. */
+  headerClassName?: string;
 }
 
 const sizeClasses = {
@@ -32,6 +35,8 @@ export function Modal({
   title,
   children,
   size = "md",
+  variant = "default",
+  headerClassName,
 }: ModalProps) {
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
@@ -77,12 +82,23 @@ export function Modal({
           role="dialog"
           aria-modal="true"
           aria-label={title}
-          className={`relative w-full ${sizeClasses[size]} transform overflow-hidden rounded-xl shadow-xl transition-all bg-surface`}
+          className={`relative w-full ${sizeClasses[size]} transform overflow-hidden rounded-xl border shadow-xl transition-all bg-surface ${
+            variant === "danger"
+              ? "border-danger-line"
+              : variant === "warning"
+                ? "border-warning-line"
+                : "border-line"
+          }`}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between border-b px-6 py-4 border-line">
-            <h2 className="text-lg font-semibold text-ink">{title}</h2>
+          {/* Header. Mono and compact, matching TerminalWindow's chrome
+              rather than the large centered heading dialogs used to carry. */}
+          <div
+            className={`flex items-center justify-between border-b px-4 py-2.5 ${headerClassName ?? "border-line bg-white/[0.02] text-ink-muted"}`}
+          >
+            <h2 className="font-mono text-[11.5px] lowercase tracking-wide">
+              {title}
+            </h2>
             {/* Named "Close" rather than `Close ${title}`: the dialog already
                 carries the title via aria-label, and some titles interpolate
                 user data. */}
@@ -108,7 +124,7 @@ export function Modal({
           </div>
 
           {/* Content */}
-          <div className="px-6 py-4">{children}</div>
+          <div className="px-4 py-4">{children}</div>
         </div>
       </div>
     </div>,
