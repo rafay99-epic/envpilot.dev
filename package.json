@@ -39,6 +39,7 @@
     "test:e2e": "turbo test:e2e --filter=@envpilot/web",
     "test:unit": "turbo test:unit --filter=@envpilot/web",
     "test:cli": "turbo test --filter=@envpilot/cli",
+    "seed": "for m in seed-feature-registry seed-tier-features seed-role-registry seed-changelog; do echo \"Running $m...\"; bunx convex run features/admin/migrations:run \"{\\\"name\\\":\\\"$m\\\"}\" || exit 1; done",
     "setup": "cp -n .env.example .env.local 2>/dev/null; ln -sf ../../.env.local apps/web/.env.local && ln -sf ../../.env.local apps/blog/.env.local && ln -sf ../../.env.local apps/docs/.env.local && echo 'Environment ready — edit .env.local with your values'"
   },
   "devDependencies": {

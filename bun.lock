@@ -59,7 +59,7 @@
     },
     "apps/blog": {
       "name": "@envpilot/blog",
-      "version": "1.7.1",
+      "version": "1.7.2",
       "dependencies": {
         "@envpilot/ui": "workspace:*",
         "date-fns": "^4.1.0",
@@ -124,7 +124,7 @@
     },
     "apps/docs": {
       "name": "@envpilot/docs",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "dependencies": {
         "@envpilot/ui": "workspace:*",
         "gray-matter": "^4.0.3",
@@ -176,7 +176,7 @@
     },
     "apps/web": {
       "name": "@envpilot/web",
-      "version": "1.63.0",
+      "version": "1.64.0",
       "dependencies": {
         "@envpilot/ui": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.29.0",
@@ -274,7 +274,7 @@
     },
     "packages/ui": {
       "name": "@envpilot/ui",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "dependencies": {
         "date-fns": "^4.1.0",
         "framer-motion": "^12.35.2",
