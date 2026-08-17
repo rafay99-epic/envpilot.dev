@@ -4,6 +4,9 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { createAuthedConvexClient } from "@/lib/convex-client";
 import { sanitizeConvexError } from "@/lib/error-messages";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("api/integrations/start");
 import {
   encodeOAuthState,
   integrationAppUrlSupportsProvider,
@@ -61,7 +64,7 @@ export async function POST(
       );
     }
     if (status === 502) {
-      console.error("Integration eligibility lookup failed", error);
+      log.error("integration_eligibility_lookup_failed", { provider }, error);
       return NextResponse.json(
         { error: "Could not verify integration access. Try again." },
         { status: 502 }

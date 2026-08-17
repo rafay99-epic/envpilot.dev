@@ -5,6 +5,9 @@ import { createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { sanitizeConvexError } from "@/lib/error-messages";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("api/integrations/callback");
 import {
   decodeOAuthState,
   integrationAppUrlSupportsProvider,
@@ -231,10 +234,12 @@ export async function GET(
         provisionedWebhook
       );
       if (!rolledBack) {
-        console.error(`${provider} OAuth provider cleanup failed`);
+        // A webhook was provisioned at the provider and we could not undo
+        // it, so the user has a live destination we have no record of.
+        log.error("integration_webhook_rollback_failed", { provider });
       }
     }
-    console.error(`${provider} OAuth callback failed`, error);
+    log.error("integration_oauth_callback_failed", { provider }, error);
     return clearState(
       settingsRedirect(appUrl, state.slug, {
         integration_error: sanitizeConvexError(error),

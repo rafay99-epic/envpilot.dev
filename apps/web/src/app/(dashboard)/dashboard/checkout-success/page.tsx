@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import confetti from "canvas-confetti";
+import { createLogger } from "@/lib/logger";
 import {
   TerminalWindow,
   TerminalLoading,
@@ -16,6 +17,8 @@ import {
   AlertTriangle,
   RefreshCw,
 } from "lucide-react";
+
+const log = createLogger("app/checkout-success");
 
 type SyncStatus = "syncing" | "success" | "error";
 
@@ -31,11 +34,14 @@ async function syncBilling(checkoutId: string): Promise<boolean> {
       { method: "POST" }
     );
     if (!res.ok) {
-      console.warn("Sync endpoint returned non-OK status, continuing...");
+      // The webhook is the fallback, so this alone is not fatal. It IS
+      // reported: if the webhook is also failing, the customer has paid and
+      // is still on free, and these two together are the only trace of it.
+      log.error("billing_sync_rejected", { checkoutId, status: res.status });
     }
     return true;
-  } catch {
-    console.warn("Sync request failed, webhook will handle tier update");
+  } catch (err) {
+    log.error("billing_sync_request_failed", { checkoutId }, err);
     return true; // Still treat as success — payment went through
   }
 }

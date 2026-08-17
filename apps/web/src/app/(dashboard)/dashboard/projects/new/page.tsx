@@ -14,6 +14,7 @@ import {
   sanitizeConvexError,
 } from "@/lib/error-messages";
 import { LimitWarning } from "@/components/tier/FeatureGate";
+import { createLogger } from "@/lib/logger";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import type { Id } from "@convex/_generated/dataModel";
@@ -43,6 +44,8 @@ const generateSlug = (name: string) =>
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .slice(0, 50);
+
+const log = createLogger("app/projects-new");
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -152,7 +155,14 @@ export default function NewProjectPage() {
               }),
             });
           } catch (err) {
-            console.error(`Failed to create variable ${variable.key}:`, err);
+            // Swallowed per variable so one failure does not abort the rest,
+            // but the user lands on a project quietly missing a variable, so
+            // it has to be reported somewhere.
+            log.error(
+              "template_variable_create_failed",
+              { projectId, key: variable.key },
+              err
+            );
           }
         }
       }
