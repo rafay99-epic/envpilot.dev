@@ -292,3 +292,104 @@ export function environmentConflictMessage(
 ): string {
   return `Variable "${key}" already exists in environment(s): ${clashes.join(", ")}. The same key is allowed only across non-overlapping environments.`;
 }
+
+/**
+ * Per-environment key clashes WITHIN one incoming batch.
+ *
+ * `findEnvironmentConflicts` compares a key against rows already in the
+ * database, which is everything a single create needs: two conflicting creates
+ * arrive as separate requests and the second one loses to the first. A batch
+ * has no first. Two items in the same array claiming DATABASE_URL for
+ * [production] must be refused before anything is written to the vault, or
+ * the transaction fails partway and every minted secret has to be unwound.
+ *
+ * Environments are deduped per item, so a sloppy ["dev", "dev"] on ONE
+ * variable is not a clash; only overlap ACROSS items is.
+ */
+export function findBatchInternalConflicts(
+  items: readonly { key: string; environments: readonly string[] }[]
+): { key: string; clashes: string[] }[] {
+  const claimedByKey = new Map<string, Set<string>>();
+  const clashesByKey = new Map<string, Set<string>>();
+
+  for (const item of items) {
+    let claimed = claimedByKey.get(item.key);
+    if (!claimed) {
+      claimed = new Set<string>();
+      claimedByKey.set(item.key, claimed);
+    }
+    for (const env of new Set(item.environments)) {
+      if (claimed.has(env)) {
+        let clashes = clashesByKey.get(item.key);
+        if (!clashes) {
+          clashes = new Set<string>();
+          clashesByKey.set(item.key, clashes);
+        }
+        clashes.add(env);
+      }
+      claimed.add(env);
+    }
+  }
+
+  return [...clashesByKey].map(([key, clashes]) => ({
+    key,
+    clashes: [...clashes],
+  }));
+}
+
+/** Bounds shared by every variable write path. */
+export const MAX_VARIABLE_KEY_LENGTH = 100;
+export const MAX_VARIABLE_DESCRIPTION_LENGTH = 500;
+
+/**
+ * A variable key is an environment-variable identifier: a letter or
+ * underscore, then letters, digits or underscores.
+ *
+ * Deliberately the PERMISSIVE form. The dashboard and the template flow
+ * require SCREAMING_SNAKE at their entry points, but `pushBulk` has always
+ * accepted lowercase-leading keys from the CLI, and tightening the shared
+ * choke point would start rejecting pushes that work today.
+ */
+const VARIABLE_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** Non-throwing form, for paths that SKIP bad keys instead of failing. */
+export function isValidVariableKey(key: string): boolean {
+  return (
+    key.length > 0 &&
+    key.length <= MAX_VARIABLE_KEY_LENGTH &&
+    VARIABLE_KEY_PATTERN.test(key)
+  );
+}
+
+/**
+ * Validate the fields every create path shares.
+ *
+ * This lived in the zod schema on POST /api/variables. With the browser
+ * calling Convex directly that route is gone, and `createWithValue` — which
+ * the CLI has always used — never checked any of it. So an unvalidated key or
+ * an unbounded description could be written by any direct caller. Enforced in
+ * createCore, which is the one function every create path goes through.
+ */
+export function assertValidVariableFields(args: {
+  key: string;
+  description?: string;
+}): void {
+  if (args.key.length === 0 || args.key.length > MAX_VARIABLE_KEY_LENGTH) {
+    throw new ConvexError(
+      `Variable key must be between 1 and ${MAX_VARIABLE_KEY_LENGTH} characters`
+    );
+  }
+  if (!VARIABLE_KEY_PATTERN.test(args.key)) {
+    throw new ConvexError(
+      `"${args.key}" is not a valid variable key. Use letters, digits and underscores, starting with a letter or underscore.`
+    );
+  }
+  if (
+    args.description !== undefined &&
+    args.description.length > MAX_VARIABLE_DESCRIPTION_LENGTH
+  ) {
+    throw new ConvexError(
+      `Description must be ${MAX_VARIABLE_DESCRIPTION_LENGTH} characters or less`
+    );
+  }
+}

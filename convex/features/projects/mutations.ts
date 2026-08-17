@@ -1,5 +1,6 @@
 import { v, ConvexError } from "convex/values";
-import { mutation } from "../../_generated/server";
+import { mutation, type MutationCtx } from "../../_generated/server";
+import type { Doc, Id } from "../../_generated/dataModel";
 import {
   checkBooleanFeature,
   checkNumericLimit,
@@ -68,18 +69,36 @@ function validateProjectInput(args: {
 // MUTATIONS
 // ==========================================
 
-export const create = mutation({
+export const projectCreateArgs = {
+  name: v.string(),
+  slug: v.string(),
+  description: v.optional(v.string()),
+  organizationId: v.id("organizations"),
+  icon: v.optional(v.string()),
+  color: v.optional(v.string()),
+};
+
+/**
+ * The whole of project creation: validation, org authorization, tier limit,
+ * slug uniqueness, the row, the creator assignment and the audit entry.
+ *
+ * Exported so the template flow creates its project through exactly this path
+ * rather than a parallel copy. A second insert site would be one deploy away
+ * from disagreeing with this one about who may create a project.
+ */
+export async function createProjectCore(
+  ctx: MutationCtx,
+  actor: Doc<"users">,
   args: {
-    name: v.string(),
-    slug: v.string(),
-    description: v.optional(v.string()),
-    organizationId: v.id("organizations"),
-    icon: v.optional(v.string()),
-    color: v.optional(v.string()),
-  },
-  returns: v.id("projects"),
-  handler: async (ctx, args) => {
-    const actor = await requireAuthedUser(ctx);
+    name: string;
+    slug: string;
+    description?: string;
+    organizationId: Id<"organizations">;
+    icon?: string;
+    color?: string;
+  }
+): Promise<Id<"projects">> {
+  {
     validateProjectInput(args);
 
     // Authorization: owners and project managers can create projects
@@ -157,6 +176,15 @@ export const create = mutation({
     });
 
     return projectId;
+  }
+}
+
+export const create = mutation({
+  args: projectCreateArgs,
+  returns: v.id("projects"),
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    return createProjectCore(ctx, actor, args);
   },
 });
 

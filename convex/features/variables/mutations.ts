@@ -1,8 +1,13 @@
 import { v, ConvexError } from "convex/values";
-import { mutation, type MutationCtx } from "../../_generated/server";
-import type { Id } from "../../_generated/dataModel";
+import {
+  mutation,
+  internalMutation,
+  type MutationCtx,
+} from "../../_generated/server";
+import type { Doc, Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import { MAX_BULK_IMPORT_SIZE } from "../billing/tierLimits";
+import { MAX_BATCH_VARIABLES } from "../../lib/batchLimits";
 import {
   checkCountedLimit,
   checkBooleanFeature,
@@ -26,7 +31,9 @@ import {
 import { revokeSharesForResource } from "../sharing/helpers";
 import {
   assertWithinEnvironmentScope,
+  assertValidVariableFields,
   findEnvironmentConflicts,
+  findBatchInternalConflicts,
   environmentConflictMessage,
 } from "./helpers";
 
@@ -37,6 +44,21 @@ import {
 // ==========================================
 // MUTATIONS
 // ==========================================
+
+/**
+ * Per-batch context resolved ONCE by `createMany` and reused for every row.
+ *
+ * The project lookup, the authorization, the tier gate and the rate-limit
+ * charge are properties of the batch, not of each variable in it. Resolving
+ * them per row was the whole cost of the old one-request-per-variable shape;
+ * charging the rate limit per row is what made a 48-variable template lose
+ * everything past the 30th.
+ */
+type BatchCreateContext = {
+  project: Doc<"projects">;
+  auth: Awaited<ReturnType<typeof authorizeVariableAccess>>;
+  gate: Awaited<ReturnType<typeof resolveOrgGateContext>>;
+};
 
 async function createCore(
   ctx: MutationCtx,
@@ -50,51 +72,67 @@ async function createCore(
     createdBy: Id<"users">;
     rotationFrequencyDays?: number;
     tagIds?: Id<"variableTags">[];
-  }
+  },
+  batch?: BatchCreateContext
 ) {
   const now = Date.now();
 
-  const project = await ctx.db.get(args.projectId);
+  // Shape validation before anything else: cheap, and it used to happen in
+  // the deleted POST /api/variables zod schema.
+  assertValidVariableFields(args);
+
+  const project = batch?.project ?? (await ctx.db.get(args.projectId));
   if (!project || project.deletedAt) {
     throw new Error("Project not found");
   }
 
   // Authorization: owner, or assigned PM / team lead / developer
   const { environmentScope, profile: creatorProfile } =
-    await authorizeVariableAccess(ctx, {
+    batch?.auth ??
+    (await authorizeVariableAccess(ctx, {
       userId: args.createdBy,
       projectId: args.projectId,
       action: "project:create_variable",
       preloadedProject: project,
-    });
+    }));
 
   // Environment scope: scoped developers may only create variables whose
-  // environments all fall inside their assignment scope
+  // environments all fall inside their assignment scope. Stays per-row: the
+  // scope is one check but the environments differ per variable.
   assertWithinEnvironmentScope(environmentScope, args.environments);
 
-  // Rate limit: prevent excessive variable creation
-  await rateLimiter.limit(ctx, "variableCreate", {
-    key: project.organizationId,
-    throws: true,
-  });
+  // Rate limit: prevent excessive variable creation. Batches are charged once
+  // up front against variableBatchCreate instead (see startFromTemplate), so
+  // charging again here would bill a 48-variable template 49 times.
+  if (!batch) {
+    await rateLimiter.limit(ctx, "variableCreate", {
+      key: project.organizationId,
+      throws: true,
+    });
+  }
 
   // Resolve the shared org/tier/grace-period context once and reuse it for
   // every feature check against this org in this handler (avoids re-fetching
   // the same rows per check). Zero behavior change.
-  const gate = await resolveOrgGateContext(ctx.db, project.organizationId);
+  const gate =
+    batch?.gate ??
+    (await resolveOrgGateContext(ctx.db, project.organizationId));
 
   // Check tier limits for variable creation. Limit-first: only counts
   // existing variables when the tier's limit is finite, and bounds that
   // count at the limit instead of scanning every variable in the project.
-  const varCheck = await checkCountedLimit(
-    ctx.db,
-    project.organizationId,
-    "max_variables_per_project",
-    (limit) => countActiveVariables(ctx.db, args.projectId, limit),
-    gate
-  );
-  if (!varCheck.allowed) {
-    throw new Error(varCheck.reason!);
+  // A batch checks the whole batch size once, before the loop.
+  if (!batch) {
+    const varCheck = await checkCountedLimit(
+      ctx.db,
+      project.organizationId,
+      "max_variables_per_project",
+      (limit) => countActiveVariables(ctx.db, args.projectId, limit),
+      gate
+    );
+    if (!varCheck.allowed) {
+      throw new Error(varCheck.reason!);
+    }
   }
 
   // Validate rotation frequency bounds
@@ -271,6 +309,101 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
     return createCore(ctx, { ...args, createdBy: actor._id });
+  },
+});
+
+/**
+ * Persist a whole batch of already-encrypted variables in ONE transaction.
+ *
+ * Every row, its version row, its creator grant and its audit entry either all
+ * land or none do, so a project can never come up half-populated. This is the
+ * property the old per-variable HTTP loop could not offer at any speed.
+ *
+ * Internal on purpose: the caller must have written the values to the vault
+ * first and must own the rollback of those refs if this throws. Public entry
+ * points are `projects.templates.startFromTemplate` and the import action.
+ */
+export const createMany = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    createdBy: v.id("users"),
+    variables: v.array(
+      v.object({
+        key: v.string(),
+        vaultRef: v.string(),
+        description: v.optional(v.string()),
+        environments: v.array(v.string()),
+        isSensitive: v.optional(v.boolean()),
+      })
+    ),
+  },
+  returns: v.array(v.id("environmentVariables")),
+  handler: async (ctx, args) => {
+    if (args.variables.length === 0) return [];
+    if (args.variables.length > MAX_BATCH_VARIABLES) {
+      throw new ConvexError(
+        `A single batch may contain at most ${MAX_BATCH_VARIABLES} variables.`
+      );
+    }
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) {
+      throw new ConvexError("Project not found");
+    }
+
+    // Resolve authorization and the tier context ONCE for the whole batch.
+    const auth = await authorizeVariableAccess(ctx, {
+      userId: args.createdBy,
+      projectId: args.projectId,
+      action: "project:create_variable",
+      preloadedProject: project,
+    });
+    const gate = await resolveOrgGateContext(ctx.db, project.organizationId);
+
+    // Admit or refuse the whole batch against the per-project tier limit.
+    // Checking per row would admit rows until the limit bound and then throw
+    // mid-loop, which is the same partial-apply failure this path exists to
+    // remove.
+    const varCheck = await checkCountedLimit(
+      ctx.db,
+      project.organizationId,
+      "max_variables_per_project",
+      (limit) => countActiveVariables(ctx.db, args.projectId, limit),
+      gate,
+      args.variables.length
+    );
+    if (!varCheck.allowed) {
+      throw new ConvexError(varCheck.reason!);
+    }
+
+    // In-batch clashes first, for a message that names the offending key.
+    // createCore re-checks each row against the database as it goes, which
+    // also catches rows inserted earlier in this very loop — that is the
+    // race-safe backstop, this is the good error.
+    const internalClashes = findBatchInternalConflicts(args.variables);
+    if (internalClashes.length > 0) {
+      const first = internalClashes[0]!;
+      throw new ConvexError(
+        `This batch defines "${first.key}" more than once for environment(s): ${first.clashes.join(", ")}. The same key is allowed only across non-overlapping environments.`
+      );
+    }
+
+    const batch: BatchCreateContext = { project, auth, gate };
+    const created: Id<"environmentVariables">[] = [];
+    for (const variable of args.variables) {
+      created.push(
+        await createCore(
+          ctx,
+          {
+            ...variable,
+            projectId: args.projectId,
+            createdBy: args.createdBy,
+          },
+          batch
+        )
+      );
+    }
+    return created;
   },
 });
 
