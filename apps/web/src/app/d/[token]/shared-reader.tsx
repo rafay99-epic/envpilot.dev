@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
@@ -72,6 +72,35 @@ function expiryLine(expiresAt: number): string {
  * its index, and /d/[token]/[docSlug] passes the slug through so the same
  * gate chain hands back that one page.
  */
+/**
+ * Fetch the reader's state without touching React state.
+ *
+ * At module scope on purpose: the effect below needs a stable reference, and
+ * a useCallback inside the component would be manual memoization that React
+ * Compiler already handles. Taking token and slug as arguments makes it
+ * stable by construction instead.
+ */
+async function fetchReaderState(
+  token: string,
+  docSlug: string | undefined
+): Promise<{ step: Step; payload?: Payload }> {
+  try {
+    const query = docSlug ? `?docSlug=${encodeURIComponent(docSlug)}` : "";
+    // Credentials included so the unlock cookie travels once it exists.
+    const response = await fetch(`/api/doc-shares/${token}${query}`, {
+      credentials: "same-origin",
+    });
+    if (response.status === 401) return { step: "locked" };
+    // Kept apart from the uniform failure screen: the link is still valid,
+    // it is only the view bucket that is empty, and it refills.
+    if (response.status === 429) return { step: "rate_limited" };
+    if (!response.ok) return { step: "unavailable" };
+    return { step: "ready", payload: await response.json() };
+  } catch {
+    return { step: "unavailable" };
+  }
+}
+
 export function SharedDocReader({
   token,
   docSlug,
@@ -90,35 +119,11 @@ export function SharedDocReader({
   // the window in the same tick.
   const isUnlockingRef = useRef(false);
 
-  // Fetching is separated from applying so the effect below never calls a
-  // setter itself: it awaits a plain result and writes it from the promise
-  // callback, which is where React expects external data to land.
-  const fetchReaderState = useCallback(async (): Promise<{
-    step: Step;
-    payload?: Payload;
-  }> => {
-    try {
-      const query = docSlug ? `?docSlug=${encodeURIComponent(docSlug)}` : "";
-      // Credentials included so the unlock cookie travels once it exists.
-      const response = await fetch(`/api/doc-shares/${token}${query}`, {
-        credentials: "same-origin",
-      });
-      if (response.status === 401) return { step: "locked" };
-      // Kept apart from the uniform failure screen: the link is still valid,
-      // it is only the view bucket that is empty, and it refills.
-      if (response.status === 429) return { step: "rate_limited" };
-      if (!response.ok) return { step: "unavailable" };
-      return { step: "ready", payload: await response.json() };
-    } catch {
-      return { step: "unavailable" };
-    }
-  }, [token, docSlug]);
-
   useEffect(() => {
     // A changed token or slug must not let a late response overwrite the view
     // the reader is now on.
     let cancelled = false;
-    void fetchReaderState().then((next) => {
+    void fetchReaderState(token, docSlug).then((next) => {
       if (cancelled) return;
       if (next.payload) setPayload(next.payload);
       setStep(next.step);
@@ -126,7 +131,7 @@ export function SharedDocReader({
     return () => {
       cancelled = true;
     };
-  }, [fetchReaderState]);
+  }, [token, docSlug]);
 
   const submitPassphrase = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -145,7 +150,7 @@ export function SharedDocReader({
       if (response.ok) {
         setPassphrase("");
         setStep("loading");
-        const next = await fetchReaderState();
+        const next = await fetchReaderState(token, docSlug);
         if (next.payload) setPayload(next.payload);
         setStep(next.step);
       } else {

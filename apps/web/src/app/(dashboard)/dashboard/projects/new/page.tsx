@@ -176,9 +176,12 @@ export default function NewProjectPage() {
           "You've reached the project limit on your current plan. Upgrade to Pro for unlimited projects."
         );
       } else setError(message);
-    } finally {
-      setIsSubmitting(false);
     }
+    // Cleared after the try/catch rather than in a finally block: React
+    // Compiler bails on any function whose try carries a finalizer. The catch
+    // swallows, and the one early return inside the try already clears the
+    // flag before it returns, so every path lands here or has handled it.
+    setIsSubmitting(false);
   };
 
   // Tier limit block
