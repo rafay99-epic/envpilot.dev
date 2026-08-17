@@ -342,6 +342,18 @@ export function FrameworkLogo({
       width={size}
       height={size}
       className={className}
+      // Both dimensions pinned, and objectFit to go with them.
+      //
+      // Tailwind's preflight sets `height: auto` on every img, which changes
+      // one dimension and not the other — precisely what next/image warns
+      // about, once per logo, on every render of the template picker.
+      //
+      // objectFit is what makes pinning both safe: these logos have very
+      // different intrinsic ratios (expressjs is wide, nextjs is square), and
+      // the `height: auto` that caused the warning was also the thing
+      // preserving their shape. Without `contain` they would letterbox into
+      // the square by stretching instead.
+      style={{ width: size, height: size, objectFit: "contain" }}
       onError={() => setImgError(true)}
     />
   );
