@@ -163,3 +163,68 @@ starts bailing out again (any `try` with a finalizer, or without a `catch`,
 anywhere in its body). Re-check with the CI scan, not a local one: the local
 scan does not load the `react-hooks-js` plugin that reports compiler
 bailouts.
+
+## `nextjs-no-client-fetch-for-server-data` — `app/extension/auth/page.tsx`
+
+**Predicate:** the flagged effect does not fetch server data. It sends
+`POST /api/extension/auth/callback?session=...` with `credentials: "include"`
+to complete the extension OAuth handshake and mint the session, and the
+session token only exists in the URL the extension opened.
+
+A Server Component cannot do this: a state-changing POST during render is
+exactly what Next forbids, and it would re-fire on every render or prefetch.
+The hazards the rule actually protects against are handled — a `cancelled`
+guard stops a late response reporting the wrong outcome, and both branches
+read the body before using it.
+
+**Invalidated if:** this route stops mutating and becomes a plain read.
+
+## `nextjs-no-client-fetch-for-server-data` — `app/(dashboard)/invitations/[token]/page.tsx`
+
+Waived, not rejected: the rule is right and the fix belongs in its own PR.
+
+**Why not here:** the correct shape is a Server Component that fetches the
+invitation and hands it to a small client child owning accept and decline.
+That is a refactor, not a rule fix. This page carries two mutations, a
+double-submit ref guard, five interactive states, and
+`setActiveOrganizationCookie` on accept, and splitting it changes the loading
+and error surfaces of an unauthenticated entry point people reach from an
+email link. None of that is verifiable without a browser, and this branch
+exists to remove random UI regressions rather than add them.
+
+**Invalidated if:** the mutations move out of this file, which makes the
+split cheap.
+
+## `js-combine-iterations` / `js-set-map-lookups` — `apps/docs/src/lib/content.ts`
+
+Not rejected in the end, but worth recording why the measurement did not
+decide it. Every site in this file is build-time only: all consumers are RSC
+pages, `sitemap.ts`, or route handlers declaring `dynamic = "force-static"`,
+over 60 MDX files in 11 sections, so no production request path runs this
+code and the runtime evidence both rules require cannot be collected.
+
+The rewrites landed anyway because each one is at least as readable as what
+it replaced — a `for` loop with `slice` instead of `filter().map()` with a
+regex, and two hoisted `Set`s instead of `includes` inside a filter. Where
+the single-pass form would have been _worse_ than the chain, the finding
+stays open instead.
+
+## Observations recorded, deliberately not changed
+
+- `apps/docs/src/components/shell.tsx` — the `get-started` link sets
+  `hover:bg-accent-soft` on an element whose base class is already
+  `bg-accent-soft`, so the hover state is identical to the resting state and
+  the transition animates nothing. `transition-all` was narrowed to
+  `transition-colors`, but picking an actual hover shade is a design change
+  and goes through mocks first.
+- `apps/docs/src/components/DocsSidebar.tsx` — the docs-home link runs
+  `pulse-glow` on an infinite loop, which is the continuously repainting
+  animation class the repo avoids on high-refresh displays.
+- `apps/docs/src/lib/content.ts` — `getDocBySlug` reads author-authored
+  frontmatter through `as string` casts, so a non-string YAML value
+  (`title: 2.2`) reaches `<title>` as a number, and its `catch` turns a doc
+  with broken YAML into a silent 404 rather than a build failure. Both are
+  real, both are the untrusted boundary in that file, and fixing them means
+  failing the build on a bad doc — an owner decision, not a rule fix.
+- `packages/ui/src/docs/DocsSidebar.tsx` holds a second copy of `DOC_ICONS`,
+  independent of the one now in `apps/docs/src/components/doc-icons.ts`.
