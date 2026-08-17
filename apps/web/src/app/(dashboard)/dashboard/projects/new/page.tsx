@@ -265,7 +265,11 @@ export default function NewProjectPage() {
           this was max-w-6xl inside a max-w-7xl shell, so the page with the
           most content was the narrowest in the app. */}
       <div className="grid grid-cols-1 border-t border-line lg:grid-cols-[1.55fr_1fr]">
-        <div className="border-line lg:border-r">
+        {/* Capped and independently scrollable below lg. Stacked, the full
+            list of 31 templates sits between the user and the name field, so
+            on a phone you scroll the entire catalogue before discovering
+            there is a form at all. */}
+        <div className="max-h-[55vh] overflow-y-auto border-line lg:max-h-none lg:overflow-visible lg:border-r">
           <TemplateSelector
             selectedTemplateId={
               fromScratch ? null : selectedTemplate?.id || undefined
@@ -274,9 +278,12 @@ export default function NewProjectPage() {
           />
         </div>
 
-        <div>
+        <div className="border-t border-line lg:border-t-0">
           <div className="lg:sticky lg:top-6">
-            <form onSubmit={handleSubmit} className="space-y-5 px-5 py-4">
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-5 px-4 py-4 sm:px-5"
+            >
               {/* Name. Underline inputs: a filled, bordered box per field was
                   a large part of what made this page read as a stack of
                   containers rather than a form. */}
@@ -347,10 +354,10 @@ export default function NewProjectPage() {
 
               {/* Icon & Color -- hidden when using framework logo */}
               {isFrameworkIcon(formData.icon) ? (
-                <div className="flex items-center justify-between border-b py-2 border-line">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b py-2 border-line">
+                  <div className="flex min-w-0 items-center gap-2">
                     <ProjectIcon icon={formData.icon} size={18} />
-                    <span className="text-xs text-ink-muted">
+                    <span className="truncate text-xs text-ink-muted">
                       Using{" "}
                       {PROJECT_TYPES[parseFrameworkType(formData.icon)!]
                         ?.label ?? "framework"}{" "}
@@ -366,7 +373,7 @@ export default function NewProjectPage() {
                         color: DEFAULT_PROJECT_COLOR,
                       }))
                     }
-                    className="text-[10px] font-medium text-ink-subtle hover:text-ink"
+                    className="shrink-0 text-[10px] font-medium text-ink-subtle hover:text-ink"
                   >
                     Switch to custom icon
                   </button>

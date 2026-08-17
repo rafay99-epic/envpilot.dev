@@ -60,7 +60,7 @@ export function BulkJobStatusLine({
   if (isFailed) {
     return (
       <div
-        className="flex items-center gap-3 rounded-b-xl border-t px-4 py-2 font-mono text-[11px] border-danger-line bg-danger-soft"
+        className="flex items-center gap-2 rounded-b-xl border-t px-3 py-2 font-mono text-[11px] sm:gap-3 sm:px-4 border-danger-line bg-danger-soft"
         role="status"
         aria-live="polite"
       >
@@ -68,7 +68,7 @@ export function BulkJobStatusLine({
         <span className="min-w-0 flex-1 truncate text-ink-muted">
           {job.error ?? "the batch could not be completed"}
         </span>
-        <span className="shrink-0 tabular-nums text-ink-faint">
+        <span className="hidden shrink-0 tabular-nums text-ink-faint sm:inline">
           stopped at {job.completed}/{job.total}
         </span>
         <button
@@ -84,7 +84,7 @@ export function BulkJobStatusLine({
 
   return (
     <div
-      className="flex items-center gap-3 rounded-b-xl border-t px-4 py-2 font-mono text-[11px] border-accent-line bg-accent-soft"
+      className="flex items-center gap-2 rounded-b-xl border-t px-3 py-2 font-mono text-[11px] sm:gap-3 sm:px-4 border-accent-line bg-accent-soft"
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={job.total}
@@ -94,7 +94,13 @@ export function BulkJobStatusLine({
       <span className="shrink-0 font-medium text-accent">vault</span>
       {/* aria-hidden: the value lives on the progressbar role above, and a
           screen reader reading out "▓▓▓▓░░░░" is noise, not information. */}
-      <span aria-hidden="true" className="shrink-0 tracking-tighter">
+      {/* The meter is the first thing to go on a narrow screen: it is a
+          redundant rendering of the counts beside it, and 12 fixed mono cells
+          would otherwise squeeze the numbers that carry the actual value. */}
+      <span
+        aria-hidden="true"
+        className="hidden shrink-0 tracking-tighter sm:inline"
+      >
         <span className="text-accent">{cells.filled}</span>
         <span className="text-ink-faint">{cells.empty}</span>
       </span>
@@ -105,7 +111,9 @@ export function BulkJobStatusLine({
         {KIND_LABEL[job.kind]}
         {job.failed > 0 ? ` · ${job.failed} failed` : ""}
       </span>
-      <span className="shrink-0 tabular-nums text-ink-faint">{percent}%</span>
+      <span className="hidden shrink-0 tabular-nums text-ink-faint sm:inline">
+        {percent}%
+      </span>
     </div>
   );
 }

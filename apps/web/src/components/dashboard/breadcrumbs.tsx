@@ -80,7 +80,7 @@ export function Breadcrumbs({
   return (
     <nav
       aria-label="Breadcrumb"
-      className={`flex items-center gap-2.5 ${className}`}
+      className={`flex min-w-0 items-center gap-2.5 ${className}`}
     >
       <button
         type="button"
@@ -92,9 +92,13 @@ export function Breadcrumbs({
         <ArrowLeft className="h-3.5 w-3.5" />
       </button>
       <span aria-hidden="true" className="h-3.5 w-px bg-line-strong" />
-      <ol className="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px]">
+      {/* Scrolls rather than wraps or clips. A deep trail (project / docs /
+          a-long-doc-slug) is wider than a phone, and the tail is the part
+          that matters, so it stays reachable instead of being cut off. The
+          scrollbar is hidden, matching the category chip rows. */}
+      <ol className="flex min-w-0 items-center gap-1.5 overflow-x-auto whitespace-nowrap font-mono text-[11.5px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {crumbs.map((crumb, i) => (
-          <li key={crumb.key} className="flex min-w-0 items-center gap-1.5">
+          <li key={crumb.key} className="flex shrink-0 items-center gap-1.5">
             {i > 0 && (
               <span aria-hidden="true" className="text-ink-faint">
                 /
@@ -103,12 +107,12 @@ export function Breadcrumbs({
             {crumb.href ? (
               <Link
                 href={crumb.href}
-                className="truncate text-ink-faint transition-colors hover:text-ink"
+                className="text-ink-faint transition-colors hover:text-ink"
               >
                 {crumb.label}
               </Link>
             ) : (
-              <span aria-current="page" className="truncate text-ink">
+              <span aria-current="page" className="text-ink">
                 {crumb.label}
               </span>
             )}
