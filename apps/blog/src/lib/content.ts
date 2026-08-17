@@ -100,9 +100,10 @@ export const getPostBySlug = cache(function getPostBySlug(
 export const getAllPosts = cache(function getAllPosts(): BlogPostMeta[] {
   if (!existsSync(CONTENT_DIR)) return [];
 
-  const slugs = readdirSync(CONTENT_DIR)
-    .filter((f) => f.endsWith(".mdx"))
-    .map((f) => basename(f, ".mdx"));
+  const slugs: string[] = [];
+  for (const entry of readdirSync(CONTENT_DIR)) {
+    if (entry.endsWith(".mdx")) slugs.push(basename(entry, ".mdx"));
+  }
 
   const posts: BlogPostMeta[] = [];
   for (const slug of slugs) {

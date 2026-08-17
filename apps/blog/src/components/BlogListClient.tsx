@@ -73,11 +73,12 @@ export function BlogListClient({ posts, allTags }: Props) {
       <div className="relative mb-6">
         <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
         <input
-          type="text"
+          type="search"
+          aria-label="Search posts"
           placeholder="Search posts by title, content, or tag…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-xl border border-line bg-surface/60 py-3.5 pl-11 pr-4 font-mono text-sm text-ink placeholder-ink-faint transition-all focus:border-accent-line focus:outline-none focus:ring-2 focus:ring-accent-line focus:bg-surface-hover/80"
+          className="w-full rounded-xl border border-line bg-surface/60 py-3.5 pl-11 pr-4 font-mono text-sm text-ink placeholder-ink-faint transition-[border-color,background-color,box-shadow] focus:border-accent-line focus:outline-none focus:ring-2 focus:ring-accent-line focus:bg-surface-hover/80"
         />
       </div>
 
@@ -86,7 +87,7 @@ export function BlogListClient({ posts, allTags }: Props) {
         <button
           type="button"
           onClick={() => handleTagClick(null)}
-          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[11px] transition-all ${
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[11px] transition-[color,background-color,border-color,box-shadow] ${
             !selectedTag
               ? "border-accent-line bg-accent-soft text-accent shadow-[0_0_12px_rgba(34,197,94,0.08)]"
               : "border-line text-ink-subtle hover:border-line hover:text-ink-muted"
@@ -100,7 +101,7 @@ export function BlogListClient({ posts, allTags }: Props) {
             key={tag}
             type="button"
             onClick={() => handleTagClick(tag)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[11px] transition-all ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[11px] transition-[color,background-color,border-color,box-shadow] ${
               selectedTag === tag
                 ? "border-accent-line bg-accent-soft text-accent shadow-[0_0_12px_rgba(34,197,94,0.08)]"
                 : "border-line text-ink-subtle hover:border-line hover:text-ink-muted"
@@ -124,7 +125,7 @@ export function BlogListClient({ posts, allTags }: Props) {
       {/* ── Featured post (hero card) ────────────────────────────── */}
       {featured && (
         <Link href={`/${featured.slug}`} className="group mb-8 block">
-          <div className="relative overflow-hidden rounded-2xl border border-line bg-gradient-to-br from-line via-line to-line p-6 transition-all duration-300 hover:border-accent-line hover:shadow-[0_0_32px_rgba(34,197,94,0.06)] sm:p-8">
+          <div className="relative overflow-hidden rounded-2xl border border-line bg-gradient-to-br from-line via-line to-line p-6 transition-[border-color,box-shadow] duration-300 hover:border-accent-line hover:shadow-[0_0_32px_rgba(34,197,94,0.06)] sm:p-8">
             {/* Subtle green radial glow */}
             <div
               aria-hidden
