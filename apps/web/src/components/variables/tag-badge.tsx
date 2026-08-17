@@ -35,6 +35,7 @@ export function TagBadge({
             e.stopPropagation();
             onRemove();
           }}
+          aria-label={`Remove tag ${name}`}
           className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-white/10"
         >
           <svg className="h-2.5 w-2.5" viewBox="0 0 10 10" fill="currentColor">

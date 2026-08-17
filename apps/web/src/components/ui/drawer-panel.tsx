@@ -161,9 +161,13 @@ export function DrawerPanel({
                   >
                     {title}
                   </h2>
+                  {/* Named "Close" rather than `Close ${title}`: the dialog
+                      already carries the title via aria-labelledby, and some
+                      titles interpolate user data. */}
                   <button
                     onClick={safeClose}
                     disabled={preventClose}
+                    aria-label="Close"
                     className="rounded-lg p-1 text-ink-muted disabled:cursor-not-allowed disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
                   >
                     <svg

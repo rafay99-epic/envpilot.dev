@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use, useReducer, useRef } from "react";
+import { useState, use, useId, useReducer, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQuery } from "convex/react";
@@ -70,6 +70,9 @@ function OrganizationMembersPageContent({
   const { user } = useAuthContext();
   const { convexUserId } = useConvexUser(user?.id);
   const timeZone = useTimeZone();
+  // Names the project checkbox group in the invite drawer, which has no single
+  // input to attach a <label> to.
+  const projectAssignmentLabelId = useId();
 
   // ---------------------------------------------------------------------------
   // Convex queries — real-time via WebSocket, no fetch() round-trip
@@ -782,6 +785,7 @@ function OrganizationMembersPageContent({
                           e.target.value as OrgRole
                         )
                       }
+                      aria-label={`Organization role for ${member.user.name || member.user.email}`}
                       className="rounded-lg border px-3 py-1.5 text-sm border-line bg-surface-raised text-ink"
                     >
                       {assignable.map((role) => (
@@ -864,6 +868,7 @@ function OrganizationMembersPageContent({
                   {canRemoveMembers && (
                     <button
                       onClick={() => handleRemoveMember(member.user._id)}
+                      aria-label={`Remove ${member.user.name || member.user.email} from the organization`}
                       className="text-ink-muted hover:text-danger"
                     >
                       <svg
@@ -1358,14 +1363,23 @@ function OrganizationMembersPageContent({
           {invite.role !== "owner" && projects.length > 0 && (
             <>
               <div>
-                <label className="block text-sm font-medium text-ink">
+                {/* A span, not a <label>: this names the checkbox group below,
+                    not one input. */}
+                <span
+                  id={projectAssignmentLabelId}
+                  className="block text-sm font-medium text-ink"
+                >
                   Assign to Projects
-                </label>
+                </span>
                 <p className="mt-1 text-xs text-ink-muted">
                   Select which projects this member is assigned to. What they
                   can do there follows from their organization role.
                 </p>
-                <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2 border-line">
+                <div
+                  role="group"
+                  aria-labelledby={projectAssignmentLabelId}
+                  className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2 border-line"
+                >
                   {projects.map((project) => (
                     <label
                       key={project._id}

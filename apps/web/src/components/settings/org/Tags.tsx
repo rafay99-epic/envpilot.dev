@@ -409,6 +409,7 @@ export function TagsTab({ organizationId }: { organizationId: string }) {
                       type="button"
                       onClick={() => removeBulkEntry(entry.name)}
                       disabled={isBulkCreating}
+                      aria-label={`Remove ${entry.name} from the tags to create`}
                       className="rounded-full p-0.5 text-ink-subtle hover:bg-surface-hover hover:text-ink-muted disabled:opacity-50"
                     >
                       <X className="h-3 w-3" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { DrawerPanel } from "@/components/ui/drawer-panel";
 import {
@@ -102,6 +102,8 @@ function AccountForm({
 }: AccountFormProps) {
   const isEditing = !!account;
   const accountId = account?._id;
+  // Names the environment toggle group, which has no single input to label.
+  const environmentsLabelId = useId();
 
   const [name, setName] = useState(account?.name ?? "");
   const [websiteUrl, setWebsiteUrl] = useState(account?.websiteUrl ?? "");
@@ -306,6 +308,7 @@ function AccountForm({
           <button
             type="button"
             onClick={() => setShowPassword((prev) => !prev)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-muted hover:text-ink-muted"
             tabIndex={-1}
           >
@@ -349,10 +352,19 @@ function AccountForm({
 
       {/* Environments */}
       <div>
-        <label className="block text-sm font-medium text-ink-muted">
+        {/* A span, not a <label>: this names the toggle group below, not one
+            input. */}
+        <span
+          id={environmentsLabelId}
+          className="block text-sm font-medium text-ink-muted"
+        >
           Environments <span className="text-danger">*</span>
-        </label>
-        <div className="mt-2 flex flex-wrap gap-2">
+        </span>
+        <div
+          role="group"
+          aria-labelledby={environmentsLabelId}
+          className="mt-2 flex flex-wrap gap-2"
+        >
           {ENVIRONMENTS.map((env) => (
             <button
               key={env}

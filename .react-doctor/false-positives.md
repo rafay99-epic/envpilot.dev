@@ -7,6 +7,37 @@ config ignore would hide that.
 
 Re-verify the predicate before dismissing the finding again.
 
+## `prefer-html-dialog` — three sites, none of them a straight swap
+
+The rule's own validation says to "confirm that modal semantics are intended
+before changing the element." Two of these three are not modals at all.
+
+**`components/integrations/IntegrationsSection.tsx`** — the disconnect
+confirmation is an inline strip rendered in flow under its row (`border-t`,
+`sm:flex-row`), not an overlay. `<dialog>` is `display: none` until opened and
+`showModal()` moves it to the top layer, which would tear it out of the row it
+belongs to. `integrations.spec.ts` also locates it by
+`getByRole("dialog", { name: 'Disconnect ...' })`.
+
+**`components/dashboard/terminal-date-picker.tsx`** — a portaled popover
+positioned from measured coordinates, with no backdrop and no focus trap by
+design. Native `<dialog>` + `show()` would be defensible here, but the current
+implementation is correct and the change buys only stacking context.
+
+**`components/ui/modal.tsx`** — this one IS a real modal, and converting it is
+the right long-term move, because it would bring a focus trap and focus
+restoration that the hand-rolled version does not have. It is deliberately NOT
+done in this PR: `Modal` backs four dialogs (confirm, audit export, variable
+history, shortcuts help), the conversion replaces the backdrop div with
+`::backdrop` and changes initial focus and stacking, and none of it can be
+verified without a browser. Landing that blind in a PR this size is how you get
+the random UI regressions this branch exists to remove.
+
+**Follow-up worth its own PR:** `Modal` has no focus trap and no focus
+restoration today, so a keyboard user can tab out of an open modal into the
+page behind it. That is a genuine accessibility defect independent of which
+element implements it.
+
 ## `no-loading-flag-reset-outside-finally` — three navigation handlers
 
 `app/(dashboard)/dashboard/projects/[slug]/docs/new/page.tsx`,

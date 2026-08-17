@@ -68,8 +68,12 @@ export function Modal({
           {/* Header */}
           <div className="flex items-center justify-between border-b px-6 py-4 border-line">
             <h2 className="text-lg font-semibold text-ink">{title}</h2>
+            {/* Named "Close" rather than `Close ${title}`: the dialog already
+                carries the title via aria-label, and some titles interpolate
+                user data. */}
             <button
               onClick={onClose}
+              aria-label="Close"
               className="rounded-lg p-1 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
             >
               <svg

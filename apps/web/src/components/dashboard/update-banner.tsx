@@ -90,6 +90,7 @@ export function UpdateBanner() {
               dismissedVersionRef.current = newVersion;
               setDismissed(true);
             }}
+            aria-label="Dismiss update notice"
             className="rounded-lg p-1 text-ink-subtle transition-colors hover:bg-surface-hover hover:text-ink-muted"
           >
             <X className="h-3.5 w-3.5" />
