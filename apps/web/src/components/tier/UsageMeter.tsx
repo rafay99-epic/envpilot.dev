@@ -31,6 +31,12 @@ interface UsageMeterProps {
 /**
  * Visual meter showing usage against limit
  */
+const METER_SIZE_CLASSES = {
+  sm: { container: "h-1.5", text: "text-xs" },
+  md: { container: "h-2", text: "text-sm" },
+  lg: { container: "h-3", text: "text-base" },
+};
+
 export function UsageMeter({
   current,
   limit,
@@ -43,21 +49,6 @@ export function UsageMeter({
   const isUnlimited = limit === null;
   const isNearLimit = !isUnlimited && percentage >= 80;
   const isAtLimit = !isUnlimited && percentage >= 100;
-
-  const sizeClasses = {
-    sm: {
-      container: "h-1.5",
-      text: "text-xs",
-    },
-    md: {
-      container: "h-2",
-      text: "text-sm",
-    },
-    lg: {
-      container: "h-3",
-      text: "text-base",
-    },
-  };
 
   const getBarColor = () => {
     if (isUnlimited) return "bg-accent";
@@ -77,7 +68,7 @@ export function UsageMeter({
     <div className={`${className}`}>
       {showValue && (
         <div
-          className={`flex justify-between items-center mb-1 ${sizeClasses[size].text}`}
+          className={`flex justify-between items-center mb-1 ${METER_SIZE_CLASSES[size].text}`}
         >
           <span className="font-medium text-ink-muted">{label}</span>
           <span className={getTextColor()}>
@@ -93,7 +84,7 @@ export function UsageMeter({
         </div>
       )}
       <div
-        className={`w-full bg-surface-hover rounded-full overflow-hidden ${sizeClasses[size].container}`}
+        className={`w-full bg-surface-hover rounded-full overflow-hidden ${METER_SIZE_CLASSES[size].container}`}
       >
         <div
           className={`h-full rounded-full transition-all duration-300 ${getBarColor()}`}

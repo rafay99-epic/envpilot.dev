@@ -22,6 +22,12 @@ const FALLBACK_STYLE =
  * Fetches dynamic tier definition for display name and color.
  * Falls back to static styling for known tiers (free/pro).
  */
+const TIER_BADGE_SIZE_CLASSES = {
+  sm: "text-xs px-1.5 py-0.5",
+  md: "text-sm px-2 py-0.5",
+  lg: "text-base px-3 py-1",
+};
+
 export function TierBadge({
   tier,
   size = "md",
@@ -31,12 +37,6 @@ export function TierBadge({
   const tierDef = useQuery(api.features.featureRegistry.queries.getTierByName, {
     name: tier,
   });
-
-  const sizeClasses = {
-    sm: "text-xs px-1.5 py-0.5",
-    md: "text-sm px-2 py-0.5",
-    lg: "text-base px-3 py-1",
-  };
 
   // Use dynamic color from DB if available, else static styles
   const dynamicStyle = tierDef?.color
@@ -52,7 +52,7 @@ export function TierBadge({
 
   return (
     <span
-      className={`inline-flex items-center font-medium rounded-full ${sizeClasses[size]} ${staticClass}`}
+      className={`inline-flex items-center font-medium rounded-full ${TIER_BADGE_SIZE_CLASSES[size]} ${staticClass}`}
       style={dynamicStyle}
     >
       {isSpecial && (

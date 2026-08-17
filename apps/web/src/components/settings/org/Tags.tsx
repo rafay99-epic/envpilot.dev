@@ -54,6 +54,9 @@ function Swatch({
   );
 }
 
+const extractErrorMessage = (err: unknown, fallback: string): string =>
+  err instanceof Error ? err.message : fallback;
+
 export function TagsTab({ organizationId }: { organizationId: string }) {
   const { tags, hasOverflow, isLoading } = useOrganizationTags(organizationId);
   const createTagMut = useCreateTag();
@@ -112,11 +115,6 @@ export function TagsTab({ organizationId }: { organizationId: string }) {
 
   // Pagination (20 per page — tags are lightweight)
   const pagination = usePagination(tags, { pageSize: 20 });
-
-  const extractErrorMessage = (err: unknown, fallback: string): string => {
-    if (err instanceof Error) return err.message;
-    return fallback;
-  };
 
   // Bulk paste parsing — accepts comma, semicolon, or newline separated names
   const parseBulkText = useCallback(

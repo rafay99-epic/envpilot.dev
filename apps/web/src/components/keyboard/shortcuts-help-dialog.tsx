@@ -7,15 +7,15 @@ import {
 } from "@/hooks/useKeyboardShortcuts";
 import { Modal } from "@/components/ui/modal";
 
+// A binding can repeat a key ("g then g"), so the token alone is not unique.
+// The prefix up to and including this token is.
+const prefixKey = (parts: string[], upTo: number, join: string) =>
+  parts.slice(0, upTo + 1).join(join);
+
 function ShortcutRow({ shortcut }: { shortcut: ShortcutDefinition }) {
   const keys = shortcut.keys.split("+").map((k) => k.trim());
   const isSequence = shortcut.keys.includes(" then ");
   const segments = shortcut.keys.split(" then ");
-
-  // A binding can repeat a key ("g then g"), so the token alone is not
-  // unique. The prefix up to and including this token is.
-  const prefixKey = (parts: string[], upTo: number, join: string) =>
-    parts.slice(0, upTo + 1).join(join);
 
   return (
     <div className="flex items-center justify-between py-1.5">
