@@ -7,14 +7,13 @@ import { FolderPlus } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import { useAuthContext } from "@/components/auth";
 import { useTierLimitCheck } from "@/hooks/useTierLimits";
-import { useCreateProject } from "@/hooks";
+import { useCreateProject, useCreateProjectFromTemplate } from "@/hooks";
 import {
   isRateLimitError,
   isTierLimitError,
   sanitizeConvexError,
 } from "@/lib/error-messages";
 import { LimitWarning } from "@/components/tier/FeatureGate";
-import { createLogger } from "@/lib/logger";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import type { Id } from "@convex/_generated/dataModel";
@@ -45,8 +44,6 @@ const generateSlug = (name: string) =>
     .replace(/-+/g, "-")
     .slice(0, 50);
 
-const log = createLogger("app/projects-new");
-
 export default function NewProjectPage() {
   const router = useRouter();
   const { canDo, organization } = useAuthContext();
@@ -55,6 +52,7 @@ export default function NewProjectPage() {
   const tierCheck = useTierLimitCheck(orgId, "create_project");
   const enforcing = useEnforcementEnabled();
   const createProject = useCreateProject();
+  const createFromTemplate = useCreateProjectFromTemplate();
 
   const [selectedTemplate, setSelectedTemplate] =
     useState<EnvironmentTemplate | null>(null);
@@ -125,49 +123,35 @@ export default function NewProjectPage() {
         return;
       }
 
-      const projectId = await createProject({
+      const projectArgs = {
         ...formData,
         description: formData.description || undefined,
         organizationId: organization.id,
-      });
-      const projectSlug = formData.slug;
+      };
 
+      // One call either way. With a template, the backend creates the project
+      // and starts a workflow that writes every variable to the vault through
+      // a bounded pool and commits them in a single transaction; this returns
+      // as soon as the project row exists, so the user is never parked on a
+      // spinner while N secrets encrypt. Progress streams to the project page
+      // over the Convex socket.
       if (selectedTemplate) {
-        // Create template variables sequentially to avoid overwhelming
-        // the WorkOS Vault API with concurrent requests.
-        for (const variable of selectedTemplate.variables) {
-          try {
-            const placeholderValue =
-              variable.defaultValue ||
-              variable.placeholder ||
-              `<${variable.key}>`;
-
-            await fetch("/api/variables", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                key: variable.key,
-                value: placeholderValue,
-                description: variable.description,
-                environments: variable.environments,
-                projectId,
-                isSensitive: variable.isSensitive,
-              }),
-            });
-          } catch (err) {
-            // Swallowed per variable so one failure does not abort the rest,
-            // but the user lands on a project quietly missing a variable, so
-            // it has to be reported somewhere.
-            log.error(
-              "template_variable_create_failed",
-              { projectId, key: variable.key },
-              err
-            );
-          }
-        }
+        await createFromTemplate({
+          ...projectArgs,
+          variables: selectedTemplate.variables.map((variable) => ({
+            key: variable.key,
+            description: variable.description,
+            defaultValue: variable.defaultValue,
+            placeholder: variable.placeholder,
+            environments: variable.environments,
+            isSensitive: variable.isSensitive,
+          })),
+        });
+      } else {
+        await createProject(projectArgs);
       }
 
-      router.push(`/dashboard/projects/${projectSlug}`);
+      router.push(`/dashboard/projects/${formData.slug}`);
     } catch (err) {
       const message = sanitizeConvexError(err);
       if (isRateLimitError(err)) setError(message);

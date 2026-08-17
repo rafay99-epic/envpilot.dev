@@ -404,6 +404,66 @@ export const sendVariableChangeEmail = action({
   },
 });
 
+/**
+ * One email for a whole batch of variables.
+ *
+ * The per-variable path fanned out once per variable per member, so an
+ * 8-variable template in a 5-member org sent 40 emails for a single click and
+ * a 48-variable one sent 240. Honours the same `variableChanges` preference.
+ */
+export const sendVariableBatchEmail = action({
+  args: {
+    userId: v.id("users"),
+    to: v.string(),
+    projectName: v.string(),
+    changedByName: v.string(),
+    count: v.number(),
+    changeType: v.union(v.literal("created"), v.literal("updated")),
+  },
+  handler: async (ctx, args) => {
+    const prefs = await ctx.runQuery(
+      internal.features.users.preferences.getByUserIdInternal,
+      {
+        userId: args.userId,
+      }
+    );
+    if (prefs?.emailNotifications?.variableChanges === false) {
+      return { success: true, skipped: true };
+    }
+
+    const safeProject = escapeHtml(args.projectName);
+    const safeChangedBy = escapeHtml(args.changedByName);
+    const initial = args.projectName.charAt(0).toUpperCase();
+    const noun = args.count === 1 ? "variable" : "variables";
+    const actionWord = args.changeType === "created" ? "added" : "updated";
+
+    const html = emailWrapper(
+      `${args.count} ${noun} ${args.changeType} - ${safeProject}`,
+      [
+        iconRow(initial),
+        headingRow(
+          `${args.count} ${noun.charAt(0).toUpperCase() + noun.slice(1)} ${args.changeType.charAt(0).toUpperCase() + args.changeType.slice(1)}`
+        ),
+        paragraphRow(
+          `<strong>${safeChangedBy}</strong> ${actionWord} <strong>${args.count}</strong> ${noun} in <strong>${safeProject}</strong>.`
+        ),
+        footerRow(
+          'You received this because you have variable change notifications enabled. <a href="#" style="color: #71717a;">Manage preferences</a>'
+        ),
+      ].join("")
+    );
+
+    const text = `${args.count} ${noun} ${args.changeType} - ${args.projectName}\n\n${args.changedByName} ${actionWord} ${args.count} ${noun} in ${args.projectName}.`;
+
+    return sendEmail(
+      args.to,
+      `${args.count} ${noun} ${args.changeType} in ${args.projectName}`,
+      html,
+      text
+    );
+  },
+});
+
 export const sendMemberUpdateEmail = action({
   args: {
     userId: v.id("users"),
