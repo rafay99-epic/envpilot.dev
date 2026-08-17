@@ -1,6 +1,7 @@
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
 import { MAX_PROJECT_FILES } from "./fileLimits";
+import { MAX_BATCH_VARIABLES } from "./batchLimits";
 import { MAX_SHARE_RECIPIENTS } from "../features/docs/shareGuards";
 
 /**
@@ -183,6 +184,39 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     rate: 2,
     period: 60_000,
     capacity: 2,
+  },
+
+  // Bulk variable WRITES (template creation, import): charged once per batch,
+  // one token per variable.
+  //
+  // capacity >> the per-call variableCreate rule on purpose, and for the same
+  // reason fileDownload sizes its burst to MAX_PROJECT_FILES: the batch entry
+  // points refuse anything larger than MAX_BATCH_VARIABLES, so a bucket that
+  // can never hold that many would reject a legal batch every single time.
+  // capacity IS the ceiling, imported rather than restated.
+  //
+  // rate is deliberately far below capacity. The burst covers one legitimate
+  // import of any size the write path accepts; the slow refill means a caller
+  // cannot sustain that rate, which is what separates a real import from a
+  // loop. Charged in reserveBatch and NOT inside the retryable vault step —
+  // a retried step re-runs its body, so a charge in there would bill twice
+  // for one transient vault failure.
+  variableBatchCreate: {
+    kind: "token bucket",
+    rate: 120,
+    period: 60_000,
+    capacity: MAX_BATCH_VARIABLES,
+  },
+
+  // Bulk variable READS (export). Separate bucket from the write rule because
+  // it returns PLAINTEXT for every row it touches, so its abuse profile is
+  // exfiltration rather than resource exhaustion and it deserves its own
+  // ceiling rather than borrowing one sized for writes.
+  variableBatchRead: {
+    kind: "token bucket",
+    rate: 60,
+    period: 60_000,
+    capacity: MAX_BATCH_VARIABLES,
   },
 
   // Tag create/update/delete: 20 per minute per org
