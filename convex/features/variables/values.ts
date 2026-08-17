@@ -887,19 +887,26 @@ export const importValues = action({
       // Encrypt everything first, pooled. The per-key catch lives inside the
       // pooled fn rather than around it: one bad key must not abort the rest,
       // which is what a bare rejection would do.
-      const minted = await pool(entries, VAULT_POOL_WIDTH, async (entry) => {
-        try {
-          const vault = await vaultCreate({
-            name: entry.key,
-            value: entry.value,
-            organizationId: project.organizationId,
-            projectId: args.projectId,
-          });
-          return { ok: true as const, key: entry.key, vaultRef: vault.id };
-        } catch {
-          return { ok: false as const };
-        }
-      });
+      const minted = await pool(
+        entries,
+        VAULT_POOL_WIDTH,
+        async (entry) => {
+          try {
+            const vault = await vaultCreate({
+              name: entry.key,
+              value: entry.value,
+              organizationId: project.organizationId,
+              projectId: args.projectId,
+            });
+            return { ok: true as const, key: entry.key, vaultRef: vault.id };
+          } catch {
+            return { ok: false as const };
+          }
+        },
+        // A project whose vault context has never been written to would race
+        // its own key derivation if the whole batch went out at once.
+        { serialFirst: true }
+      );
 
       for (const item of minted) {
         if (!item.ok) {
@@ -982,7 +989,10 @@ export const importValues = action({
           projectId: args.projectId,
         });
         return { kind: "create", key: entry.key, vaultRef: vault.id };
-      }
+      },
+      // Same cold-context risk as above: an import into an empty project is
+      // the first write for that key_context.
+      { serialFirst: true }
     );
 
     // Every key the import mentioned is accounted for, so replace-mode only

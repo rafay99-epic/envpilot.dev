@@ -340,7 +340,8 @@ export const writeTemplateSecrets = internalAction({
           minted.push(ref);
           return ref;
         },
-        report
+        // Always cold: this project's key_context has never been written to.
+        { onSettled: report, serialFirst: true }
       );
     } catch (error) {
       // A partial fan-out leaves secrets nothing will ever reference. The

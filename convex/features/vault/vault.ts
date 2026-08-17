@@ -56,6 +56,21 @@ function safeHeader(value: string | null): string | undefined {
   return /^[A-Za-z0-9._:-]{1,128}$/.test(trimmed) ? trimmed : undefined;
 }
 
+/**
+ * A provider's failure reason, narrowed to something safe to log.
+ *
+ * Deliberately stricter than passing the string through: letters, digits,
+ * spaces and light punctuation only, capped short. That admits the generic
+ * reasons WorkOS returns ("Invalid request parameters", "Item already
+ * exists") while refusing anything shaped like an echoed value, a token or
+ * a URL.
+ */
+function safeReason(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > 100) return undefined;
+  return /^[A-Za-z0-9 ._:'-]+$/.test(trimmed) ? trimmed : undefined;
+}
+
 async function providerFailure(
   operation: string,
   response: Response
@@ -66,8 +81,16 @@ async function providerFailure(
   );
   let code: string | undefined;
   try {
-    const body = (await response.clone().json()) as { code?: unknown };
-    code = typeof body.code === "string" ? safeHeader(body.code) : undefined;
+    const body = (await response.clone().json()) as {
+      code?: unknown;
+      error?: unknown;
+    };
+    // WorkOS returns its reason in `error`, not `code`. Reading only `code`
+    // meant every provider failure logged as a bare status — a 400 that took
+    // a live reproduction against the API to identify, because the message
+    // carried no reason at all.
+    const reason = typeof body.code === "string" ? body.code : body.error;
+    code = typeof reason === "string" ? safeReason(reason) : undefined;
   } catch {
     // Provider bodies and messages may contain sensitive data. Ignore them.
   }

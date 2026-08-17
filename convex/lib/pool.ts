@@ -35,7 +35,26 @@ export async function pool<T, R>(
   items: readonly T[],
   width: number,
   fn: (item: T, index: number) => Promise<R>,
-  onSettled?: (completed: number) => void
+  {
+    onSettled,
+    serialFirst = false,
+  }: {
+    onSettled?: (completed: number) => void;
+    /**
+     * Run the first item ALONE before fanning out the rest.
+     *
+     * WorkOS Vault derives a data encryption key lazily, on the first write
+     * for a given key_context. Concurrent writes against a context that has
+     * no key yet race that derivation: one wins and the others come back
+     * `400 Invalid request parameters`. Template provisioning always writes
+     * into a brand-new projectId, so its context is always cold and the
+     * whole fan-out failed every time.
+     *
+     * One serialised request warms the context; everything after it is
+     * concurrent as normal. Costs a single extra round trip in series.
+     */
+    serialFirst?: boolean;
+  } = {}
 ): Promise<R[]> {
   const out = new Array<R>(items.length);
   let next = 0;
@@ -43,6 +62,14 @@ export async function pool<T, R>(
   // An array rather than a nullable: TypeScript cannot see that a closure
   // assigns to a `let`, so narrowing after the await would collapse it.
   const failures: unknown[] = [];
+
+  if (serialFirst && items.length > 0) {
+    // Deliberately unguarded: if the very first write fails there is nothing
+    // to unwind here, and the caller's catch owns the outcome either way.
+    out[0] = await fn(items[0]!, 0);
+    next = 1;
+    onSettled?.(++completed);
+  }
 
   const worker = async (): Promise<void> => {
     for (
