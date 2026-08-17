@@ -21,7 +21,7 @@ const createShareSchema = z
     mode: z.enum(["one_time", "time_limited"]),
     ttlMs: z.number().int().min(3_600_000).max(604_800_000),
     hasPassphrase: z.boolean(),
-    recipientEmails: z.array(z.string().email()).min(1).max(10),
+    recipientEmails: z.array(z.email()).min(1).max(10),
     clientKeyBase64Url: z.string().min(1).max(256),
   })
   .refine(

@@ -29,7 +29,7 @@ const createLinkSchema = z
       .min(MIN_PASSPHRASE_LENGTH)
       .max(MAX_PASSPHRASE_LENGTH)
       .optional(),
-    recipientEmail: z.string().email().optional(),
+    recipientEmail: z.email().optional(),
     note: z.string().max(280).optional(),
   })
   .refine(

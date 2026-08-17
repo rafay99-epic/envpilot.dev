@@ -7,7 +7,7 @@ import * as Sentry from "@sentry/nextjs";
 import { sanitizeConvexError, isRateLimitError } from "@/lib/error-messages";
 
 const verifyOtpSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   otp: z
     .string()
     .length(6)

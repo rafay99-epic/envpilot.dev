@@ -24,7 +24,6 @@ import { z } from "zod";
  * `.or(z.literal(""))` at call sites that allow clearing the field.
  */
 export const websiteUrlSchema = z
-  .string()
   .url("Invalid URL")
   .max(2048)
   .refine((url) => /^https?:\/\//i.test(url), {

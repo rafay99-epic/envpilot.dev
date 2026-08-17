@@ -11,7 +11,7 @@ import { normalizeOrgRole } from "@/lib/roles";
 const updateOrgSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional(),
-  logoUrl: z.string().url().optional(),
+  logoUrl: z.url().optional(),
 });
 
 type RouteParams = { params: Promise<{ slug: string }> };
