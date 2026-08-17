@@ -12,6 +12,9 @@ import {
 } from "@/lib/format-converter";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
+import { useAction } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { sanitizeConvexError } from "@/lib/error-messages";
 import type { Id } from "@convex/_generated/dataModel";
 
 interface ImportDrawerProps {
@@ -60,6 +63,7 @@ export function ImportDialog({
   const [parseError, setParseError] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const importValues = useAction(api.features.variables.values.importValues);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -111,36 +115,33 @@ export function ImportDialog({
     setResult(null);
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/import`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, format, environment, mode }),
+      // Parse in the browser and send key/value pairs. The file text never
+      // needs a server round trip to become structured, and the backend takes
+      // entries rather than a blob of unknown format.
+      const entries = Object.entries(parse(content, format)).map(
+        ([key, value]) => ({ key, value })
+      );
+
+      const data = await importValues({
+        projectId: projectId as Id<"projects">,
+        environment,
+        mode,
+        entries,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Import failed");
-      }
-
-      if (data.requested) {
-        setResult({
-          created: 0,
-          updated: 0,
-          deleted: 0,
-          requested: data.data.requested,
-        });
-      } else {
-        setResult({
-          created: data.data.created,
-          updated: data.data.updated,
-          deleted: data.data.deleted,
-        });
-      }
+      setResult(
+        data.path === "requests"
+          ? { created: 0, updated: 0, deleted: 0, requested: data.requested }
+          : {
+              created: data.created,
+              updated: data.updated,
+              deleted: data.deleted,
+            }
+      );
 
       onImported?.();
     } catch (err) {
-      setParseError(err instanceof Error ? err.message : "Import failed");
+      setParseError(sanitizeConvexError(err) || "Import failed");
     }
     // Runs on both paths: the catch above swallows, and neither branch returns early.
     setIsImporting(false);

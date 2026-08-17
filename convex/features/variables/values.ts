@@ -8,6 +8,9 @@ import {
   orgRoleValidator,
 } from "../../lib/roleCompat";
 import { roleLevel, ROLE_LEVEL } from "../../lib/authz";
+import { pool, VAULT_POOL_WIDTH } from "../../lib/pool";
+import { vaultCreate, vaultRead } from "../vault/vault";
+import { isValidVariableKey } from "./helpers";
 
 // Explicit result types. Actions here call ctx.runQuery/runMutation/runAction
 // on `api`/`internal`; annotating each handler's return type breaks the
@@ -752,23 +755,22 @@ export const exportValues = action({
       .filter((r) => r.hasAccess)
       .filter((r) => !environment || r.environments.includes(environment));
 
-    const values: Array<{ key: string; value: string }> = [];
-    for (const r of accessible) {
-      let value = "";
-      if (r.vaultRef) {
-        try {
-          value = await ctx.runAction(
-            internal.features.vault.vault.readSecret,
-            {
-              vaultRef: r.vaultRef,
-            }
-          );
-        } catch {
-          value = DECRYPTION_FAILED;
-        }
+    // Pooled, not sequential: one export of a large project used to be one
+    // Convex action execution PER variable, run one at a time. The plain
+    // vaultRead runs in this process, so the whole fan-out is one execution
+    // with VAULT_POOL_WIDTH decrypts in flight and the next starting the
+    // moment a slot frees.
+    const values = await pool(accessible, VAULT_POOL_WIDTH, async (r) => {
+      if (!r.vaultRef) return { key: r.key, value: "" };
+      try {
+        const value = await vaultRead(r.vaultRef);
+        return { key: r.key, value: value || "" };
+      } catch {
+        // Per-variable failure is reported in the payload rather than
+        // aborting the export, exactly as before.
+        return { key: r.key, value: DECRYPTION_FAILED };
       }
-      values.push({ key: r.key, value: value || "" });
-    }
+    });
 
     return { values };
   },
@@ -869,25 +871,47 @@ export const importValues = action({
     let requested = 0;
     let skipped = 0;
 
+    // A dotenv file can carry a key the backend will not accept (leading
+    // digit, punctuation). Drop those here and count them as skipped rather
+    // than letting createCore's throw abort an otherwise-good import — the
+    // same skip-do-not-fail contract pushBulk has always had.
+    const entries = args.entries.filter((e) => {
+      if (isValidVariableKey(e.key)) return true;
+      skipped++;
+      return false;
+    });
+
     // Developer path: file a variable request per proposed key. Per-key errors
     // are swallowed (skipped), exactly like the route.
     if (!canWriteDirectly) {
-      for (const entry of args.entries) {
+      // Encrypt everything first, pooled. The per-key catch lives inside the
+      // pooled fn rather than around it: one bad key must not abort the rest,
+      // which is what a bare rejection would do.
+      const minted = await pool(entries, VAULT_POOL_WIDTH, async (entry) => {
         try {
-          const vault = await ctx.runAction(
-            internal.features.vault.vault.createSecret,
-            {
-              name: entry.key,
-              value: entry.value,
-              organizationId: project.organizationId,
-              projectId: args.projectId,
-            }
-          );
+          const vault = await vaultCreate({
+            name: entry.key,
+            value: entry.value,
+            organizationId: project.organizationId,
+            projectId: args.projectId,
+          });
+          return { ok: true as const, key: entry.key, vaultRef: vault.id };
+        } catch {
+          return { ok: false as const };
+        }
+      });
+
+      for (const item of minted) {
+        if (!item.ok) {
+          skipped++;
+          continue;
+        }
+        try {
           await ctx.runMutation(
             api.features.variables.requests.mutations.create,
             {
-              key: entry.key,
-              vaultRef: vault.id,
+              key: item.key,
+              vaultRef: item.vaultRef,
               environments: [args.environment],
               projectId: args.projectId,
               isSensitive: false,
@@ -918,51 +942,81 @@ export const importValues = action({
     );
     const existingByKey = new Map(existing.map((e) => [e.key, e]));
 
-    for (const entry of args.entries) {
-      const current = existingByKey.get(entry.key);
-      if (current) {
-        const currentValue = await ctx.runAction(
-          internal.features.vault.vault.readSecret,
-          {
-            vaultRef: current.vaultRef,
-          }
-        );
-        if (currentValue !== entry.value) {
-          const vault = await ctx.runAction(
-            internal.features.vault.vault.createSecret,
-            {
-              name: entry.key,
-              value: entry.value,
-              organizationId: project.organizationId,
-              projectId: args.projectId,
-            }
-          );
-          await ctx.runMutation(api.features.variables.mutations.update, {
-            variableId: current._id,
-            vaultRef: vault.id,
-            changeReason: args.changeReason,
-          });
-          updated++;
+    // Two phases. All the vault work (the slow part) happens first, pooled;
+    // the mutations that follow are cheap DB writes. Interleaving them the way
+    // this used to meant every decrypt-compare-encrypt round trip blocked the
+    // next entry from even starting.
+    type ImportOp =
+      | {
+          kind: "update";
+          variableId: Id<"environmentVariables">;
+          vaultRef: string;
         }
-        existingByKey.delete(entry.key);
-      } else {
-        const vault = await ctx.runAction(
-          internal.features.vault.vault.createSecret,
-          {
+      | { kind: "create"; key: string; vaultRef: string }
+      | { kind: "unchanged" };
+
+    const ops = await pool(
+      entries,
+      VAULT_POOL_WIDTH,
+      async (entry): Promise<ImportOp> => {
+        const current = existingByKey.get(entry.key);
+        if (current) {
+          const currentValue = await vaultRead(current.vaultRef);
+          if (currentValue === entry.value) return { kind: "unchanged" };
+          const vault = await vaultCreate({
             name: entry.key,
             value: entry.value,
             organizationId: project.organizationId,
             projectId: args.projectId,
-          }
-        );
-        await ctx.runMutation(api.features.variables.mutations.create, {
-          key: entry.key,
-          vaultRef: vault.id,
-          environments: [args.environment],
+          });
+          return {
+            kind: "update",
+            variableId: current._id,
+            vaultRef: vault.id,
+          };
+        }
+        const vault = await vaultCreate({
+          name: entry.key,
+          value: entry.value,
+          organizationId: project.organizationId,
           projectId: args.projectId,
-          isSensitive: false,
         });
-        created++;
+        return { kind: "create", key: entry.key, vaultRef: vault.id };
+      }
+    );
+
+    // Every key the import mentioned is accounted for, so replace-mode only
+    // removes what was genuinely absent from the file. Deleting a key the map
+    // never had is a no-op, which is why this does not need the branch the
+    // interleaved version had.
+    for (const entry of entries) existingByKey.delete(entry.key);
+
+    for (const op of ops) {
+      switch (op.kind) {
+        case "update":
+          await ctx.runMutation(api.features.variables.mutations.update, {
+            variableId: op.variableId,
+            vaultRef: op.vaultRef,
+            changeReason: args.changeReason,
+          });
+          updated++;
+          break;
+        case "create":
+          await ctx.runMutation(api.features.variables.mutations.create, {
+            key: op.key,
+            vaultRef: op.vaultRef,
+            environments: [args.environment],
+            projectId: args.projectId,
+            isSensitive: false,
+          });
+          created++;
+          break;
+        case "unchanged":
+          break;
+        default: {
+          const _exhaustive: never = op;
+          return _exhaustive;
+        }
       }
     }
 
