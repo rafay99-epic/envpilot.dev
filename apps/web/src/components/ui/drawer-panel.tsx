@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useCallback, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+
+/**
+ * Safe to check directly rather than tracking a mounted flag in state: these
+ * only ever render once `isOpen` flips, which is a user interaction and so
+ * always client-side. Server and client both render null on first paint, so
+ * there is no hydration mismatch and no effect needed.
+ */
+const canPortal = () => typeof document !== "undefined";
+
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 
 interface DrawerPanelProps {
@@ -119,7 +129,13 @@ export function DrawerPanel({
     };
   }, [isOpen]);
 
-  return (
+  if (!canPortal()) return null;
+
+  // Portalled to <body> for the same reason as Modal: the sidebar is
+  // `relative z-20` and <main> is `relative z-10`, so a drawer rendered
+  // inside the page cannot paint its backdrop over the sidebar no matter
+  // how high its own z-index goes.
+  return createPortal(
     // 14 components import DrawerPanel, so it sits on the always-loaded
     // dashboard path. LazyMotion + `m` keeps the full Motion bundle off that
     // path; `domAnimation` is enough here (opacity and transform only, no
@@ -195,6 +211,7 @@ export function DrawerPanel({
           </div>
         )}
       </AnimatePresence>
-    </LazyMotion>
+    </LazyMotion>,
+    document.body
   );
 }

@@ -1,6 +1,15 @@
 "use client";
 
 import { useEffect, useCallback, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+
+/**
+ * Safe to check directly rather than tracking a mounted flag in state: these
+ * only ever render once `isOpen` flips, which is a user interaction and so
+ * always client-side. Server and client both render null on first paint, so
+ * there is no hydration mismatch and no effect needed.
+ */
+const canPortal = () => typeof document !== "undefined";
 
 interface ModalProps {
   isOpen: boolean;
@@ -45,9 +54,15 @@ export function Modal({
     };
   }, [isOpen, handleEscape]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !canPortal()) return null;
 
-  return (
+  // Portalled to <body>, and that is load-bearing rather than tidiness.
+  // The dashboard sidebar is `relative z-20` and <main> is `relative z-10`,
+  // so a dialog rendered inside the page is confined to main's stacking
+  // context: its z-50 competes only with main's other children, and the
+  // whole subtree — backdrop included — paints UNDER the sidebar. That is
+  // why the background dimmed but the sidebar stayed lit.
+  return createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
       <div
@@ -96,6 +111,7 @@ export function Modal({
           <div className="px-6 py-4">{children}</div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
