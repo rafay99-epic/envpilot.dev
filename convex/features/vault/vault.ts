@@ -162,7 +162,187 @@ async function reconcileUpdatedObject(
   return null;
 }
 
-/** Create an encrypted object. Returns the opaque vaultRef id. */
+export type VaultCreateArgs = {
+  name: string;
+  value: string;
+  organizationId: string;
+  projectId: string;
+  environment?: string;
+  /**
+   * Makes the vault object name deterministic, which is what makes a retry
+   * safe: a re-run reconciles to the object the first attempt created instead
+   * of minting a second one. Batch callers MUST pass one.
+   */
+  idempotencyKey?: string;
+};
+
+/**
+ * Create an encrypted object. Returns the opaque vaultRef id.
+ *
+ * Plain function on purpose: batch paths call this directly so N writes cost
+ * one action execution instead of N. `createSecret` below is the thin
+ * internalAction wrapper for callers that cross a function boundary.
+ */
+export async function vaultCreate(
+  args: VaultCreateArgs
+): Promise<VaultObjectResult> {
+  // Unique object name mirrors lib/vault.ts exactly so behavior is identical.
+  if (
+    args.idempotencyKey !== undefined &&
+    !/^[A-Za-z0-9_-]{1,128}$/.test(args.idempotencyKey)
+  ) {
+    throw new Error("Vault create idempotency key is invalid");
+  }
+  const uniqueName = `${args.name}:${args.projectId}:${args.idempotencyKey ?? Date.now()}`;
+  const key_context: Record<string, string> = {
+    organizationId: args.organizationId,
+    projectId: args.projectId,
+  };
+  if (args.environment) key_context.environment = args.environment;
+
+  let res: Response;
+  try {
+    // Do not client-abort this state-changing request: an abort cannot prove
+    // whether WorkOS committed the object. If the connection itself fails,
+    // reconcile by the deterministic object name before reporting failure.
+    res = await fetch(VAULT_BASE, {
+      method: "POST",
+      headers: authHeaders(true),
+      body: JSON.stringify({
+        name: uniqueName,
+        value: args.value,
+        key_context,
+      }),
+    });
+  } catch {
+    for (const delay of [0, 250, 1_000]) {
+      if (delay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+      const reconciled = await readCreatedObjectByName(uniqueName);
+      if (reconciled) return reconciled;
+    }
+    throw new Error(
+      "Vault create outcome could not be confirmed (code=network_error)"
+    );
+  }
+  if (!res.ok) {
+    throw await providerFailure("create", res);
+  }
+  try {
+    return parseObjectResult(
+      (await res.json()) as Parameters<typeof parseObjectResult>[0]
+    );
+  } catch {
+    const reconciled = await readCreatedObjectByName(uniqueName);
+    if (reconciled) return reconciled;
+    throw new Error("Vault create failed (code=invalid_response)");
+  }
+}
+
+/** Read + decrypt an object by ref. Throws NOT_FOUND-style on empty value. */
+export async function vaultRead(vaultRef: string): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(`${VAULT_BASE}/${encodeURIComponent(vaultRef)}`, {
+      method: "GET",
+      headers: authHeaders(false),
+      signal: AbortSignal.timeout(VAULT_TIMEOUT_MS),
+    });
+  } catch {
+    throw new Error("Vault read failed (code=network_error)");
+  }
+  if (!res.ok) {
+    throw await providerFailure("read", res);
+  }
+  let data: { value?: string | null };
+  try {
+    data = (await res.json()) as { value?: string | null };
+  } catch {
+    throw new Error("Vault read failed (code=invalid_response)");
+  }
+  // Distinguish a genuinely-missing value (undefined/null) from a valid
+  // empty-string secret — `!data.value` would wrongly reject "".
+  if (data.value === undefined || data.value === null) {
+    throw new Error("Vault read failed (code=missing_value)");
+  }
+  return data.value;
+}
+
+/** Update the value; same id, new version. */
+export async function vaultUpdate(args: {
+  vaultRef: string;
+  value: string;
+  versionCheck?: string;
+}): Promise<VaultObjectResult> {
+  const body: Record<string, string> = { value: args.value };
+  if (args.versionCheck) body.version_check = args.versionCheck;
+
+  let res: Response;
+  try {
+    // Like create, an update must not be client-aborted: reporting failure
+    // after WorkOS committed would leave Convex metadata behind the value.
+    res = await fetch(`${VAULT_BASE}/${encodeURIComponent(args.vaultRef)}`, {
+      method: "PUT",
+      headers: authHeaders(true),
+      body: JSON.stringify(body),
+    });
+  } catch {
+    const reconciled = await reconcileUpdatedObject(args.vaultRef, args.value);
+    if (reconciled) return reconciled;
+    throw new Error(
+      "Vault update outcome could not be confirmed (code=network_error)"
+    );
+  }
+  if (!res.ok) {
+    throw await providerFailure("update", res);
+  }
+  try {
+    return parseObjectResult(
+      (await res.json()) as Parameters<typeof parseObjectResult>[0]
+    );
+  } catch {
+    const reconciled = await reconcileUpdatedObject(args.vaultRef, args.value);
+    if (reconciled) return reconciled;
+    throw new Error("Vault update failed (code=invalid_response)");
+  }
+}
+
+/**
+ * Delete (scheduled) an object. Returns true when gone or already gone
+ * (2xx/404/410), false otherwise — callers MUST NOT hard-delete the owning
+ * Convex row unless this returns true (matches convex/vaultGc.ts semantics so a
+ * live secret is never orphaned).
+ */
+export async function vaultDelete(vaultRef: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${VAULT_BASE}/${encodeURIComponent(vaultRef)}`, {
+      method: "DELETE",
+      headers: authHeaders(false),
+      signal: AbortSignal.timeout(VAULT_TIMEOUT_MS),
+    });
+    if (res.ok || res.status === 404 || res.status === 410) return true;
+    console.warn((await providerFailure("delete", res)).message);
+    return false;
+  } catch {
+    console.warn("Vault delete failed (code=network_error)");
+    return false;
+  }
+}
+
+// ==========================================
+// INTERNAL ACTION WRAPPERS
+// ==========================================
+// Thin delegations for callers that cross a Convex function boundary. Behavior
+// and signatures are unchanged; in-process callers should use the plain
+// functions above instead so a batch costs one execution rather than N.
+
+const vaultObjectResult = v.object({
+  id: v.string(),
+  versionId: v.optional(v.string()),
+  keyId: v.optional(v.string()),
+});
+
 export const createSecret = internalAction({
   args: {
     name: v.string(),
@@ -172,178 +352,28 @@ export const createSecret = internalAction({
     environment: v.optional(v.string()),
     idempotencyKey: v.optional(v.string()),
   },
-  returns: v.object({
-    id: v.string(),
-    versionId: v.optional(v.string()),
-    keyId: v.optional(v.string()),
-  }),
-  handler: async (_ctx, args) => {
-    // Unique object name mirrors lib/vault.ts exactly so behavior is identical.
-    if (
-      args.idempotencyKey !== undefined &&
-      !/^[A-Za-z0-9_-]{1,128}$/.test(args.idempotencyKey)
-    ) {
-      throw new Error("Vault create idempotency key is invalid");
-    }
-    const uniqueName = `${args.name}:${args.projectId}:${args.idempotencyKey ?? Date.now()}`;
-    const key_context: Record<string, string> = {
-      organizationId: args.organizationId,
-      projectId: args.projectId,
-    };
-    if (args.environment) key_context.environment = args.environment;
-
-    let res: Response;
-    try {
-      // Do not client-abort this state-changing request: an abort cannot prove
-      // whether WorkOS committed the object. If the connection itself fails,
-      // reconcile by the deterministic object name before reporting failure.
-      res = await fetch(VAULT_BASE, {
-        method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({
-          name: uniqueName,
-          value: args.value,
-          key_context,
-        }),
-      });
-    } catch {
-      for (const delay of [0, 250, 1_000]) {
-        if (delay > 0) {
-          await new Promise((resolve) => setTimeout(resolve, delay));
-        }
-        const reconciled = await readCreatedObjectByName(uniqueName);
-        if (reconciled) return reconciled;
-      }
-      throw new Error(
-        "Vault create outcome could not be confirmed (code=network_error)"
-      );
-    }
-    if (!res.ok) {
-      throw await providerFailure("create", res);
-    }
-    try {
-      return parseObjectResult(
-        (await res.json()) as Parameters<typeof parseObjectResult>[0]
-      );
-    } catch {
-      const reconciled = await readCreatedObjectByName(uniqueName);
-      if (reconciled) return reconciled;
-      throw new Error("Vault create failed (code=invalid_response)");
-    }
-  },
+  returns: vaultObjectResult,
+  handler: (_ctx, args) => vaultCreate(args),
 });
 
-/** Read + decrypt an object by ref. Throws NOT_FOUND-style on empty value. */
 export const readSecret = internalAction({
   args: { vaultRef: v.string() },
   returns: v.string(),
-  handler: async (_ctx, args) => {
-    let res: Response;
-    try {
-      res = await fetch(`${VAULT_BASE}/${encodeURIComponent(args.vaultRef)}`, {
-        method: "GET",
-        headers: authHeaders(false),
-        signal: AbortSignal.timeout(VAULT_TIMEOUT_MS),
-      });
-    } catch {
-      throw new Error("Vault read failed (code=network_error)");
-    }
-    if (!res.ok) {
-      throw await providerFailure("read", res);
-    }
-    let data: { value?: string | null };
-    try {
-      data = (await res.json()) as { value?: string | null };
-    } catch {
-      throw new Error("Vault read failed (code=invalid_response)");
-    }
-    // Distinguish a genuinely-missing value (undefined/null) from a valid
-    // empty-string secret — `!data.value` would wrongly reject "".
-    if (data.value === undefined || data.value === null) {
-      throw new Error("Vault read failed (code=missing_value)");
-    }
-    return data.value;
-  },
+  handler: (_ctx, args) => vaultRead(args.vaultRef),
 });
 
-/** Update the value; same id, new version. */
 export const updateSecret = internalAction({
   args: {
     vaultRef: v.string(),
     value: v.string(),
     versionCheck: v.optional(v.string()),
   },
-  returns: v.object({
-    id: v.string(),
-    versionId: v.optional(v.string()),
-    keyId: v.optional(v.string()),
-  }),
-  handler: async (_ctx, args) => {
-    const body: Record<string, string> = { value: args.value };
-    if (args.versionCheck) body.version_check = args.versionCheck;
-
-    let res: Response;
-    try {
-      // Like create, an update must not be client-aborted: reporting failure
-      // after WorkOS committed would leave Convex metadata behind the value.
-      res = await fetch(`${VAULT_BASE}/${encodeURIComponent(args.vaultRef)}`, {
-        method: "PUT",
-        headers: authHeaders(true),
-        body: JSON.stringify(body),
-      });
-    } catch {
-      const reconciled = await reconcileUpdatedObject(
-        args.vaultRef,
-        args.value
-      );
-      if (reconciled) return reconciled;
-      throw new Error(
-        "Vault update outcome could not be confirmed (code=network_error)"
-      );
-    }
-    if (!res.ok) {
-      throw await providerFailure("update", res);
-    }
-    try {
-      return parseObjectResult(
-        (await res.json()) as Parameters<typeof parseObjectResult>[0]
-      );
-    } catch {
-      const reconciled = await reconcileUpdatedObject(
-        args.vaultRef,
-        args.value
-      );
-      if (reconciled) return reconciled;
-      throw new Error("Vault update failed (code=invalid_response)");
-    }
-  },
+  returns: vaultObjectResult,
+  handler: (_ctx, args) => vaultUpdate(args),
 });
 
-/**
- * Delete (scheduled) an object. Returns true when gone or already gone
- * (2xx/404/410), false otherwise — callers MUST NOT hard-delete the owning
- * Convex row unless this returns true (matches convex/vaultGc.ts semantics so a
- * live secret is never orphaned).
- */
 export const deleteSecret = internalAction({
   args: { vaultRef: v.string() },
   returns: v.boolean(),
-  handler: async (_ctx, args) => {
-    try {
-      const res = await fetch(
-        `${VAULT_BASE}/${encodeURIComponent(args.vaultRef)}`,
-        {
-          method: "DELETE",
-          headers: authHeaders(false),
-          signal: AbortSignal.timeout(VAULT_TIMEOUT_MS),
-        }
-      );
-      if (res.ok || res.status === 404 || res.status === 410) return true;
-      console.warn((await providerFailure("delete", res)).message);
-      return false;
-    } catch {
-      console.warn("Vault delete failed (code=network_error)");
-      return false;
-    }
-  },
+  handler: (_ctx, args) => vaultDelete(args.vaultRef),
 });
