@@ -12,7 +12,7 @@ import { handleApiError } from "@/lib/api-errors";
 const log = createLogger("api/organizations/transfer");
 
 const transferSchema = z.object({
-  targetUserEmail: z.string().email("A valid email address is required"),
+  targetUserEmail: z.email("A valid email address is required"),
 });
 
 type RouteParams = { params: Promise<{ slug: string }> };

@@ -9,12 +9,14 @@ import {
   docsComponents,
   GlowCard,
   GlowDivider,
-  Reveal,
-  SITE_URLS,
+  jsonLdScript,
   MermaidChart,
   remarkMermaid,
+  Reveal,
+  SITE_URLS,
 } from "@envpilot/ui";
-import { DocsSidebar, DOC_ICONS } from "@/components/DocsSidebar";
+import { DocsSidebar } from "@/components/DocsSidebar";
+import { DOC_ICONS } from "@/components/doc-icons";
 import { TableOfContents } from "@/components/TableOfContents";
 import { DocsShell } from "@/components/shell";
 import { LLMActions } from "@/components/LLMActions";
@@ -140,7 +142,7 @@ export default async function DocPage({ params }: PageProps) {
     <DocsShell>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData) }}
       />
       <div className="relative overflow-hidden">
         {/* Deliberately no ambient backdrop here: docs are a reading

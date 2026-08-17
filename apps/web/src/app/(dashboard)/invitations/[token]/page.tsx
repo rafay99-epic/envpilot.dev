@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { roleLabel } from "@/lib/roles";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateWith } from "@/lib/format";
+import { OrgLogo } from "@/components/shared/org-logo";
 
 interface InvitationDetails {
   email: string;
@@ -37,14 +40,23 @@ export default function InvitationAcceptPage({
   const [status, setStatus] = useState<
     "pending" | "accepted" | "declined" | "expired" | "error"
   >("pending");
+  const timeZone = useTimeZone();
+
+  // Accept and decline both mutate the invitation, and state only flips on
+  // the next render — the ref closes the double-click window in between.
+  const inFlight = useRef(false);
 
   useEffect(() => {
+    // A second token would otherwise race the first response into state.
+    let cancelled = false;
+
     async function fetchInvitation() {
       try {
         const response = await fetch(`/api/invitations/${token}`);
 
         if (!response.ok) {
           const data = await response.json();
+          if (cancelled) return;
           if (data.status === "expired") {
             setStatus("expired");
           } else if (data.status) {
@@ -56,18 +68,28 @@ export default function InvitationAcceptPage({
         }
 
         const data = await response.json();
+        if (cancelled) return;
         setInvitation(data.invitation);
       } catch (err) {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setIsLoading(false);
       }
+      // Not a finally block: the catch swallows, so this runs on both paths,
+      // and React Compiler bails on any function containing a try statement
+      // with a finalizer.
+      if (!cancelled) setIsLoading(false);
     }
 
     fetchInvitation();
+
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   async function handleAccept() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setIsAccepting(true);
     setError(null);
 
@@ -92,12 +114,15 @@ export default function InvitationAcceptPage({
         router.push(`/organizations/${data.organization.slug}`);
       }, 2000);
     } catch (err) {
+      inFlight.current = false;
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsAccepting(false);
     }
   }
 
   async function handleDecline() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setIsDeclining(true);
     setError(null);
 
@@ -113,6 +138,7 @@ export default function InvitationAcceptPage({
 
       setStatus("declined");
     } catch (err) {
+      inFlight.current = false;
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsDeclining(false);
     }
@@ -269,9 +295,10 @@ export default function InvitationAcceptPage({
       <div className="w-full max-w-md">
         <div className="rounded-xl border p-8 text-center border-line bg-surface">
           {invitation.organization.logoUrl ? (
-            <img
+            <OrgLogo
               src={invitation.organization.logoUrl}
               alt={invitation.organization.name}
+              size={64}
               className="mx-auto h-16 w-16 rounded-xl object-cover"
             />
           ) : (
@@ -326,11 +353,11 @@ export default function InvitationAcceptPage({
 
           <p className="mt-4 text-xs text-ink-muted">
             Expires{" "}
-            {new Date(invitation.expiresAt).toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
+            {formatDateWith(
+              invitation.expiresAt,
+              { year: "numeric", month: "long", day: "numeric" },
+              timeZone
+            )}
           </p>
         </div>
       </div>

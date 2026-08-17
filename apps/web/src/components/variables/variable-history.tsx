@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui";
 import type { Id } from "@convex/_generated/dataModel";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateTime } from "@/lib/format";
 
 interface VersionRecord {
   _id: Id<"variableVersions">;
@@ -28,6 +30,10 @@ interface VariableHistoryProps {
 
 type FilterType = "all" | "updates" | "rollbacks";
 
+/** A rollback records itself in the change reason; nothing else does. */
+const isRollback = (changeReason?: string) =>
+  changeReason?.toLowerCase().includes("rolled back") || false;
+
 export function VariableHistory({
   isOpen,
   onClose,
@@ -45,12 +51,7 @@ export function VariableHistory({
   const [compareMode, setCompareMode] = useState(false);
   const [selectedVersions, setSelectedVersions] = useState<number[]>([]);
 
-  const formatDate = (timestamp: number) => {
-    return new Intl.DateTimeFormat("en-US", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(timestamp));
-  };
+  const timeZone = useTimeZone();
 
   const formatRelativeTime = (timestamp: number) => {
     const now = Date.now();
@@ -60,15 +61,11 @@ export function VariableHistory({
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
-    if (days > 7) return formatDate(timestamp);
+    if (days > 7) return formatDateTime(timestamp, timeZone);
     if (days > 0) return `${days} day${days > 1 ? "s" : ""} ago`;
     if (hours > 0) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
     if (minutes > 0) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
     return "Just now";
-  };
-
-  const isRollback = (changeReason?: string) => {
-    return changeReason?.toLowerCase().includes("rolled back") || false;
   };
 
   const filteredHistory = history.filter((record) => {
@@ -117,6 +114,13 @@ export function VariableHistory({
   };
 
   const compareVersions = getCompareVersions();
+
+  // Built once per render and probed per row, rather than rescanned inside
+  // each loop. `filteredHistory` grows with the variable's history, and each
+  // row asks about the selection twice.
+  const selectedVersionSet = new Set(selectedVersions);
+  const olderEnvironmentSet = new Set(compareVersions?.older.environments);
+  const newerEnvironmentSet = new Set(compareVersions?.newer.environments);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -215,7 +219,7 @@ export function VariableHistory({
                       <span
                         key={env}
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          !compareVersions.newer.environments.includes(env)
+                          !newerEnvironmentSet.has(env)
                             ? "bg-danger-soft text-danger"
                             : "bg-surface-hover text-ink-muted"
                         }`}
@@ -247,7 +251,7 @@ export function VariableHistory({
                       <span
                         key={env}
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          !compareVersions.older.environments.includes(env)
+                          !olderEnvironmentSet.has(env)
                             ? "bg-accent-soft text-accent"
                             : "bg-surface-hover text-ink-muted"
                         }`}
@@ -333,7 +337,7 @@ export function VariableHistory({
               <div
                 key={record._id}
                 className={`flex items-start justify-between py-4 transition-colors ${
-                  compareMode && selectedVersions.includes(record.version)
+                  compareMode && selectedVersionSet.has(record.version)
                     ? "bg-info-soft"
                     : ""
                 }`}
@@ -347,7 +351,7 @@ export function VariableHistory({
                       disabled={!compareMode}
                       className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
                         compareMode
-                          ? selectedVersions.includes(record.version)
+                          ? selectedVersionSet.has(record.version)
                             ? "bg-info text-white ring-2 ring-info-line"
                             : "bg-surface-raised text-ink-muted hover:bg-info-soft hover:text-info"
                           : "bg-surface-raised text-ink-muted"
@@ -412,7 +416,7 @@ export function VariableHistory({
                         d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    <span title={formatDate(record.createdAt)}>
+                    <span title={formatDateTime(record.createdAt, timeZone)}>
                       {formatRelativeTime(record.createdAt)}
                     </span>
                     {record.changedByUser && (

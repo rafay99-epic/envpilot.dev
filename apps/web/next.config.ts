@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 import { APP_VERSIONS } from "./src/lib/versions";
+import { remoteImagePatterns } from "./src/lib/image-hosts";
 
 const sentryTunnelRoute = "/api/telemetry-envelope";
 
@@ -14,6 +15,14 @@ const blogUrl = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.envpilot.dev";
 const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.envpilot.dev";
 
 const nextConfig: NextConfig = {
+  // `next build` and `next dev` share this directory, including its
+  // `node_modules` symlink farm. A build run while the dev server is up
+  // rewrites that farm underneath it, and the dev server then fails to
+  // resolve packages from the wrong base directory ("resolve 'tailwindcss'
+  // in .../apps"). Set NEXT_DIST_DIR to verify a build without touching a
+  // running dev server. Unset everywhere else, so CI and Vercel are
+  // unaffected.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   reactCompiler: true,
   transpilePackages: ["@envpilot/ui"],
   env: {
@@ -87,16 +96,10 @@ const nextConfig: NextConfig = {
   },
 
   // ── Image optimization ─────────────────────────────────────────────
-  // Allow external avatar/logo domains for next/image
+  // Derived from OPTIMIZED_IMAGE_HOSTS so the runtime host check in
+  // isOptimizableImageHost cannot disagree with what the optimizer accepts.
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "**.workos.com" },
-      { protocol: "https", hostname: "workoscdn.com" },
-      { protocol: "https", hostname: "**.workoscdn.com" },
-      { protocol: "https", hostname: "**.googleusercontent.com" },
-      { protocol: "https", hostname: "**.githubusercontent.com" },
-      { protocol: "https", hostname: "svgl.app" },
-    ],
+    remotePatterns: remoteImagePatterns,
   },
 
   // ── Keep heavy server-only packages out of the client bundle ───────

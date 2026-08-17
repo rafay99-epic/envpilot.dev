@@ -11,6 +11,8 @@ import {
   TerminalButtonLink,
 } from "@/components/dashboard/terminal-ui";
 import { createLogger } from "@/lib/logger";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDate } from "@/lib/format";
 
 const log = createLogger("access-notices");
 
@@ -49,6 +51,7 @@ export function AccessNotices({
       : "skip"
   );
   const [acknowledging, setAcknowledging] = useState(false);
+  const timeZone = useTimeZone();
 
   // The organizations list/create pages are the escape route out of a
   // suspended org — never cover them.
@@ -76,7 +79,7 @@ export function AccessNotices({
             <p className="mt-3 text-ink-muted">
               Your access to this organization has been revoked
               {membershipStatus.suspendedAt
-                ? ` on ${new Date(membershipStatus.suspendedAt).toLocaleDateString()}`
+                ? ` on ${formatDate(membershipStatus.suspendedAt, timeZone)}`
                 : ""}
               .
             </p>
@@ -113,10 +116,10 @@ export function AccessNotices({
 
   const message =
     notice.kind === "org_deleted"
-      ? `${notice.organizationName} was deleted on ${new Date(notice.createdAt).toLocaleDateString()}. Your data in it is no longer available.`
+      ? `${notice.organizationName} was deleted on ${formatDate(notice.createdAt, timeZone)}. Your data in it is no longer available.`
       : notice.kind === "left"
-        ? `You left ${notice.organizationName} on ${new Date(notice.createdAt).toLocaleDateString()}.`
-        : `Your access to ${notice.organizationName} was revoked on ${new Date(notice.createdAt).toLocaleDateString()}. Please contact your organization.`;
+        ? `You left ${notice.organizationName} on ${formatDate(notice.createdAt, timeZone)}.`
+        : `Your access to ${notice.organizationName} was revoked on ${formatDate(notice.createdAt, timeZone)}. Please contact your organization.`;
 
   async function handleAcknowledge() {
     setAcknowledging(true);

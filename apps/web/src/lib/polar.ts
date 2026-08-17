@@ -12,23 +12,6 @@ export const isPaymentsEnabled = () => {
   return process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
 };
 
-// Validate Polar configuration
-const validatePolarConfig = () => {
-  if (!isPaymentsEnabled()) {
-    return { valid: false, reason: "Payments are disabled" };
-  }
-
-  if (!process.env.POLAR_ACCESS_TOKEN) {
-    return { valid: false, reason: "POLAR_ACCESS_TOKEN is not configured" };
-  }
-
-  if (!process.env.POLAR_WEBHOOK_SECRET) {
-    return { valid: false, reason: "POLAR_WEBHOOK_SECRET is not configured" };
-  }
-
-  return { valid: true, reason: null };
-};
-
 // Lazy-initialized Polar client
 let polarClient: Polar | null = null;
 
@@ -64,11 +47,4 @@ export const getPolarWebhookSecret = (): string | null => {
     return null;
   }
   return process.env.POLAR_WEBHOOK_SECRET || null;
-};
-
-/**
- * Get Polar configuration status
- */
-export const getPolarConfigStatus = () => {
-  return validatePolarConfig();
 };

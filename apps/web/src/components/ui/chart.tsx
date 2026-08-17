@@ -17,11 +17,10 @@ export type ChartConfig = {
   );
 };
 
-type ChartContextProps = {
-  config: ChartConfig;
-};
-
-const ChartContext = React.createContext<ChartContextProps | null>(null);
+// The context carries the config itself rather than a `{ config }` wrapper:
+// a wrapper is a fresh object on every render, so every consumer re-rendered
+// even when the config was unchanged.
+const ChartContext = React.createContext<ChartConfig | null>(null);
 
 function useChart() {
   const context = React.useContext(ChartContext);
@@ -44,7 +43,7 @@ const ChartContainer = React.forwardRef<
   const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`;
 
   return (
-    <ChartContext.Provider value={{ config }}>
+    <ChartContext.Provider value={config}>
       <div
         data-chart={chartId}
         ref={ref}
@@ -152,7 +151,7 @@ const ChartTooltipContent = React.forwardRef<
     },
     ref
   ) => {
-    const { config } = useChart();
+    const config = useChart();
 
     const tooltipLabel = React.useMemo(() => {
       if (hideLabel || !payload?.length) {
@@ -301,7 +300,7 @@ const ChartLegendContent = React.forwardRef<
     { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey },
     ref
   ) => {
-    const { config } = useChart();
+    const config = useChart();
 
     if (!payload?.length) {
       return null;

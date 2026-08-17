@@ -169,8 +169,26 @@ const CONTENT_DIR = resolve(process.cwd(), "content");
  * while npm served 1.20.0. A stale version string is now unrepresentable.
  */
 function readVersion(relativePath: string): string {
-  const raw = readFileSync(resolve(process.cwd(), relativePath), "utf-8");
-  return (JSON.parse(raw) as { version: string }).version;
+  const path = resolve(process.cwd(), relativePath);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf-8"));
+  } catch (cause) {
+    throw new Error(`[docs/content] unreadable package.json: ${path}`, {
+      cause,
+    });
+  }
+
+  const version =
+    typeof parsed === "object" && parsed !== null && "version" in parsed
+      ? parsed.version
+      : undefined;
+  // Failing the build beats shipping a page that renders a literal
+  // "{{cliVersion}}" because interpolate() had nothing to substitute.
+  if (typeof version !== "string") {
+    throw new Error(`[docs/content] no "version" string in ${path}`);
+  }
+  return version;
 }
 
 const PACKAGE_VERSIONS: Record<string, string> = {
@@ -236,18 +254,22 @@ export const getDocBySlug = cache(function getDocBySlug(
 
 /** Page slugs on disk for one section: SECTIONS order first, then extras. */
 function sectionSlugsOnDisk(section: DocSection): string[] {
-  let files: string[];
+  const files: string[] = [];
   try {
-    files = readdirSync(join(CONTENT_DIR, section.slug))
-      .filter((f) => f.endsWith(".mdx"))
-      .map((f) => f.replace(/\.mdx$/, ""));
+    for (const entry of readdirSync(join(CONTENT_DIR, section.slug))) {
+      if (entry.endsWith(".mdx")) files.push(entry.slice(0, -".mdx".length));
+    }
   } catch {
     return [];
   }
 
-  const ordered = section.pages.filter((p) => files.includes(p));
-  const extras = files.filter((f) => !section.pages.includes(f)).sort();
-  return [...ordered, ...extras].map((p) => `${section.slug}/${p}`);
+  // Both filters below are membership tests, so the two sets are built once
+  // rather than rescanning the arrays per element.
+  const onDisk = new Set(files);
+  const listed = new Set(section.pages);
+  const ordered = section.pages.filter((page) => onDisk.has(page));
+  const extras = files.filter((file) => !listed.has(file)).sort();
+  return [...ordered, ...extras].map((page) => `${section.slug}/${page}`);
 }
 
 /** Every doc slug in reading order (drives prev/next, sitemap, llms.txt). */
@@ -276,8 +298,12 @@ export const getAllDocs = cache(function getAllDocs(): Omit<
 /** Sections with their resolved pages — drives the sidebar and the home hub. */
 export const getNavigation = cache(function getNavigation() {
   const docs = getAllDocs();
-  return SECTIONS.map((section) => ({
-    ...section,
-    items: docs.filter((doc) => doc.sectionSlug === section.slug),
-  })).filter((section) => section.items.length > 0);
+  // One pass: a section with no pages on disk is skipped rather than built
+  // and then filtered back out.
+  const navigation: (DocSection & { items: typeof docs })[] = [];
+  for (const section of SECTIONS) {
+    const items = docs.filter((doc) => doc.sectionSlug === section.slug);
+    if (items.length > 0) navigation.push({ ...section, items });
+  }
+  return navigation;
 });

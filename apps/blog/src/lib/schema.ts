@@ -1,29 +1,27 @@
 import { z } from "zod";
 
-export const blogFrontmatterSchema = z
-  .object({
-    title: z
-      .string()
-      .min(1, "Blog post title is required")
-      .max(200, "Title must be ≤200 characters"),
-    description: z
-      .string()
-      .min(1, "Description (excerpt) is required")
-      .max(500, "Description must be ≤500 characters"),
-    date: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD format"),
-    tags: z.array(z.string().min(1)).min(1, "At least one tag is required"),
-    keywords: z.array(z.string().min(1)).default([]),
-    author: z.object({
-      name: z.string().min(1, "Author name is required"),
-    }),
-    coverImage: z.string().optional(),
-    series: z.string().min(1).optional(),
-    seriesPart: z.number().int().positive().optional(),
-    seriesTotal: z.number().int().positive().optional(),
-  })
-  .strict();
+export const blogFrontmatterSchema = z.strictObject({
+  title: z
+    .string()
+    .min(1, "Blog post title is required")
+    .max(200, "Title must be ≤200 characters"),
+  description: z
+    .string()
+    .min(1, "Description (excerpt) is required")
+    .max(500, "Description must be ≤500 characters"),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD format"),
+  tags: z.array(z.string().min(1)).min(1, "At least one tag is required"),
+  keywords: z.array(z.string().min(1)).default([]),
+  author: z.object({
+    name: z.string().min(1, "Author name is required"),
+  }),
+  coverImage: z.string().optional(),
+  series: z.string().min(1).optional(),
+  seriesPart: z.number().int().positive().optional(),
+  seriesTotal: z.number().int().positive().optional(),
+});
 
 /**
  * Full blog post shape (includes raw MDX body).

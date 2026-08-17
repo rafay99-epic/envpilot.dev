@@ -2,6 +2,8 @@
 
 import { Download, Loader2, Pencil, Trash2, Upload, Users } from "lucide-react";
 import { formatBytes, type SecretFile } from "@/hooks/useSecretFiles";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateTimeShort } from "@/lib/format";
 
 interface FileListItemProps {
   file: SecretFile;
@@ -37,11 +39,7 @@ export function FileListItem({
   canDelete = false,
   canManagePermissions = false,
 }: FileListItemProps) {
-  const formatDate = (timestamp: number) =>
-    new Intl.DateTimeFormat("en-US", {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(new Date(timestamp));
+  const timeZone = useTimeZone();
 
   const isWritable = file.access === "write";
 
@@ -94,7 +92,7 @@ export function FileListItem({
                 {formatBytes(file.size)} · {file.mode}
               </span>
               <span className="text-xs text-ink-subtle">
-                Updated {formatDate(file.updatedAt)}
+                Updated {formatDateTimeShort(file.updatedAt, timeZone)}
               </span>
             </div>
           </div>

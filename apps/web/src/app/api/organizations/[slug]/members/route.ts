@@ -21,7 +21,7 @@ const log = createLogger("api/organizations/members");
 const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
 
 const inviteMemberSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.email("Invalid email address"),
   // Open registry slug — Convex validates it against the role registry
   // (invitations.create rejects unknown/inactive slugs with a ConvexError).
   role: z.string().min(1),

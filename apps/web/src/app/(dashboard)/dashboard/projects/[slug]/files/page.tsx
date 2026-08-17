@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use } from "react";
+import { useId, useState, use } from "react";
 import { FileKey, Plus } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import type { Id } from "@convex/_generated/dataModel";
@@ -73,6 +73,8 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
   const updateFile = useUpdateSecretFile();
   const deleteFile = useDeleteSecretFile();
   const getFileContent = useGetSecretFileContent();
+
+  const environmentFilterLabelId = useId();
 
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -222,10 +224,19 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
 
         {/* Environment filter */}
         <div className="flex flex-wrap items-center gap-4">
-          <label className="text-sm font-medium text-ink-muted">
+          {/* Names the whole button group, so a span + role="group" rather
+              than a <label>, which may only name a single control. */}
+          <span
+            id={environmentFilterLabelId}
+            className="text-sm font-medium text-ink-muted"
+          >
             Environment:
-          </label>
-          <div className="flex flex-wrap gap-2">
+          </span>
+          <div
+            role="group"
+            aria-labelledby={environmentFilterLabelId}
+            className="flex flex-wrap gap-2"
+          >
             <button
               onClick={() => setSelectedEnvironment("all")}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${

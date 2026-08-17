@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import { X, Copy, Check, Loader2, Mail, AlertTriangle } from "lucide-react";
 import * as Sentry from "@sentry/nextjs";
 import {
@@ -67,6 +67,11 @@ export function ShareLinkForm({
 }: ShareLinkFormProps) {
   const createShare = useCreateShare();
   const { user } = useAuth();
+  const uid = useId();
+  const emailFieldId = `${uid}-email`;
+  const passphraseFieldId = `${uid}-passphrase`;
+  const modeLabelId = `${uid}-mode`;
+  const ttlLabelId = `${uid}-ttl`;
   // Prop wins when provided (e.g. tests); otherwise fall back to the signed-in
   // user's email so we can block self-sharing before the request is sent.
   const selfEmail = (currentUserEmail ?? user?.email)?.trim().toLowerCase();
@@ -78,6 +83,10 @@ export function ShareLinkForm({
   const [usePassphrase, setUsePassphrase] = useState(false);
   const [passphrase, setPassphrase] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  // `disabled` only applies after the next render, so a fast double click
+  // would create two shares and send two notification emails. The ref shuts
+  // the window in the same tick.
+  const isGeneratingRef = useRef(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,42 +117,47 @@ export function ShareLinkForm({
   };
 
   const handleGenerate = async () => {
+    if (isGeneratingRef.current) return;
     if (emails.length === 0) {
       setError("Add at least one recipient email");
       return;
     }
 
+    isGeneratingRef.current = true;
     setIsGenerating(true);
     setError(null);
 
     try {
       const payload = await buildPayload();
-      if (payload == null) return;
+      // A null payload aborts silently, per the buildPayload contract. Kept as
+      // a skipped block instead of an early return so the guard below always
+      // runs and the button can never latch disabled.
+      if (payload != null) {
+        const clientKey = generateClientKey();
+        const encryptedPayload = await encryptForShare(
+          payload,
+          clientKey,
+          usePassphrase ? passphrase : undefined
+        );
 
-      const clientKey = generateClientKey();
-      const encryptedPayload = await encryptForShare(
-        payload,
-        clientKey,
-        usePassphrase ? passphrase : undefined
-      );
+        const result = await createShare.mutateAsync({
+          ...extraShareArgs,
+          organizationId,
+          projectId,
+          encryptedPayload,
+          mode,
+          ttlMs,
+          hasPassphrase: usePassphrase,
+          recipientEmails: emails,
+          clientKeyBase64Url: clientKeyToBase64Url(clientKey),
+        } as Parameters<typeof createShare.mutateAsync>[0]);
 
-      const result = await createShare.mutateAsync({
-        ...extraShareArgs,
-        organizationId,
-        projectId,
-        encryptedPayload,
-        mode,
-        ttlMs,
-        hasPassphrase: usePassphrase,
-        recipientEmails: emails,
-        clientKeyBase64Url: clientKeyToBase64Url(clientKey),
-      } as Parameters<typeof createShare.mutateAsync>[0]);
-
-      const origin = window.location.origin;
-      setEmailsFailed(result.emailsFailed ?? []);
-      setGeneratedUrl(
-        `${origin}/s/${result.token}#${clientKeyToBase64Url(clientKey)}`
-      );
+        const origin = window.location.origin;
+        setEmailsFailed(result.emailsFailed ?? []);
+        setGeneratedUrl(
+          `${origin}/s/${result.token}#${clientKeyToBase64Url(clientKey)}`
+        );
+      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to create share";
@@ -163,9 +177,12 @@ export function ShareLinkForm({
           },
         });
       }
-    } finally {
-      setIsGenerating(false);
     }
+    // Released after the try/catch rather than in a `finally` — the compiler
+    // bails on a component containing one. The catch swallows and no branch
+    // returns early, so every path reaches here.
+    isGeneratingRef.current = false;
+    setIsGenerating(false);
   };
 
   const handleCopyUrl = async () => {
@@ -216,15 +233,16 @@ export function ShareLinkForm({
         )}
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+          <div className="mb-1.5 block text-xs font-medium text-ink-muted">
             Share Link
-          </label>
+          </div>
           <div className="flex items-center gap-2">
             <code className="flex-1 truncate rounded-lg px-3 py-2 font-mono text-xs bg-surface-raised text-ink-muted">
               {generatedUrl}
             </code>
             <button
               onClick={handleCopyUrl}
+              aria-label="Copy share link"
               className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent"
             >
               {copied ? (
@@ -269,11 +287,15 @@ export function ShareLinkForm({
     <div className="space-y-5">
       {/* Recipient Emails */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+        <label
+          htmlFor={emailFieldId}
+          className="mb-1.5 block text-xs font-medium text-ink-muted"
+        >
           Recipient Emails
         </label>
         <div className="flex gap-2">
           <input
+            id={emailFieldId}
             type="email"
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
@@ -284,7 +306,7 @@ export function ShareLinkForm({
               }
             }}
             placeholder="Enter email and press Enter"
-            className="flex-1 rounded-lg border px-3 py-2 text-sm placeholder:text-ink-muted focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line border-line bg-surface text-ink"
+            className="flex-1 rounded-lg border px-3 py-2 text-base placeholder:text-ink-muted focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line sm:text-sm border-line bg-surface text-ink"
           />
           <button
             type="button"
@@ -306,6 +328,7 @@ export function ShareLinkForm({
                 <button
                   type="button"
                   onClick={() => setEmails(emails.filter((e) => e !== email))}
+                  aria-label={`Remove ${email}`}
                   className="ml-0.5 rounded-full p-0.5 hover:bg-accent"
                 >
                   <X className="h-3 w-3" />
@@ -318,10 +341,13 @@ export function ShareLinkForm({
 
       {/* Mode */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+        <div
+          id={modeLabelId}
+          className="mb-1.5 block text-xs font-medium text-ink-muted"
+        >
           Share Mode
-        </label>
-        <div className="flex gap-2">
+        </div>
+        <div role="group" aria-labelledby={modeLabelId} className="flex gap-2">
           <button
             type="button"
             onClick={() => setMode("one_time")}
@@ -352,10 +378,13 @@ export function ShareLinkForm({
 
       {/* TTL */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+        <div
+          id={ttlLabelId}
+          className="mb-1.5 block text-xs font-medium text-ink-muted"
+        >
           Expires After
-        </label>
-        <div className="flex gap-2">
+        </div>
+        <div role="group" aria-labelledby={ttlLabelId} className="flex gap-2">
           {TTL_OPTIONS.map((opt) => (
             <button
               key={opt.label}
@@ -387,13 +416,19 @@ export function ShareLinkForm({
           </span>
         </label>
         {usePassphrase && (
-          <input
-            type="password"
-            value={passphrase}
-            onChange={(e) => setPassphrase(e.target.value)}
-            placeholder="Enter a passphrase"
-            className="mt-2 w-full rounded-lg border px-3 py-2 text-sm placeholder:text-ink-muted focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line border-line bg-surface text-ink"
-          />
+          <>
+            <label className="sr-only" htmlFor={passphraseFieldId}>
+              Passphrase
+            </label>
+            <input
+              id={passphraseFieldId}
+              type="password"
+              value={passphrase}
+              onChange={(e) => setPassphrase(e.target.value)}
+              placeholder="Enter a passphrase"
+              className="mt-2 w-full rounded-lg border px-3 py-2 text-base placeholder:text-ink-muted focus:border-accent-line focus:outline-none focus:ring-1 focus:ring-accent-line sm:text-sm border-line bg-surface text-ink"
+            />
+          </>
         )}
       </div>
 

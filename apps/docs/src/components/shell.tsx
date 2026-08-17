@@ -81,7 +81,7 @@ function NavActions() {
       </a>
       <a
         href={`${SITE_URLS.www}/sign-up`}
-        className="rounded border border-accent-line bg-accent-soft px-3 py-1.5 text-xs text-accent transition-all hover:bg-accent-soft"
+        className="rounded border border-accent-line bg-accent-soft px-3 py-1.5 text-xs text-accent transition-colors hover:bg-accent-soft"
       >
         get-started
       </a>

@@ -69,6 +69,19 @@ function providerName(provider: Provider): string {
   return provider === "slack" ? "Slack" : "Discord";
 }
 
+const toggleGroup = (groups: EventGroup[], key: EventGroup): EventGroup[] =>
+  groups.includes(key)
+    ? groups.filter((group) => group !== key)
+    : [...groups, key];
+
+const toggleProject = (
+  projectsInScope: Id<"projects">[],
+  projectId: Id<"projects">
+): Id<"projects">[] =>
+  projectsInScope.includes(projectId)
+    ? projectsInScope.filter((id) => id !== projectId)
+    : [...projectsInScope, projectId];
+
 function relativeTime(timestamp: number): string {
   const minutes = Math.round((Date.now() - timestamp) / 60_000);
   if (minutes < 1) return "just now";
@@ -87,35 +100,35 @@ function ProviderMark({ provider }: { provider: Provider }) {
       >
         <svg viewBox="0 0 54 54" className="h-full w-full">
           <path
-            d="M11.379 33.9993c0 3.1365-2.53388 5.6514-5.6514 5.6514-3.11752 0-5.67038-2.5339-5.67038-5.6514 0-3.1176 2.53388-5.6514 5.6514-5.6514H11.36v5.6514h.019Z"
+            d="M11.379 34c0 3.14-2.53 5.65-5.65 5.65-3.12 0-5.67-2.53-5.67-5.65 0-3.12 2.53-5.65 5.65-5.65H11.36v5.65h.019Z"
             fill="#E01E5A"
           />
           <path
-            d="M14.1962 33.9997c0-3.1365 2.5339-5.6514 5.6514-5.6514s5.6514 2.5339 5.6514 5.6514v14.1356c0 3.1365-2.5339 5.6514-5.6514 5.6514s-5.6514-2.5149-5.6514-5.6514V33.9997Z"
+            d="M14.2 34c0-3.14 2.53-5.65 5.65-5.65s5.65 2.53 5.65 5.65v14.14c0 3.14-2.53 5.65-5.65 5.65s-5.65-2.51-5.65-5.65V34Z"
             fill="#E01E5A"
           />
           <path
-            d="M19.8662 11.2673c-3.1366 0-5.6514-2.53383-5.6514-5.65136 0-3.11752 2.5338-5.6513938 5.6514-5.6513938 3.1175 0 5.6513 2.5338738 5.6513 5.6513938v5.65136h-5.6513Z"
+            d="M19.87 11.27c-3.14 0-5.65-2.53-5.65-5.65 0-3.12 2.53-5.65 5.65-5.65 3.12 0 5.65 2.53 5.65 5.65v5.65h-5.65Z"
             fill="#36C5F0"
           />
           <path
-            d="M19.8682 14.1334c3.1365 0 5.6514 2.5339 5.6514 5.6514s-2.5339 5.6514-5.6514 5.6514H5.67566c-3.1365 0-5.6513985-2.5339-5.6513985-5.6514s2.5338785-5.6514 5.6513985-5.6514H19.8682Z"
+            d="M19.87 14.13c3.14 0 5.65 2.53 5.65 5.65s-2.53 5.65-5.65 5.65H5.68c-3.14 0-5.65-2.53-5.65-5.65s2.53-5.65 5.65-5.65H19.87Z"
             fill="#36C5F0"
           />
           <path
-            d="M42.5323 19.7853c0-3.1365 2.5339-5.6514 5.6514-5.6514s5.6514 2.5339 5.6514 5.6514-2.5339 5.6514-5.6514 5.6514h-5.6514v-5.6514Z"
+            d="M42.53 19.79c0-3.14 2.53-5.65 5.65-5.65s5.65 2.53 5.65 5.65-2.53 5.65-5.65 5.65h-5.65v-5.65Z"
             fill="#2EB67D"
           />
           <path
-            d="M39.7126 19.7934c0 3.1365-2.5339 5.6514-5.6514 5.6514s-5.6514-2.5338-5.6514-5.6514V5.61986c0-3.1365 2.5338-5.6513999 5.6514-5.6513999 3.1175 0 5.6514 2.5148999 5.6514 5.6513999V19.7934Z"
+            d="M39.71 19.79c0 3.14-2.53 5.65-5.65 5.65s-5.65-2.53-5.65-5.65V5.62c0-3.14 2.53-5.65 5.65-5.65 3.12 0 5.65 2.51 5.65 5.65V19.79Z"
             fill="#2EB67D"
           />
           <path
-            d="M34.0376 42.482c3.1365 0 5.6514 2.5338 5.6514 5.6514 0 3.1175-2.5338 5.6514-5.6514 5.6514-3.1175 0-5.6514-2.5339-5.6514-5.6514V42.482h5.6514Z"
+            d="M34.04 42.482c3.14 0 5.65 2.53 5.65 5.65 0 3.12-2.53 5.65-5.65 5.65-3.12 0-5.65-2.53-5.65-5.65V42.482h5.65Z"
             fill="#ECB22E"
           />
           <path
-            d="M34.0381 39.6507c-3.1365 0-5.6514-2.5339-5.6514-5.6514s2.5339-5.6514 5.6514-5.6514h14.1925c3.1365 0 5.6514 2.5339 5.6514 5.6514s-2.5338 5.6514-5.6514 5.6514H34.0381Z"
+            d="M34.04 39.65c-3.14 0-5.65-2.53-5.65-5.65s2.53-5.65 5.65-5.65h14.19c3.14 0 5.65 2.53 5.65 5.65s-2.53 5.65-5.65 5.65H34.04Z"
             fill="#ECB22E"
           />
         </svg>
@@ -130,7 +143,7 @@ function ProviderMark({ provider }: { provider: Provider }) {
     >
       <svg viewBox="0 0 64 48" className="h-full w-full" fill="none">
         <path
-          d="M40.575 0c-.6188 1.09866-1.1744 2.2352-1.6796 3.397-4.7987-.71981-9.6858-.71981-14.4972 0C23.9057 2.2352 23.3374 1.09866 22.7186 0 18.2104.770324 13.8157 2.12155 9.64839 4.02841 1.38951 16.2652-.845688 28.1863.265599 39.9432 5.10222 43.517 10.5197 46.2447 16.2909 47.9874c1.3007-1.7427 2.4498-3.5991 3.4348-5.5312-1.8689-.6946-3.6748-1.5659-5.4049-2.5762.4547-.3283.8967-.6693 1.326-.9976 10.1405 4.7735 21.8848 4.7735 32.0379 0 .4294.3536.8714.6946 1.326.9976-1.7301 1.0229-3.5359 1.8816-5.4176 2.5888.985 1.9321 2.1342 3.7885 3.4349 5.5312 5.7711-1.7427 11.1887-4.4452 16.0253-8.0189C64.3666 26.3299 60.8055 14.5099 53.6452 4.04104 49.4905 2.13418 45.0959.782952 40.5876.0252565L40.575 0ZM21.1401 32.7072c-3.1192 0-5.708-2.8287-5.708-6.3268 0-3.498 2.4878-6.3394 5.6954-6.3394s5.7585 2.854 5.7079 6.3394c-.0505 3.4854-2.513 6.3268-5.6953 6.3268Zm21.0387 0c-3.1318 0-5.6954-2.8287-5.6954-6.3268 0-3.498 2.4878-6.3394 5.6954-6.3394s5.7458 2.854 5.6953 6.3394c-.0505 3.4854-2.513 6.3268-5.6953 6.3268Z"
+          d="M40.575 0c-.62 1.1-1.17 2.24-1.68 3.397-4.8-.72-9.69-.72-14.5 0C23.91 2.24 23.34 1.1 22.72 0 18.21.77 13.82 2.12 9.65 4.03 1.39 16.27-.85 28.19.27 39.94 5.1 43.517 10.52 46.24 16.29 47.99c1.3-1.74 2.45-3.6 3.43-5.53-1.87-.69-3.67-1.57-5.4-2.58.45-.33.9-.67 1.326-1 10.14 4.77 21.88 4.77 32.04 0 .43.35.87.69 1.326 1-1.73 1.02-3.54 1.88-5.42 2.59.985 1.93 2.13 3.79 3.43 5.53 5.77-1.74 11.19-4.45 16.03-8.02C64.37 26.33 60.81 14.51 53.65 4.04 49.49 2.13 45.1.78 40.59.03L40.575 0ZM21.14 32.71c-3.12 0-5.708-2.83-5.708-6.33 0-3.498 2.49-6.34 5.7-6.34s5.76 2.854 5.71 6.34c-.05 3.49-2.513 6.33-5.7 6.33Zm21.04 0c-3.13 0-5.7-2.83-5.7-6.33 0-3.498 2.49-6.34 5.7-6.34s5.75 2.854 5.7 6.34c-.05 3.49-2.513 6.33-5.7 6.33Z"
           fill="white"
         />
       </svg>
@@ -273,6 +286,9 @@ export function IntegrationsSection({
 
   const [editingId, setEditingId] = useState<Id<"orgWebhooks"> | null>(null);
   const [editGroups, setEditGroups] = useState<EventGroup[]>([]);
+  // Built once per render and probed once per event-group checkbox, rather
+  // than rescanned inside the loop that renders them.
+  const editGroupSet = new Set(editGroups);
   const [editAllProjects, setEditAllProjects] = useState(true);
   const [editProjectIds, setEditProjectIds] = useState<Id<"projects">[]>([]);
   const [savingId, setSavingId] = useState<Id<"orgWebhooks"> | null>(null);
@@ -281,25 +297,12 @@ export function IntegrationsSection({
   const [testingId, setTestingId] = useState<Id<"orgWebhooks"> | null>(null);
   const [togglingId, setTogglingId] = useState<Id<"orgWebhooks"> | null>(null);
 
-  const toggleGroup = (groups: EventGroup[], key: EventGroup): EventGroup[] =>
-    groups.includes(key)
-      ? groups.filter((group) => group !== key)
-      : [...groups, key];
-
-  const toggleProject = (
-    projectsInScope: Id<"projects">[],
-    projectId: Id<"projects">
-  ): Id<"projects">[] =>
-    projectsInScope.includes(projectId)
-      ? projectsInScope.filter((id) => id !== projectId)
-      : [...projectsInScope, projectId];
-
   const startConnect = async (provider: Provider) => {
     setConnectingProvider(provider);
     try {
       const response = await fetch(
         `/api/integrations/${provider}/start?organizationId=${encodeURIComponent(organizationId)}&format=json`,
-        { cache: "no-store" }
+        { method: "POST", cache: "no-store" }
       );
       const data = (await response.json().catch(() => null)) as {
         url?: unknown;
@@ -784,7 +787,7 @@ export function IntegrationsSection({
                               >
                                 <input
                                   type="checkbox"
-                                  checked={editGroups.includes(group.key)}
+                                  checked={editGroupSet.has(group.key)}
                                   onChange={() =>
                                     setEditGroups((current) =>
                                       toggleGroup(current, group.key)
@@ -919,6 +922,8 @@ function ProjectChecklist({
   if (projects.length === 0) {
     return <p className="mt-3 text-xs text-ink-subtle">No active projects.</p>;
   }
+  // Every row asks about the selection twice, so scan the list once.
+  const selectedIds = new Set(selected);
   return (
     <div className="mt-3 max-h-40 space-y-2 overflow-y-auto pr-2">
       {projects.map((project) => (
@@ -928,12 +933,12 @@ function ProjectChecklist({
         >
           <input
             type="checkbox"
-            checked={selected.includes(project._id)}
+            checked={selectedIds.has(project._id)}
             onChange={() => onToggle(project._id)}
             className="accent-accent"
           />
           <span className="truncate">{project.name}</span>
-          {selected.includes(project._id) && (
+          {selectedIds.has(project._id) && (
             <Check className="ml-auto h-3.5 w-3.5 text-accent" />
           )}
         </label>

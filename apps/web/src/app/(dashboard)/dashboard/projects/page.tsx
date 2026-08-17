@@ -10,6 +10,8 @@ import {
   useFavoriteProjects,
   useToggleFavorite,
 } from "@/hooks";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDate } from "@/lib/format";
 import { useAuthContext } from "@/components/auth";
 import type { Id } from "@convex/_generated/dataModel";
 import {
@@ -181,10 +183,12 @@ function ProjectCard({
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
 }) {
+  const timeZone = useTimeZone();
+
   return (
     <Link
       href={`/dashboard/projects/${project.slug}`}
-      className="group flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface/90 transition-all hover:border-accent-line hover:shadow-lg hover:shadow-accent-line"
+      className="group flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface/90 transition-[border-color,box-shadow] hover:border-accent-line hover:shadow-lg hover:shadow-accent-line"
     >
       <div className="flex items-center gap-2 border-b border-line bg-surface-raised/80 px-4 py-2">
         <div className="h-2.5 w-2.5 rounded-full bg-danger/80" />
@@ -227,7 +231,7 @@ function ProjectCard({
         )}
         <div className="mt-3 flex items-center text-xs text-ink-faint">
           <Clock className="mr-1.5 h-3 w-3" />
-          Created {new Date(project.createdAt).toLocaleDateString()}
+          Created {formatDate(project.createdAt, timeZone)}
         </div>
       </div>
     </Link>

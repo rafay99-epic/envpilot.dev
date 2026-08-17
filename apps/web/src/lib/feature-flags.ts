@@ -36,15 +36,6 @@ export function isFeatureEnabled(flag: FeatureFlag): boolean {
 }
 
 /**
- * Get all feature flag states
- */
-export function getFeatureFlagStates(): Record<FeatureFlag, boolean> {
-  return {
-    [FEATURE_FLAGS.PAYMENTS]: isFeatureEnabled(FEATURE_FLAGS.PAYMENTS),
-  };
-}
-
-/**
  * Client-safe feature flags (only includes NEXT_PUBLIC_ variables)
  * These can be safely exposed to the browser
  */

@@ -103,12 +103,15 @@ export function VariableCreateDrawer({
 
     // Summarize failures in user terms — duplicate keys are the common,
     // user-correctable case and get their own line instead of raw errors.
-    const duplicateKeys = failures
-      .filter((f) => /already exists/i.test(f.error))
-      .map((f) => f.key);
-    const otherFailures = failures.filter(
-      (f) => !/already exists/i.test(f.error)
-    );
+    // Partitioned in one pass. The chain walked `failures` three times and
+    // ran the same test twice per entry to answer both halves of it.
+    const isDuplicate = /already exists/i;
+    const duplicateKeys: string[] = [];
+    const otherFailures: typeof failures = [];
+    for (const failure of failures) {
+      if (isDuplicate.test(failure.error)) duplicateKeys.push(failure.key);
+      else otherFailures.push(failure);
+    }
     const parts: string[] = [];
     if (duplicateKeys.length > 0) {
       parts.push(

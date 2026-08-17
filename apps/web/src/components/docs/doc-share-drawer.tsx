@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -33,7 +33,9 @@ const TTL_OPTIONS = [
 ];
 
 const FIELD =
-  "w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-line bg-surface text-ink placeholder:text-ink-faint";
+  "w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-line bg-surface text-ink placeholder:text-ink-faint";
+// 16px on phones, or iOS zooms the viewport when the field takes focus.
+const FIELD_TEXT = "text-base sm:text-sm";
 const LABEL = "mb-1.5 block text-xs font-medium text-ink-muted";
 
 interface DocShareDrawerProps {
@@ -65,6 +67,13 @@ export function DocShareDrawer({
 }: DocShareDrawerProps) {
   const { user, organization } = useAuthContext();
   const orgId = organization?.id as Id<"organizations"> | undefined;
+
+  const uid = useId();
+  const scopeLabelId = `${uid}-scope`;
+  const recipientsLabelId = `${uid}-recipients`;
+  const linkFieldId = `${uid}-link`;
+  const emailFieldId = `${uid}-email`;
+  const passphraseFieldId = `${uid}-passphrase`;
 
   const access = useDocAccess(projectId);
   // Skipped while closed. The drawer stays mounted so AnimatePresence can play
@@ -114,6 +123,7 @@ export function DocShareDrawer({
       member.status !== "suspended" &&
       member.user.email.toLowerCase() !== selfEmail
   );
+  const selectedSet = new Set(selected);
 
   const reset = () => {
     setScope("page");
@@ -240,8 +250,14 @@ export function DocShareDrawer({
     <DrawerPanel isOpen={isOpen} onClose={close} title="Share page" width="lg">
       <div className="space-y-6">
         <div>
-          <label className={LABEL}>Sharing</label>
-          <div className="flex gap-2">
+          <div id={scopeLabelId} className={LABEL}>
+            Sharing
+          </div>
+          <div
+            role="group"
+            aria-labelledby={scopeLabelId}
+            className="flex gap-2"
+          >
             <button
               type="button"
               onClick={() => setScope("page")}
@@ -321,10 +337,14 @@ export function DocShareDrawer({
         {tab === "team" ? (
           <div className="space-y-4">
             <div>
-              <label className={LABEL}>
+              <div id={recipientsLabelId} className={LABEL}>
                 Who should read it ({selected.length} selected)
-              </label>
-              <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border p-1 border-line">
+              </div>
+              <div
+                role="group"
+                aria-labelledby={recipientsLabelId}
+                className="max-h-56 space-y-1 overflow-y-auto rounded-lg border p-1 border-line"
+              >
                 {members === undefined && (
                   <p className="px-2 py-3 text-xs text-ink-subtle">
                     Loading members…
@@ -342,7 +362,7 @@ export function DocShareDrawer({
                   >
                     <input
                       type="checkbox"
-                      checked={selected.includes(member.userId)}
+                      checked={selectedSet.has(member.userId)}
                       onChange={() => toggle(member.userId)}
                       className="h-3.5 w-3.5 accent-accent-hover"
                     />
@@ -403,12 +423,15 @@ export function DocShareDrawer({
           <div className="space-y-4">
             {linkUrl ? (
               <div>
-                <label className={LABEL}>Link</label>
+                <label className={LABEL} htmlFor={linkFieldId}>
+                  Link
+                </label>
                 <div className="flex gap-2">
                   <input
+                    id={linkFieldId}
                     readOnly
                     value={linkUrl}
-                    className={`${FIELD} font-mono text-xs`}
+                    className={`${FIELD} font-mono text-base sm:text-xs`}
                   />
                   <button
                     type="button"
@@ -435,13 +458,16 @@ export function DocShareDrawer({
               <>
                 <TtlPicker value={ttlMs} onChange={setTtlMs} />
                 <div>
-                  <label className={LABEL}>Email it to (optional)</label>
+                  <label className={LABEL} htmlFor={emailFieldId}>
+                    Email it to (optional)
+                  </label>
                   <input
+                    id={emailFieldId}
                     type="email"
                     value={recipientEmail}
                     onChange={(event) => setRecipientEmail(event.target.value)}
                     placeholder="person@example.com"
-                    className={FIELD}
+                    className={`${FIELD} ${FIELD_TEXT}`}
                   />
                 </div>
                 <div>
@@ -459,13 +485,17 @@ export function DocShareDrawer({
                   </label>
                   {usePassphrase && (
                     <>
+                      <label className="sr-only" htmlFor={passphraseFieldId}>
+                        Passphrase
+                      </label>
                       <input
+                        id={passphraseFieldId}
                         type="password"
                         value={passphrase}
                         onChange={(event) => setPassphrase(event.target.value)}
                         placeholder={`At least ${MIN_PASSPHRASE_LENGTH} characters`}
                         autoComplete="new-password"
-                        className={`${FIELD} mt-2`}
+                        className={`${FIELD} ${FIELD_TEXT} mt-2`}
                       />
                       <p className="mt-1.5 text-[11px] text-warning">
                         Give this to the reader yourself. It is deliberately
@@ -515,10 +545,13 @@ function TtlPicker({
   value: number;
   onChange: (value: number) => void;
 }) {
+  const labelId = useId();
   return (
     <div>
-      <label className={LABEL}>Access expires after</label>
-      <div className="flex gap-2">
+      <div id={labelId} className={LABEL}>
+        Access expires after
+      </div>
+      <div role="group" aria-labelledby={labelId} className="flex gap-2">
         {TTL_OPTIONS.map((option) => (
           <button
             key={option.value}
@@ -545,16 +578,20 @@ function NoteField({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const fieldId = useId();
   return (
     <div>
-      <label className={LABEL}>Note (optional)</label>
+      <label className={LABEL} htmlFor={fieldId}>
+        Note (optional)
+      </label>
       <input
+        id={fieldId}
         type="text"
         value={value}
         maxLength={280}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Why you are sending this"
-        className={FIELD}
+        className={`${FIELD} ${FIELD_TEXT}`}
       />
     </div>
   );

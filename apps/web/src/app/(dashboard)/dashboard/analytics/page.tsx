@@ -216,6 +216,8 @@ function AnalyticsPageContent() {
   );
 }
 
+const TIME_RANGES: TimeRange[] = [7, 30, 90];
+
 function Header({
   daysBack,
   setDaysBack,
@@ -225,8 +227,6 @@ function Header({
   setDaysBack: (v: TimeRange) => void;
   maxRetentionDays: number | null;
 }) {
-  const ranges: TimeRange[] = [7, 30, 90];
-
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="font-mono">
@@ -237,7 +237,7 @@ function Header({
       </div>
       <div className="flex items-center gap-2">
         <div className="flex gap-1 rounded-lg border border-line bg-surface/50 p-1">
-          {ranges.map((range) => {
+          {TIME_RANGES.map((range) => {
             const disabled =
               maxRetentionDays !== null && range > maxRetentionDays;
             return (

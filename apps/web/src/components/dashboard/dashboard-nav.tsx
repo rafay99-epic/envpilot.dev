@@ -379,6 +379,8 @@ export function DashboardNav() {
           <UserButton collapsed />
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isMobileMenuOpen}
             className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink"
           >
             {isMobileMenuOpen ? (
@@ -393,7 +395,9 @@ export function DashboardNav() {
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
-          <div
+          <button
+            type="button"
+            aria-label="Dismiss"
             className="fixed inset-0 bg-overlay"
             onClick={() => setIsMobileMenuOpen(false)}
           />

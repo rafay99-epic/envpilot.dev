@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useQuery, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { createLogger } from "@/lib/logger";
 import { PageHeader } from "@envpilot/ui";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDate } from "@/lib/format";
 
 const log = createLogger("app/dashboard/requests");
 
@@ -401,6 +403,8 @@ function RequestRow({
   onAccept: (environments: string[], suppliedValue?: string) => void;
   onReject: () => void;
 }) {
+  const timeZone = useTimeZone();
+  const suppliedValueFieldId = useId();
   const [isValueVisible, setIsValueVisible] = useState(false);
   // Reviewer's environment override, pre-selected to the requested set.
   const [selectedEnvironments, setSelectedEnvironments] = useState<string[]>(
@@ -504,14 +508,24 @@ function RequestRow({
       <td className="px-5 py-3">
         {!request.hasValue ? (
           isPending ? (
-            <input
-              type="password"
-              data-testid="request-value-input"
-              value={suppliedValue}
-              onChange={(e) => setSuppliedValue(e.target.value)}
-              placeholder="Enter the value to approve"
-              className="w-44 rounded-lg border border-line bg-surface px-2 py-1.5 font-mono text-xs text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none"
-            />
+            <>
+              {/* sr-only: this is one cell of a dense table whose column
+                  heading is the only room for a name. Naming the key keeps
+                  every row's field distinct. */}
+              <label htmlFor={suppliedValueFieldId} className="sr-only">
+                Value for {request.key}
+              </label>
+              <input
+                id={suppliedValueFieldId}
+                type="password"
+                data-testid="request-value-input"
+                value={suppliedValue}
+                onChange={(e) => setSuppliedValue(e.target.value)}
+                placeholder="Enter the value to approve"
+                // 16px on phones, or iOS zooms the viewport on focus.
+                className="w-44 rounded-lg border border-line bg-surface px-2 py-1.5 font-mono text-base text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none sm:text-xs"
+              />
+            </>
           ) : (
             <span className="text-xs text-ink-faint">
               value supplied at approval
@@ -553,7 +567,7 @@ function RequestRow({
 
       {/* Requested date */}
       <td className="whitespace-nowrap px-5 py-3 text-sm text-ink-subtle">
-        {new Date(request.createdAt).toLocaleDateString()}
+        {formatDate(request.createdAt, timeZone)}
       </td>
 
       {/* Actions (pending) or review info (resolved) */}
@@ -612,7 +626,7 @@ function RequestRow({
             )}
             {request.reviewedAt && (
               <span className="text-xs text-ink-faint">
-                {new Date(request.reviewedAt).toLocaleDateString()}
+                {formatDate(request.reviewedAt, timeZone)}
               </span>
             )}
             {request.reviewReason && (

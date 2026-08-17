@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FolderPlus } from "lucide-react";
@@ -14,6 +14,7 @@ import {
   sanitizeConvexError,
 } from "@/lib/error-messages";
 import { LimitWarning } from "@/components/tier/FeatureGate";
+import { createLogger } from "@/lib/logger";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import type { Id } from "@convex/_generated/dataModel";
@@ -36,6 +37,16 @@ import {
   toFrameworkIcon,
 } from "@/constants/framework-logos";
 
+const generateSlug = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 50);
+
+const log = createLogger("app/projects-new");
+
 export default function NewProjectPage() {
   const router = useRouter();
   const { canDo, organization } = useAuthContext();
@@ -57,27 +68,22 @@ export default function NewProjectPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
-
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .slice(0, 50);
-  };
+  // Read only inside the change handlers, never rendered, so a ref avoids a
+  // render per keystroke in the slug field.
+  const slugManuallyEdited = useRef(false);
+  const iconLabelId = useId();
+  const colorLabelId = useId();
 
   const handleNameChange = (name: string) => {
     setFormData((prev) => ({
       ...prev,
       name,
-      slug: slugManuallyEdited ? prev.slug : generateSlug(name),
+      slug: slugManuallyEdited.current ? prev.slug : generateSlug(name),
     }));
   };
 
   const handleSlugChange = (slug: string) => {
-    setSlugManuallyEdited(true);
+    slugManuallyEdited.current = true;
     setFormData((prev) => ({
       ...prev,
       slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, ""),
@@ -149,7 +155,14 @@ export default function NewProjectPage() {
               }),
             });
           } catch (err) {
-            console.error(`Failed to create variable ${variable.key}:`, err);
+            // Swallowed per variable so one failure does not abort the rest,
+            // but the user lands on a project quietly missing a variable, so
+            // it has to be reported somewhere.
+            log.error(
+              "template_variable_create_failed",
+              { projectId, key: variable.key },
+              err
+            );
           }
         }
       }
@@ -163,9 +176,12 @@ export default function NewProjectPage() {
           "You've reached the project limit on your current plan. Upgrade to Pro for unlimited projects."
         );
       } else setError(message);
-    } finally {
-      setIsSubmitting(false);
     }
+    // Cleared after the try/catch rather than in a finally block: React
+    // Compiler bails on any function whose try carries a finalizer. The catch
+    // swallows, and the one early return inside the try already clears the
+    // flag before it returns, so every path lands here or has handled it.
+    setIsSubmitting(false);
   };
 
   // Tier limit block
@@ -437,10 +453,17 @@ export default function NewProjectPage() {
                 <>
                   {/* Icon */}
                   <div>
-                    <label className="block text-xs font-medium text-ink-muted">
+                    <span
+                      id={iconLabelId}
+                      className="block text-xs font-medium text-ink-muted"
+                    >
                       Icon
-                    </label>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    </span>
+                    <div
+                      role="group"
+                      aria-labelledby={iconLabelId}
+                      className="mt-1.5 flex flex-wrap gap-1.5"
+                    >
                       {PROJECT_ICONS.map((icon) => (
                         <button
                           key={icon}
@@ -448,6 +471,8 @@ export default function NewProjectPage() {
                           onClick={() =>
                             setFormData((prev) => ({ ...prev, icon }))
                           }
+                          aria-label={icon}
+                          aria-pressed={formData.icon === icon}
                           className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
                             formData.icon === icon
                               ? "bg-accent-soft ring-1 ring-accent-line"
@@ -470,10 +495,17 @@ export default function NewProjectPage() {
 
                   {/* Color */}
                   <div>
-                    <label className="block text-xs font-medium text-ink-muted">
+                    <span
+                      id={colorLabelId}
+                      className="block text-xs font-medium text-ink-muted"
+                    >
                       Color
-                    </label>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    </span>
+                    <div
+                      role="group"
+                      aria-labelledby={colorLabelId}
+                      className="mt-1.5 flex flex-wrap gap-1.5"
+                    >
                       {PROJECT_COLORS.map((color) => (
                         <button
                           key={color}
@@ -481,6 +513,8 @@ export default function NewProjectPage() {
                           onClick={() =>
                             setFormData((prev) => ({ ...prev, color }))
                           }
+                          aria-label={color}
+                          aria-pressed={formData.color === color}
                           className={`h-7 w-7 rounded-lg transition-all ${
                             formData.color === color
                               ? "ring-2 ring-offset-1 ring-line"

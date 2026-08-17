@@ -256,20 +256,9 @@ jobs:
         # a Convex deployment. See convex/tsconfig.ci.json.
         run: bunx tsc --noEmit -p convex/tsconfig.ci.json
 
-  react-doctor:
-    name: React Doctor (advisory)
-    needs: changes
-    # Advisory-only → main pushes only (was every PR push; pure minutes burn).
-    if: |
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      needs.changes.outputs.run_web == 'true'
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
-      - name: Run react-doctor
-        run: bunx -y react-doctor@latest apps/web --yes --offline --fail-on none --score
+  # React Doctor lives in its own workflow now (react-doctor.yml). The job
+  # here scanned apps/web only, ran on main pushes only, and printed a bare
+  # score into the log — no PR comment, no inline findings, no other surface.
 
   # ------------------------------------------------------------------
   # Stage 2: the gate — the single required status check

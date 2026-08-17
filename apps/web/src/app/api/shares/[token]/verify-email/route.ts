@@ -8,7 +8,7 @@ import { sendShareOtpEmail } from "@/lib/share-emails";
 import { isRateLimitError } from "@/lib/error-messages";
 
 const verifyEmailSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
 });
 
 /**

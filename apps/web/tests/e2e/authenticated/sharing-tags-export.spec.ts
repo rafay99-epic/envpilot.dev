@@ -209,15 +209,14 @@ test.describe("sharing, tags, export — post-cleanup survival", () => {
         "generated share URL should carry the one-time token and decryption-key fragment"
       ).toMatch(/\/s\/[^#]+#.+/);
 
-      // No active-shares list to assert against here: components/variables/
-      // active-shares-list.tsx exists (exported from the barrel file) but is
-      // never rendered by ShareSecretDrawer or the project page — confirmed
-      // by grepping every usage in apps/web/src. There is currently no
-      // in-app way to view or revoke a variable share once generated.
+      // No active-shares list to assert against here. The unrendered
+      // ActiveSharesList component was deleted as dead code; the gap it
+      // stood for is still open, so there is no in-app way to view or
+      // revoke a variable share once it has been generated.
       test.info().annotations.push({
         type: "note",
         description:
-          "ActiveSharesList (apps/web/src/components/variables/active-shares-list.tsx) is dead code for variables — not wired into ShareSecretDrawer or the project page, so a generated share can't be viewed/revoked from the UI. Not asserted here; see the produced audit report.",
+          "No UI exists to view or revoke a generated variable share. ActiveSharesList was never wired into ShareSecretDrawer or the project page and has been deleted; building the real surface is still outstanding.",
       });
 
       await shareDrawer.getByRole("button", { name: "Done" }).click();

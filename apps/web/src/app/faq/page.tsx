@@ -1,3 +1,4 @@
+import { jsonLdScript } from "@envpilot/ui";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { MarketingShell, PageHero, terminal } from "@/components/marketing";
@@ -214,7 +215,7 @@ export default function FAQPage() {
     <MarketingShell>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(faqSchema) }}
       />
       <PageHero
         eyebrow="faq"

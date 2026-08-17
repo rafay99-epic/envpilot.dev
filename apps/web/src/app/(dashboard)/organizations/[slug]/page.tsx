@@ -9,8 +9,11 @@ import type { Id } from "@convex/_generated/dataModel";
 import { Building2 } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateWith } from "@/lib/format";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { useOrganizationBySlug, useOrganizationMemberCount } from "@/hooks";
+import { OrgLogo } from "@/components/shared/org-logo";
 import {
   normalizeOrgRole,
   roleLabel,
@@ -28,6 +31,7 @@ export default function OrganizationPage({
   const { slug } = use(params);
   const router = useRouter();
   const organization = useOrganizationBySlug(slug);
+  const timeZone = useTimeZone();
   const memberCount = useOrganizationMemberCount(organization?._id) ?? 0;
 
   const tierData = useQuery(
@@ -90,9 +94,10 @@ export default function OrganizationPage({
         // The org's own logo (or its initial) — identity, not decoration.
         leading={
           organization.logoUrl ? (
-            <img
+            <OrgLogo
               src={organization.logoUrl}
               alt={organization.name}
+              size={40}
               className="h-10 w-10 shrink-0 rounded-lg object-cover"
             />
           ) : (
@@ -135,7 +140,7 @@ export default function OrganizationPage({
         {isTeamLeadPlus && (
           <Link
             href={`/organizations/${slug}/members`}
-            className="group flex items-center gap-4 rounded-xl border p-6 transition-all hover:shadow-md border-line bg-surface hover:border-line"
+            className="group flex items-center gap-4 rounded-xl border p-6 transition-shadow hover:shadow-md border-line bg-surface hover:border-line"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-info-soft text-info">
               <svg
@@ -177,7 +182,7 @@ export default function OrganizationPage({
         {isOwner && (
           <Link
             href={`/organizations/${slug}/settings`}
-            className="group flex items-center gap-4 rounded-xl border p-6 transition-all hover:shadow-md border-line bg-surface hover:border-line"
+            className="group flex items-center gap-4 rounded-xl border p-6 transition-shadow hover:shadow-md border-line bg-surface hover:border-line"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-surface-raised text-ink-muted">
               <svg
@@ -227,7 +232,7 @@ export default function OrganizationPage({
             router.push("/dashboard/projects");
             router.refresh();
           }}
-          className="group flex items-center gap-4 rounded-xl border p-6 text-left transition-all hover:shadow-md border-line bg-surface hover:border-line"
+          className="group flex items-center gap-4 rounded-xl border p-6 text-left transition-shadow hover:shadow-md border-line bg-surface hover:border-line"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-accent-soft text-accent">
             <svg
@@ -271,11 +276,11 @@ export default function OrganizationPage({
           <div className="flex justify-between border-b pb-4 border-line">
             <dt className="text-sm text-ink-muted">Created</dt>
             <dd className="text-sm text-ink">
-              {new Date(organization.createdAt).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              {formatDateWith(
+                organization.createdAt,
+                { year: "numeric", month: "long", day: "numeric" },
+                timeZone
+              )}
             </dd>
           </div>
           <div className="flex justify-between border-b pb-4 border-line">
@@ -287,11 +292,11 @@ export default function OrganizationPage({
           <div className="flex justify-between">
             <dt className="text-sm text-ink-muted">Last Updated</dt>
             <dd className="text-sm text-ink">
-              {new Date(organization.updatedAt).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              {formatDateWith(
+                organization.updatedAt,
+                { year: "numeric", month: "long", day: "numeric" },
+                timeZone
+              )}
             </dd>
           </div>
         </dl>

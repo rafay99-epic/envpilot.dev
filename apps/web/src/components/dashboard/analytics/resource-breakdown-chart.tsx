@@ -40,15 +40,24 @@ interface ResourceBreakdownChartProps {
 export function ResourceBreakdownChart({
   resourceTypeCounts,
 }: ResourceBreakdownChartProps) {
-  const data = Object.entries(resourceTypeCounts)
-    .filter(([, count]) => count > 0)
-    .map(([type, count]) => ({
+  // Skip-and-shape in one pass: the chain allocated a filtered array of
+  // entries before building the slices it actually renders.
+  const data: {
+    type: string;
+    label: string;
+    count: number;
+    fill: string;
+  }[] = [];
+  for (const [type, count] of Object.entries(resourceTypeCounts)) {
+    if (count <= 0) continue;
+    data.push({
       type,
       label: RESOURCE_LABELS[type] ?? type,
       count,
       fill: RESOURCE_COLORS[type] ?? "#71717a",
-    }))
-    .sort((a, b) => b.count - a.count);
+    });
+  }
+  data.sort((a, b) => b.count - a.count);
 
   const chartConfig: ChartConfig = {};
   for (const item of data) {

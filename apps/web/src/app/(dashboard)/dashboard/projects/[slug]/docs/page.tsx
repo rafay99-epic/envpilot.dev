@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { BookText, Plus, FileText, Clock, Search, Trash2 } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
@@ -18,6 +18,8 @@ import {
   groupDocsByModule,
   type DocSummary,
 } from "@/hooks";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDate } from "@/lib/format";
 
 /** Mirrors SEARCH_LIMIT in convex/features/docs/queries.ts. */
 const SEARCH_LIMIT = 20;
@@ -61,6 +63,7 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
   const showNew = access ? access.canCreate && !atLimit : true;
   const isLoadingDocs = docs === undefined;
 
+  const filterFieldId = useId();
   const [filter, setFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -156,14 +159,22 @@ export default function ProjectDocsPage({ params }: DocsPageProps) {
 
         {allDocs.length > 0 && (
           <div className="relative max-w-md">
+            {/* sr-only: the field is a bare search box whose icon and result
+                counter already occupy its gutters — a visible label would add
+                a line the layout does not have room for. */}
+            <label htmlFor={filterFieldId} className="sr-only">
+              Search pages
+            </label>
             <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
             <input
+              id={filterFieldId}
               type="search"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               data-testid="doc-filter"
               placeholder="Search titles and page text…"
-              className="w-full rounded-lg border border-white/10 bg-white/[0.03] py-2 pr-20 pl-9 text-sm text-ink transition-colors outline-none placeholder:text-ink-subtle focus:border-accent-line focus:bg-white/[0.05]"
+              // 16px on phones, or iOS zooms the viewport on focus.
+              className="w-full rounded-lg border border-white/10 bg-white/[0.03] py-2 pr-20 pl-9 text-base text-ink transition-colors outline-none placeholder:text-ink-subtle focus:border-accent-line focus:bg-white/[0.05] sm:text-sm"
             />
             <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 font-mono text-[10px] text-ink-subtle">
               {isSearching
@@ -218,6 +229,8 @@ function DocRow({
   doc: DocSummary & { matchedBody?: boolean };
   projectSlug: string;
 }) {
+  const timeZone = useTimeZone();
+
   return (
     <Link
       href={`/dashboard/projects/${projectSlug}/docs/${doc.slug}`}
@@ -253,7 +266,7 @@ function DocRow({
       </div>
       <span className="hidden shrink-0 items-center gap-1 text-[11px] text-ink-muted sm:flex">
         <Clock className="h-3 w-3" />
-        {new Date(doc.updatedAt).toLocaleDateString()}
+        {formatDate(doc.updatedAt, timeZone)}
       </span>
     </Link>
   );

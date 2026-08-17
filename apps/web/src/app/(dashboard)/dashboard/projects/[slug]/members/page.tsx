@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use } from "react";
+import { useId, useState, use } from "react";
 import Link from "next/link";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
@@ -18,12 +18,12 @@ import { sanitizeConvexError } from "@/lib/error-messages";
 import { DrawerPanel } from "@/components/ui";
 import { PageHeader } from "@envpilot/ui";
 import type { Id } from "@convex/_generated/dataModel";
+import { EnvironmentScopeSelector } from "@/components/members/environment-scope-selector";
 import {
-  EnvironmentScopeSelector,
   allEnvironments,
   formatEnvironmentScope,
   scopeToPayload,
-} from "@/components/members/environment-scope-selector";
+} from "@/components/members/environment-scope";
 import {
   normalizeOrgRole,
   roleLevel,
@@ -128,13 +128,14 @@ export default function ProjectMembersPage({
   const [showAddMember, setShowAddMember] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const memberSelectId = useId();
   // Environment scope for developers being added — all checked = unrestricted.
-  const [addEnvScope, setAddEnvScope] = useState<string[]>(allEnvironments());
+  const [addEnvScope, setAddEnvScope] = useState<string[]>(allEnvironments);
 
   // Edit environment scope for an existing developer member
   const [editingScopeMember, setEditingScopeMember] =
     useState<ProjectMember | null>(null);
-  const [editEnvScope, setEditEnvScope] = useState<string[]>(allEnvironments());
+  const [editEnvScope, setEditEnvScope] = useState<string[]>(allEnvironments);
   const [isSavingScope, setIsSavingScope] = useState(false);
 
   // Gates from the actor's org role: strictly-below management. The caller's
@@ -465,8 +466,14 @@ export default function ProjectMembersPage({
         <form onSubmit={handleAddMember} className="mt-6 space-y-4">
           {/* User selection */}
           <div>
-            <label className="block text-sm font-medium text-ink">Member</label>
+            <label
+              htmlFor={memberSelectId}
+              className="block text-sm font-medium text-ink"
+            >
+              Member
+            </label>
             <select
+              id={memberSelectId}
               value={selectedUserId}
               onChange={(e) => setSelectedUserId(e.target.value)}
               required

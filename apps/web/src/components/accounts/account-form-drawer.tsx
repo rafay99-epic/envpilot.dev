@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { DrawerPanel } from "@/components/ui/drawer-panel";
 import {
@@ -46,49 +46,89 @@ export function AccountFormDrawer({
 }: AccountFormDrawerProps) {
   const isEditing = !!account;
 
-  const [name, setName] = useState("");
-  const [websiteUrl, setWebsiteUrl] = useState("");
+  // Submitting belongs to the request, not to the account being edited, so it
+  // stays out here with the panel it locks.
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Promise.finally rather than a finally block: React Compiler cannot lower
+  // a try statement with a finalizer, and it bails on the whole component
+  // when it hits one, so the component loses automatic memoization.
+  const handleSubmit = (data: AccountFormData) => {
+    setIsSubmitting(true);
+    return onSubmit(data).finally(() => setIsSubmitting(false));
+  };
+
+  return (
+    <DrawerPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title={title ?? (isEditing ? "Edit Account" : "Add Account")}
+      preventClose={isSubmitting}
+      width="lg"
+    >
+      {/* The panel unmounts its children while closed and the key restarts the
+          form when the drawer is pointed at another account, so the fields
+          start from the account instead of being copied into state by an
+          effect that renders one stale frame first. */}
+      <AccountForm
+        key={account?._id ?? "new"}
+        account={account ?? null}
+        onRevealCredentials={onRevealCredentials}
+        onSubmit={handleSubmit}
+        onCancel={onClose}
+        isSubmitting={isSubmitting}
+        submitLabel={submitLabel}
+      />
+    </DrawerPanel>
+  );
+}
+
+interface AccountFormProps {
+  account: Account | null;
+  onRevealCredentials?: () => Promise<AccountVaultPayload | null>;
+  onSubmit: (data: AccountFormData) => Promise<void>;
+  onCancel: () => void;
+  isSubmitting: boolean;
+  submitLabel?: string;
+}
+
+function AccountForm({
+  account,
+  onRevealCredentials,
+  onSubmit,
+  onCancel,
+  isSubmitting,
+  submitLabel,
+}: AccountFormProps) {
+  const isEditing = !!account;
+  const accountId = account?._id;
+  // Names the environment toggle group, which has no single input to label.
+  const environmentsLabelId = useId();
+
+  const [name, setName] = useState(account?.name ?? "");
+  const [websiteUrl, setWebsiteUrl] = useState(account?.websiteUrl ?? "");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [description, setDescription] = useState("");
-  const [environments, setEnvironments] = useState<Environment[]>([
-    "development",
-  ]);
+  const [description, setDescription] = useState(account?.description ?? "");
+  const [environments, setEnvironments] = useState<Environment[]>(
+    (account?.environments as Environment[] | undefined) ?? ["development"]
+  );
 
   const [showPassword, setShowPassword] = useState(false);
-  const [credentialsDirty, setCredentialsDirty] = useState(false);
-  const [isPrefilling, setIsPrefilling] = useState(false);
+  // Read only by submit, never by render, so a ref avoids a render on the first
+  // credential keystroke.
+  const credentialsDirty = useRef(false);
+  // The prefill starts with the mount, so the fields read as loading on the
+  // first frame instead of flashing as editable and then locking.
+  const [isPrefilling, setIsPrefilling] = useState(
+    !!account && !!onRevealCredentials
+  );
   const [prefillFailed, setPrefillFailed] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset / hydrate form whenever the drawer opens (or the target changes).
-  useEffect(() => {
-    if (!isOpen) return;
-
-    setError(null);
-    setShowPassword(false);
-    setCredentialsDirty(false);
-    setPrefillFailed(false);
-    setUsername("");
-    setPassword("");
-
-    if (account) {
-      setName(account.name);
-      setWebsiteUrl(account.websiteUrl ?? "");
-      setDescription(account.description ?? "");
-      setEnvironments(account.environments as Environment[]);
-    } else {
-      setName("");
-      setWebsiteUrl("");
-      setDescription("");
-      setEnvironments(["development"]);
-    }
-  }, [isOpen, account]);
-
   // Keep the latest reveal function in a ref so the prefill effect can depend
-  // only on [isOpen, account] — otherwise an unstable prop identity would
-  // cancel the in-flight fetch and re-fire the audit log on every render.
+  // on the account alone — otherwise an unstable prop identity would cancel
+  // the in-flight fetch and re-fire the audit log on every render.
   const revealRef = useRef(onRevealCredentials);
   useEffect(() => {
     revealRef.current = onRevealCredentials;
@@ -96,13 +136,11 @@ export function AccountFormDrawer({
 
   // Prefill credentials in edit mode via the reveal function (once per open).
   useEffect(() => {
-    if (!isOpen || !account) return;
+    if (!accountId) return;
     const reveal = revealRef.current;
     if (!reveal) return;
     let cancelled = false;
 
-    setIsPrefilling(true);
-    setPrefillFailed(false);
     reveal()
       .then((creds) => {
         if (cancelled) return;
@@ -126,7 +164,7 @@ export function AccountFormDrawer({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, account]);
+  }, [accountId]);
 
   const toggleEnvironment = (env: Environment) => {
     setEnvironments((prev) =>
@@ -152,7 +190,7 @@ export function AccountFormDrawer({
     }
 
     // Credentials are required on create; on edit they only matter when changed.
-    const credentialsChanged = !isEditing || credentialsDirty;
+    const credentialsChanged = !isEditing || credentialsDirty.current;
     if (credentialsChanged) {
       if (!username.trim() || !password.trim()) {
         setError(
@@ -164,7 +202,6 @@ export function AccountFormDrawer({
       }
     }
 
-    setIsSubmitting(true);
     try {
       await onSubmit({
         name: name.trim(),
@@ -177,195 +214,194 @@ export function AccountFormDrawer({
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   return (
-    <DrawerPanel
-      isOpen={isOpen}
-      onClose={onClose}
-      title={title ?? (isEditing ? "Edit Account" : "Add Account")}
-      preventClose={isSubmitting}
-      width="lg"
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="rounded-lg p-3 text-sm bg-danger-soft text-danger">
-            {error}
-          </div>
-        )}
-
-        {/* Name */}
-        <div>
-          <label
-            htmlFor="account-name"
-            className="block text-sm font-medium text-ink-muted"
-          >
-            Name <span className="text-danger">*</span>
-          </label>
-          <input
-            id="account-name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Stripe Dashboard"
-            className="mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
-          />
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <div className="rounded-lg p-3 text-sm bg-danger-soft text-danger">
+          {error}
         </div>
+      )}
 
-        {/* Website URL */}
-        <div>
-          <label
-            htmlFor="account-url"
-            className="block text-sm font-medium text-ink-muted"
-          >
-            Website URL <span className="text-ink-muted">(optional)</span>
-          </label>
-          <input
-            id="account-url"
-            type="url"
-            value={websiteUrl}
-            onChange={(e) => setWebsiteUrl(e.target.value)}
-            placeholder="https://dashboard.stripe.com"
-            className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
-          />
-        </div>
+      {/* Name */}
+      <div>
+        <label
+          htmlFor="account-name"
+          className="block text-sm font-medium text-ink-muted"
+        >
+          Name <span className="text-danger">*</span>
+        </label>
+        <input
+          id="account-name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Stripe Dashboard"
+          className="mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+        />
+      </div>
 
-        {/* Username */}
-        <div>
-          <label
-            htmlFor="account-username"
-            className="block text-sm font-medium text-ink-muted"
-          >
-            Username / Email{" "}
-            {!isEditing && <span className="text-danger">*</span>}
-          </label>
+      {/* Website URL */}
+      <div>
+        <label
+          htmlFor="account-url"
+          className="block text-sm font-medium text-ink-muted"
+        >
+          Website URL <span className="text-ink-muted">(optional)</span>
+        </label>
+        <input
+          id="account-url"
+          type="url"
+          value={websiteUrl}
+          onChange={(e) => setWebsiteUrl(e.target.value)}
+          placeholder="https://dashboard.stripe.com"
+          className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+        />
+      </div>
+
+      {/* Username */}
+      <div>
+        <label
+          htmlFor="account-username"
+          className="block text-sm font-medium text-ink-muted"
+        >
+          Username / Email{" "}
+          {!isEditing && <span className="text-danger">*</span>}
+        </label>
+        <input
+          id="account-username"
+          type="text"
+          value={username}
+          onChange={(e) => {
+            setUsername(e.target.value);
+            credentialsDirty.current = true;
+          }}
+          disabled={isPrefilling}
+          placeholder={isPrefilling ? "Loading…" : "user@example.com"}
+          className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
+        />
+      </div>
+
+      {/* Password */}
+      <div>
+        <label
+          htmlFor="account-password"
+          className="block text-sm font-medium text-ink-muted"
+        >
+          Password {!isEditing && <span className="text-danger">*</span>}
+        </label>
+        <div className="relative mt-1">
           <input
-            id="account-username"
-            type="text"
-            value={username}
+            id="account-password"
+            type={showPassword ? "text" : "password"}
+            value={password}
             onChange={(e) => {
-              setUsername(e.target.value);
-              setCredentialsDirty(true);
+              setPassword(e.target.value);
+              credentialsDirty.current = true;
             }}
             disabled={isPrefilling}
-            placeholder={isPrefilling ? "Loading…" : "user@example.com"}
-            className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
+            placeholder={isPrefilling ? "Loading…" : "••••••••"}
+            className="block w-full rounded-lg border px-4 py-2 pr-10 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
           />
-        </div>
-
-        {/* Password */}
-        <div>
-          <label
-            htmlFor="account-password"
-            className="block text-sm font-medium text-ink-muted"
-          >
-            Password {!isEditing && <span className="text-danger">*</span>}
-          </label>
-          <div className="relative mt-1">
-            <input
-              id="account-password"
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setCredentialsDirty(true);
-              }}
-              disabled={isPrefilling}
-              placeholder={isPrefilling ? "Loading…" : "••••••••"}
-              className="block w-full rounded-lg border px-4 py-2 pr-10 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-muted hover:text-ink-muted"
-              tabIndex={-1}
-            >
-              {showPassword ? (
-                <EyeOff className="h-5 w-5" />
-              ) : (
-                <Eye className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-          {isEditing && !prefillFailed && (
-            <p className="mt-1 text-xs text-ink-muted">
-              Editing either field rewrites the stored credentials.
-            </p>
-          )}
-          {isEditing && prefillFailed && (
-            <p className="mt-1 text-xs text-warning">
-              Could not load existing credentials. Enter both fields to replace
-              them, or leave blank to keep the current values.
-            </p>
-          )}
-        </div>
-
-        {/* Description */}
-        <div>
-          <label
-            htmlFor="account-description"
-            className="block text-sm font-medium text-ink-muted"
-          >
-            Description <span className="text-ink-muted">(optional)</span>
-          </label>
-          <textarea
-            id="account-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="What this account is used for…"
-            rows={2}
-            className="mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
-          />
-        </div>
-
-        {/* Environments */}
-        <div>
-          <label className="block text-sm font-medium text-ink-muted">
-            Environments <span className="text-danger">*</span>
-          </label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {ENVIRONMENTS.map((env) => (
-              <button
-                key={env}
-                type="button"
-                onClick={() => toggleEnvironment(env as Environment)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${envToggleClasses(
-                  env as Environment,
-                  environments.includes(env as Environment)
-                )}`}
-              >
-                {env}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-3 pt-4">
           <button
             type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
+            onClick={() => setShowPassword((prev) => !prev)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-muted hover:text-ink-muted"
+            tabIndex={-1}
           >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting || isPrefilling}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
-          >
-            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isSubmitting
-              ? "Saving…"
-              : (submitLabel ??
-                (isEditing ? "Save Changes" : "Create Account"))}
+            {showPassword ? (
+              <EyeOff className="h-5 w-5" />
+            ) : (
+              <Eye className="h-5 w-5" />
+            )}
           </button>
         </div>
-      </form>
-    </DrawerPanel>
+        {isEditing && !prefillFailed && (
+          <p className="mt-1 text-xs text-ink-muted">
+            Editing either field rewrites the stored credentials.
+          </p>
+        )}
+        {isEditing && prefillFailed && (
+          <p className="mt-1 text-xs text-warning">
+            Could not load existing credentials. Enter both fields to replace
+            them, or leave blank to keep the current values.
+          </p>
+        )}
+      </div>
+
+      {/* Description */}
+      <div>
+        <label
+          htmlFor="account-description"
+          className="block text-sm font-medium text-ink-muted"
+        >
+          Description <span className="text-ink-muted">(optional)</span>
+        </label>
+        <textarea
+          id="account-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="What this account is used for…"
+          rows={2}
+          className="mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+        />
+      </div>
+
+      {/* Environments */}
+      <div>
+        {/* A span, not a <label>: this names the toggle group below, not one
+            input. */}
+        <span
+          id={environmentsLabelId}
+          className="block text-sm font-medium text-ink-muted"
+        >
+          Environments <span className="text-danger">*</span>
+        </span>
+        <div
+          role="group"
+          aria-labelledby={environmentsLabelId}
+          className="mt-2 flex flex-wrap gap-2"
+        >
+          {ENVIRONMENTS.map((env) => (
+            <button
+              key={env}
+              type="button"
+              onClick={() => toggleEnvironment(env as Environment)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${envToggleClasses(
+                env as Environment,
+                environments.includes(env as Environment)
+              )}`}
+            >
+              {env}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-end gap-3 pt-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isSubmitting}
+          className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 text-ink-muted hover:bg-surface-hover"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={isSubmitting || isPrefilling}
+          className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
+        >
+          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+          {isSubmitting
+            ? "Saving…"
+            : (submitLabel ?? (isEditing ? "Save Changes" : "Create Account"))}
+        </button>
+      </div>
+    </form>
   );
 }

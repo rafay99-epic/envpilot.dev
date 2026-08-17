@@ -66,29 +66,11 @@ export function useAssignableAccountMembers(
   );
 }
 
-/** Non-throwing check of whether the caller can manage this account's grants. */
-export function useCanManageAccountPermissions(
-  accountId: Id<"projectAccounts"> | undefined,
-  userId: Id<"users"> | undefined
-) {
-  return useQuery(
-    convexApi.features.permissions.accountPermissions.queries
-      .canManageAccountPermissions,
-    accountId && userId ? { accountId, userId } : "skip"
-  );
-}
-
 /* ─── Permission mutations (direct Convex, no Vault) ────────────────── */
 
 export function useGrantAccountPermission() {
   return useConvexMutation(
     convexApi.features.permissions.accountPermissions.mutations.grant
-  );
-}
-
-export function useUpdateAccountPermission() {
-  return useConvexMutation(
-    convexApi.features.permissions.accountPermissions.mutations.update
   );
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "envpilot-monorepo",
-  "version": "1.50.0",
+  "version": "1.51.0",
   "private": true,
   "description": "Envpilot — secure environment variable management for teams",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
@@ -16,7 +16,9 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently --names web,convex,admin,blog,docs --prefix-colors blue,green,magenta,cyan,yellow \"turbo dev --filter=@envpilot/web\" \"convex dev\" \"turbo dev --filter=@envpilot/admin\" \"turbo dev --filter=@envpilot/blog\" \"turbo dev --filter=@envpilot/docs\"",
+    "dev": "./scripts/dev.sh",
+    "dev:web": "./scripts/dev.sh web",
+    "dev:all": "concurrently --names web,convex,admin,blog,docs --prefix-colors blue,green,magenta,cyan,yellow \"turbo dev --filter=@envpilot/web\" \"convex dev\" \"turbo dev --filter=@envpilot/admin\" \"turbo dev --filter=@envpilot/blog\" \"turbo dev --filter=@envpilot/docs\"",
     "dev:local": "./scripts/dev-local.sh",
     "dev:cli": "turbo dev --filter=@envpilot/cli",
     "dev:admin": "turbo dev --filter=@envpilot/admin",

@@ -1,3 +1,4 @@
+import { jsonLdScript } from "@envpilot/ui";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { convex } from "@/lib/convex-client";
@@ -76,7 +77,7 @@ export default async function PricingPage() {
     <MarketingShell>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(faqSchema) }}
       />
       <PageHero
         eyebrow="pricing"

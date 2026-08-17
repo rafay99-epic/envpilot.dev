@@ -18,6 +18,8 @@ import {
   useResolveVariableRequest,
 } from "@/hooks";
 import { createLogger } from "@/lib/logger";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateTimeShort } from "@/lib/format";
 
 const log = createLogger("app/dashboard/project-requests");
 
@@ -51,12 +53,7 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
   const [error, setError] = useState<string | null>(null);
 
   const requestPagination = usePagination(requests, { pageSize: 10 });
-
-  const formatDate = (timestamp: number) =>
-    new Intl.DateTimeFormat("en-US", {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(new Date(timestamp));
+  const timeZone = useTimeZone();
 
   const handleCancel = async (requestId: Id<"environmentVariableRequests">) => {
     if (!projectId || !convexUserId) return;
@@ -198,7 +195,7 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                             </span>
                           )}
                           {" · "}
-                          {formatDate(request.createdAt)}
+                          {formatDateTimeShort(request.createdAt, timeZone)}
                         </p>
                         {request.description && (
                           <p className="mt-2 text-sm text-ink-muted">

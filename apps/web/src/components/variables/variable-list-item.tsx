@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { Id } from "@convex/_generated/dataModel";
 import { Eye, EyeOff, Copy, Check, Loader2, Share2 } from "lucide-react";
 import { TagBadge } from "./tag-badge";
+import { formatDateTimeShort } from "@/lib/format";
+import { useTimeZone } from "@/hooks/useTimeZone";
 
 interface Variable {
   _id: Id<"environmentVariables">;
@@ -57,13 +59,7 @@ export function VariableListItem({
 }: VariableListItemProps) {
   const [isValueVisible, setIsValueVisible] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  const formatDate = (timestamp: number) => {
-    return new Intl.DateTimeFormat("en-US", {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(new Date(timestamp));
-  };
+  const timeZone = useTimeZone();
 
   const handleToggleReveal = () => {
     if (!revealedValue && !isRevealing && onReveal) {
@@ -92,14 +88,15 @@ export function VariableListItem({
       <div className="flex items-center justify-between">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           {showCheckbox && (
-            <label className="mt-1 flex cursor-pointer items-center">
+            <div className="mt-1 flex items-center">
               <input
                 type="checkbox"
                 checked={isSelected}
                 onChange={onToggleSelect}
-                className="h-4 w-4"
+                aria-label={`Select ${variable.key}`}
+                className="h-4 w-4 cursor-pointer"
               />
-            </label>
+            </div>
           )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-3">
@@ -152,7 +149,7 @@ export function VariableListItem({
                 ))}
               </div>
               <span className="text-xs text-ink-subtle">
-                Updated {formatDate(variable.updatedAt)}
+                Updated {formatDateTimeShort(variable.updatedAt, timeZone)}
               </span>
             </div>
           </div>

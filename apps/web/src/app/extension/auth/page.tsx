@@ -13,6 +13,10 @@ function ExtensionAuthContent() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    // A second token would otherwise race the first response into state and
+    // report the wrong outcome for the session the user is actually on.
+    let cancelled = false;
+
     async function completeAuth() {
       if (!sessionToken) {
         setStatus("error");
@@ -30,22 +34,29 @@ function ExtensionAuthContent() {
         );
 
         if (response.ok) {
+          if (cancelled) return;
           setStatus("success");
           setMessage(
             "Authentication successful! You can now close this window and return to your editor."
           );
         } else {
           const data = await response.json();
+          if (cancelled) return;
           setStatus("error");
           setMessage(data.error || "Authentication failed");
         }
       } catch (err) {
+        if (cancelled) return;
         setStatus("error");
         setMessage(err instanceof Error ? err.message : "An error occurred");
       }
     }
 
     completeAuth();
+
+    return () => {
+      cancelled = true;
+    };
   }, [sessionToken]);
 
   return (

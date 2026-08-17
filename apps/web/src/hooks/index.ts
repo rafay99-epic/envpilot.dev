@@ -3,7 +3,6 @@ export {
   useUserOrganizations,
   useCurrentUserOrganizations,
   useCreateOrganization,
-  useOrganization,
   useOrganizationBySlug,
   useOrganizationMembers,
   useOrganizationMemberCount,
@@ -12,13 +11,7 @@ export {
 } from "./useOrganizations";
 
 // Project hooks
-export {
-  useOrganizationProjects,
-  useOrganizationProjectsWithStats,
-  useProject,
-  useUserProjects,
-  useProjectBySlug,
-} from "./useProjects";
+export { useOrganizationProjects, useProjectBySlug } from "./useProjects";
 export { useAutoPageSize } from "./useAutoPageSize";
 export {
   useCreateProject,
@@ -28,28 +21,11 @@ export {
 } from "./useProjectActions";
 
 // Variable hooks
-export {
-  useProjectVariables,
-  useVariable,
-  useVariableHistory,
-  useVariablesWithAccess,
-} from "./useVariables";
-
-// Permission hooks
-export {
-  useVariablePermissions,
-  useUserPermissions,
-  useCheckPermission,
-  usePermissionHistory,
-  useUsersWithProjectAccess,
-  useCanManageVariablePermissions,
-  useAssignableMembers,
-} from "./usePermissions";
+export { useVariableHistory } from "./useVariables";
 
 // Dashboard hooks (simplified wrappers)
 export {
   useProjects,
-  useVariables,
   useDashboardStats,
   useRecentActivity,
   useRecentProjects,
@@ -63,9 +39,7 @@ export {
   useAccounts,
   useAccountGrants,
   useAssignableAccountMembers,
-  useCanManageAccountPermissions,
   useGrantAccountPermission,
-  useUpdateAccountPermission,
   useRevokeAccountPermission,
   useCreateAccount,
   useUpdateAccount,
@@ -78,37 +52,20 @@ export {
 export {
   useFeatureRequests,
   usePlannedFeatures,
-  useFeatureRequest,
   useFeatureCategories,
-  useHasVoted,
   useFeatureRequestMutations,
-  useAdminFeatureRequestMutations,
 } from "./useFeatureRequests";
-
-// Changelog hooks
-export {
-  useChangelogEntries,
-  useChangelogEntry,
-  useChangelogByVersion,
-  useChangelogByType,
-  useChangelogVersions,
-} from "./useChangelog";
 
 // Tier limits hooks and utilities
 export {
   useTierLimitCheck,
-  // Utility functions (kept with "use" prefix for backwards compatibility)
-  useLimitDescription,
-  useLimitPercentage,
-  // Properly named utility functions
-  getLimitDescription,
   calculateLimitPercentage,
   type Tier,
   type TierAction,
 } from "./useTierLimits";
 
 // Dynamic feature gate hooks (new — preferred)
-export { useFeatureGate, useUserTier, useAllFeatures } from "./useFeatureGate";
+export { useFeatureGate, useAllFeatures } from "./useFeatureGate";
 
 // Global search hook
 export { useGlobalSearch } from "./useGlobalSearch";
@@ -122,7 +79,6 @@ export { useConvexUser } from "./useConvexUser";
 // Project members hooks
 export {
   useProjectMembers,
-  useProjectMembership,
   useAssignableProjectMembers,
   useProjectMemberActions,
 } from "./useProjectMembers";
@@ -150,40 +106,22 @@ export {
 } from "./useVariableRequests";
 
 // Audit log hooks
-export {
-  useOrganizationAuditLogs,
-  useOrganizationAuditLogCount,
-  useProjectAuditLogs,
-  useVariableAuditLogs,
-  useSecurityEvents,
-  useSensitiveDataAccess,
-  usePermissionChanges,
-  useAuditLogSummary,
-  useComplianceReport,
-  useRecentAlerts,
-  useAlertCount,
-  useAuditLogsByTimeRange,
-  useAuditLogsForExport,
-  useAuditMutations,
-} from "./useAuditLogs";
+export { useAuditLogSummary } from "./useAuditLogs";
 
 // Secret file hooks
 export {
   useSecretFiles,
-  useDeletedSecretFiles,
   useSecretFileGrants,
   useUploadSecretFile,
   useGetSecretFileContent,
   useUpdateSecretFile,
   useDeleteSecretFile,
-  useRestoreSecretFile,
   useGrantSecretFileAccess,
   useRevokeSecretFileAccess,
   fileToBase64,
   downloadBase64,
   formatBytes,
   type SecretFile,
-  type DeletedSecretFile,
 } from "./useSecretFiles";
 
 // Project documentation hooks
@@ -197,7 +135,6 @@ export {
   usePublishDoc,
   useUnpublishDoc,
   useDeleteDoc,
-  useRestoreDoc,
   useDocShares,
   useProjectDocShares,
   useSharedWithMe,

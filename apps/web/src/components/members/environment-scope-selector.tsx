@@ -1,36 +1,9 @@
 "use client";
 
+import { useId } from "react";
+
 import { ENVIRONMENTS } from "@/constants/project";
-
-/** All environments checked — the default, meaning unrestricted access. */
-export function allEnvironments(): string[] {
-  return [...ENVIRONMENTS];
-}
-
-export function isUnrestrictedScope(selected: string[]): boolean {
-  return ENVIRONMENTS.every((env) => selected.includes(env));
-}
-
-/**
- * Convert the UI selection to the API payload. All environments checked means
- * unrestricted — send nothing so the backend stores no scope.
- */
-export function scopeToPayload(selected: string[]): string[] | undefined {
-  return isUnrestrictedScope(selected) ? undefined : selected;
-}
-
-/** Human-readable scope for badges: "development, staging" or "All environments". */
-export function formatEnvironmentScope(environments?: string[] | null): string {
-  // Absent scope = unrestricted; an explicit empty array = deny-all (backend
-  // rejects it on write, but a legacy row could carry it — show the truth).
-  if (environments == null) return "All environments";
-  if (environments.length === 0) return "No environments";
-  const known = ENVIRONMENTS.filter((env) => environments.includes(env));
-  const extras = environments.filter(
-    (env) => !(ENVIRONMENTS as readonly string[]).includes(env)
-  );
-  return [...known, ...extras].join(", ");
-}
+import { allEnvironments, isUnrestrictedScope } from "./environment-scope";
 
 interface EnvironmentScopeSelectorProps {
   selected: string[];
@@ -51,6 +24,10 @@ export function EnvironmentScopeSelector({
   disabled = false,
   helperText = "Developers only see and edit variables in the selected environments. Production access can be withheld here.",
 }: EnvironmentScopeSelectorProps) {
+  const uid = useId();
+  const labelId = `${uid}-label`;
+  const helpId = `${uid}-help`;
+
   function toggle(env: string, checked: boolean) {
     if (checked) {
       onChange([...selected, env]);
@@ -61,14 +38,19 @@ export function EnvironmentScopeSelector({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-ink">
+      <div id={labelId} className="block text-sm font-medium text-ink">
         Environment access
-      </label>
-      <p className="mt-1 text-xs text-ink-muted">
+      </div>
+      <p id={helpId} className="mt-1 text-xs text-ink-muted">
         {helperText} A variable is visible only when all of its environments
         fall within this scope.
       </p>
-      <div className="mt-2 space-y-1 rounded-lg border p-2 border-line">
+      <div
+        role="group"
+        aria-labelledby={labelId}
+        aria-describedby={helpId}
+        className="mt-2 space-y-1 rounded-lg border p-2 border-line"
+      >
         {ENVIRONMENTS.map((env) => (
           <label
             key={env}

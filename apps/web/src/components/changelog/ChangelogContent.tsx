@@ -6,6 +6,8 @@ import remarkGfm from "remark-gfm";
 import { usePaginatedQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { terminal } from "@/components/marketing";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDate } from "@/lib/format";
 
 type ChangelogType =
   | "feature"
@@ -238,12 +240,8 @@ function ChangelogEntryCard({
 }) {
   const entryTypes = types ?? [type];
   const primaryConfig = TYPE_CONFIG[entryTypes[0]];
-  const date = new Date(publishedAt);
-  const formattedDate = date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const timeZone = useTimeZone();
+  const formattedDate = formatDate(publishedAt, timeZone);
 
   return (
     <article className="group relative md:pl-10">

@@ -20,6 +20,51 @@ import {
   useCreatePortalSession,
 } from "@/hooks/queries/useBillingQuery";
 import { usePaymentsEnabled } from "@/hooks/usePaymentsEnabled";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateWith } from "@/lib/format";
+
+const PERIOD_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+};
+
+function getStatusColor(status: string): "green" | "amber" | "red" {
+  switch (status) {
+    case "active":
+      return "green";
+    case "canceled":
+    case "canceling":
+      return "amber";
+    case "past_due":
+    case "revoked":
+    case "unpaid":
+      return "red";
+    default:
+      return "amber";
+  }
+}
+
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case "active":
+      return "Active";
+    case "canceled":
+      return "Canceled";
+    case "revoked":
+      return "Expired";
+    case "past_due":
+      return "Past Due";
+    case "trialing":
+      return "Trial";
+    case "unpaid":
+      return "Unpaid";
+    case "incomplete":
+      return "Incomplete";
+    default:
+      return status.charAt(0).toUpperCase() + status.slice(1);
+  }
+}
 
 const CANCEL_REASONS = [
   { value: "too_expensive", label: "Too expensive" },
@@ -48,6 +93,7 @@ export function BillingSettings({
   const { data: subscription, isLoading } = useSubscription(organizationId);
   const portalMutation = useCreatePortalSession();
   const paymentsEnabled = usePaymentsEnabled();
+  const timeZone = useTimeZone();
 
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -58,56 +104,14 @@ export function BillingSettings({
     text: string;
   } | null>(null);
 
-  function formatDate(timestamp: number) {
-    return new Date(timestamp).toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
-
-  function getStatusColor(status: string): "green" | "amber" | "red" {
-    switch (status) {
-      case "active":
-        return "green";
-      case "canceled":
-      case "canceling":
-        return "amber";
-      case "past_due":
-      case "revoked":
-      case "unpaid":
-        return "red";
-      default:
-        return "amber";
-    }
-  }
-
-  function getStatusLabel(status: string): string {
-    switch (status) {
-      case "active":
-        return "Active";
-      case "canceled":
-        return "Canceled";
-      case "revoked":
-        return "Expired";
-      case "past_due":
-        return "Past Due";
-      case "trialing":
-        return "Trial";
-      case "unpaid":
-        return "Unpaid";
-      case "incomplete":
-        return "Incomplete";
-      default:
-        return status.charAt(0).toUpperCase() + status.slice(1);
-    }
-  }
+  const formatDate = (timestamp: number) =>
+    formatDateWith(timestamp, PERIOD_DATE_OPTIONS, timeZone);
 
   async function handleManageBilling() {
     if (!organizationId) return;
     try {
       const data = await portalMutation.mutateAsync({ organizationId });
-      if (data.portalUrl) window.open(data.portalUrl, "_blank");
+      if (data.portalUrl) window.open(data.portalUrl, "_blank", "noopener");
     } catch {
       // Error is handled by mutation state
     }

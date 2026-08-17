@@ -1,21 +1,14 @@
 import type { ReactNode } from "react";
 import {
   MarketingShell as UIMarketingShell,
-  MarketingNav as UIMarketingNav,
-  MarketingFooter as UIMarketingFooter,
   SITE_URLS,
   type NavLink,
   type FooterColumn,
 } from "@envpilot/ui";
 import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
 
-// Re-export the rest of the shared UI package unchanged. The three composed
-// components below shadow the package's Shell/Nav/Footer with web-wired
-// versions that inject this app's nav links, footer links, and auth buttons.
-export * from "@envpilot/ui";
-
-// Nav destinations. docs + blog point at their (future) subdomains; the rest
-// stay in-app. Order matches the original MarketingNav.
+// Nav destinations. docs + blog point at their subdomains; the rest stay
+// in-app.
 const NAV_LINKS: NavLink[] = [
   { label: "features", href: "/#features" },
   { label: "pricing", href: "/pricing" },
@@ -81,14 +74,6 @@ const FOOTER_COLUMNS: FooterColumn[] = [
     ],
   },
 ];
-
-export function MarketingNav() {
-  return <UIMarketingNav links={NAV_LINKS} actions={<PublicHeaderButtons />} />;
-}
-
-export function MarketingFooter() {
-  return <UIMarketingFooter columns={FOOTER_COLUMNS} statusUrl="/api/status" />;
-}
 
 export function MarketingShell({
   children,

@@ -1,0 +1,63 @@
+name: React Doctor
+
+# React health scan (correctness, performance, a11y, security, maintainability)
+# for every React surface in the workspace. Lives in its own workflow rather
+# than ci.yml so it can carry the write permissions the PR feedback needs
+# without granting them to the build/deploy pipeline.
+#
+# Advisory for now: `blocking: none` reports findings without failing the
+# check. Tighten to `error` (then `warning`) once the backlog is down and the
+# team trusts the signal — the check is NOT in the required `checks-passed`
+# gate, so flipping it is a one-line change here plus a branch-protection
+# tick.
+
+on:
+  # PRs: scan the changed files and post one sticky summary comment listing
+  # only what this branch introduced relative to the merge base.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "apps/web/**"
+      - "apps/admin/**"
+      - "apps/blog/**"
+      - "apps/docs/**"
+      - "packages/ui/**"
+      - "doctor.config.*"
+      - ".github/workflows/react-doctor.yml"
+  # main: record the score trend only. No comment, no failure.
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "apps/admin/**"
+      - "apps/blog/**"
+      - "apps/docs/**"
+      - "packages/ui/**"
+      - "doctor.config.*"
+
+permissions:
+  contents: read
+  pull-requests: write # inline review comments
+  issues: write # sticky summary comment (PR comments use the issues API)
+  statuses: write # score + counts next to the commit
+
+# A new push supersedes the in-flight scan, so reviewers only see the latest.
+concurrency:
+  group: react-doctor-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  react-doctor:
+    name: React Doctor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: without it the Action cannot resolve the merge base
+          # and reports every pre-existing issue as introduced by the PR.
+          fetch-depth: 0
+      - uses: millionco/react-doctor@v2
+        with:
+          # Every discovered workspace project, not just apps/web.
+          project: "*"
+          blocking: none

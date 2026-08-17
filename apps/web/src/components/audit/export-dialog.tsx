@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 
 const DATE_PRESETS = [
@@ -33,6 +33,10 @@ export function AuditExportDialog({
   const [selectedPreset, setSelectedPreset] = useState(2); // Default: 30 days
   const [format, setFormat] = useState<ExportFormat>("csv");
 
+  const uid = useId();
+  const dateRangeLabelId = `${uid}-date-range`;
+  const formatLabelId = `${uid}-format`;
+
   const handleExport = () => {
     const now = Date.now();
     const preset = DATE_PRESETS[selectedPreset];
@@ -51,12 +55,20 @@ export function AuditExportDialog({
       size="md"
     >
       <div className="space-y-5">
-        {/* Date Range */}
+        {/* Date Range — the heading names the whole preset group, so a span +
+            role="group" rather than a <label>, which names one control. */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-ink-muted">
+          <span
+            id={dateRangeLabelId}
+            className="mb-2 block text-sm font-medium text-ink-muted"
+          >
             Date Range
-          </label>
-          <div className="flex flex-wrap gap-2">
+          </span>
+          <div
+            role="group"
+            aria-labelledby={dateRangeLabelId}
+            className="flex flex-wrap gap-2"
+          >
             {DATE_PRESETS.map((preset, i) => (
               <button
                 key={preset.label}
@@ -75,10 +87,17 @@ export function AuditExportDialog({
 
         {/* Format */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-ink-muted">
+          <span
+            id={formatLabelId}
+            className="mb-2 block text-sm font-medium text-ink-muted"
+          >
             Format
-          </label>
-          <div className="flex gap-2">
+          </span>
+          <div
+            role="group"
+            aria-labelledby={formatLabelId}
+            className="flex gap-2"
+          >
             <button
               onClick={() => setFormat("csv")}
               className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${

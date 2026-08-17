@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
@@ -12,6 +12,15 @@ import {
   sanitizeConvexError,
 } from "@/lib/error-messages";
 
+function generateSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 50);
+}
+
 export default function NewOrganizationPage() {
   const router = useRouter();
   const createOrganization = useCreateOrganization();
@@ -21,26 +30,19 @@ export default function NewOrganizationPage() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
-
-  function generateSlug(value: string): string {
-    return value
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .slice(0, 50);
-  }
+  // Only handlers read this, so a ref keeps the first slug edit from costing a
+  // render that changes nothing on screen.
+  const slugTouched = useRef(false);
 
   function handleNameChange(value: string) {
     setName(value);
-    if (!slugTouched) {
+    if (!slugTouched.current) {
       setSlug(generateSlug(value));
     }
   }
 
   function handleSlugChange(value: string) {
-    setSlugTouched(true);
+    slugTouched.current = true;
     setSlug(generateSlug(value));
   }
 

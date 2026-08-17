@@ -82,20 +82,29 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     // Opt-in credential sweep — each revocation is authorized and audited by
     // its own mutation. Failures are collected, not silently swallowed.
-    const credentialErrors: string[] = [];
-    for (const cred of parsed.data.revokeCredentials ?? []) {
-      try {
-        await client.mutation(api.features.api.keys.revoke, {
-          keyId: cred.id as Id<"apiKeys">,
-        });
-      } catch (err) {
-        reportApiError(
-          err,
-          "POST /api/organizations/[slug]/members/[userId]/suspend (credential sweep)"
-        );
-        credentialErrors.push(`${cred.type} ${cred.id}`);
-      }
-    }
+    // Revocations are independent of each other and each carries its own
+    // authorization and audit write, so they go out together. Every one is
+    // attempted regardless of its siblings: the per-item catch means nothing
+    // rejects, so Promise.all cannot abandon the rest of the sweep. During a
+    // security hold, a credential left live because an earlier one failed
+    // would be the worst outcome here.
+    const sweep = await Promise.all(
+      (parsed.data.revokeCredentials ?? []).map((cred) =>
+        client
+          .mutation(api.features.api.keys.revoke, {
+            keyId: cred.id as Id<"apiKeys">,
+          })
+          .then(() => null)
+          .catch((err: unknown) => {
+            reportApiError(
+              err,
+              "POST /api/organizations/[slug]/members/[userId]/suspend (credential sweep)"
+            );
+            return `${cred.type} ${cred.id}`;
+          })
+      )
+    );
+    const credentialErrors = sweep.filter((entry) => entry !== null);
 
     return NextResponse.json({
       success: true,

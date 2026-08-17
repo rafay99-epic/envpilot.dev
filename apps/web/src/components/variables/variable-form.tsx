@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import {
   ENVIRONMENTS,
   type Environment,
@@ -63,6 +63,7 @@ export function VariableForm({
   }));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const environmentsLabelId = useId();
   const [showValue, setShowValue] = useState(!initialData?.isSensitive);
   const [rotationEnabled, setRotationEnabled] = useState(
     () =>
@@ -165,7 +166,7 @@ export function VariableForm({
           onChange={handleKeyChange}
           disabled={isEditing}
           placeholder="DATABASE_URL"
-          className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong disabled:cursor-not-allowed border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
+          className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-base focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong disabled:cursor-not-allowed sm:text-sm border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
         />
         {isEditing && (
           <p className="mt-1 text-xs text-ink-muted">
@@ -198,11 +199,12 @@ export function VariableForm({
             placeholder={
               isEditing ? "Enter new value or leave empty" : "postgres://..."
             }
-            className="block w-full rounded-lg border px-4 py-2 pr-10 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+            className="block w-full rounded-lg border px-4 py-2 pr-10 font-mono text-base focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong sm:text-sm border-line bg-surface-raised text-ink placeholder-ink-subtle"
           />
           <button
             type="button"
             onClick={() => setShowValue((prev) => !prev)}
+            aria-label={showValue ? "Hide value" : "Show value"}
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-muted hover:text-ink-muted"
           >
             {showValue ? (
@@ -259,16 +261,23 @@ export function VariableForm({
           }
           placeholder="Brief description of what this variable is used for..."
           rows={2}
-          className="mt-1 block w-full rounded-lg border px-4 py-2 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+          className="mt-1 block w-full rounded-lg border px-4 py-2 text-base focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong sm:text-sm border-line bg-surface-raised text-ink placeholder-ink-subtle"
         />
       </div>
 
       {/* Environments */}
       <div>
-        <label className="block text-sm font-medium text-ink-muted">
+        <div
+          id={environmentsLabelId}
+          className="block text-sm font-medium text-ink-muted"
+        >
           Environments <span className="text-danger">*</span>
-        </label>
-        <div className="mt-2 flex flex-wrap gap-2">
+        </div>
+        <div
+          role="group"
+          aria-labelledby={environmentsLabelId}
+          className="mt-2 flex flex-wrap gap-2"
+        >
           {ENVIRONMENTS.map((env) => (
             <button
               key={env}
@@ -346,7 +355,8 @@ export function VariableForm({
                     rotationFrequencyDays: Number(e.target.value),
                   }))
                 }
-                className="rounded-lg border px-3 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink"
+                aria-label="Rotation frequency"
+                className="rounded-lg border px-3 py-1.5 text-base focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong sm:text-sm border-line bg-surface-raised text-ink"
               >
                 {ROTATION_PRESETS.map((preset) => (
                   <option key={preset.value} value={preset.value}>

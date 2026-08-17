@@ -8,6 +8,14 @@ import {
   TerminalInput,
 } from "@/components/dashboard/terminal-ui";
 import { useUnsavedChanges } from "@/hooks";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDateWith } from "@/lib/format";
+
+/** "August 2026" — the member-since line. */
+const MEMBER_SINCE_OPTIONS: Intl.DateTimeFormatOptions = {
+  month: "long",
+  year: "numeric",
+};
 
 export interface AccountUser {
   firstName: string | null;
@@ -38,6 +46,7 @@ export function GeneralSettings({ user }: { user: AccountUser | null }) {
   } | null>(null);
 
   const { dirtyCount } = useUnsavedChanges(form, snapshot);
+  const timeZone = useTimeZone();
 
   async function handleSave() {
     if (dirtyCount === 0) return;
@@ -130,10 +139,11 @@ export function GeneralSettings({ user }: { user: AccountUser | null }) {
               <p className="text-[13px] text-ink-subtle">
                 Member since{" "}
                 {user?.createdAt
-                  ? new Date(user.createdAt).toLocaleDateString("en-US", {
-                      month: "long",
-                      year: "numeric",
-                    })
+                  ? formatDateWith(
+                      user.createdAt,
+                      MEMBER_SINCE_OPTIONS,
+                      timeZone
+                    )
                   : "—"}
               </p>
             </div>

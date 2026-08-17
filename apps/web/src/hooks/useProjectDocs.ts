@@ -131,10 +131,6 @@ export function useDeleteDoc() {
   return useMutation(convexApi.features.docs.mutations.remove);
 }
 
-export function useRestoreDoc() {
-  return useMutation(convexApi.features.docs.mutations.restore);
-}
-
 /** Group docs by module, preserving each module's most-recent-first order. */
 export function groupDocsByModule<T extends DocSummary>(
   docs: T[]

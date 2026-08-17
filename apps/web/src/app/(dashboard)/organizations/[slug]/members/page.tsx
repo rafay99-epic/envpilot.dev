@@ -1,17 +1,24 @@
 "use client";
 
-import { useState, use, useCallback, useRef } from "react";
+import { useState, use, useId, useReducer, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Users } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import { ConfirmDialog, DrawerPanel, ProjectIcon } from "@/components/ui";
+import { EnvironmentScopeSelector } from "@/components/members/environment-scope-selector";
+import { scopeToPayload } from "@/components/members/environment-scope";
 import {
-  EnvironmentScopeSelector,
-  allEnvironments,
-  scopeToPayload,
-} from "@/components/members/environment-scope-selector";
+  initialInvitePanelState,
+  invitePanelReducer,
+  type SearchUser,
+} from "@/components/members/invite-panel-state";
+import {
+  initialMemberSessionsState,
+  memberSessionsReducer,
+} from "@/components/members/member-sessions-state";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import {
@@ -39,17 +46,10 @@ import {
   type OrgRole,
 } from "@/lib/roles";
 import { createLogger } from "@/lib/logger";
+import { formatDate } from "@/lib/format";
+import { useTimeZone } from "@/hooks/useTimeZone";
 
 const log = createLogger("app/dashboard/organization-members");
-
-interface SearchUser {
-  _id: string;
-  email: string;
-  name?: string;
-  avatarUrl?: string;
-  isMember?: boolean;
-  hasPendingInvitation?: boolean;
-}
 
 export default function OrganizationMembersPage(props: {
   params: Promise<{ slug: string }>;
@@ -69,6 +69,10 @@ function OrganizationMembersPageContent({
   const { slug } = use(params);
   const { user } = useAuthContext();
   const { convexUserId } = useConvexUser(user?.id);
+  const timeZone = useTimeZone();
+  // Names the project checkbox group in the invite drawer, which has no single
+  // input to attach a <label> to.
+  const projectAssignmentLabelId = useId();
 
   // ---------------------------------------------------------------------------
   // Convex queries — real-time via WebSocket, no fetch() round-trip
@@ -149,48 +153,29 @@ function OrganizationMembersPageContent({
     name: string;
   } | null>(null);
 
+  // Open/closed is a toggle the header button owns — the drawer's contents are
+  // the machine below.
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<OrgRole>("developer");
-  const [isInviting, setIsInviting] = useState(false);
-  const [inviteError, setInviteError] = useState<string | null>(null);
+  // Every field of the invite drawer: form, submission and email typeahead.
+  const [invite, dispatchInvite] = useReducer(
+    invitePanelReducer,
+    initialInvitePanelState
+  );
+  // Re-entry guard for the submit handler. `invite.isSubmitting` disables the
+  // button, but only from the next render, so a second submit in the same tick
+  // still reads the stale `false` and sends a duplicate invitation.
+  const invitingRef = useRef(false);
+  // The invite panel renders one checkbox per project and asks each one
+  // whether it is selected, so the lookup happens once per row.
+  const selectedProjectIdSet = new Set(invite.projectIds);
 
-  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
-  // Environment scope for developer invites — all checked = unrestricted.
-  const [inviteEnvScope, setInviteEnvScope] =
-    useState<string[]>(allEnvironments());
-
-  const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showSearchResults, setShowSearchResults] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const [expandedSessionsUserId, setExpandedSessionsUserId] = useState<
-    string | null
-  >(null);
-  const [memberSessions, setMemberSessions] = useState<{
-    cliTokens: Array<{
-      _id: string;
-      deviceName: string;
-      lastUsedAt?: number;
-      createdAt: number;
-      expiresAt: number;
-      tokenPreview: string;
-    }>;
-    extensionSessions: Array<{
-      _id: string;
-      projectId: string;
-      projectName: string;
-      deviceName: string;
-      lastUsedAt?: number;
-      createdAt: number;
-      expiresAt: number;
-      tokenPreview: string;
-    }>;
-  } | null>(null);
-  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
-  const [isRevokingSession, setIsRevokingSession] = useState(false);
+  const [sessions, dispatchSessions] = useReducer(
+    memberSessionsReducer,
+    initialMemberSessionsState
+  );
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -219,29 +204,24 @@ function OrganizationMembersPageContent({
   // capability access.env_scoped) with project assignments. All environments
   // checked = unrestricted = send nothing.
   const inviteRoleEnvScoped =
-    roleMetaBySlug.get(inviteRole)?.envScoped ??
-    ENV_SCOPED_ROLE_FALLBACK.has(inviteRole);
+    roleMetaBySlug.get(invite.role)?.envScoped ??
+    ENV_SCOPED_ROLE_FALLBACK.has(invite.role);
   const inviteEnvScopeApplies =
-    inviteRoleEnvScoped && selectedProjectIds.length > 0;
+    inviteRoleEnvScoped && invite.projectIds.length > 0;
 
   function resetInviteForm() {
     setShowInviteModal(false);
-    setInviteEmail("");
-    setInviteRole("developer");
-    setSelectedProjectIds([]);
-    setInviteEnvScope(allEnvironments());
-    setInviteError(null);
-    setSearchResults([]);
-    setShowSearchResults(false);
+    dispatchInvite({ kind: "form-reset" });
   }
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
-    setIsInviting(true);
-    setInviteError(null);
+    if (invitingRef.current) return;
+    invitingRef.current = true;
+    dispatchInvite({ kind: "submit-started" });
 
     const environments = inviteEnvScopeApplies
-      ? scopeToPayload(inviteEnvScope)
+      ? scopeToPayload(invite.environmentScope)
       : undefined;
 
     try {
@@ -249,10 +229,10 @@ function OrganizationMembersPageContent({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: inviteEmail,
-          role: inviteRole,
-          ...(inviteRole !== "owner" && selectedProjectIds.length > 0
-            ? { projectIds: selectedProjectIds }
+          email: invite.email,
+          role: invite.role,
+          ...(invite.role !== "owner" && invite.projectIds.length > 0
+            ? { projectIds: invite.projectIds }
             : {}),
           ...(environments ? { environments } : {}),
         }),
@@ -260,42 +240,52 @@ function OrganizationMembersPageContent({
 
       const data = await response.json();
 
+      // Falls through rather than returning early: the guard and the
+      // submitting flag are released after this try/catch, and an early
+      // return would skip both and leave the form permanently disabled.
       if (!response.ok) {
-        if (data.code === "TIER_LIMIT_REACHED") {
-          setInviteError(
-            "Team member limit reached. Upgrade to Pro for unlimited team members."
-          );
-          return;
+        if (data.code !== "TIER_LIMIT_REACHED") {
+          throw new Error(data.error || "Failed to send invitation");
         }
-        throw new Error(data.error || "Failed to send invitation");
-      }
-
-      resetInviteForm();
-
-      if (data.emailSent) {
-        setNotice("Invitation sent successfully! Email delivered.");
+        dispatchInvite({
+          kind: "submit-failed",
+          error:
+            "Team member limit reached. Upgrade to Pro for unlimited team members.",
+        });
       } else {
-        setNotice(
-          `Invitation created, but email could not be sent${data.emailError ? `: ${data.emailError}` : ""}. Share the invitation link manually.`
-        );
+        resetInviteForm();
+
+        if (data.emailSent) {
+          setNotice("Invitation sent successfully! Email delivered.");
+        } else {
+          setNotice(
+            `Invitation created, but email could not be sent${data.emailError ? `: ${data.emailError}` : ""}. Share the invitation link manually.`
+          );
+        }
+        setTimeout(() => setNotice(null), 8000);
+        // No manual refetch — Convex reactivity updates invitations query automatically
       }
-      setTimeout(() => setNotice(null), 8000);
-      // No manual refetch — Convex reactivity updates invitations query automatically
     } catch (err) {
       log.error(
         "organization_invite_failed",
         {
           slug,
-          email: inviteEmail,
-          inviteRole,
-          projectIds: selectedProjectIds,
+          email: invite.email,
+          inviteRole: invite.role,
+          projectIds: invite.projectIds,
         },
         err
       );
-      setInviteError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsInviting(false);
+      dispatchInvite({
+        kind: "submit-failed",
+        error: err instanceof Error ? err.message : "An error occurred",
+      });
     }
+    // Released after the try/catch rather than in a finally block: the catch
+    // swallows, so this runs on both paths, and React Compiler bails on any
+    // function containing a try statement with a finalizer.
+    invitingRef.current = false;
+    dispatchInvite({ kind: "submit-settled" });
   }
 
   async function handleRoleChange(userId: string, newRole: OrgRole) {
@@ -381,39 +371,39 @@ function OrganizationMembersPageContent({
     });
   }
 
-  const searchUsers = useCallback(
-    async (query: string) => {
-      if (query.length < 2) {
-        setSearchResults([]);
-        setShowSearchResults(false);
-        return;
-      }
+  // Called straight from the input's change handler, never from a dependency
+  // array, so there is nothing for a useCallback to stabilise. React Compiler
+  // caches it anyway.
+  async function searchUsers(query: string) {
+    if (query.length < 2) {
+      dispatchInvite({ kind: "search-cleared" });
+      return;
+    }
 
-      setIsSearching(true);
-      try {
-        const response = await fetch(
-          `/api/users/search?q=${encodeURIComponent(query)}&organizationId=${orgId}&limit=5`
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setSearchResults(data.users || []);
-          setShowSearchResults(true);
-        }
-      } catch (err) {
-        log.error(
-          "member_search_failed",
-          { slug, organizationId: orgId, query },
-          err
-        );
-      } finally {
-        setIsSearching(false);
+    dispatchInvite({ kind: "search-started" });
+    try {
+      const response = await fetch(
+        `/api/users/search?q=${encodeURIComponent(query)}&organizationId=${orgId}&limit=5`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        dispatchInvite({
+          kind: "search-succeeded",
+          results: data.users || [],
+        });
       }
-    },
-    [slug, orgId]
-  );
+    } catch (err) {
+      log.error(
+        "member_search_failed",
+        { slug, organizationId: orgId, query },
+        err
+      );
+    }
+    dispatchInvite({ kind: "search-settled" });
+  }
 
   function handleEmailChange(value: string) {
-    setInviteEmail(value);
+    dispatchInvite({ kind: "email-changed", email: value });
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -425,21 +415,16 @@ function OrganizationMembersPageContent({
   }
 
   function selectUser(user: SearchUser) {
-    setInviteEmail(user.email);
-    setShowSearchResults(false);
-    setSearchResults([]);
+    dispatchInvite({ kind: "suggestion-selected", email: user.email });
   }
 
   async function toggleSessions(userId: string) {
-    if (expandedSessionsUserId === userId) {
-      setExpandedSessionsUserId(null);
-      setMemberSessions(null);
+    if (sessions.expandedUserId === userId) {
+      dispatchSessions({ kind: "panel-collapsed" });
       return;
     }
 
-    setExpandedSessionsUserId(userId);
-    setIsLoadingSessions(true);
-    setMemberSessions(null);
+    dispatchSessions({ kind: "panel-expanded", userId });
 
     try {
       const response = await fetch(
@@ -447,7 +432,7 @@ function OrganizationMembersPageContent({
       );
       if (response.ok) {
         const data = await response.json();
-        setMemberSessions(data);
+        dispatchSessions({ kind: "sessions-loaded", sessions: data });
       } else {
         const data = await response.json();
         setError(data.error || "Failed to fetch sessions");
@@ -459,9 +444,8 @@ function OrganizationMembersPageContent({
         err
       );
       setError(err instanceof Error ? err.message : "Failed to fetch sessions");
-    } finally {
-      setIsLoadingSessions(false);
     }
+    dispatchSessions({ kind: "load-settled" });
   }
 
   async function handleRevokeSession(
@@ -469,7 +453,7 @@ function OrganizationMembersPageContent({
     type: "cli" | "extension" | "all",
     sessionId?: string
   ) {
-    setIsRevokingSession(true);
+    dispatchSessions({ kind: "revoke-started" });
     try {
       const response = await fetch(
         `/api/organizations/${slug}/members/${userId}/sessions`,
@@ -492,15 +476,28 @@ function OrganizationMembersPageContent({
       );
       setTimeout(() => setNotice(null), 5000);
 
-      // Refresh the sessions list without closing the panel
-      setIsLoadingSessions(true);
-      const refreshRes = await fetch(
-        `/api/organizations/${slug}/members/${userId}/sessions`
-      );
-      if (refreshRes.ok) {
-        setMemberSessions(await refreshRes.json());
+      // Refresh the sessions list without closing the panel. Its own catch:
+      // the revoke already succeeded, so a failed refresh must neither leave
+      // the list spinning nor report the revoke as failed.
+      dispatchSessions({ kind: "reload-started" });
+      try {
+        const refreshRes = await fetch(
+          `/api/organizations/${slug}/members/${userId}/sessions`
+        );
+        if (refreshRes.ok) {
+          dispatchSessions({
+            kind: "sessions-loaded",
+            sessions: await refreshRes.json(),
+          });
+        }
+      } catch (refreshErr) {
+        log.error(
+          "member_sessions_refresh_failed",
+          { slug, userId, organizationId: orgId },
+          refreshErr
+        );
       }
-      setIsLoadingSessions(false);
+      dispatchSessions({ kind: "load-settled" });
     } catch (err) {
       log.error(
         "member_session_revoke_failed",
@@ -508,9 +505,8 @@ function OrganizationMembersPageContent({
         err
       );
       setError(err instanceof Error ? err.message : "Failed to revoke session");
-    } finally {
-      setIsRevokingSession(false);
     }
+    dispatchSessions({ kind: "revoke-settled" });
   }
 
   function handleCancelInvitation(invitationId: string) {
@@ -749,9 +745,11 @@ function OrganizationMembersPageContent({
               <div className="flex items-center justify-between px-6 py-4">
                 <div className="flex items-center gap-4">
                   {member.user.avatarUrl ? (
-                    <img
+                    <Image
                       src={member.user.avatarUrl}
                       alt={member.user.name || member.user.email}
+                      width={40}
+                      height={40}
                       className="h-10 w-10 rounded-full object-cover"
                     />
                   ) : (
@@ -787,6 +785,7 @@ function OrganizationMembersPageContent({
                           e.target.value as OrgRole
                         )
                       }
+                      aria-label={`Organization role for ${member.user.name || member.user.email}`}
                       className="rounded-lg border px-3 py-1.5 text-sm border-line bg-surface-raised text-ink"
                     >
                       {assignable.map((role) => (
@@ -808,7 +807,7 @@ function OrganizationMembersPageContent({
                     <button
                       onClick={() => toggleSessions(member.user._id)}
                       className={`rounded-md p-1.5 transition-colors ${
-                        expandedSessionsUserId === member.user._id
+                        sessions.expandedUserId === member.user._id
                           ? "bg-surface-raised text-ink"
                           : "text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
                       }`}
@@ -869,6 +868,7 @@ function OrganizationMembersPageContent({
                   {canRemoveMembers && (
                     <button
                       onClick={() => handleRemoveMember(member.user._id)}
+                      aria-label={`Remove ${member.user.name || member.user.email} from the organization`}
                       className="text-ink-muted hover:text-danger"
                     >
                       <svg
@@ -890,29 +890,29 @@ function OrganizationMembersPageContent({
               </div>
 
               {/* Expandable Sessions Panel */}
-              {expandedSessionsUserId === member.user._id && (
+              {sessions.expandedUserId === member.user._id && (
                 <div className="border-t px-6 py-4 border-line bg-canvas">
-                  {isLoadingSessions ? (
+                  {sessions.isLoading ? (
                     <div className="flex items-center justify-center py-4">
                       <div className="h-5 w-5 animate-spin rounded-full border-2 border-line border-t-line-strong" />
                       <span className="ml-2 text-sm text-ink-subtle">
                         Loading sessions...
                       </span>
                     </div>
-                  ) : memberSessions ? (
+                  ) : sessions.data ? (
                     <div className="space-y-4">
                       {/* CLI Tokens */}
                       <div>
                         <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                          CLI Tokens ({memberSessions.cliTokens.length})
+                          CLI Tokens ({sessions.data.cliTokens.length})
                         </h4>
-                        {memberSessions.cliTokens.length === 0 ? (
+                        {sessions.data.cliTokens.length === 0 ? (
                           <p className="mt-2 text-sm text-ink-subtle">
                             No active CLI sessions.
                           </p>
                         ) : (
                           <div className="mt-2 space-y-2">
-                            {memberSessions.cliTokens.map((token) => (
+                            {sessions.data.cliTokens.map((token) => (
                               <div
                                 key={token._id}
                                 className="flex items-center justify-between rounded-lg border px-4 py-3 border-line bg-surface"
@@ -937,11 +937,9 @@ function OrganizationMembersPageContent({
                                     </p>
                                     <p className="text-xs text-ink-muted">
                                       Created{" "}
-                                      {new Date(
-                                        token.createdAt
-                                      ).toLocaleDateString()}
+                                      {formatDate(token.createdAt, timeZone)}
                                       {token.lastUsedAt &&
-                                        ` · Last used ${new Date(token.lastUsedAt).toLocaleDateString()}`}
+                                        ` · Last used ${formatDate(token.lastUsedAt, timeZone)}`}
                                       {" · "}
                                       <span className="font-mono">
                                         {token.tokenPreview}
@@ -963,7 +961,7 @@ function OrganizationMembersPageContent({
                                         ),
                                     })
                                   }
-                                  disabled={isRevokingSession}
+                                  disabled={sessions.isRevoking}
                                   className="rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 text-danger hover:bg-danger-soft"
                                 >
                                   Revoke
@@ -978,15 +976,15 @@ function OrganizationMembersPageContent({
                       <div>
                         <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
                           VS Code Extension (
-                          {memberSessions.extensionSessions.length})
+                          {sessions.data.extensionSessions.length})
                         </h4>
-                        {memberSessions.extensionSessions.length === 0 ? (
+                        {sessions.data.extensionSessions.length === 0 ? (
                           <p className="mt-2 text-sm text-ink-subtle">
                             No active extension sessions.
                           </p>
                         ) : (
                           <div className="mt-2 space-y-2">
-                            {memberSessions.extensionSessions.map((session) => (
+                            {sessions.data.extensionSessions.map((session) => (
                               <div
                                 key={session._id}
                                 className="flex items-center justify-between rounded-lg border px-4 py-3 border-line bg-surface"
@@ -1011,11 +1009,9 @@ function OrganizationMembersPageContent({
                                     </p>
                                     <p className="text-xs text-ink-muted">
                                       {session.deviceName} · Linked{" "}
-                                      {new Date(
-                                        session.createdAt
-                                      ).toLocaleDateString()}
+                                      {formatDate(session.createdAt, timeZone)}
                                       {session.lastUsedAt &&
-                                        ` · Last used ${new Date(session.lastUsedAt).toLocaleDateString()}`}
+                                        ` · Last used ${formatDate(session.lastUsedAt, timeZone)}`}
                                     </p>
                                   </div>
                                 </div>
@@ -1033,7 +1029,7 @@ function OrganizationMembersPageContent({
                                         ),
                                     })
                                   }
-                                  disabled={isRevokingSession}
+                                  disabled={sessions.isRevoking}
                                   className="rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 text-danger hover:bg-danger-soft"
                                 >
                                   Revoke
@@ -1045,8 +1041,8 @@ function OrganizationMembersPageContent({
                       </div>
 
                       {/* Revoke All Button */}
-                      {(memberSessions.cliTokens.length > 0 ||
-                        memberSessions.extensionSessions.length > 0) && (
+                      {(sessions.data.cliTokens.length > 0 ||
+                        sessions.data.extensionSessions.length > 0) && (
                         <div className="flex justify-end border-t pt-3 border-line">
                           <button
                             onClick={() =>
@@ -1058,10 +1054,10 @@ function OrganizationMembersPageContent({
                                   handleRevokeSession(member.user._id, "all"),
                               })
                             }
-                            disabled={isRevokingSession}
+                            disabled={sessions.isRevoking}
                             className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 bg-danger hover:bg-danger"
                           >
-                            {isRevokingSession
+                            {sessions.isRevoking
                               ? "Revoking..."
                               : "Revoke All Sessions"}
                           </button>
@@ -1124,10 +1120,8 @@ function OrganizationMembersPageContent({
                   <div>
                     <p className="font-medium text-ink">{invitation.email}</p>
                     <p className="text-sm text-ink-muted">
-                      Invited{" "}
-                      {new Date(invitation.createdAt).toLocaleDateString()} ·
-                      Expires{" "}
-                      {new Date(invitation.expiresAt).toLocaleDateString()}
+                      Invited {formatDate(invitation.createdAt, timeZone)} ·
+                      Expires {formatDate(invitation.expiresAt, timeZone)}
                     </p>
                   </div>
                 </div>
@@ -1232,12 +1226,12 @@ function OrganizationMembersPageContent({
         title="Invite Team Member"
         side="right"
         width="md"
-        preventClose={isInviting}
+        preventClose={invite.isSubmitting}
       >
         <form onSubmit={handleInvite} className="space-y-4">
-          {inviteError && (
+          {invite.error && (
             <div className="rounded-lg border p-3 border-danger-line bg-danger-soft">
-              <p className="text-sm text-danger">{inviteError}</p>
+              <p className="text-sm text-danger">{invite.error}</p>
             </div>
           )}
           <div className="relative">
@@ -1252,29 +1246,33 @@ function OrganizationMembersPageContent({
                 ref={searchInputRef}
                 type="email"
                 id="email"
-                value={inviteEmail}
+                value={invite.email}
                 onChange={(e) => handleEmailChange(e.target.value)}
                 onFocus={() =>
-                  inviteEmail.length >= 2 && setShowSearchResults(true)
+                  invite.email.length >= 2 &&
+                  dispatchInvite({ kind: "suggestions-shown" })
                 }
                 onBlur={() =>
-                  setTimeout(() => setShowSearchResults(false), 200)
+                  setTimeout(
+                    () => dispatchInvite({ kind: "suggestions-hidden" }),
+                    200
+                  )
                 }
                 placeholder="Search by email or name..."
                 required
                 autoComplete="off"
                 className="block w-full rounded-lg border px-4 py-2.5 placeholder:text-ink-muted focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
               />
-              {isSearching && (
+              {invite.isSearching && (
                 <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-line-strong" />
                 </div>
               )}
             </div>
-            {showSearchResults && searchResults.length > 0 && (
+            {invite.showSearchResults && invite.searchResults.length > 0 && (
               <div className="absolute z-10 mt-1 w-full rounded-lg border shadow-lg border-line bg-surface-raised">
                 <ul className="max-h-60 overflow-auto py-1">
-                  {searchResults.map((user) => (
+                  {invite.searchResults.map((user) => (
                     <li key={user._id}>
                       <button
                         type="button"
@@ -1283,9 +1281,11 @@ function OrganizationMembersPageContent({
                         className="flex w-full items-center gap-3 px-4 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50 hover:bg-surface-hover"
                       >
                         {user.avatarUrl ? (
-                          <img
+                          <Image
                             src={user.avatarUrl}
                             alt={user.name || user.email}
+                            width={32}
+                            height={32}
                             className="h-8 w-8 rounded-full object-cover"
                           />
                         ) : (
@@ -1331,8 +1331,13 @@ function OrganizationMembersPageContent({
             </label>
             <select
               id="role"
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as OrgRole)}
+              value={invite.role}
+              onChange={(e) =>
+                dispatchInvite({
+                  kind: "role-changed",
+                  role: e.target.value as OrgRole,
+                })
+              }
               className="mt-2 block w-full rounded-lg border px-4 py-2.5 focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
             >
               {inviteRoleOptions.map((role) => (
@@ -1342,12 +1347,12 @@ function OrganizationMembersPageContent({
               ))}
             </select>
             <p className="mt-1.5 text-xs text-ink-muted">
-              {roleMetaBySlug.get(inviteRole)?.description ??
-                ORG_ROLE_DESCRIPTIONS[inviteRole] ??
+              {roleMetaBySlug.get(invite.role)?.description ??
+                ORG_ROLE_DESCRIPTIONS[invite.role] ??
                 ""}
             </p>
           </div>
-          {inviteRole !== "owner" && projects.length === 0 && (
+          {invite.role !== "owner" && projects.length === 0 && (
             <div className="rounded-lg border p-3 border-line bg-surface-raised">
               <p className="text-xs text-ink-muted">
                 No projects available. Create a project first to assign
@@ -1355,17 +1360,26 @@ function OrganizationMembersPageContent({
               </p>
             </div>
           )}
-          {inviteRole !== "owner" && projects.length > 0 && (
+          {invite.role !== "owner" && projects.length > 0 && (
             <>
               <div>
-                <label className="block text-sm font-medium text-ink">
+                {/* A span, not a <label>: this names the checkbox group below,
+                    not one input. */}
+                <span
+                  id={projectAssignmentLabelId}
+                  className="block text-sm font-medium text-ink"
+                >
                   Assign to Projects
-                </label>
+                </span>
                 <p className="mt-1 text-xs text-ink-muted">
                   Select which projects this member is assigned to. What they
                   can do there follows from their organization role.
                 </p>
-                <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2 border-line">
+                <div
+                  role="group"
+                  aria-labelledby={projectAssignmentLabelId}
+                  className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2 border-line"
+                >
                   {projects.map((project) => (
                     <label
                       key={project._id}
@@ -1373,21 +1387,14 @@ function OrganizationMembersPageContent({
                     >
                       <input
                         type="checkbox"
-                        checked={selectedProjectIds.includes(project._id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedProjectIds([
-                              ...selectedProjectIds,
-                              project._id,
-                            ]);
-                          } else {
-                            setSelectedProjectIds(
-                              selectedProjectIds.filter(
-                                (id) => id !== project._id
-                              )
-                            );
-                          }
-                        }}
+                        checked={selectedProjectIdSet.has(project._id)}
+                        onChange={(e) =>
+                          dispatchInvite({
+                            kind: "project-toggled",
+                            projectId: project._id,
+                            selected: e.target.checked,
+                          })
+                        }
                         className="h-4 w-4"
                       />
                       <div className="flex items-center gap-2">
@@ -1409,9 +1416,11 @@ function OrganizationMembersPageContent({
           )}
           {inviteEnvScopeApplies && (
             <EnvironmentScopeSelector
-              selected={inviteEnvScope}
-              onChange={setInviteEnvScope}
-              disabled={isInviting}
+              selected={invite.environmentScope}
+              onChange={(environments) =>
+                dispatchInvite({ kind: "environments-changed", environments })
+              }
+              disabled={invite.isSubmitting}
             />
           )}
           <div className="flex justify-end gap-3 pt-4">
@@ -1425,13 +1434,13 @@ function OrganizationMembersPageContent({
             <button
               type="submit"
               disabled={
-                isInviting ||
-                !inviteEmail ||
-                (inviteEnvScopeApplies && inviteEnvScope.length === 0)
+                invite.isSubmitting ||
+                !invite.email ||
+                (inviteEnvScopeApplies && invite.environmentScope.length === 0)
               }
               className="rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
             >
-              {isInviting ? "Sending..." : "Send Invitation"}
+              {invite.isSubmitting ? "Sending..." : "Send Invitation"}
             </button>
           </div>
         </form>

@@ -226,7 +226,7 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
  * every query/mutation runs with a server-verified identity
  * (convex/auth.config.ts + ctx.auth.getUserIdentity()).
  */
-export function ConvexBoundaryProvider({ children }: { children: ReactNode }) {
+function ConvexBoundaryProvider({ children }: { children: ReactNode }) {
   return (
     <AuthKitProvider>
       <ConvexProviderWithAuth client={convex} useAuth={useConvexAuthFromWorkOS}>

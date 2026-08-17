@@ -4,6 +4,9 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { createAuthedConvexClient } from "@/lib/convex-client";
 import { sanitizeConvexError } from "@/lib/error-messages";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("api/integrations/start");
 import {
   encodeOAuthState,
   integrationAppUrlSupportsProvider,
@@ -13,7 +16,14 @@ import {
   parseIntegrationAppUrl,
 } from "@/lib/integration-oauth";
 
-export async function GET(
+/**
+ * POST, not GET: this hands back an authorize URL and sets the httpOnly OAuth
+ * state cookie that the callback validates against. A GET that writes a cookie
+ * can be fired by a link prefetch or a forged cross-site request, which would
+ * overwrite a live state cookie mid-flow. The only caller is the Connect
+ * button in the integrations settings panel, which posts to it directly.
+ */
+export async function POST(
   request: Request,
   { params }: { params: Promise<{ provider: string }> }
 ) {
@@ -54,7 +64,7 @@ export async function GET(
       );
     }
     if (status === 502) {
-      console.error("Integration eligibility lookup failed", error);
+      log.error("integration_eligibility_lookup_failed", { provider }, error);
       return NextResponse.json(
         { error: "Could not verify integration access. Try again." },
         { status: 502 }

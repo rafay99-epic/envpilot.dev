@@ -7,6 +7,19 @@ import { api } from "@convex/_generated/api";
 import { isPaymentsEnabled } from "@/lib/polar";
 import { sanitizeConvexError } from "@/lib/error-messages";
 
+export const dynamic = "force-dynamic";
+
+/**
+ * Every exit from this route is tied to one authenticated user and one
+ * single-use checkout session, so no cache (browser, CDN or Next's router)
+ * may replay it.
+ */
+function redirectNoStore(url: string | URL) {
+  const response = NextResponse.redirect(url);
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
 /**
  * GET /api/checkout?tier=<tier-name>   (default: "pro")
  *
@@ -34,7 +47,7 @@ export async function GET(req: Request) {
 
   // Check if payments are enabled (env var = outer gate)
   if (!isPaymentsEnabled()) {
-    return NextResponse.redirect(new URL("/pricing", url.origin));
+    return redirectNoStore(new URL("/pricing", url.origin));
   }
 
   // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
@@ -43,7 +56,7 @@ export async function GET(req: Request) {
     {}
   );
   if (!dbPaymentsEnabled) {
-    return NextResponse.redirect(new URL("/pricing", url.origin));
+    return redirectNoStore(new URL("/pricing", url.origin));
   }
 
   const tierName = url.searchParams.get("tier") ?? "pro";
@@ -55,7 +68,7 @@ export async function GET(req: Request) {
     // Redirect unauthenticated users to sign-in, then back to checkout
     const signInUrl = new URL("/sign-in", url.origin);
     signInUrl.searchParams.set("returnTo", url.pathname + url.search);
-    return NextResponse.redirect(signInUrl.toString());
+    return redirectNoStore(signInUrl.toString());
   }
 
   const accessToken = process.env.POLAR_ACCESS_TOKEN;
@@ -104,7 +117,7 @@ export async function GET(req: Request) {
   const redirectWithError = (message: string) => {
     const errorUrl = new URL("/dashboard/checkout-success", origin);
     errorUrl.searchParams.set("error", message);
-    return NextResponse.redirect(errorUrl.toString());
+    return redirectNoStore(errorUrl.toString());
   };
 
   // Resolve the Polar product from the tier SERVER-SIDE:
@@ -149,7 +162,7 @@ export async function GET(req: Request) {
       organizationId: primaryOrg._id,
     });
     if (checkoutState.status === "already_subscribed") {
-      return NextResponse.redirect(
+      return redirectNoStore(
         new URL("/dashboard/settings?tab=billing&notice=already-pro", origin)
       );
     }
@@ -252,7 +265,7 @@ export async function GET(req: Request) {
 
     const result = await polar.checkouts.create(checkoutParams);
 
-    return NextResponse.redirect(result.url);
+    return redirectNoStore(result.url);
   } catch (error) {
     console.error("Polar checkout error:", error);
     Sentry.captureException(error, {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
@@ -72,6 +72,35 @@ function expiryLine(expiresAt: number): string {
  * its index, and /d/[token]/[docSlug] passes the slug through so the same
  * gate chain hands back that one page.
  */
+/**
+ * Fetch the reader's state without touching React state.
+ *
+ * At module scope on purpose: the effect below needs a stable reference, and
+ * a useCallback inside the component would be manual memoization that React
+ * Compiler already handles. Taking token and slug as arguments makes it
+ * stable by construction instead.
+ */
+async function fetchReaderState(
+  token: string,
+  docSlug: string | undefined
+): Promise<{ step: Step; payload?: Payload }> {
+  try {
+    const query = docSlug ? `?docSlug=${encodeURIComponent(docSlug)}` : "";
+    // Credentials included so the unlock cookie travels once it exists.
+    const response = await fetch(`/api/doc-shares/${token}${query}`, {
+      credentials: "same-origin",
+    });
+    if (response.status === 401) return { step: "locked" };
+    // Kept apart from the uniform failure screen: the link is still valid,
+    // it is only the view bucket that is empty, and it refills.
+    if (response.status === 429) return { step: "rate_limited" };
+    if (!response.ok) return { step: "unavailable" };
+    return { step: "ready", payload: await response.json() };
+  } catch {
+    return { step: "unavailable" };
+  }
+}
+
 export function SharedDocReader({
   token,
   docSlug,
@@ -81,46 +110,34 @@ export function SharedDocReader({
 }) {
   const [step, setStep] = useState<Step>("loading");
   const [payload, setPayload] = useState<Payload | null>(null);
+  const passphraseFieldId = useId();
   const [passphrase, setPassphrase] = useState("");
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const [isUnlocking, setIsUnlocking] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const query = docSlug ? `?docSlug=${encodeURIComponent(docSlug)}` : "";
-      // Credentials included so the unlock cookie travels once it exists.
-      const response = await fetch(`/api/doc-shares/${token}${query}`, {
-        credentials: "same-origin",
-      });
-      if (response.status === 401) {
-        setStep("locked");
-        return;
-      }
-      // Kept apart from the uniform failure screen: the link is still valid,
-      // it is only the view bucket that is empty, and it refills.
-      if (response.status === 429) {
-        setStep("rate_limited");
-        return;
-      }
-      if (!response.ok) {
-        setStep("unavailable");
-        return;
-      }
-      const data = await response.json();
-      setPayload(data);
-      setStep("ready");
-    } catch {
-      setStep("unavailable");
-    }
-  }, [token, docSlug]);
+  // The state flag only lands on the next render, so a double submit would
+  // send two unlock attempts against the rate-limited endpoint. The ref shuts
+  // the window in the same tick.
+  const isUnlockingRef = useRef(false);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    // A changed token or slug must not let a late response overwrite the view
+    // the reader is now on.
+    let cancelled = false;
+    void fetchReaderState(token, docSlug).then((next) => {
+      if (cancelled) return;
+      if (next.payload) setPayload(next.payload);
+      setStep(next.step);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, docSlug]);
 
   const submitPassphrase = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (passphrase.length < MIN_PASSPHRASE_LENGTH || isUnlocking) return;
+    if (passphrase.length < MIN_PASSPHRASE_LENGTH || isUnlockingRef.current)
+      return;
+    isUnlockingRef.current = true;
     setIsUnlocking(true);
     setUnlockError(null);
     try {
@@ -130,19 +147,24 @@ export function SharedDocReader({
         credentials: "same-origin",
         body: JSON.stringify({ passphrase }),
       });
-      if (!response.ok) {
+      if (response.ok) {
+        setPassphrase("");
+        setStep("loading");
+        const next = await fetchReaderState(token, docSlug);
+        if (next.payload) setPayload(next.payload);
+        setStep(next.step);
+      } else {
         const data = await response.json().catch(() => ({}));
         setUnlockError(data.error ?? "Incorrect passphrase.");
-        return;
       }
-      setPassphrase("");
-      setStep("loading");
-      await load();
     } catch {
       setUnlockError("Something went wrong. Please try again.");
-    } finally {
-      setIsUnlocking(false);
     }
+    // Released after the try/catch rather than in a `finally` — the compiler
+    // bails on a component containing one. The catch swallows and no branch
+    // returns early, so every path reaches here.
+    isUnlockingRef.current = false;
+    setIsUnlocking(false);
   };
 
   if (step === "loading") {
@@ -210,14 +232,22 @@ export function SharedDocReader({
             The sender protected this document. They will have given you the
             passphrase separately.
           </p>
+          {/* sr-only: the heading and the paragraph above already name this
+              single field, and a fourth line of centred copy would only
+              repeat them. */}
+          <label htmlFor={passphraseFieldId} className="sr-only">
+            Passphrase
+          </label>
           <input
+            id={passphraseFieldId}
             type="password"
             value={passphrase}
             onChange={(event) => setPassphrase(event.target.value)}
             placeholder="Passphrase"
             autoFocus
             autoComplete="off"
-            className="w-full rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-sm text-ink outline-none placeholder:text-ink-faint focus:border-accent-line"
+            // 16px on phones, or iOS zooms the viewport on focus.
+            className="w-full rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-base text-ink outline-none placeholder:text-ink-faint focus:border-accent-line sm:text-sm"
           />
           {unlockError && (
             <p className="mt-3 text-center text-xs text-danger">

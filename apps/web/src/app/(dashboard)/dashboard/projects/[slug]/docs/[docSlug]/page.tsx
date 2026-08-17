@@ -1,28 +1,21 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useReducer, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import {
-  ArrowLeft,
-  GitPullRequest,
-  Pencil,
-  Send,
-  Share2,
-  Trash2,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { ConfirmDialog } from "@/components/ui";
 import { FeatureGate } from "@/components/tier/FeatureGate";
+import { DocEditor, DocSharesList, DocShareDrawer } from "@/components/docs";
+import { DocDetailHeader } from "@/components/docs/doc-detail-header";
 import {
-  DocEditor,
-  DocSharesList,
-  DocShareDrawer,
-  DocStatusPill,
-} from "@/components/docs";
+  docEditorReducer,
+  initialDocEditorState,
+} from "@/components/docs/doc-editor-state";
 import {
   useDocAccess,
   useProjectBySlug,
@@ -33,6 +26,7 @@ import {
   useDeleteDoc,
 } from "@/hooks";
 import { sanitizeConvexError } from "@/lib/error-messages";
+import { useTimeZone } from "@/hooks/useTimeZone";
 
 // Read mode is the common case and is the only one that renders markdown;
 // the module index never loads this chunk at all.
@@ -54,7 +48,16 @@ interface DocPageProps {
  */
 export default function DocDetailPage({ params }: DocPageProps) {
   const { slug, docSlug } = use(params);
+  // Everything below is per-page state — the editor draft, the notice, the
+  // open share drawer. Keying on the slug restarts it when another page is
+  // opened, which the App Router does not do on its own because the route
+  // stays the same.
+  return <DocDetailView key={docSlug} slug={slug} docSlug={docSlug} />;
+}
+
+function DocDetailView({ slug, docSlug }: { slug: string; docSlug: string }) {
   const router = useRouter();
+  const timeZone = useTimeZone();
   const { organization } = useAuthContext();
   const orgId = organization?.id as Id<"organizations"> | undefined;
 
@@ -69,13 +72,15 @@ export default function DocDetailPage({ params }: DocPageProps) {
   const unpublishDoc = useUnpublishDoc();
   const deleteDoc = useDeleteDoc();
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [draftBody, setDraftBody] = useState("");
-  const [draftTitle, setDraftTitle] = useState("");
-  const [warnings, setWarnings] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [isBusy, setIsBusy] = useState(false);
+  // The editor's fields move together, so they are one reducer rather than
+  // seven setters called in sequence. The two dialog toggles below are
+  // genuinely independent and stay as plain state.
+  const [editor, dispatch] = useReducer(
+    docEditorReducer,
+    initialDocEditorState
+  );
+  const { isEditing, draftBody, draftTitle, warnings, error, notice, isBusy } =
+    editor;
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
@@ -90,97 +95,71 @@ export default function DocDetailPage({ params }: DocPageProps) {
     docAccess?.canShareExternal === true ||
     docAccess?.externalUpgradeRequired === true;
 
-  // Seed the editor when a different page loads. Guarded on docSlug rather
-  // than the doc object so a live update from another tab cannot overwrite
-  // what the user is currently typing.
-  useEffect(() => {
-    setIsEditing(false);
-    setWarnings([]);
-    setError(null);
-    setNotice(null);
-    setShareOpen(false);
-  }, [docSlug]);
-
   const beginEdit = () => {
     if (!doc) return;
-    setDraftBody(doc.body);
-    setDraftTitle(doc.title);
-    setWarnings([]);
-    setError(null);
-    setIsEditing(true);
+    dispatch({ kind: "edit-started", title: doc.title, body: doc.body });
   };
 
   const handleSave = async () => {
     if (!doc) return;
-    setError(null);
-    setNotice(null);
-    setIsBusy(true);
+    dispatch({ kind: "request-started" });
     try {
       const result = await updateDoc({
         docId: doc._id,
         title: draftTitle,
         body: draftBody,
       });
-      setWarnings(result.warnings ?? []);
-      setIsEditing(false);
-      setNotice(
-        result.unpublished
-          ? "Saved. Editing a published page returns it to draft — publish again when it reads right."
-          : "Saved."
-      );
+      dispatch({
+        kind: "saved",
+        warnings: result.warnings ?? [],
+        notice: result.unpublished
+          ? "Saved. Editing a published page returns it to draft, so publish again when it reads right."
+          : "Saved.",
+      });
       // The title change may have moved the slug, so follow it.
       if (result.slug !== docSlug) {
         router.replace(`/dashboard/projects/${slug}/docs/${result.slug}`);
       }
     } catch (e) {
-      setError(sanitizeConvexError(e));
-    } finally {
-      setIsBusy(false);
+      dispatch({ kind: "request-failed", error: sanitizeConvexError(e) });
     }
   };
 
   const handlePublish = async () => {
     if (!doc) return;
-    setError(null);
-    setNotice(null);
-    setIsBusy(true);
+    dispatch({ kind: "request-started" });
     try {
       await publishDoc({ docId: doc._id });
-      setNotice("Published.");
+      dispatch({ kind: "request-succeeded", notice: "Published." });
     } catch (e) {
-      setError(sanitizeConvexError(e));
-    } finally {
-      setIsBusy(false);
+      dispatch({ kind: "request-failed", error: sanitizeConvexError(e) });
     }
   };
 
   const handleUnpublish = async () => {
     if (!doc) return;
-    setError(null);
-    setNotice(null);
-    setIsBusy(true);
+    dispatch({ kind: "request-started" });
     try {
       await unpublishDoc({ docId: doc._id });
-      setNotice("Returned to draft.");
+      dispatch({ kind: "request-succeeded", notice: "Returned to draft." });
     } catch (e) {
-      setError(sanitizeConvexError(e));
-    } finally {
-      setIsBusy(false);
+      dispatch({ kind: "request-failed", error: sanitizeConvexError(e) });
     }
   };
 
   const handleDelete = async () => {
     if (!doc) return;
-    setIsBusy(true);
+    dispatch({ kind: "request-started" });
     try {
       await deleteDoc({ docId: doc._id });
       router.push(`/dashboard/projects/${slug}/docs`);
     } catch (e) {
-      setError(sanitizeConvexError(e));
-      setIsBusy(false);
-    } finally {
-      setConfirmDelete(false);
+      dispatch({ kind: "request-failed", error: sanitizeConvexError(e) });
     }
+    // Closed after the try/catch rather than in a finally block: React
+    // Compiler bails on any function holding a try with a finalizer, and the
+    // catch above swallows, so this runs on both paths.
+    setConfirmDelete(false);
   };
 
   if (isLoadingProject) return <TerminalLoading fullPage />;
@@ -224,151 +203,24 @@ export default function DocDetailPage({ params }: DocPageProps) {
           <TerminalLoading />
         ) : (
           <>
-            {/* One header block. The title used to render twice while
-                editing — a static h1 plus the edit input — under four more
-                rows. The input IS the title; the rest is one meta line. */}
-            <div
-              className={`flex shrink-0 items-start justify-between gap-4 ${
-                isEditing ? "mx-auto w-full max-w-[920px] px-4" : ""
-              }`}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  {isEditing ? (
-                    <input
-                      value={draftTitle}
-                      onChange={(e) => setDraftTitle(e.target.value)}
-                      maxLength={200}
-                      data-testid="doc-title-edit"
-                      aria-label="Page title"
-                      placeholder="Page title"
-                      className="min-w-0 flex-1 border-0 bg-transparent p-0 text-2xl font-bold text-ink outline-none placeholder:text-ink-subtle"
-                    />
-                  ) : (
-                    <h1
-                      data-testid="doc-title"
-                      className="min-w-0 truncate text-2xl font-bold text-ink"
-                    >
-                      {doc.title}
-                    </h1>
-                  )}
-                  <DocStatusPill status={doc.status} />
-                </div>
-
-                <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-ink-subtle">
-                  <span className="text-ink-muted">{doc.module}</span>
-                  <span aria-hidden>·</span>
-                  <span>{doc.authorName}</span>
-                  <span aria-hidden>·</span>
-                  <span>{new Date(doc.updatedAt).toLocaleDateString()}</span>
-                  {doc.prUrl && (
-                    <>
-                      <span aria-hidden>·</span>
-                      <a
-                        href={doc.prUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-accent hover:underline"
-                      >
-                        <GitPullRequest className="h-3 w-3" />
-                        Pull request
-                      </a>
-                    </>
-                  )}
-                </p>
-              </div>
-
-              {(doc.canEdit ||
-                doc.canPublish ||
-                doc.canDelete ||
-                canOpenShare) && (
-                <div className="flex shrink-0 items-center gap-2">
-                  {isEditing ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setIsEditing(false)}
-                        disabled={isBusy}
-                        className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="doc-save"
-                        onClick={handleSave}
-                        disabled={isBusy}
-                        className="rounded-lg bg-ink px-4 py-1.5 text-sm font-medium text-ink-inverse transition-colors hover:bg-ink-muted disabled:opacity-50"
-                      >
-                        {isBusy ? "Saving…" : "Save"}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {canOpenShare && doc.status === "published" && (
-                        <button
-                          type="button"
-                          data-testid="doc-share"
-                          onClick={() => setShareOpen(true)}
-                          title="Share this page"
-                          aria-label="Share this page"
-                          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
-                        >
-                          <Share2 className="h-4 w-4" />
-                          Share
-                        </button>
-                      )}
-                      {doc.canDelete && (
-                        <button
-                          type="button"
-                          data-testid="doc-delete"
-                          onClick={() => setConfirmDelete(true)}
-                          title="Move to trash"
-                          aria-label="Move to trash"
-                          className="rounded-lg p-2 text-ink-subtle transition-colors hover:bg-danger-soft hover:text-danger"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                      {doc.canEdit && (
-                        <button
-                          type="button"
-                          data-testid="doc-edit"
-                          onClick={beginEdit}
-                          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
-                        >
-                          <Pencil className="h-4 w-4" />
-                          Edit
-                        </button>
-                      )}
-                      {doc.canPublish &&
-                        (doc.status === "draft" ? (
-                          <button
-                            type="button"
-                            data-testid="doc-publish"
-                            onClick={handlePublish}
-                            disabled={isBusy}
-                            className="flex items-center gap-1.5 rounded-lg bg-ink px-4 py-1.5 text-sm font-medium text-ink-inverse transition-colors hover:bg-ink-muted disabled:opacity-50"
-                          >
-                            <Send className="h-3.5 w-3.5" />
-                            Publish
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            data-testid="doc-unpublish"
-                            onClick={handleUnpublish}
-                            disabled={isBusy}
-                            className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
-                          >
-                            Return to draft
-                          </button>
-                        ))}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
+            <DocDetailHeader
+              doc={doc}
+              isEditing={isEditing}
+              isBusy={isBusy}
+              draftTitle={draftTitle}
+              timeZone={timeZone}
+              canOpenShare={canOpenShare}
+              onTitleChange={(title) =>
+                dispatch({ kind: "title-changed", title })
+              }
+              onBeginEdit={beginEdit}
+              onCancelEdit={() => dispatch({ kind: "edit-cancelled" })}
+              onSave={handleSave}
+              onPublish={handlePublish}
+              onUnpublish={handleUnpublish}
+              onShare={() => setShareOpen(true)}
+              onDelete={() => setConfirmDelete(true)}
+            />
 
             {/* What publishing actually changes. */}
             {doc.status === "draft" && !isEditing && (
@@ -395,7 +247,7 @@ export default function DocDetailPage({ params }: DocPageProps) {
               <div className="min-h-0 flex-1">
                 <DocEditor
                   body={draftBody}
-                  onChange={setDraftBody}
+                  onChange={(body) => dispatch({ kind: "body-changed", body })}
                   warnings={warnings}
                   disabled={isBusy}
                 />

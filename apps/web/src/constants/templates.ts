@@ -168,24 +168,6 @@ export interface EnvironmentTemplate {
 }
 
 /**
- * Category display information
- */
-export const VARIABLE_CATEGORIES: Record<
-  TemplateVariableCategory,
-  { label: string; icon: string }
-> = {
-  database: { label: "Database", icon: "database" },
-  authentication: { label: "Authentication", icon: "shield-check" },
-  api: { label: "API & Services", icon: "plug" },
-  storage: { label: "Storage", icon: "hard-drive" },
-  email: { label: "Email", icon: "mail" },
-  monitoring: { label: "Monitoring", icon: "bar-chart-3" },
-  payment: { label: "Payment", icon: "credit-card" },
-  general: { label: "General", icon: "settings" },
-  deployment: { label: "Deployment", icon: "rocket" },
-} as const;
-
-/**
  * Project type display information
  * Icons are Lucide icon names used as fallback when SVGL logos fail to load
  */
@@ -2433,77 +2415,3 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
     ],
   },
 ];
-
-/**
- * Get a template by its ID
- */
-export function getTemplateById(id: string): EnvironmentTemplate | undefined {
-  return BUILT_IN_TEMPLATES.find((template) => template.id === id);
-}
-
-/**
- * Get templates by project type
- */
-export function getTemplatesByProjectType(
-  projectType: ProjectType
-): EnvironmentTemplate[] {
-  return BUILT_IN_TEMPLATES.filter(
-    (template) => template.projectType === projectType
-  );
-}
-
-/**
- * Get templates by category
- */
-export function getTemplatesByCategory(
-  category: TemplateCategory
-): EnvironmentTemplate[] {
-  return BUILT_IN_TEMPLATES.filter(
-    (template) => template.category === category
-  );
-}
-
-/**
- * Get popular/featured templates
- */
-export function getPopularTemplates(): EnvironmentTemplate[] {
-  return BUILT_IN_TEMPLATES.filter((template) => template.isPopular);
-}
-
-/**
- * Search templates by tags or name
- */
-export function searchTemplates(query: string): EnvironmentTemplate[] {
-  const normalizedQuery = query.toLowerCase();
-  return BUILT_IN_TEMPLATES.filter(
-    (template) =>
-      template.name.toLowerCase().includes(normalizedQuery) ||
-      template.description.toLowerCase().includes(normalizedQuery) ||
-      template.tags.some((tag) => tag.toLowerCase().includes(normalizedQuery))
-  );
-}
-
-/**
- * Group template variables by category
- */
-export function groupVariablesByCategory(
-  variables: TemplateVariable[]
-): Record<TemplateVariableCategory, TemplateVariable[]> {
-  const grouped: Record<TemplateVariableCategory, TemplateVariable[]> = {
-    database: [],
-    authentication: [],
-    api: [],
-    storage: [],
-    email: [],
-    monitoring: [],
-    payment: [],
-    general: [],
-    deployment: [],
-  };
-
-  for (const variable of variables) {
-    grouped[variable.category].push(variable);
-  }
-
-  return grouped;
-}

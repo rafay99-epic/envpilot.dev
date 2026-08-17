@@ -5,6 +5,8 @@ import { FileText, FolderOpen, Inbox } from "lucide-react";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { PageHeader } from "@envpilot/ui";
 import { useSharedWithMe } from "@/hooks";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDate } from "@/lib/format";
 
 /**
  * Pages teammates handed to the reader.
@@ -16,6 +18,7 @@ import { useSharedWithMe } from "@/hooks";
  */
 export default function SharedDocsPage() {
   const shares = useSharedWithMe();
+  const timeZone = useTimeZone();
 
   return (
     <div className="space-y-5 pt-6">
@@ -75,7 +78,7 @@ export default function SharedDocsPage() {
                     )}
                   </div>
                   <span className="shrink-0 font-mono text-[11px] text-ink-faint">
-                    expires {new Date(share.expiresAt).toLocaleDateString()}
+                    expires {formatDate(share.expiresAt, timeZone)}
                   </span>
                 </div>
               </Link>

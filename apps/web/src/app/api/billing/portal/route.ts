@@ -10,7 +10,7 @@ import { reportApiError } from "@/lib/api-errors";
 
 const portalSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
-  returnUrl: z.string().url("Return URL must be a valid URL").optional(),
+  returnUrl: z.url("Return URL must be a valid URL").optional(),
 });
 
 /**

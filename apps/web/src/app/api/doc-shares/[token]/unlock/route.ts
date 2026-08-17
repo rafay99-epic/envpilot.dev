@@ -31,15 +31,18 @@ const unlockSchema = z.object({
  * the same 401. The endpoint never confirms that a token exists — otherwise
  * it is an oracle for probing which of them do.
  */
+// noindex on the API too, not just the page: a shared document must never
+// become a search result, whichever surface a crawler reaches first.
+const NOINDEX_HEADERS = { "X-Robots-Tag": "noindex, nofollow, noarchive" };
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
-  const headers = { "X-Robots-Tag": "noindex, nofollow, noarchive" };
   const rejection = NextResponse.json(
     { error: "Incorrect passphrase." },
-    { status: 401, headers }
+    { status: 401, headers: NOINDEX_HEADERS }
   );
 
   try {
@@ -67,7 +70,10 @@ export async function POST(
     );
     if (!verified.ok) return rejection;
 
-    const response = NextResponse.json({ status: "ok" }, { headers });
+    const response = NextResponse.json(
+      { status: "ok" },
+      { headers: NOINDEX_HEADERS }
+    );
     response.cookies.set({
       name: unlockCookieName(token),
       value: passphraseHash,
@@ -85,7 +91,7 @@ export async function POST(
     if (isRateLimitError(error)) {
       return NextResponse.json(
         { error: "Too many attempts. Please try again later." },
-        { status: 429, headers }
+        { status: 429, headers: NOINDEX_HEADERS }
       );
     }
     return rejection;

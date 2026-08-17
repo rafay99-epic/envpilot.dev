@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use } from "react";
+import { useId, useState, use } from "react";
 import Link from "next/link";
 import { KeyRound } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
@@ -65,6 +65,8 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
   const updateAccount = useUpdateAccount();
   const deleteAccount = useDeleteAccount();
   const revealAccount = useRevealAccount();
+
+  const environmentFilterLabelId = useId();
 
   // ── UI state ──
   const [notice, setNotice] = useState<string | null>(null);
@@ -274,10 +276,19 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
 
         {/* Environment filter */}
         <div className="flex flex-wrap items-center gap-4">
-          <label className="text-sm font-medium text-ink-muted">
+          {/* Names the whole button group, so a span + role="group" rather
+              than a <label>, which may only name a single control. */}
+          <span
+            id={environmentFilterLabelId}
+            className="text-sm font-medium text-ink-muted"
+          >
             Environment:
-          </label>
-          <div className="flex gap-2">
+          </span>
+          <div
+            role="group"
+            aria-labelledby={environmentFilterLabelId}
+            className="flex gap-2"
+          >
             <button
               onClick={() => setSelectedEnvironment("all")}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${

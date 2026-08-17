@@ -1,3 +1,4 @@
+import { jsonLdScript } from "@envpilot/ui";
 import type { Metadata } from "next";
 import LandingPage from "@/components/landing/LandingPage";
 import { convex } from "@/lib/convex-client";
@@ -64,11 +65,11 @@ export default async function HomePage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(softwareAppSchema) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(faqSchema) }}
       />
       <LandingPage
         pricingData={pricingData}

@@ -8,6 +8,12 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { TerminalWindow } from "@/components/dashboard/terminal-ui";
+import { formatDateWith } from "@/lib/format";
+
+// Buckets are keyed by UTC day, so ticks are parsed and rendered in UTC and
+// never land a day off for the reader's zone.
+const formatDate = (value: string) =>
+  formatDateWith(`${value}T00:00:00Z`, { month: "short", day: "numeric" });
 
 const chartConfig = {
   count: {
@@ -34,11 +40,6 @@ export function ActivityChart({ dailyCounts, daysBack }: ActivityChartProps) {
       count: dailyCounts[key] ?? 0,
     });
   }
-
-  const formatDate = (value: string) => {
-    const d = new Date(value + "T00:00:00");
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  };
 
   return (
     <TerminalWindow title="activity-overview">

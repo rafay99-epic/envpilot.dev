@@ -8,6 +8,8 @@ import { AlertTriangle, ArrowLeft, FileText } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { useMarkShareViewed, useSharedDoc } from "@/hooks";
+import { useTimeZone } from "@/hooks/useTimeZone";
+import { formatDate } from "@/lib/format";
 
 const DocMarkdown = dynamic(
   () => import("@/components/docs/doc-markdown").then((m) => m.DocMarkdown),
@@ -36,6 +38,7 @@ export default function SharedDocReaderPage({
   const [openSlug, setOpenSlug] = useState<string | undefined>(undefined);
 
   const shared = useSharedDoc(shareId as Id<"docShares">, openSlug);
+  const timeZone = useTimeZone();
   const markViewed = useMarkShareViewed();
   const recorded = useRef<string | null>(null);
 
@@ -99,6 +102,16 @@ export default function SharedDocReaderPage({
     );
   }
 
+  // The effect above is sending this reader to the real page. Hold the
+  // loading state rather than painting the stripped-down copy for a frame.
+  if (shared.kind === "page" && shared.projectSlug) {
+    return (
+      <div className="pt-6">
+        <TerminalLoading />
+      </div>
+    );
+  }
+
   // ── Module index ────────────────────────────────────────────────────────
   if (shared.kind === "module") {
     const { module } = shared;
@@ -121,7 +134,7 @@ export default function SharedDocReaderPage({
           </h1>
           <p className="mt-1 text-xs text-ink-subtle">
             Shared by {module.sharedByName} · access expires{" "}
-            {new Date(module.expiresAt).toLocaleDateString()}
+            {formatDate(module.expiresAt, timeZone)}
           </p>
         </div>
 
@@ -193,7 +206,7 @@ export default function SharedDocReaderPage({
         <h1 className="mt-1.5 text-2xl font-bold text-ink">{doc.title}</h1>
         <p className="mt-1 text-xs text-ink-subtle">
           Written by {doc.authorName} · shared by {doc.sharedByName} · access
-          expires {new Date(doc.expiresAt).toLocaleDateString()}
+          expires {formatDate(doc.expiresAt, timeZone)}
         </p>
       </div>
 

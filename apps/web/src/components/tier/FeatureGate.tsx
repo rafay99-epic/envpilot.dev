@@ -147,19 +147,19 @@ interface ProOnlyBadgeProps {
 /**
  * Badge indicating a feature is Pro-only
  */
+const PRO_BADGE_SIZE_CLASSES = {
+  sm: "text-[10px] px-1.5 py-0.5",
+  md: "text-xs px-2 py-0.5",
+};
+
 export function ProOnlyBadge({
   size = "sm",
   showTooltip = true,
   tooltipText = "Pro feature",
 }: ProOnlyBadgeProps) {
-  const sizeClasses = {
-    sm: "text-[10px] px-1.5 py-0.5",
-    md: "text-xs px-2 py-0.5",
-  };
-
   return (
     <span
-      className={`inline-flex items-center gap-0.5 font-medium rounded-full bg-linear-to-r from-premium-line to-info-line text-white ${sizeClasses[size]}`}
+      className={`inline-flex items-center gap-0.5 font-medium rounded-full bg-linear-to-r from-premium-line to-info-line text-white ${PRO_BADGE_SIZE_CLASSES[size]}`}
       title={showTooltip ? tooltipText : undefined}
     >
       <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">

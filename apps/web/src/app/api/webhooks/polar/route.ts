@@ -7,6 +7,9 @@ import * as Sentry from "@sentry/nextjs";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { getPolarWebhookSecret, isPaymentsEnabled } from "@/lib/polar";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("api/webhooks/polar");
 
 /**
  * Polar.sh Webhook Handler
@@ -38,7 +41,9 @@ export async function POST(request: Request) {
   const webhookSecret = getPolarWebhookSecret();
 
   if (!webhookSecret) {
-    console.error("Polar webhook secret is not configured");
+    // Alerts on purpose: without this, every Polar webhook 503s, so a
+    // customer can pay and never be upgraded, with nothing to show it.
+    log.error("polar_webhook_secret_missing");
     return NextResponse.json(
       { error: "Payment system is not configured" },
       { status: 503 }
@@ -58,14 +63,17 @@ export async function POST(request: Request) {
     event = validateEvent(body, headers, webhookSecret);
   } catch (err) {
     if (err instanceof WebhookVerificationError) {
-      console.error("Webhook signature verification failed:", err.message);
+      // warn, not error: unsigned probes hit this route constantly, and
+      // alerting on each one would bury the failures that matter. It shows
+      // up as context on any later Issue.
+      log.warn("polar_webhook_signature_invalid", { reason: err.message });
       return NextResponse.json(
         { error: "Webhook signature verification failed" },
         { status: 403 }
       );
     }
     const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("Webhook verification error:", message);
+    log.warn("polar_webhook_verification_failed", { reason: message });
     return NextResponse.json(
       { error: `Webhook verification failed: ${message}` },
       { status: 400 }
@@ -77,7 +85,11 @@ export async function POST(request: Request) {
   // action re-authenticates every call via this shared bridge secret.
   const bridgeSecret = process.env.BILLING_WEBHOOK_BRIDGE_SECRET;
   if (!bridgeSecret) {
-    console.error("BILLING_WEBHOOK_BRIDGE_SECRET is not configured");
+    // Same class of failure as the missing webhook secret: verified events
+    // arrive and are then dropped before Convex ever sees them.
+    log.error("billing_webhook_bridge_secret_missing", {
+      eventType: event.type,
+    });
     return NextResponse.json(
       { error: "Payment system is not configured" },
       { status: 503 }
@@ -100,7 +112,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("Error processing webhook:", error);
     // Money path — Convex dispatch failed after signature verification
     // succeeded. Capture with event context (never the raw payload/secret).
     Sentry.captureException(error, {

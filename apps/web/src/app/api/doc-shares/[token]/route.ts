@@ -19,6 +19,10 @@ import { unlockCookieName } from "@/lib/doc-share-crypto";
  * Unknown, revoked, expired, unpublished and downgraded all produce the same
  * 404 body. Nothing here tells a prober which one it hit.
  */
+// noindex on the API too, not just the page: a shared document must never
+// become a search result, whichever surface a crawler reaches first.
+const NOINDEX_HEADERS = { "X-Robots-Tag": "noindex, nofollow, noarchive" };
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ token: string }> }
@@ -30,7 +34,6 @@ export async function GET(
 
   // noindex on the API too, not just the page: a shared document must never
   // become a search result, whichever surface a crawler reaches first.
-  const headers = { "X-Robots-Tag": "noindex, nofollow, noarchive" };
 
   try {
     const jar = await cookies();
@@ -50,31 +53,31 @@ export async function GET(
     if (result.status === "locked") {
       return NextResponse.json(
         { status: "locked", salt: result.salt },
-        { status: 401, headers }
+        { status: 401, headers: NOINDEX_HEADERS }
       );
     }
     if (result.status !== "ok") {
       return NextResponse.json(
         { error: "This link is invalid, expired, or was revoked." },
-        { status: 404, headers }
+        { status: 404, headers: NOINDEX_HEADERS }
       );
     }
 
     // Forwarded whole: the mutation already returns the shaped public view
     // (a module index, or one page), and nothing else.
-    return NextResponse.json(result, { headers });
+    return NextResponse.json(result, { headers: NOINDEX_HEADERS });
   } catch (error) {
     if (isRateLimitError(error)) {
       return NextResponse.json(
         { error: "Too many attempts. Please try again later." },
-        { status: 429, headers }
+        { status: 429, headers: NOINDEX_HEADERS }
       );
     }
     // Deliberately uniform: an unexpected failure must not be distinguishable
     // from a bad token either.
     return NextResponse.json(
       { error: "This link is invalid, expired, or was revoked." },
-      { status: 404, headers }
+      { status: 404, headers: NOINDEX_HEADERS }
     );
   }
 }

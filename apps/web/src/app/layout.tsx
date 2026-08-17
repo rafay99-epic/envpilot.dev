@@ -1,3 +1,4 @@
+import { jsonLdScript } from "@envpilot/ui";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -15,7 +16,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.envpilot.dev";
+const CANONICAL_URL = "https://www.envpilot.dev";
+
+// `new URL()` throws on a malformed string, and this runs at module scope in
+// the root layout, so a typo in NEXT_PUBLIC_APP_URL (a missing protocol is the
+// easy one) would take down every route with a stack trace rather than
+// anything a reader could act on. Fall back to the canonical origin so
+// metadata stays valid whatever the environment carries.
+const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
+const baseUrl =
+  configuredUrl && URL.canParse(configuredUrl) ? configuredUrl : CANONICAL_URL;
 
 const ogImagePng = `${baseUrl}/og-image.png`;
 const ogImageJpg = `${baseUrl}/og-image.jpg`;
@@ -27,7 +37,10 @@ export const metadata: Metadata = {
   },
   description:
     "Envpilot keeps your team's environment variables in sync — CLI, VS Code extension, and web dashboard with role-based access control.",
-  metadataBase: new URL(baseUrl),
+  // Second argument is the base: single-argument `new URL()` throws on a
+  // malformed string, while resolving against the canonical origin cannot.
+  // `baseUrl` is already validated above, so this is the belt to that braces.
+  metadataBase: new URL(baseUrl, CANONICAL_URL),
   // NOTE: no root-level `alternates.canonical` — it would be inherited by
   // every page that doesn't override it, telling crawlers all subpages are
   // duplicates of the homepage. Each page sets its own canonical instead.
@@ -136,7 +149,7 @@ export default function RootLayout({
       >
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData) }}
         />
         {/* Plain <script>, never next/script: `beforeInteractive` emits a
             client-rendered <script> that React 19.2 rejects. */}

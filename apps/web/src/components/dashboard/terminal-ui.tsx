@@ -143,6 +143,15 @@ export function TerminalButtonLink({
   );
 }
 
+const BADGE_COLORS = {
+  green: "bg-accent-soft text-accent border-accent-line",
+  amber: "bg-warning-soft text-warning border-warning-line",
+  red: "bg-danger-soft text-danger border-danger-line",
+  zinc: "bg-surface-raised text-ink-muted border-line",
+  blue: "bg-info-soft text-info border-info-line",
+  purple: "bg-premium-soft text-premium border-premium-line",
+};
+
 export function TerminalBadge({
   children,
   color = "green",
@@ -152,18 +161,9 @@ export function TerminalBadge({
   color?: "green" | "amber" | "red" | "zinc" | "blue" | "purple";
   className?: string;
 }) {
-  const colors = {
-    green: "bg-accent-soft text-accent border-accent-line",
-    amber: "bg-warning-soft text-warning border-warning-line",
-    red: "bg-danger-soft text-danger border-danger-line",
-    zinc: "bg-surface-raised text-ink-muted border-line",
-    blue: "bg-info-soft text-info border-info-line",
-    purple: "bg-premium-soft text-premium border-premium-line",
-  };
-
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${colors[color]} ${className}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${BADGE_COLORS[color]} ${className}`}
     >
       {children}
     </span>
