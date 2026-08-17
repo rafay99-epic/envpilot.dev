@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { SITE_URLS } from "@envpilot/ui";
+import { jsonLdScript, SITE_URLS } from "@envpilot/ui";
 import { BlogShell } from "@/components/shell";
 import { getAllPosts } from "@/lib/content";
 import { BlogListClient } from "@/components/BlogListClient";
@@ -47,7 +47,7 @@ export default function BlogPage() {
     <BlogShell>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(blogSchema) }}
       />
       {/* ── Compact hero ───────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-line">

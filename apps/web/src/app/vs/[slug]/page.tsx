@@ -1,3 +1,4 @@
+import { jsonLdScript } from "@envpilot/ui";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -10,7 +11,6 @@ import {
   terminal,
 } from "@/components/marketing";
 import { COMPARISONS, getComparisonBySlug } from "@/lib/comparisons";
-import { jsonLdScript } from "@/lib/json-ld";
 
 interface PageProps {
   params: Promise<{ slug: string }>;

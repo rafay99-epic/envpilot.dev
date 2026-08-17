@@ -1,10 +1,10 @@
+import { jsonLdScript } from "@envpilot/ui";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
-import { jsonLdScript } from "@/lib/json-ld";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

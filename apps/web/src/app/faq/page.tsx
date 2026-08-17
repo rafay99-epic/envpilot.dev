@@ -1,9 +1,9 @@
+import { jsonLdScript } from "@envpilot/ui";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { MarketingShell, PageHero, terminal } from "@/components/marketing";
 import { ScrollSpySidebar } from "@/components/ui/ScrollSpySidebar";
 import { FAQAccordion } from "@/components/faq/FAQAccordion";
-import { jsonLdScript } from "@/lib/json-ld";
 
 export const metadata: Metadata = {
   title: "FAQ | Envpilot",

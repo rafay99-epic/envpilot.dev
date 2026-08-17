@@ -6,15 +6,16 @@ import rehypePrettyCode from "rehype-pretty-code";
 import { format, parseISO } from "date-fns";
 import { getPostBySlug, getAllPosts } from "@/lib/content";
 import {
-  docsComponents,
-  SITE_URLS,
-  GlowDivider,
   AuroraGlow,
+  docsComponents,
+  GlowDivider,
   GridLines,
-  Noise,
-  Reveal,
+  jsonLdScript,
   MermaidChart,
+  Noise,
   remarkMermaid,
+  Reveal,
+  SITE_URLS,
 } from "@envpilot/ui";
 import { BlogShell } from "@/components/shell";
 import Link from "next/link";
@@ -150,7 +151,7 @@ export default async function BlogPostPage({ params }: PageProps) {
     <BlogShell>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPostingSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(blogPostingSchema) }}
       />
       <div className="relative overflow-hidden">
         <div

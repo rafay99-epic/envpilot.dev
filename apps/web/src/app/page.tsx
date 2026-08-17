@@ -1,10 +1,10 @@
+import { jsonLdScript } from "@envpilot/ui";
 import type { Metadata } from "next";
 import LandingPage from "@/components/landing/LandingPage";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { PricingData } from "@/components/pricing/PricingContent";
 import { FAQ_ITEMS } from "@/components/landing/faq-data";
-import { jsonLdScript } from "@/lib/json-ld";
 
 export const revalidate = 300; // refresh pricing data every 5 minutes
 

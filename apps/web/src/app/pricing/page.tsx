@@ -1,3 +1,4 @@
+import { jsonLdScript } from "@envpilot/ui";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { convex } from "@/lib/convex-client";
@@ -14,7 +15,6 @@ import {
   PricingContent,
   type PricingData,
 } from "@/components/pricing/PricingContent";
-import { jsonLdScript } from "@/lib/json-ld";
 
 export const metadata: Metadata = {
   title: "Pricing | Envpilot",
