@@ -9,6 +9,8 @@ import {
 } from "@/components/dashboard/terminal-ui";
 import { useUnsavedChanges } from "@/hooks";
 import { useTimeZone } from "@/hooks/useTimeZone";
+import { useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
 import { formatDateWith } from "@/lib/format";
 
 /** "August 2026" — the member-since line. */
@@ -32,6 +34,7 @@ const HELP_LINKS = [
 ];
 
 export function GeneralSettings({ user }: { user: AccountUser | null }) {
+  const updateProfile = useMutation(api.features.users.users.updateProfile);
   // The snapshot is what "discard" restores and what dirtiness is measured
   // against — it advances only on a successful save.
   const [snapshot, setSnapshot] = useState({
@@ -57,16 +60,11 @@ export function GeneralSettings({ user }: { user: AccountUser | null }) {
     const sent = form;
 
     try {
-      const res = await fetch("/api/users/me", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sent),
+      // The users row stores one `name`; the form edits it as two fields.
+      // That join used to happen in the route.
+      await updateProfile({
+        name: `${sent.firstName} ${sent.lastName}`.trim(),
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to save");
-      }
 
       setSnapshot(sent);
       setSaveMessage({ type: "success", text: "Profile updated" });

@@ -38,12 +38,13 @@ import {
   TagFilter,
   type VariableFormData,
 } from "@/components/variables";
+import { BulkJobProgress } from "@/components/variables/BulkJobProgress";
+import { useRevealSecret } from "@/hooks/useRevealSecret";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { useIsMacPlatform } from "@/hooks/useIsMacPlatform";
-import { ApiError } from "@/lib/api-client";
+import { sanitizeConvexError, isTierLimitError } from "@/lib/error-messages";
 import { createLogger } from "@/lib/logger";
-// Variable CRUD mutations MUST stay as API routes (WorkOS Vault integration)
 import {
   useCreateVariable,
   useUpdateVariable,
@@ -186,6 +187,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const deleteVariable = useDeleteVariable();
   const bulkDelete = useBulkDeleteVariables();
   const rollbackVariable = useRollbackVariable();
+  const revealSecret = useRevealSecret();
 
   // --- Local UI state ---
   const [notice, setNotice] = useState<string | null>(null);
@@ -320,20 +322,15 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         setNotice("Variable created successfully.");
       }
     } catch (err) {
-      const isDuplicateKey =
-        err instanceof ApiError &&
-        err.status === 409 &&
-        /already exists/i.test(err.message);
-      const message =
-        err instanceof ApiError && err.code === "TIER_LIMIT_REACHED"
-          ? "Variable limit reached. Upgrade to Pro for unlimited variables."
-          : isDuplicateKey
-            ? // The backend names the clashing environment(s) — surface it
-              // verbatim (same key across DIFFERENT environments is legal).
-              err.message
-            : err instanceof Error
-              ? err.message
-              : "Failed to create variable";
+      // Convex redacts plain Error messages to "Server Error" in production,
+      // so the readable text only survives inside a ConvexError payload.
+      // sanitizeConvexError unwraps it; the classifiers read the result.
+      const raw = sanitizeConvexError(err);
+      const message = isTierLimitError(raw)
+        ? "Variable limit reached. Upgrade to Pro for unlimited variables."
+        : // A conflict names the clashing environment(s) — surface it
+          // verbatim (same key across DIFFERENT environments is legal).
+          raw || "Failed to create variable";
       log.error(
         "project_variable_create_failed",
         {
@@ -341,7 +338,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           organizationId: organization?.id,
           key: data.key,
           environments: data.environments,
-          code: err instanceof ApiError ? err.code : undefined,
         },
         err
       );
@@ -481,31 +477,14 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
     setRevealingIds((prev) => new Set(prev).add(variable._id));
     try {
-      const res = await fetch(
-        `/api/vault?vaultRef=${encodeURIComponent(variable.vaultRef)}&organizationId=${encodeURIComponent(organization.id)}`
-      );
-      // An expired session makes the auth middleware redirect this fetch to
-      // the HTML sign-in page (a followed redirect, so res.ok is TRUE) —
-      // calling res.json() on it throws `Unexpected token '<'`. Check the
-      // content type before parsing. Only the HTML/redirect shape gets the
-      // session-expired message; any other non-JSON response (plain-text
-      // 500, gateway error page) reports its status instead.
-      const contentType = res.headers.get("content-type") ?? "";
-      if (!contentType.includes("application/json")) {
-        if (res.redirected || contentType.includes("text/html")) {
-          throw new Error(
-            "Your session has expired. Please refresh the page and sign in again."
-          );
-        }
-        throw new Error(
-          `Failed to read secret (unexpected ${res.status} response).`
-        );
-      }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to read secret");
+      // Over the Convex socket, so the whole "an expired session redirects
+      // this fetch to the HTML sign-in page and res.json() chokes on '<'"
+      // problem does not exist: there is no redirect to follow and no
+      // content-type to sniff. Convex reports auth failure as an error.
+      const value = await revealSecret(variable.vaultRef);
       setRevealedValues((prev) => ({
         ...prev,
-        [variable._id]: data.data.value,
+        [variable._id]: value,
       }));
     } catch (err) {
       log.error(
@@ -653,6 +632,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           </>
         }
       />
+
+      {/* Live vault progress for template provisioning, import and export.
+          Renders itself to null when nothing is running. */}
+      <BulkJobProgress projectId={project._id} />
 
       {notice && (
         <div className="rounded-lg border p-4 border-accent-line bg-accent-soft">
@@ -1107,13 +1090,12 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           organizationId={orgId}
           projectId={projectId}
           onRevealValue={async () => {
-            if (!sharingVariable.vaultRef || !organization?.id) return null;
-            const res = await fetch(
-              `/api/vault?vaultRef=${encodeURIComponent(sharingVariable.vaultRef)}&organizationId=${encodeURIComponent(organization.id)}`
-            );
-            const data = await res.json();
-            if (!res.ok) return null;
-            return data.data.value;
+            if (!sharingVariable.vaultRef) return null;
+            try {
+              return await revealSecret(sharingVariable.vaultRef);
+            } catch {
+              return null;
+            }
           }}
         />
       )}

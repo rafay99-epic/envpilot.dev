@@ -201,11 +201,14 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
   };
 
   const handleDelete = async () => {
-    if (!deletingAccount) return;
+    if (!deletingAccount || !convexUserId) return;
     setNotice(null);
     setError(null);
     try {
-      await deleteAccount.mutateAsync(deletingAccount._id);
+      await deleteAccount.mutateAsync({
+        accountId: deletingAccount._id,
+        deletedBy: convexUserId,
+      });
       setDeletingAccount(null);
       setNotice("Account deleted successfully.");
     } catch (err) {

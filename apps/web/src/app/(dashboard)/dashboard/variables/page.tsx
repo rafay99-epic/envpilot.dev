@@ -25,6 +25,8 @@ import {
   type VariableFormData,
 } from "@/components/variables";
 import { useOrganizationTags, useCreateTag } from "@/hooks";
+import { useUpdateVariable, useDeleteVariable } from "@/hooks/queries";
+import { useRevealSecret } from "@/hooks/useRevealSecret";
 import { ConfirmDialog } from "@/components/ui";
 import {
   Plus,
@@ -75,6 +77,9 @@ interface Variable {
 
 export default function VariablesPage() {
   const { canDo, organization, user } = useAuthContext();
+  const updateVariable = useUpdateVariable();
+  const deleteVariable = useDeleteVariable();
+  const revealSecret = useRevealSecret();
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
     | undefined;
@@ -171,14 +176,10 @@ export default function VariablesPage() {
 
     setRevealingIds((prev) => new Set(prev).add(variable._id));
     try {
-      const res = await fetch(
-        `/api/vault?vaultRef=${encodeURIComponent(variable.vaultRef)}&organizationId=${encodeURIComponent(organization.id)}`
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to read secret");
+      const value = await revealSecret(variable.vaultRef);
       setRevealedValues((prev) => ({
         ...prev,
-        [variable._id]: data.data.value,
+        [variable._id]: value,
       }));
     } catch (err) {
       log.error(
@@ -210,26 +211,19 @@ export default function VariablesPage() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/variables/${variableId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          value: data.value || undefined,
-          // Send "" through (not undefined) so a cleared description is
-          // actually removed server-side — see convex/variables.ts update.
-          description: data.description,
-          environments: data.environments,
-          isSensitive: data.isSensitive,
-          rotationFrequencyDays: data.rotationFrequencyDays,
-          tagIds: data.tagIds,
-          changeReason: "Updated via dashboard",
-        }),
+      await updateVariable.mutateAsync({
+        variableId,
+        projectId: editingVariable?.projectId ?? "",
+        value: data.value || undefined,
+        // Send "" through (not undefined) so a cleared description is
+        // actually removed server-side — see convex/variables.ts update.
+        description: data.description,
+        environments: data.environments,
+        isSensitive: data.isSensitive,
+        rotationFrequencyDays: data.rotationFrequencyDays,
+        tagIds: data.tagIds,
+        changeReason: "Updated via dashboard",
       });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to update variable");
-      }
 
       setNotice("Variable updated successfully.");
       setTimeout(() => setNotice(null), 3000);
@@ -263,14 +257,10 @@ export default function VariablesPage() {
     setNotice(null);
     setError(null);
     try {
-      const response = await fetch(`/api/variables/${deletingVariable._id}`, {
-        method: "DELETE",
+      await deleteVariable.mutateAsync({
+        variableId: deletingVariable._id,
+        projectId: deletingVariable.projectId,
       });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to delete variable");
-      }
 
       setDeletingVariable(null);
       setNotice("Variable deleted successfully.");

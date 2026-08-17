@@ -1,15 +1,18 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
-import { useQuery, useMutation as useConvexMutation } from "convex/react";
+import {
+  useQuery,
+  useAction,
+  useMutation as useConvexMutation,
+} from "convex/react";
 import { api as convexApi } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { api } from "@/lib/api-client";
 import {
   parseAccountVault,
   type AccountVaultPayload,
 } from "@/lib/account-payload";
 import { createLogger } from "@/lib/logger";
+import { useRevealSecret } from "./useRevealSecret";
 
 const log = createLogger("hooks/useAccounts");
 
@@ -80,7 +83,11 @@ export function useRevokeAccountPermission() {
   );
 }
 
-/* ─── CRUD mutations (API routes → WorkOS Vault) ────────────────────── */
+/* ─── CRUD mutations (direct Convex → WorkOS Vault) ─────────────────── */
+//
+// These posted to /api/accounts*, which read the AuthKit session and then
+// called the exact Convex actions used here. The `mutateAsync` shape is kept
+// so call sites did not have to change their control flow.
 
 interface CreateAccountParams {
   organizationId: string;
@@ -100,11 +107,24 @@ interface AccountMutationResponse {
 }
 
 export function useCreateAccount() {
-  return useMutation({
-    mutationKey: ["accounts", "create"],
-    mutationFn: (data: CreateAccountParams) =>
-      api.post<AccountMutationResponse>("/api/accounts", data),
-  });
+  const create = useAction(
+    convexApi.features.accounts.values.createWithCredentials
+  );
+  return {
+    mutateAsync: async ({
+      organizationId: _organizationId,
+      projectId,
+      ...data
+    }: CreateAccountParams): Promise<AccountMutationResponse> => {
+      // organizationId was only ever used by the route to re-check membership;
+      // the action derives it from the project it authorizes against.
+      const { accountId } = await create({
+        ...data,
+        projectId: projectId as Id<"projects">,
+      });
+      return { id: accountId, success: true };
+    },
+  };
 }
 
 interface UpdateAccountParams {
@@ -119,19 +139,45 @@ interface UpdateAccountParams {
 }
 
 export function useUpdateAccount() {
-  return useMutation({
-    mutationKey: ["accounts", "update"],
-    mutationFn: ({ id, ...data }: UpdateAccountParams) =>
-      api.patch<AccountMutationResponse>(`/api/accounts/${id}`, data),
-  });
+  const update = useAction(
+    convexApi.features.accounts.values.updateWithCredentials
+  );
+  return {
+    mutateAsync: async ({
+      id,
+      ...data
+    }: UpdateAccountParams): Promise<AccountMutationResponse> => {
+      const { accountId } = await update({
+        ...data,
+        accountId: id as Id<"projectAccounts">,
+      });
+      return { id: accountId, success: true };
+    },
+  };
 }
 
 export function useDeleteAccount() {
-  return useMutation({
-    mutationKey: ["accounts", "delete"],
-    mutationFn: (id: string) =>
-      api.del<{ success: boolean }>(`/api/accounts/${id}`),
-  });
+  const remove = useConvexMutation(
+    convexApi.features.accounts.mutations.remove
+  );
+  return {
+    // `deletedBy` is passed in rather than resolved here: the caller already
+    // holds convexUserId, and re-deriving it inside the hook would add a
+    // second subscription that can lag behind the page's own.
+    mutateAsync: async ({
+      accountId,
+      deletedBy,
+    }: {
+      accountId: string;
+      deletedBy: Id<"users">;
+    }): Promise<{ success: boolean }> => {
+      await remove({
+        accountId: accountId as Id<"projectAccounts">,
+        deletedBy,
+      });
+      return { success: true };
+    },
+  };
 }
 
 /* ─── Reveal (Vault fetch + parse + audit) ──────────────────────────── */
@@ -139,6 +185,7 @@ export function useDeleteAccount() {
 interface RevealAccountArgs {
   accountId: Id<"projectAccounts">;
   vaultRef: string;
+  /** Retained for log context only — authorization is by resource, not org. */
   organizationId: string;
   userId: Id<"users">;
 }
@@ -152,6 +199,7 @@ export function useRevealAccount() {
   const logAccess = useConvexMutation(
     convexApi.features.accounts.mutations.logAccess
   );
+  const revealSecret = useRevealSecret();
 
   return async ({
     accountId,
@@ -160,14 +208,8 @@ export function useRevealAccount() {
     userId,
   }: RevealAccountArgs): Promise<AccountVaultPayload | null> => {
     try {
-      const res = await fetch(
-        `/api/vault?vaultRef=${encodeURIComponent(vaultRef)}&organizationId=${encodeURIComponent(organizationId)}`
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to read account credentials");
-      }
-      const parsed = parseAccountVault(data.data.value);
+      const value = await revealSecret(vaultRef);
+      const parsed = parseAccountVault(value);
       if (!parsed) {
         throw new Error("Account credentials are malformed");
       }

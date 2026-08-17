@@ -1,11 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { hasE2ECredentials, SKIP_REASON } from "../env";
+import { authedConvex } from "../convex";
 import {
   fixtureError,
   getWorkerProjectSlug,
+  resolveOwnedProject,
   trackClientErrors,
 } from "./support";
+import { api as convexApi } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 
 // Authenticated e2e — VS Code unsync-on-close project settings. Exercises
 // the pro-gated "VS Code Sync" section on the project settings General tab:
@@ -20,30 +24,7 @@ test.skip(!hasE2ECredentials, SKIP_REASON);
 
 /** Resolve the worker fixture project's id from its slug via the API. */
 async function getProjectId(page: Page, slug: string): Promise<string> {
-  const orgsResponse = await page.request.get("/api/organizations");
-  if (!orgsResponse.ok()) {
-    throw fixtureError(
-      `GET /api/organizations failed (${orgsResponse.status()})`
-    );
-  }
-  const { organizations } = (await orgsResponse.json()) as {
-    organizations: Array<{ _id: string; role: string }>;
-  };
-  const ownedOrg = organizations.find((o) => o.role === "owner");
-  if (!ownedOrg) throw fixtureError("the test user OWNS no organization");
-
-  const projectsResponse = await page.request.get(
-    `/api/projects?organizationId=${ownedOrg._id}`
-  );
-  if (!projectsResponse.ok()) {
-    throw fixtureError(
-      `GET /api/projects failed (${projectsResponse.status()})`
-    );
-  }
-  const { projects } = (await projectsResponse.json()) as {
-    projects: Array<{ _id: string; slug: string }>;
-  };
-  const project = projects.find((p) => p.slug === slug);
+  const { project } = await resolveOwnedProject(page, slug);
   if (!project) {
     throw fixtureError(`worker fixture project '${slug}' not found`);
   }
@@ -57,14 +38,15 @@ test.describe.serial("VS Code unsync-on-close settings", () => {
   const unsyncToggle = (page: Page) =>
     page.getByRole("button", { name: "Unsync on close", exact: true });
 
-  /** Read the persisted flag straight from the project API. */
+  /** Read the persisted flag straight from Convex. */
   async function readPersistedFlag(page: Page): Promise<boolean | undefined> {
-    const response = await page.request.get(`/api/projects/${projectId}`);
-    expect(response.ok(), await response.text()).toBeTruthy();
-    const { project } = (await response.json()) as {
-      project: { vscodeAutoUnsyncOnClose?: boolean };
-    };
-    return project.vscodeAutoUnsyncOnClose;
+    const convex = await authedConvex(page.request);
+    const project = (await convex.query(
+      convexApi.features.projects.queries.getById,
+      { projectId: projectId as Id<"projects"> }
+    )) as { vscodeAutoUnsyncOnClose?: boolean } | null;
+    expect(project, `project ${projectId} not readable`).not.toBeNull();
+    return project?.vscodeAutoUnsyncOnClose;
   }
 
   /**
@@ -99,10 +81,11 @@ test.describe.serial("VS Code unsync-on-close settings", () => {
 
     // Fixture hygiene: a crashed prior run may have left the flag OFF on the
     // reused worker project — restore the default before asserting it.
-    const reset = await page.request.patch(`/api/projects/${projectId}`, {
-      data: { vscodeAutoUnsyncOnClose: true },
+    const convex = await authedConvex(page.request);
+    await convex.mutation(convexApi.features.projects.mutations.update, {
+      projectId: projectId as Id<"projects">,
+      vscodeAutoUnsyncOnClose: true,
     });
-    expect(reset.ok(), await reset.text()).toBeTruthy();
 
     const sectionVisible = await openGeneralSettings(page);
     test.skip(

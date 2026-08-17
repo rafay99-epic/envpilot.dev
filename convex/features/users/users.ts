@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { internalQuery, mutation, query } from "../../_generated/server";
 import { requireAuthedUser } from "../../lib/identity";
+import { assertOrgAction } from "../../lib/authz";
 
 /**
  * User Queries and Mutations
@@ -243,5 +244,86 @@ export const revokeOwnSessions = mutation({
     }
 
     return { revoked: count, sessionIds };
+  },
+});
+
+/**
+ * Search an organization's members for the invite picker, annotated with
+ * whether each result is already a member or already invited.
+ *
+ * Replaces GET /api/users/search, which composed this from three separate
+ * queries and — because it reached `users.search` through the UNAUTHENTICATED
+ * Convex client — left that query ungated. Anyone who knew an organization id
+ * could enumerate its members. Authorization is required here, once, before
+ * anything is read.
+ */
+export const searchForInvite = query({
+  args: {
+    searchTerm: v.string(),
+    organizationId: v.id("organizations"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("users"),
+      email: v.string(),
+      name: v.optional(v.string()),
+      avatarUrl: v.optional(v.string()),
+      isMember: v.boolean(),
+      hasPendingInvitation: v.boolean(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    // Inviting is the reason to search, so the gate is the invite capability.
+    await assertOrgAction(
+      ctx,
+      actor._id,
+      args.organizationId,
+      "org:invite_member"
+    );
+
+    const searchLower = args.searchTerm.toLowerCase();
+    const limit = args.limit ?? 10;
+
+    const members = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
+    const memberIds = new Set(members.map((m) => m.userId));
+
+    const invitations = await ctx.db
+      .query("invitations")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
+    const now = Date.now();
+    const pendingEmails = new Set(
+      invitations
+        .filter((i) => i.status === "pending" && i.expiresAt > now)
+        .map((i) => i.email.toLowerCase())
+    );
+
+    const users = await Promise.all(members.map((m) => ctx.db.get(m.userId)));
+
+    return users
+      .filter(
+        (user): user is NonNullable<typeof user> =>
+          user !== null &&
+          (user.email.toLowerCase().includes(searchLower) ||
+            (user.name?.toLowerCase().includes(searchLower) ?? false))
+      )
+      .slice(0, limit)
+      .map((user) => ({
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+        isMember: memberIds.has(user._id),
+        hasPendingInvitation: pendingEmails.has(user.email.toLowerCase()),
+      }));
   },
 });

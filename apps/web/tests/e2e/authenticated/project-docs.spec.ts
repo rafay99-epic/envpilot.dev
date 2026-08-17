@@ -4,7 +4,12 @@ import { makeFunctionReference } from "convex/server";
 import { readFileSync } from "node:fs";
 
 import { hasE2ECredentials, SKIP_REASON, STORAGE_STATE_PATH } from "../env";
-import { getWorkerProjectSlug, postMcp, trackClientErrors } from "./support";
+import {
+  getWorkerProjectSlug,
+  postMcp,
+  resolveOwnedProject,
+  trackClientErrors,
+} from "./support";
 
 /**
  * Authenticated e2e — project documentation, end to end through the REAL UI
@@ -150,24 +155,10 @@ test.describe.serial("Project documentation", () => {
     test.setTimeout(120_000);
     test.skip(!projectSlug, "no project from the first test");
 
-    const orgsResponse = await page.request.get("/api/organizations");
-    expect(orgsResponse.ok(), await orgsResponse.text()).toBeTruthy();
-    const { organizations } = (await orgsResponse.json()) as {
-      organizations: Array<{ _id: string; role: string }>;
-    };
-    const ownedOrg = organizations.find((o) => o.role === "owner");
-    if (!ownedOrg) throw new Error("The e2e test user owns no organization.");
-
-    const projectsResponse = await page.request.get(
-      `/api/projects?organizationId=${ownedOrg._id}`
+    const { organizationId, project } = await resolveOwnedProject(
+      page,
+      projectSlug
     );
-    expect(projectsResponse.ok(), await projectsResponse.text()).toBeTruthy();
-    const { projects } = (await projectsResponse.json()) as {
-      projects: Array<{ _id: string; slug: string }>;
-    };
-    const project = projects.find((p) => p.slug === projectSlug);
-    if (!project)
-      throw new Error("Worker fixture project not found via /api/projects.");
 
     if (!CONVEX_URL) {
       throw new Error(
@@ -178,7 +169,7 @@ test.describe.serial("Project documentation", () => {
     convex.setAuth(await fetchOwnerAccessToken());
 
     const minted = (await convex.action(fn.createApiKey, {
-      organizationId: ownedOrg._id,
+      organizationId,
       name: `E2E docs key ${STAMP}`,
       scopeProjects: [project._id],
       scopeEnvironments: ["production"],
@@ -194,12 +185,7 @@ test.describe.serial("Project documentation", () => {
     test.skip(!projectSlug, "no project from the first test");
     if (!CONVEX_URL) test.skip(true, "no Convex URL");
 
-    const orgsResponse = await page.request.get("/api/organizations");
-    const { organizations } = (await orgsResponse.json()) as {
-      organizations: Array<{ _id: string; role: string }>;
-    };
-    const ownedOrg = organizations.find((o) => o.role === "owner");
-    if (!ownedOrg) throw new Error("The e2e test user owns no organization.");
+    const { organizationId } = await resolveOwnedProject(page, projectSlug);
 
     const convex = new ConvexHttpClient(CONVEX_URL as string);
     convex.setAuth(await fetchOwnerAccessToken());
@@ -209,7 +195,7 @@ test.describe.serial("Project documentation", () => {
     // both, and that is enforced in the backend, not just in the form.
     await expect(
       convex.action(fn.createApiKey, {
-        organizationId: ownedOrg._id,
+        organizationId,
         name: `E2E bad combo ${STAMP}`,
         scopeProjects: "all",
         scopeEnvironments: ["production"],

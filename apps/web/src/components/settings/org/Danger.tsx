@@ -7,15 +7,25 @@ import {
   TerminalButton,
   TerminalInput,
 } from "@/components/dashboard/terminal-ui";
+import { useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { sanitizeConvexError } from "@/lib/error-messages";
 
 export function DangerTab({
   slug,
+  organizationId,
   organizationName,
 }: {
+  /** Still needed by the transfer flow, which stays on its API route. */
   slug: string;
+  organizationId: string;
   organizationName: string;
 }) {
   const router = useRouter();
+  const removeOrganization = useMutation(
+    api.features.organizations.mutations.remove
+  );
   const [error, setError] = useState<string | null>(null);
 
   const [transferEmail, setTransferEmail] = useState("");
@@ -60,18 +70,13 @@ export function DangerTab({
     setError(null);
 
     try {
-      const response = await fetch(`/api/organizations/${slug}`, {
-        method: "DELETE",
+      await removeOrganization({
+        organizationId: organizationId as Id<"organizations">,
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to delete organization");
-      }
 
       router.push("/organizations");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(sanitizeConvexError(err) || "An error occurred");
       setIsDeleting(false);
     }
   }

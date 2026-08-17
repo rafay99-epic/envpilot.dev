@@ -9,6 +9,10 @@ import {
   TerminalInput,
 } from "@/components/dashboard/terminal-ui";
 import { useUnsavedChanges } from "@/hooks";
+import { useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { sanitizeConvexError } from "@/lib/error-messages";
 
 // A type alias, not an interface: only aliases get the implicit index
 // signature `useUnsavedChanges<T extends Record<string, unknown>>` needs.
@@ -18,11 +22,9 @@ type ProfileValues = {
 };
 
 export function GeneralTab({
-  slug,
   organization,
   orgTier,
 }: {
-  slug: string;
   organization: {
     _id: string;
     name: string;
@@ -31,6 +33,9 @@ export function GeneralTab({
   };
   orgTier: string;
 }) {
+  const updateOrganization = useMutation(
+    api.features.organizations.mutations.update
+  );
   const [values, setValues] = useState<ProfileValues>({
     name: "",
     description: "",
@@ -69,24 +74,16 @@ export function GeneralTab({
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(`/api/organizations/${slug}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: sent.name,
-          description: sent.description || undefined,
-        }),
+      await updateOrganization({
+        organizationId: organization._id as Id<"organizations">,
+        name: sent.name,
+        description: sent.description || undefined,
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to update organization");
-      }
 
       setSnapshot(sent);
       setSuccessMessage("Organization settings updated successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(sanitizeConvexError(err) || "An error occurred");
     } finally {
       setIsSaving(false);
     }

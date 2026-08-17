@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { SettingsRow, SettingsSection } from "@envpilot/ui";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { useSavePreferences } from "@/hooks/usePreferences";
 
 interface NotificationPrefs {
   variableChanges: boolean;
@@ -51,27 +54,22 @@ export function NotificationSettings() {
     securityAlerts: true,
     rotationReminders: true,
   });
-  const [isLoading, setIsLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const savePreferences = useSavePreferences();
+
+  // Reactive read: Convex pushes the stored preferences once they load, and
+  // again if another tab changes them. Replaces a fetch-in-an-effect that
+  // could only ever show a snapshot taken at mount.
+  const stored = useQuery(api.features.users.preferences.getByUserId, {});
+  const isLoading = stored === undefined;
 
   useEffect(() => {
-    async function fetchPreferences() {
-      try {
-        const res = await fetch("/api/users/me/preferences");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.emailNotifications) {
-            setPrefs(data.emailNotifications);
-          }
-        }
-      } catch {
-        // Use defaults
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    fetchPreferences();
-  }, []);
+    if (!stored?.emailNotifications) return;
+    const next = stored.emailNotifications;
+    // rotationReminders is optional in storage (rows written before it
+    // existed have no value); the UI needs a concrete boolean.
+    setPrefs({ ...next, rotationReminders: next.rotationReminders ?? true });
+  }, [stored]);
 
   async function handleToggle(key: keyof NotificationPrefs) {
     const newPrefs = { ...prefs, [key]: !prefs[key] };
@@ -79,11 +77,7 @@ export function NotificationSettings() {
     setSavingKey(key);
 
     try {
-      await fetch("/api/users/me/preferences", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailNotifications: newPrefs }),
-      });
+      await savePreferences({ emailNotifications: newPrefs });
     } catch {
       // Revert on error
       setPrefs(prefs);

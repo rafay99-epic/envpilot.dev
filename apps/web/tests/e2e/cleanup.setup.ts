@@ -1,5 +1,8 @@
 import { test as setup } from "@playwright/test";
+import { api as convexApi } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 
+import { authedConvex } from "./convex";
 import { hasE2ECredentials, SKIP_REASON } from "./env";
 
 /**
@@ -40,29 +43,33 @@ const STALE_AGE_MS = 30 * 60 * 1000;
  */
 const STALE_PROJECT_PATTERN = /^E2E Project \d+$/;
 
-const BULK_DELETE_MAX = 50; // /api/variables/bulk-delete caps ids per call
+const BULK_DELETE_MAX = 50; // variables.bulkDelete caps ids per call
 const TAG_CLEANUP_MAX = 15; // leave headroom under tagMutate's 20/minute limit
 const CLEANUP_TITLE = "purge stale E2E data from the fixture org";
+
+/** Convex surfaces user-facing text in a ConvexError payload, not `message`. */
+function messageOf(error: unknown): string {
+  if (error && typeof error === "object" && "data" in error) {
+    return String((error as { data: unknown }).data);
+  }
+  return error instanceof Error ? error.message : String(error);
+}
 
 setup(CLEANUP_TITLE, async ({ request, page }) => {
   setup.skip(!hasE2ECredentials, SKIP_REASON);
   setup.setTimeout(120_000);
 
-  const orgsResponse = await request.get("/api/organizations");
-  if (!orgsResponse.ok()) {
-    throw new Error(
-      `cleanup: GET /api/organizations failed (${orgsResponse.status()}) — ` +
-        "is the saved auth session still valid?"
-    );
-  }
-  const { organizations } = (await orgsResponse.json()) as {
-    organizations: Array<{
-      _id: string;
-      name: string;
-      slug: string;
-      role: string;
-    }>;
-  };
+  const convex = await authedConvex(request);
+
+  const organizations = (await convex.query(
+    convexApi.features.organizations.queries.listForUser,
+    {}
+  )) as Array<{
+    _id: Id<"organizations">;
+    name: string;
+    slug: string;
+    role: string;
+  }>;
 
   let deletedVariables = 0;
   let deletedProjects = 0;
@@ -138,18 +145,10 @@ setup(CLEANUP_TITLE, async ({ request, page }) => {
       if (hasNextPage) await next.click();
     }
 
-    const projectsResponse = await request.get(
-      `/api/projects?organizationId=${org._id}`
-    );
-    if (!projectsResponse.ok()) {
-      throw new Error(
-        `cleanup: GET /api/projects for org "${org.name}" failed ` +
-          `(${projectsResponse.status()})`
-      );
-    }
-    const { projects } = (await projectsResponse.json()) as {
-      projects: Array<{ _id: string; name: string }>;
-    };
+    const projects = (await convex.query(
+      convexApi.features.projects.queries.listWithStats,
+      { organizationId: org._id }
+    )) as Array<{ _id: Id<"projects">; name: string }>;
 
     for (const project of projects) {
       // Leftover throwaway project from a failed run — delete it whole once
@@ -158,32 +157,34 @@ setup(CLEANUP_TITLE, async ({ request, page }) => {
       if (STALE_PROJECT_PATTERN.test(project.name)) {
         const createdAt = Number(project.name.replace(/^E2E Project /, ""));
         if (createdAt < Date.now() - STALE_AGE_MS) {
-          const res = await request.delete(`/api/projects/${project._id}`);
-          if (res.ok()) deletedProjects += 1;
-          else {
+          try {
+            await convex.mutation(
+              convexApi.features.projects.mutations.remove,
+              { projectId: project._id }
+            );
+            deletedProjects += 1;
+          } catch (error) {
             warnings.push(
               `stale project "${project.name}" not deleted ` +
-                `(${res.status()}) — will retry next run`
+                `(${messageOf(error)}) — will retry next run`
             );
           }
         }
         continue;
       }
 
-      const variablesResponse = await request.get(
-        `/api/variables?projectId=${project._id}`
-      );
-      if (!variablesResponse.ok()) {
-        throw new Error(
-          `cleanup: GET /api/variables for project "${project.name}" failed ` +
-            `(${variablesResponse.status()})`
-        );
-      }
-      const { variables } = (await variablesResponse.json()) as {
-        variables: Array<{ _id: string; key: string; _creationTime: number }>;
-      };
+      const variables = (await convex.query(
+        convexApi.features.variables.queries.listWithAccess,
+        { projectId: project._id }
+      )) as Array<{
+        _id: Id<"environmentVariables">;
+        key: string;
+        _creationTime: number;
+        hasAccess: boolean;
+      }>;
 
       const staleIds = variables
+        .filter((v) => v.hasAccess)
         .filter(
           (v) =>
             STALE_VARIABLE_PATTERN.test(v.key) &&
@@ -193,36 +194,44 @@ setup(CLEANUP_TITLE, async ({ request, page }) => {
 
       for (let i = 0; i < staleIds.length; i += BULK_DELETE_MAX) {
         const chunk = staleIds.slice(i, i + BULK_DELETE_MAX);
-        const res = await request.post("/api/variables/bulk-delete", {
-          data: { variableIds: chunk, projectId: project._id },
-        });
-        if (!res.ok()) {
-          const body = await res.text();
+        try {
+          await convex.mutation(
+            convexApi.features.variables.mutations.bulkDelete,
+            { variableIds: chunk }
+          );
+          deletedVariables += chunk.length;
+        } catch (error) {
+          const body = messageOf(error);
           // "Variable not found" = an id vanished between our list fetch and
           // this call (e.g. a concurrent run already deleted it) — bulkDelete
           // validates only the chunk's first id, so fall back to per-id
           // deletes and ignore the ones that are already gone.
-          if (/Variable not found/i.test(body)) {
-            for (const id of chunk) {
-              const single = await request.delete(`/api/variables/${id}`);
-              if (single.ok()) deletedVariables += 1;
-              else if (single.status() !== 404) {
-                // 404 = already gone (the goal); anything else is a real
-                // skip worth surfacing.
+          if (!/Variable not found/i.test(body)) {
+            throw new Error(
+              `cleanup: bulk-delete of ${chunk.length} stale variables in ` +
+                `"${project.name}" failed: ${body}`
+            );
+          }
+          for (const id of chunk) {
+            try {
+              await convex.mutation(
+                convexApi.features.variables.mutations.remove,
+                { variableId: id }
+              );
+              deletedVariables += 1;
+            } catch (singleError) {
+              const single = messageOf(singleError);
+              // "not found" = already gone (the goal); anything else is a
+              // real skip worth surfacing.
+              if (!/not found/i.test(single)) {
                 warnings.push(
                   `variable ${id} in "${project.name}" not deleted ` +
-                    `(${single.status()}) — will retry next run`
+                    `(${single}) — will retry next run`
                 );
               }
             }
-            continue;
           }
-          throw new Error(
-            `cleanup: bulk-delete of ${chunk.length} stale variables in ` +
-              `"${project.name}" failed (${res.status()}): ${body}`
-          );
         }
-        deletedVariables += chunk.length;
       }
     }
   }

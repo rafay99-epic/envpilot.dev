@@ -1,4 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
+import { api as convexApi } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+
+import { authedConvex } from "../convex";
 
 // Shared fixtures for authenticated RBAC specs. Kept separate from
 // invite-panel.spec.ts so existing passing specs are never touched.
@@ -72,47 +76,39 @@ export async function getWorkerProjectSlug(page: Page): Promise<string> {
   const slug = `e2e-worker-project-${workerIndex}`;
   const name = `E2E Worker Project ${workerIndex}`;
 
-  const orgsResponse = await page.request.get("/api/organizations");
-  if (!orgsResponse.ok()) {
-    throw fixtureError(
-      `GET /api/organizations failed (${orgsResponse.status()}) — is the saved auth session still valid?`
-    );
-  }
-  const { organizations } = (await orgsResponse.json()) as {
-    organizations: Array<{ _id: string; role: string }>;
-  };
+  const convex = await authedConvex(page.request);
+
+  const organizations = (await convex.query(
+    convexApi.features.organizations.queries.listForUser,
+    {}
+  )) as Array<{ _id: Id<"organizations">; role: string }>;
   const ownedOrg = organizations.find((o) => o.role === "owner");
   if (!ownedOrg) throw fixtureError("the test user OWNS no organization");
 
-  const projectsResponse = await page.request.get(
-    `/api/projects?organizationId=${ownedOrg._id}`
-  );
-  if (!projectsResponse.ok()) {
-    throw fixtureError(
-      `GET /api/projects failed (${projectsResponse.status()})`
-    );
-  }
-  const { projects } = (await projectsResponse.json()) as {
-    projects: Array<{ slug: string }>;
-  };
+  const projects = (await convex.query(
+    convexApi.features.projects.queries.listWithStats,
+    { organizationId: ownedOrg._id }
+  )) as Array<{ slug: string }>;
 
   if (!projects.some((p) => p.slug === slug)) {
-    const createResponse = await page.request.post("/api/projects", {
-      data: {
+    try {
+      await convex.mutation(convexApi.features.projects.mutations.create, {
         name,
         slug,
         organizationId: ownedOrg._id,
         description: "Per-worker Playwright fixture project (auto-created)",
-      },
-    });
-    // 409 = another test in this worker raced us to it — that's fine.
-    if (!createResponse.ok() && createResponse.status() !== 409) {
-      throw fixtureError(
-        `creating the worker fixture project failed ` +
-          `(${createResponse.status()}): ${await createResponse.text()}. ` +
-          `If this is a tier-limit error, the e2e account must be on the ` +
-          `pro tier (bunx convex run features/admin/e2e:ensureE2EUserPro)`
-      );
+      });
+    } catch (error) {
+      // "slug already exists" = another test in this worker raced us to it,
+      // which is the same condition the old 409 allowance covered.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/already exists/i.test(message)) {
+        throw fixtureError(
+          `creating the worker fixture project failed: ${message}. ` +
+            `If this is a tier-limit error, the e2e account must be on the ` +
+            `pro tier (bunx convex run features/admin/e2e:ensureE2EUserPro)`
+        );
+      }
     }
   }
 
@@ -383,4 +379,39 @@ export async function postMcp(
   const contentType = response.headers()["content-type"] ?? "";
   const text = await response.text();
   return { status, json: parseMcpBody(contentType, text) };
+}
+
+/**
+ * Resolve the owned org and one of its projects by slug, over Convex.
+ *
+ * Four specs each carried their own copy of this block against the REST
+ * adapters. One helper, so a change to how fixtures are located is a change
+ * in one place.
+ */
+export async function resolveOwnedProject(
+  page: Page,
+  projectSlug: string
+): Promise<{
+  organizationId: Id<"organizations">;
+  project: { _id: Id<"projects">; slug: string };
+}> {
+  const convex = await authedConvex(page.request);
+
+  const organizations = (await convex.query(
+    convexApi.features.organizations.queries.listForUser,
+    {}
+  )) as Array<{ _id: Id<"organizations">; role: string }>;
+  const ownedOrg = organizations.find((o) => o.role === "owner");
+  if (!ownedOrg) throw fixtureError("the test user OWNS no organization");
+
+  const projects = (await convex.query(
+    convexApi.features.projects.queries.listWithStats,
+    { organizationId: ownedOrg._id }
+  )) as Array<{ _id: Id<"projects">; slug: string }>;
+  const project = projects.find((p) => p.slug === projectSlug);
+  if (!project) {
+    throw fixtureError(`worker fixture project "${projectSlug}" not found`);
+  }
+
+  return { organizationId: ownedOrg._id, project };
 }

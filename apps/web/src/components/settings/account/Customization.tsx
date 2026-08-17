@@ -7,6 +7,7 @@ import { TerminalButton } from "@/components/dashboard/terminal-ui";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { getEffectiveShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { validateBinding } from "@/lib/shortcut-validation";
+import { useSavePreferences } from "@/hooks/usePreferences";
 import {
   initialShortcutRecorderState,
   shortcutRecorderReducer,
@@ -23,6 +24,7 @@ export function CustomizationSettings() {
   const updateBinding = useKeyboardStore((s) => s.updateBinding);
   const removeBinding = useKeyboardStore((s) => s.removeBinding);
   const resetAllBindings = useKeyboardStore((s) => s.resetAllBindings);
+  const savePreferences = useSavePreferences();
 
   const [recorder, dispatch] = useReducer(
     shortcutRecorderReducer,
@@ -114,11 +116,7 @@ export function CustomizationSettings() {
     updateBinding(shortcutId, binding);
 
     try {
-      await fetch("/api/users/me/preferences", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyboardShortcuts: newBindings }),
-      });
+      await savePreferences({ keyboardShortcuts: newBindings });
       setSaveMessage("Saved");
       setTimeout(() => setSaveMessage(null), 2000);
     } catch {
@@ -135,11 +133,7 @@ export function CustomizationSettings() {
     removeBinding(shortcutId);
     const { [shortcutId]: _, ...rest } = customBindings;
     try {
-      await fetch("/api/users/me/preferences", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyboardShortcuts: rest }),
-      });
+      await savePreferences({ keyboardShortcuts: rest });
     } catch {
       // Revert
       updateBinding(shortcutId, customBindings[shortcutId]);
@@ -149,11 +143,7 @@ export function CustomizationSettings() {
   async function handleResetAll() {
     resetAllBindings();
     try {
-      await fetch("/api/users/me/preferences", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyboardShortcuts: {} }),
-      });
+      await savePreferences({ keyboardShortcuts: {} });
       setSaveMessage("All shortcuts reset to defaults");
       setTimeout(() => setSaveMessage(null), 2000);
     } catch {
