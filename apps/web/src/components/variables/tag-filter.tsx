@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { Tag } from "lucide-react";
 import type { Tag as TagType } from "@/hooks/useTags";
 
@@ -16,6 +17,9 @@ export function TagFilter({
   onToggleTag,
   onClearAll,
 }: TagFilterProps) {
+  // Before the early return — hooks may not be called conditionally.
+  const labelId = useId();
+
   if (tags.length === 0) return null;
 
   const hasSelection = selectedTagIds.length > 0;
@@ -25,8 +29,16 @@ export function TagFilter({
   return (
     <>
       <span className="mx-2 text-ink-faint">|</span>
-      <label className="text-sm font-medium text-ink-muted">Tags:</label>
-      <div className="flex flex-wrap gap-1.5">
+      {/* Names the whole chip group, so a span + role="group" rather than a
+          <label>, which may only name a single control. */}
+      <span id={labelId} className="text-sm font-medium text-ink-muted">
+        Tags:
+      </span>
+      <div
+        role="group"
+        aria-labelledby={labelId}
+        className="flex flex-wrap gap-1.5"
+      >
         <button
           onClick={onClearAll}
           className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${

@@ -32,11 +32,12 @@ export function ShareSecretDrawer({
       width="lg"
     >
       <div className="space-y-6">
-        {/* Variable Key */}
+        {/* Variable Key — this heads a read-only <code> block, not a form
+            control, so it is a span rather than a <label>. */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+          <span className="mb-1.5 block text-xs font-medium text-ink-muted">
             Variable
-          </label>
+          </span>
           <code className="block rounded-lg px-3 py-2 font-mono text-sm font-semibold bg-surface-raised text-ink">
             {variable.key}
           </code>

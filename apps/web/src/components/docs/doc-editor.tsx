@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { AlertTriangle, Columns2, Eye, ListTree, Pencil } from "lucide-react";
 import { useMarkdownCommands } from "@/hooks/useMarkdownCommands";
@@ -56,6 +56,7 @@ export function DocEditor({
   warnings = [],
   disabled = false,
 }: DocEditorProps) {
+  const bodyFieldId = useId();
   const [mode, setMode] = useState<ViewMode>("write");
   const [showOutline, setShowOutline] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -219,7 +220,13 @@ export function DocEditor({
               mode === "split" ? "w-1/2 border-r border-white/10" : "w-full"
             }`}
           >
+            {/* sr-only: the textarea IS the column, edge to edge, so there is
+                no line above it to put a visible label on. */}
+            <label htmlFor={bodyFieldId} className="sr-only">
+              Page body, in markdown
+            </label>
             <textarea
+              id={bodyFieldId}
               ref={textareaRef}
               data-testid="doc-body-input"
               defaultValue={body}

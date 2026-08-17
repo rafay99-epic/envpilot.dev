@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
@@ -81,6 +81,7 @@ export function SharedDocReader({
 }) {
   const [step, setStep] = useState<Step>("loading");
   const [payload, setPayload] = useState<Payload | null>(null);
+  const passphraseFieldId = useId();
   const [passphrase, setPassphrase] = useState("");
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const [isUnlocking, setIsUnlocking] = useState(false);
@@ -226,14 +227,22 @@ export function SharedDocReader({
             The sender protected this document. They will have given you the
             passphrase separately.
           </p>
+          {/* sr-only: the heading and the paragraph above already name this
+              single field, and a fourth line of centred copy would only
+              repeat them. */}
+          <label htmlFor={passphraseFieldId} className="sr-only">
+            Passphrase
+          </label>
           <input
+            id={passphraseFieldId}
             type="password"
             value={passphrase}
             onChange={(event) => setPassphrase(event.target.value)}
             placeholder="Passphrase"
             autoFocus
             autoComplete="off"
-            className="w-full rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-sm text-ink outline-none placeholder:text-ink-faint focus:border-accent-line"
+            // 16px on phones, or iOS zooms the viewport on focus.
+            className="w-full rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-base text-ink outline-none placeholder:text-ink-faint focus:border-accent-line sm:text-sm"
           />
           {unlockError && (
             <p className="mt-3 text-center text-xs text-danger">
