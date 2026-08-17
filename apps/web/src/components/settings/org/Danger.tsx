@@ -7,15 +7,28 @@ import {
   TerminalButton,
   TerminalInput,
 } from "@/components/dashboard/terminal-ui";
+import { useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { sanitizeConvexError } from "@/lib/error-messages";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("settings/org-danger");
 
 export function DangerTab({
   slug,
+  organizationId,
   organizationName,
 }: {
+  /** Still needed by the transfer flow, which stays on its API route. */
   slug: string;
+  organizationId: string;
   organizationName: string;
 }) {
   const router = useRouter();
+  const removeOrganization = useMutation(
+    api.features.organizations.mutations.remove
+  );
   const [error, setError] = useState<string | null>(null);
 
   const [transferEmail, setTransferEmail] = useState("");
@@ -48,6 +61,7 @@ export function DangerTab({
       router.refresh();
       router.push("/organizations");
     } catch (err) {
+      log.error("organization_transfer_failed", { slug }, err);
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsTransferring(false);
     }
@@ -60,18 +74,22 @@ export function DangerTab({
     setError(null);
 
     try {
-      const response = await fetch(`/api/organizations/${slug}`, {
-        method: "DELETE",
+      await removeOrganization({
+        organizationId: organizationId as Id<"organizations">,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to delete organization");
-      }
-
+      // No reset on this path on purpose: the organization is gone and we
+      // are navigating away, so the button must stay disabled through the
+      // transition rather than flicker back to "Delete".
       router.push("/organizations");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      log.error("organization_delete_failed", { organizationId }, err);
+      setError(sanitizeConvexError(err) || "An error occurred");
+      // The rejection path DOES reset, which is what the rule is protecting
+      // against; it cannot see the router.push above. A `finally` is not an
+      // option here either, since one makes React Compiler bail on the whole
+      // component.
+      // react-doctor-disable-next-line react-doctor/no-loading-flag-reset-outside-finally
       setIsDeleting(false);
     }
   }

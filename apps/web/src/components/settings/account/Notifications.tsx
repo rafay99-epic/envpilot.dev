@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { SettingsRow, SettingsSection } from "@envpilot/ui";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { useSavePreferences } from "@/hooks/usePreferences";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("settings/notifications");
 
 interface NotificationPrefs {
   variableChanges: boolean;
@@ -43,53 +49,53 @@ const NOTIFICATIONS: {
   },
 ];
 
-export function NotificationSettings() {
-  const [prefs, setPrefs] = useState<NotificationPrefs>({
-    variableChanges: true,
-    memberUpdates: true,
-    accessRequests: true,
-    securityAlerts: true,
-    rotationReminders: true,
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [savingKey, setSavingKey] = useState<string | null>(null);
+const DEFAULT_PREFS: NotificationPrefs = {
+  variableChanges: true,
+  memberUpdates: true,
+  accessRequests: true,
+  securityAlerts: true,
+  rotationReminders: true,
+};
 
-  useEffect(() => {
-    async function fetchPreferences() {
-      try {
-        const res = await fetch("/api/users/me/preferences");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.emailNotifications) {
-            setPrefs(data.emailNotifications);
-          }
-        }
-      } catch {
-        // Use defaults
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    fetchPreferences();
-  }, []);
+export function NotificationSettings() {
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const savePreferences = useSavePreferences();
+
+  // Reactive read: Convex pushes the stored preferences once they load, and
+  // again if another tab changes them.
+  const stored = useQuery(api.features.users.preferences.getByUserId, {});
+  const isLoading = stored === undefined;
+
+  // The stored value is the source of truth and `optimistic` is only the
+  // pending toggle. DERIVED, not copied into state by an effect: syncing
+  // props-to-state in an effect costs an extra render pass on every push
+  // from the query, and the two copies can disagree in between.
+  const [optimistic, setOptimistic] = useState<NotificationPrefs | null>(null);
+  const prefs: NotificationPrefs = optimistic ?? {
+    ...DEFAULT_PREFS,
+    ...stored?.emailNotifications,
+    // Optional in storage (rows written before it existed have no value);
+    // the switches need a concrete boolean.
+    rotationReminders: stored?.emailNotifications?.rotationReminders ?? true,
+  };
 
   async function handleToggle(key: keyof NotificationPrefs) {
-    const newPrefs = { ...prefs, [key]: !prefs[key] };
-    setPrefs(newPrefs);
+    const next = { ...prefs, [key]: !prefs[key] };
+    setOptimistic(next);
     setSavingKey(key);
 
     try {
-      await fetch("/api/users/me/preferences", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailNotifications: newPrefs }),
-      });
-    } catch {
-      // Revert on error
-      setPrefs(prefs);
-    } finally {
-      setSavingKey(null);
+      await savePreferences({ emailNotifications: next });
+      // Keep the override: it already equals what was stored, so holding it
+      // avoids a flicker back to the old value while the query catches up.
+    } catch (err) {
+      log.error("notification_preference_save_failed", { key }, err);
+      // Drop it and fall back to whatever storage actually says.
+      setOptimistic(null);
     }
+    // After the try/catch, not in a `finally`: React Compiler bails on the
+    // whole component when a try carries a finalizer.
+    setSavingKey(null);
   }
 
   return (

@@ -38,12 +38,13 @@ import {
   TagFilter,
   type VariableFormData,
 } from "@/components/variables";
+import { BulkJobStatusLine } from "@/components/variables/BulkJobStatusLine";
+import { useRevealSecret } from "@/hooks/useRevealSecret";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { useIsMacPlatform } from "@/hooks/useIsMacPlatform";
-import { ApiError } from "@/lib/api-client";
+import { sanitizeConvexError, isTierLimitError } from "@/lib/error-messages";
 import { createLogger } from "@/lib/logger";
-// Variable CRUD mutations MUST stay as API routes (WorkOS Vault integration)
 import {
   useCreateVariable,
   useUpdateVariable,
@@ -122,6 +123,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     setShowConfirmDialog: setShowBulkDeleteConfirm,
   } = useVariableSelectionStore();
 
+  // Declared above the hotkey registrations that call it: the handlers
+  // close over the setter, so keeping the declaration below them reads as
+  // use-before-declare even though it only runs on a key press.
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
   // Keyboard shortcut: Cmd/Ctrl+Shift+K to open Add Variable drawer (respects custom bindings)
   const customBindings = useKeyboardStore((s) => s.customBindings);
   const addVarKeys = customBindings.ADD_VARIABLE ?? SHORTCUTS.ADD_VARIABLE.keys;
@@ -186,10 +192,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const deleteVariable = useDeleteVariable();
   const bulkDelete = useBulkDeleteVariables();
   const rollbackVariable = useRollbackVariable();
+  const revealSecret = useRevealSecret();
 
   // --- Local UI state ---
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [selectedEnvironment, setSelectedEnvironment] = useState<string>("all");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
@@ -221,7 +226,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const isSearchLoading = isSearching && searchData === undefined;
 
   // Modal states
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showExportDrawer, setShowExportDrawer] = useState(false);
   const [showImportDrawer, setShowImportDrawer] = useState(false);
   const [editingVariable, setEditingVariable] = useState<Variable | null>(null);
@@ -265,16 +269,13 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     if (selectedIds.size === 0 || !projectId) return;
 
     setBulkDeleting(true);
-    setNotice(null);
-    setError(null);
-
     try {
       const result = await bulkDelete.mutateAsync({
         variableIds: Array.from(selectedIds),
         projectId,
       });
 
-      setNotice(
+      toast.success(
         `Successfully deleted ${result.deletedCount} variable${result.deletedCount !== 1 ? "s" : ""}.`
       );
       exitSelectionMode();
@@ -288,20 +289,20 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         },
         err
       );
-      setError(
+      toast.error(
         err instanceof Error ? err.message : "Failed to delete variables"
       );
-    } finally {
-      setBulkDeleting(false);
-      setShowBulkDeleteConfirm(false);
     }
+    // After the try/catch, not in a `finally`. One finalizer anywhere in this
+    // component makes React Compiler bail on the WHOLE component, so the two
+    // handlers here have to agree. The catch swallows and no branch inside
+    // the try returns early.
+    setBulkDeleting(false);
+    setShowBulkDeleteConfirm(false);
   };
 
   const handleCreateVariable = async (data: VariableFormData) => {
     if (!projectId) return;
-    setNotice(null);
-    setError(null);
-
     try {
       const result = await createVariable.mutateAsync({
         key: data.key,
@@ -315,25 +316,20 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       });
 
       if (result.requested) {
-        setNotice("Variable request submitted for admin approval.");
+        toast.success("Variable request submitted for admin approval.");
       } else {
-        setNotice("Variable created successfully.");
+        toast.success("Variable created successfully.");
       }
     } catch (err) {
-      const isDuplicateKey =
-        err instanceof ApiError &&
-        err.status === 409 &&
-        /already exists/i.test(err.message);
-      const message =
-        err instanceof ApiError && err.code === "TIER_LIMIT_REACHED"
-          ? "Variable limit reached. Upgrade to Pro for unlimited variables."
-          : isDuplicateKey
-            ? // The backend names the clashing environment(s) — surface it
-              // verbatim (same key across DIFFERENT environments is legal).
-              err.message
-            : err instanceof Error
-              ? err.message
-              : "Failed to create variable";
+      // Convex redacts plain Error messages to "Server Error" in production,
+      // so the readable text only survives inside a ConvexError payload.
+      // sanitizeConvexError unwraps it; the classifiers read the result.
+      const raw = sanitizeConvexError(err);
+      const message = isTierLimitError(raw)
+        ? "Variable limit reached. Upgrade to Pro for unlimited variables."
+        : // A conflict names the clashing environment(s) — surface it
+          // verbatim (same key across DIFFERENT environments is legal).
+          raw || "Failed to create variable";
       log.error(
         "project_variable_create_failed",
         {
@@ -341,11 +337,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           organizationId: organization?.id,
           key: data.key,
           environments: data.environments,
-          code: err instanceof ApiError ? err.code : undefined,
         },
         err
       );
-      setError(message);
+      toast.error(message);
       // Re-throw with the friendly message — the create drawer's form shows
       // err.message in its inline banner, never the raw backend text.
       throw new Error(message);
@@ -357,9 +352,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     data: VariableFormData
   ) => {
     if (!projectId) return;
-    setNotice(null);
-    setError(null);
-
     try {
       await updateVariable.mutateAsync({
         variableId,
@@ -375,7 +367,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         tagIds: data.tagIds,
       });
 
-      setNotice("Variable updated successfully.");
+      toast.success("Variable updated successfully.");
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to update variable";
@@ -389,7 +381,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         },
         err
       );
-      setError(message);
+      toast.error(message);
       throw err;
     }
   };
@@ -397,8 +389,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const handleDeleteVariable = async () => {
     if (!deletingVariable || !projectId) return;
 
-    setNotice(null);
-    setError(null);
     try {
       await deleteVariable.mutateAsync({
         variableId: deletingVariable._id,
@@ -406,7 +396,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       });
 
       setDeletingVariable(null);
-      setNotice("Variable deleted successfully.");
+      toast.success("Variable deleted successfully.");
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to delete variable";
@@ -419,7 +409,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         },
         err
       );
-      setError(message);
+      toast.error(message);
       throw err;
     }
   };
@@ -440,7 +430,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         targetVersion,
       });
 
-      setNotice(
+      toast.success(
         `Rolled back ${historyVariableKey} to version ${targetVersion}.`
       );
 
@@ -470,7 +460,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       );
       const message =
         err instanceof Error ? err.message : "Failed to rollback variable";
-      setError(message);
+      toast.error(message);
       toast.error(message);
     }
   };
@@ -481,31 +471,14 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
     setRevealingIds((prev) => new Set(prev).add(variable._id));
     try {
-      const res = await fetch(
-        `/api/vault?vaultRef=${encodeURIComponent(variable.vaultRef)}&organizationId=${encodeURIComponent(organization.id)}`
-      );
-      // An expired session makes the auth middleware redirect this fetch to
-      // the HTML sign-in page (a followed redirect, so res.ok is TRUE) —
-      // calling res.json() on it throws `Unexpected token '<'`. Check the
-      // content type before parsing. Only the HTML/redirect shape gets the
-      // session-expired message; any other non-JSON response (plain-text
-      // 500, gateway error page) reports its status instead.
-      const contentType = res.headers.get("content-type") ?? "";
-      if (!contentType.includes("application/json")) {
-        if (res.redirected || contentType.includes("text/html")) {
-          throw new Error(
-            "Your session has expired. Please refresh the page and sign in again."
-          );
-        }
-        throw new Error(
-          `Failed to read secret (unexpected ${res.status} response).`
-        );
-      }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to read secret");
+      // Over the Convex socket, so the whole "an expired session redirects
+      // this fetch to the HTML sign-in page and res.json() chokes on '<'"
+      // problem does not exist: there is no redirect to follow and no
+      // content-type to sniff. Convex reports auth failure as an error.
+      const value = await revealSecret(variable.vaultRef);
       setRevealedValues((prev) => ({
         ...prev,
-        [variable._id]: data.data.value,
+        [variable._id]: value,
       }));
     } catch (err) {
       log.error(
@@ -518,14 +491,17 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         },
         err
       );
-      setError("Failed to reveal variable value.");
-    } finally {
-      setRevealingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(variable._id);
-        return next;
-      });
+      toast.error("Failed to reveal variable value.");
     }
+    // Cleared after the try/catch rather than in a `finally`: React Compiler
+    // bails on the whole component when a try carries a finalizer. The catch
+    // swallows and no branch inside the try returns early, so both paths
+    // reach here.
+    setRevealingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(variable._id);
+      return next;
+    });
   };
 
   // Search mode swaps the source to server results (already env-filtered by
@@ -653,18 +629,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           </>
         }
       />
-
-      {notice && (
-        <div className="rounded-lg border p-4 border-accent-line bg-accent-soft">
-          <p className="text-sm text-accent">{notice}</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded-lg border p-4 border-danger-line bg-danger-soft">
-          <p className="text-sm text-danger">{error}</p>
-        </div>
-      )}
 
       <div className="flex flex-wrap items-center gap-4">
         {/* A button group, not a form control, so it gets a labelled group
@@ -961,6 +925,13 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             </>
           )}
         </div>
+
+        {/* Pinned to the panel's bottom edge, inside its border. Renders null
+            when nothing is running, and because it lives here rather than
+            above the panel it never pushes the table down on appear or leave
+            a gap on finish. The rows landing directly above it are the
+            confirmation that the batch committed. */}
+        <BulkJobStatusLine projectId={project._id} />
       </div>
 
       <VariableCreateDrawer
@@ -998,10 +969,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         isOpen={!!deletingVariable}
         onClose={() => setDeletingVariable(null)}
         onConfirm={handleDeleteVariable}
-        title="Delete Variable"
-        message={`Are you sure you want to delete "${deletingVariable?.key}"? You can restore it for 7 days. After that it is permanently deleted, including the stored secret value.`}
+        title="delete variable"
+        message={`Recoverable from trash for 7 days, then the stored secret value is destroyed.`}
         confirmText="Delete"
         variant="danger"
+        confirmPhrase={deletingVariable?.key}
       />
 
       {projectId && (
@@ -1027,8 +999,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         isOpen={showBulkDeleteConfirm}
         onClose={() => setShowBulkDeleteConfirm(false)}
         onConfirm={handleBulkDelete}
-        title="Bulk Delete Variables"
-        message={`Are you sure you want to delete ${selectedIds.size} variable${selectedIds.size !== 1 ? "s" : ""}? You can restore them for 7 days. After that they are permanently deleted, including the stored secret values.`}
+        title="delete variables"
+        message={`${selectedIds.size} variable${selectedIds.size !== 1 ? "s" : ""}. Recoverable from trash for 7 days, then the stored secret values are destroyed.`}
         confirmText={isBulkDeleting ? "Deleting..." : "Delete All"}
         variant="danger"
       />
@@ -1107,13 +1079,12 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           organizationId={orgId}
           projectId={projectId}
           onRevealValue={async () => {
-            if (!sharingVariable.vaultRef || !organization?.id) return null;
-            const res = await fetch(
-              `/api/vault?vaultRef=${encodeURIComponent(sharingVariable.vaultRef)}&organizationId=${encodeURIComponent(organization.id)}`
-            );
-            const data = await res.json();
-            if (!res.ok) return null;
-            return data.data.value;
+            if (!sharingVariable.vaultRef) return null;
+            try {
+              return await revealSecret(sharingVariable.vaultRef);
+            } catch {
+              return null;
+            }
           }}
         />
       )}

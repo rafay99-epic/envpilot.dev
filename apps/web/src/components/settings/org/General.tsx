@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { SaveBar, SettingsField, SettingsSection } from "@envpilot/ui";
 import { SectionProvenance } from "@/components/settings/SectionProvenance";
 import {
@@ -9,6 +9,13 @@ import {
   TerminalInput,
 } from "@/components/dashboard/terminal-ui";
 import { useUnsavedChanges } from "@/hooks";
+import { useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { sanitizeConvexError } from "@/lib/error-messages";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("settings/org-general");
 
 // A type alias, not an interface: only aliases get the implicit index
 // signature `useUnsavedChanges<T extends Record<string, unknown>>` needs.
@@ -18,11 +25,9 @@ type ProfileValues = {
 };
 
 export function GeneralTab({
-  slug,
   organization,
   orgTier,
 }: {
-  slug: string;
   organization: {
     _id: string;
     name: string;
@@ -31,28 +36,38 @@ export function GeneralTab({
   };
   orgTier: string;
 }) {
+  const updateOrganization = useMutation(
+    api.features.organizations.mutations.update
+  );
   const [values, setValues] = useState<ProfileValues>({
     name: "",
     description: "",
   });
   const [snapshot, setSnapshot] = useState<ProfileValues | null>(null);
-  const seededOrganizationId = useRef<string | null>(null);
+  const [seededOrganizationId, setSeededOrganizationId] = useState<
+    string | null
+  >(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Seed once per organization: the query is reactive, so re-seeding on every
   // result would discard in-flight edits when someone else writes.
-  useEffect(() => {
-    if (seededOrganizationId.current === organization._id) return;
-    seededOrganizationId.current = organization._id;
+  //
+  // Adjusted DURING render rather than in an effect. This is the documented
+  // shape for "reset state when a prop changes": React re-runs the component
+  // immediately without committing the first pass, so it costs less than the
+  // extra render an effect would schedule, and the form is never briefly
+  // shown with the previous organization's values.
+  if (seededOrganizationId !== organization._id) {
     const seeded = {
       name: organization.name,
       description: organization.description || "",
     };
+    setSeededOrganizationId(organization._id);
     setValues(seeded);
     setSnapshot(seeded);
-  }, [organization]);
+  }
 
   const { dirtyCount } = useUnsavedChanges(values, snapshot);
 
@@ -69,27 +84,26 @@ export function GeneralTab({
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(`/api/organizations/${slug}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: sent.name,
-          description: sent.description || undefined,
-        }),
+      await updateOrganization({
+        organizationId: organization._id as Id<"organizations">,
+        name: sent.name,
+        description: sent.description || undefined,
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to update organization");
-      }
 
       setSnapshot(sent);
       setSuccessMessage("Organization settings updated successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsSaving(false);
+      log.error(
+        "organization_update_failed",
+        { organizationId: organization._id },
+        err
+      );
+      setError(sanitizeConvexError(err) || "An error occurred");
     }
+    // After the try/catch, not in a `finally`: React Compiler bails on the
+    // whole component when a try carries a finalizer. The catch swallows, so
+    // this clears on both paths.
+    setIsSaving(false);
   }
 
   return (

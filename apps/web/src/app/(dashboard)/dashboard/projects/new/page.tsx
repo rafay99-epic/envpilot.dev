@@ -7,15 +7,15 @@ import { FolderPlus } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import { useAuthContext } from "@/components/auth";
 import { useTierLimitCheck } from "@/hooks/useTierLimits";
-import { useCreateProject } from "@/hooks";
+import { useCreateProject, useCreateProjectFromTemplate } from "@/hooks";
 import {
   isRateLimitError,
   isTierLimitError,
   sanitizeConvexError,
 } from "@/lib/error-messages";
 import { LimitWarning } from "@/components/tier/FeatureGate";
-import { createLogger } from "@/lib/logger";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
+import { createLogger } from "@/lib/logger";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import type { Id } from "@convex/_generated/dataModel";
 import {
@@ -55,6 +55,7 @@ export default function NewProjectPage() {
   const tierCheck = useTierLimitCheck(orgId, "create_project");
   const enforcing = useEnforcementEnabled();
   const createProject = useCreateProject();
+  const createFromTemplate = useCreateProjectFromTemplate();
 
   const [selectedTemplate, setSelectedTemplate] =
     useState<EnvironmentTemplate | null>(null);
@@ -125,51 +126,49 @@ export default function NewProjectPage() {
         return;
       }
 
-      const projectId = await createProject({
+      const projectArgs = {
         ...formData,
         description: formData.description || undefined,
         organizationId: organization.id,
-      });
-      const projectSlug = formData.slug;
+      };
 
+      // One call either way. With a template, the backend creates the project
+      // and starts a workflow that writes every variable to the vault through
+      // a bounded pool and commits them in a single transaction; this returns
+      // as soon as the project row exists, so the user is never parked on a
+      // spinner while N secrets encrypt. Progress streams to the project page
+      // over the Convex socket.
       if (selectedTemplate) {
-        // Create template variables sequentially to avoid overwhelming
-        // the WorkOS Vault API with concurrent requests.
-        for (const variable of selectedTemplate.variables) {
-          try {
-            const placeholderValue =
-              variable.defaultValue ||
-              variable.placeholder ||
-              `<${variable.key}>`;
-
-            await fetch("/api/variables", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                key: variable.key,
-                value: placeholderValue,
-                description: variable.description,
-                environments: variable.environments,
-                projectId,
-                isSensitive: variable.isSensitive,
-              }),
-            });
-          } catch (err) {
-            // Swallowed per variable so one failure does not abort the rest,
-            // but the user lands on a project quietly missing a variable, so
-            // it has to be reported somewhere.
-            log.error(
-              "template_variable_create_failed",
-              { projectId, key: variable.key },
-              err
-            );
-          }
-        }
+        await createFromTemplate({
+          ...projectArgs,
+          variables: selectedTemplate.variables.map((variable) => ({
+            key: variable.key,
+            description: variable.description,
+            defaultValue: variable.defaultValue,
+            placeholder: variable.placeholder,
+            environments: variable.environments,
+            isSensitive: variable.isSensitive,
+          })),
+        });
+      } else {
+        await createProject(projectArgs);
       }
 
-      router.push(`/dashboard/projects/${projectSlug}`);
+      router.push(`/dashboard/projects/${formData.slug}`);
     } catch (err) {
       const message = sanitizeConvexError(err);
+      // Restores the reporting this page had before the rewrite: the create is
+      // now one call, so a failure here means no project AND no variables.
+      log.error(
+        "project_create_failed",
+        {
+          organizationId: organization?.id,
+          slug: formData.slug,
+          template: selectedTemplate?.id,
+          variableCount: selectedTemplate?.variables.length ?? 0,
+        },
+        err
+      );
       if (isRateLimitError(err)) setError(message);
       else if (isTierLimitError(message)) {
         setError(
@@ -234,33 +233,14 @@ export default function NewProjectPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link
-          href="/dashboard/projects"
-          className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover"
-        >
-          <svg
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            />
-          </svg>
-        </Link>
-        <PageHeader
-          icon={FolderPlus}
-          title="Create New Project"
-          description={organization ? `in ${organization.name}` : undefined}
-        />
-      </div>
+    <div className="space-y-6">
+      {/* No back arrow here any more: the shell renders breadcrumbs with a
+          history-back control above every dashboard page. */}
+      <PageHeader
+        icon={FolderPlus}
+        title="Create New Project"
+        description={organization ? `in ${organization.name}` : undefined}
+      />
 
       {/* Tier limit warning */}
       {enforcing &&
@@ -279,98 +259,47 @@ export default function NewProjectPage() {
         </div>
       )}
 
-      {/* Master-Detail Layout */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        {/* Left: Template Selector */}
-        <div className="lg:col-span-3">
-          <div className="rounded-xl border p-4 border-line bg-surface">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-ink-muted">
-              Choose a template
-            </p>
-            <TemplateSelector
-              selectedTemplateId={
-                fromScratch ? null : selectedTemplate?.id || undefined
-              }
-              onSelectTemplate={handleTemplateSelect}
-            />
-          </div>
+      {/* One hairline splits the two halves. The page carried two bordered
+          panels with nine more bordered elements nested inside them, all at
+          the same weight; the separators do that work now. Full width too —
+          this was max-w-6xl inside a max-w-7xl shell, so the page with the
+          most content was the narrowest in the app. */}
+      <div className="grid grid-cols-1 border-t border-line lg:grid-cols-[1.55fr_1fr]">
+        {/* Capped and independently scrollable below lg. Stacked, the full
+            list of 31 templates sits between the user and the name field, so
+            on a phone you scroll the entire catalogue before discovering
+            there is a form at all. */}
+        <div className="max-h-[55vh] overflow-y-auto border-line lg:max-h-none lg:overflow-visible lg:border-r">
+          <TemplateSelector
+            selectedTemplateId={
+              fromScratch ? null : selectedTemplate?.id || undefined
+            }
+            onSelectTemplate={handleTemplateSelect}
+          />
         </div>
 
-        {/* Right: Project Details Form (sticky) */}
-        <div className="lg:col-span-2">
+        <div className="border-t border-line lg:border-t-0">
           <div className="lg:sticky lg:top-6">
             <form
               onSubmit={handleSubmit}
-              className="space-y-5 rounded-xl border p-4 border-line bg-surface"
+              className="space-y-5 px-4 py-4 sm:px-5"
             >
-              <p className="text-xs font-medium uppercase tracking-wider text-ink-muted">
-                Project Details
-              </p>
-
-              {/* Template Badge */}
-              {selectedTemplate && (
-                <div className="flex items-center gap-2.5 rounded-lg border px-3 py-2 border-line bg-surface-raised/50">
-                  <div
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded"
-                    style={{
-                      backgroundColor: selectedTemplate.color + "20",
-                    }}
-                  >
-                    <FrameworkLogo
-                      projectType={selectedTemplate.projectType}
-                      size={16}
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-ink">
-                      {selectedTemplate.name}
-                    </p>
-                    <p className="text-[10px] text-ink-muted">
-                      {selectedTemplate.variables.length} variables included
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Preview */}
-              <div className="flex items-center gap-3 rounded-lg p-3 bg-surface-raised/50">
-                <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-                  style={{
-                    backgroundColor: isFrameworkIcon(formData.icon)
-                      ? "transparent"
-                      : formData.color,
-                  }}
-                >
-                  <ProjectIcon
-                    icon={formData.icon}
-                    size={isFrameworkIcon(formData.icon) ? 32 : 20}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-ink">
-                    {formData.name || "Project Name"}
-                  </p>
-                  <p className="truncate text-xs text-ink-muted">
-                    {formData.slug || "project-slug"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Name */}
+              {/* Name. Underline inputs: a filled, bordered box per field was
+                  a large part of what made this page read as a stack of
+                  containers rather than a form. */}
               <div>
                 <label
                   htmlFor="name"
-                  className="block text-xs font-medium text-ink-muted"
+                  className="block font-mono text-[10.5px] uppercase tracking-wider text-ink-faint"
                 >
-                  Project Name
+                  name
                 </label>
                 <input
                   type="text"
                   id="name"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border px-3 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+                  className="mt-1 block w-full border-0 border-b bg-transparent px-0 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-0 border-line text-ink placeholder-ink-faint"
                   placeholder="My Awesome Project"
                   required
                 />
@@ -380,12 +309,12 @@ export default function NewProjectPage() {
               <div>
                 <label
                   htmlFor="slug"
-                  className="block text-xs font-medium text-ink-muted"
+                  className="block font-mono text-[10.5px] uppercase tracking-wider text-ink-faint"
                 >
-                  Slug
+                  slug
                 </label>
-                <div className="mt-1 flex rounded-lg border border-line bg-surface-raised">
-                  <span className="flex items-center px-2.5 text-xs text-ink-muted">
+                <div className="mt-1 flex items-center border-b border-line">
+                  <span className="font-mono text-xs text-ink-faint">
                     /projects/
                   </span>
                   <input
@@ -393,7 +322,7 @@ export default function NewProjectPage() {
                     id="slug"
                     value={formData.slug}
                     onChange={(e) => handleSlugChange(e.target.value)}
-                    className="block w-full rounded-r-lg border-0 bg-transparent px-0 py-1.5 text-sm focus:outline-none focus:ring-0 text-ink placeholder-ink-subtle"
+                    className="block w-full border-0 bg-transparent px-0 py-1.5 font-mono text-xs focus:outline-none focus:ring-0 text-ink placeholder-ink-faint"
                     placeholder="my-awesome-project"
                     required
                   />
@@ -404,9 +333,9 @@ export default function NewProjectPage() {
               <div>
                 <label
                   htmlFor="description"
-                  className="block text-xs font-medium text-ink-muted"
+                  className="block font-mono text-[10.5px] uppercase tracking-wider text-ink-faint"
                 >
-                  Description <span className="text-ink-muted">(optional)</span>
+                  description <span className="normal-case">(optional)</span>
                 </label>
                 <textarea
                   id="description"
@@ -418,17 +347,17 @@ export default function NewProjectPage() {
                     }))
                   }
                   rows={2}
-                  className="mt-1 block w-full rounded-lg border px-3 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+                  className="mt-1 block w-full resize-none border-0 border-b bg-transparent px-0 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-0 border-line text-ink placeholder-ink-faint"
                   placeholder="A brief description..."
                 />
               </div>
 
               {/* Icon & Color -- hidden when using framework logo */}
               {isFrameworkIcon(formData.icon) ? (
-                <div className="flex items-center justify-between rounded-lg border px-3 py-2 border-line bg-surface-raised/50">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b py-2 border-line">
+                  <div className="flex min-w-0 items-center gap-2">
                     <ProjectIcon icon={formData.icon} size={18} />
-                    <span className="text-xs text-ink-muted">
+                    <span className="truncate text-xs text-ink-muted">
                       Using{" "}
                       {PROJECT_TYPES[parseFrameworkType(formData.icon)!]
                         ?.label ?? "framework"}{" "}
@@ -444,7 +373,7 @@ export default function NewProjectPage() {
                         color: DEFAULT_PROJECT_COLOR,
                       }))
                     }
-                    className="text-[10px] font-medium text-ink-subtle hover:text-ink"
+                    className="shrink-0 text-[10px] font-medium text-ink-subtle hover:text-ink"
                   >
                     Switch to custom icon
                   </button>
@@ -455,9 +384,9 @@ export default function NewProjectPage() {
                   <div>
                     <span
                       id={iconLabelId}
-                      className="block text-xs font-medium text-ink-muted"
+                      className="block font-mono text-[10.5px] uppercase tracking-wider text-ink-faint"
                     >
-                      Icon
+                      icon
                     </span>
                     <div
                       role="group"
@@ -473,10 +402,10 @@ export default function NewProjectPage() {
                           }
                           aria-label={icon}
                           aria-pressed={formData.icon === icon}
-                          className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+                          className={`flex h-[26px] w-[26px] items-center justify-center rounded border transition-colors ${
                             formData.icon === icon
-                              ? "bg-accent-soft ring-1 ring-accent-line"
-                              : "bg-surface-raised hover:bg-surface-hover"
+                              ? "border-accent-line bg-accent-soft"
+                              : "border-line hover:bg-surface-hover"
                           }`}
                         >
                           <ProjectIcon
@@ -497,9 +426,9 @@ export default function NewProjectPage() {
                   <div>
                     <span
                       id={colorLabelId}
-                      className="block text-xs font-medium text-ink-muted"
+                      className="block font-mono text-[10.5px] uppercase tracking-wider text-ink-faint"
                     >
-                      Color
+                      colour
                     </span>
                     <div
                       role="group"
@@ -515,9 +444,9 @@ export default function NewProjectPage() {
                           }
                           aria-label={color}
                           aria-pressed={formData.color === color}
-                          className={`h-7 w-7 rounded-lg transition-all ${
+                          className={`h-[19px] w-[19px] rounded transition-all ${
                             formData.color === color
-                              ? "ring-2 ring-offset-1 ring-line"
+                              ? "outline outline-2 outline-offset-1 outline-ink"
                               : ""
                           }`}
                           style={{ backgroundColor: color }}
@@ -534,7 +463,7 @@ export default function NewProjectPage() {
               )}
 
               {/* Actions */}
-              <div className="flex items-center gap-2 pt-2">
+              <div className="flex items-center gap-2 border-t pt-4 border-line">
                 <Link
                   href="/dashboard/projects"
                   className="rounded-lg px-3 py-1.5 text-xs font-medium text-ink-muted hover:bg-surface-hover"

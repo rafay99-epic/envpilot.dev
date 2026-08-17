@@ -3,6 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { DEFAULT_PROJECT_COLOR, PROJECT_COLORS } from "@/constants/project";
 import { hasE2ECredentials, SKIP_REASON } from "../env";
 import { getOwnedOrgSlug, getWorkerProjectSlug } from "./support";
+import { authedConvex } from "../convex";
+import { api as convexApi } from "@convex/_generated/api";
 
 // The three settings surfaces now share one shell: tabs are data, `?tab=` is
 // the source of truth, and a settings tab renders flat sections — no cards.
@@ -238,11 +240,11 @@ test.describe("settings shell", () => {
     await expect(pressed, "exactly one swatch is selected").toHaveCount(1);
     const selected = await pressed.getAttribute("aria-label");
 
-    const response = await page.request.get("/api/projects");
-    expect(response.ok()).toBe(true);
-    const { projects } = (await response.json()) as {
-      projects: { slug: string; color?: string }[];
-    };
+    const convex = await authedConvex(page.request);
+    const projects = (await convex.query(
+      convexApi.features.projects.queries.listForUser,
+      {}
+    )) as Array<{ slug: string; color?: string }>;
     const stored =
       projects.find((p) => p.slug === slug)?.color ?? DEFAULT_PROJECT_COLOR;
 

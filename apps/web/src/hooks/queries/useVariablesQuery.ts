@@ -1,150 +1,135 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query-keys";
+"use client";
 
-interface Variable {
-  _id: string;
-  key: string;
-  description?: string;
-  environments: string[];
-  isSensitive: boolean;
-  version: number;
-  createdAt: number;
-  updatedAt: number;
-  vaultRef?: string;
-  permission?: "read" | "write" | "admin" | null;
-  rotationFrequencyDays?: number;
-  expiresAt?: number;
-  rotationStatus?: "active" | "expiring_soon" | "expired";
-  tagIds?: string[];
-}
+import { useAction, useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 
-interface VersionRecord {
-  _id: string;
-  version: number;
-  description?: string;
-  environments: string[];
-  changeReason?: string;
-  createdAt: number;
-  changedByUser: { name?: string; email: string } | null;
-}
+/**
+ * Variable writes, straight to Convex.
+ *
+ * These used to post to /api/variables* through React Query. Every one of
+ * those routes was a passthrough: read the AuthKit session, then call the
+ * exact Convex function called here. The browser already holds an
+ * authenticated Convex socket, so the HTTP hop re-derived an identity it
+ * already had.
+ *
+ * The React Query layer went with it. Its `onSuccess` handlers invalidated
+ * `queryKeys.variables.*`, and nothing read those keys: the lists are
+ * `usePaginatedQuery`/`useQuery` against Convex, which push on write. The
+ * invalidation was maintaining a cache with no readers.
+ *
+ * The hooks keep the `mutateAsync` shape so call sites did not have to change
+ * their control flow.
+ */
 
-export function useCreateVariable() {
-  const queryClient = useQueryClient();
+type MutationLike<TArgs, TResult> = {
+  mutateAsync: (args: TArgs) => Promise<TResult>;
+};
 
-  return useMutation({
-    mutationFn: (data: {
-      key: string;
-      value: string;
-      description?: string;
-      environments: string[];
-      projectId: string;
-      isSensitive: boolean;
-      rotationFrequencyDays?: number;
-      tagIds?: string[];
-    }) =>
-      api.post<{
-        variable?: Variable;
-        requested?: boolean;
-        requestId?: string;
-        message?: string;
-      }>("/api/variables", data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.variables.list(variables.projectId),
+export function useCreateVariable(): MutationLike<
+  {
+    key: string;
+    value: string;
+    description?: string;
+    environments: string[];
+    projectId: string;
+    isSensitive: boolean;
+    rotationFrequencyDays?: number;
+    tagIds?: string[];
+  },
+  { requested: boolean }
+> {
+  const createWithValue = useAction(
+    api.features.variables.values.createWithValue
+  );
+
+  return {
+    mutateAsync: async ({ projectId, tagIds, ...data }) => {
+      await createWithValue({
+        ...data,
+        projectId: projectId as Id<"projects">,
+        tagIds: tagIds as Id<"variableTags">[] | undefined,
       });
+      // Direct creation only. The request-for-approval path is a separate
+      // flow (variables/requests); the old route never returned true here
+      // either, so callers see the same branch they always did.
+      return { requested: false };
     },
-  });
+  };
 }
 
-export function useUpdateVariable() {
-  const queryClient = useQueryClient();
+export function useUpdateVariable(): MutationLike<
+  {
+    variableId: string;
+    projectId: string;
+    value?: string;
+    description?: string;
+    environments?: string[];
+    isSensitive?: boolean;
+    changeReason?: string;
+    rotationFrequencyDays?: number;
+    tagIds?: string[];
+  },
+  void
+> {
+  const updateWithValue = useAction(
+    api.features.variables.values.updateWithValue
+  );
 
-  return useMutation({
-    mutationFn: ({
+  return {
+    mutateAsync: async ({
       variableId,
-      projectId,
+      projectId: _projectId,
+      tagIds,
       ...data
-    }: {
-      variableId: string;
-      projectId: string;
-      value?: string;
-      description?: string;
-      environments?: string[];
-      isSensitive?: boolean;
-      changeReason?: string;
-      rotationFrequencyDays?: number;
-      tagIds?: string[];
-    }) =>
-      api.patch<{ variable: Variable }>(`/api/variables/${variableId}`, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.variables.list(variables.projectId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.variables.detail(variables.variableId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.variables.history(variables.variableId),
+    }) => {
+      await updateWithValue({
+        ...data,
+        variableId: variableId as Id<"environmentVariables">,
+        tagIds: tagIds as Id<"variableTags">[] | undefined,
       });
     },
-  });
+  };
 }
 
-export function useDeleteVariable() {
-  const queryClient = useQueryClient();
+export function useDeleteVariable(): MutationLike<
+  { variableId: string; projectId: string },
+  void
+> {
+  const remove = useMutation(api.features.variables.mutations.remove);
 
-  return useMutation({
-    mutationFn: ({ variableId }: { variableId: string; projectId: string }) =>
-      api.del<{ success: boolean }>(`/api/variables/${variableId}`),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.variables.list(variables.projectId),
-      });
+  return {
+    mutateAsync: async ({ variableId }) => {
+      await remove({ variableId: variableId as Id<"environmentVariables"> });
     },
-  });
+  };
 }
 
-export function useBulkDeleteVariables() {
-  const queryClient = useQueryClient();
+export function useBulkDeleteVariables(): MutationLike<
+  { variableIds: string[]; projectId: string },
+  { deletedCount: number }
+> {
+  const bulkDelete = useMutation(api.features.variables.mutations.bulkDelete);
 
-  return useMutation({
-    mutationFn: (data: { variableIds: string[]; projectId: string }) =>
-      api.post<{ success: boolean; deletedCount: number }>(
-        "/api/variables/bulk-delete",
-        data
-      ),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.variables.list(variables.projectId),
-      });
-    },
-  });
+  return {
+    mutateAsync: ({ variableIds }) =>
+      bulkDelete({
+        variableIds: variableIds as Id<"environmentVariables">[],
+      }),
+  };
 }
 
-export function useRollbackVariable() {
-  const queryClient = useQueryClient();
+export function useRollbackVariable(): MutationLike<
+  { variableId: string; projectId: string; targetVersion: number },
+  { valueRestored: boolean }
+> {
+  const rollback = useMutation(api.features.variables.mutations.rollback);
 
-  return useMutation({
-    mutationFn: ({
-      variableId,
-      targetVersion,
-    }: {
-      variableId: string;
-      projectId: string;
-      targetVersion: number;
-    }) =>
-      api.post<{ variable: Variable; valueRestored: boolean }>(
-        `/api/variables/${variableId}/rollback`,
-        { targetVersion }
-      ),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.variables.list(variables.projectId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.variables.history(variables.variableId),
-      });
-    },
-  });
+  return {
+    mutateAsync: ({ variableId, targetVersion }) =>
+      rollback({
+        variableId: variableId as Id<"environmentVariables">,
+        targetVersion,
+      }),
+  };
 }

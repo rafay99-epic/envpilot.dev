@@ -94,6 +94,7 @@ import type * as features_permissions_variablePermissions_cleanup from "../featu
 import type * as features_permissions_variablePermissions_queries from "../features/permissions/variablePermissions/queries.js";
 import type * as features_projects_deletion from "../features/projects/deletion.js";
 import type * as features_projects_favorites from "../features/projects/favorites.js";
+import type * as features_projects_fromTemplate from "../features/projects/fromTemplate.js";
 import type * as features_projects_helpers from "../features/projects/helpers.js";
 import type * as features_projects_members from "../features/projects/members.js";
 import type * as features_projects_mutations from "../features/projects/mutations.js";
@@ -110,8 +111,10 @@ import type * as features_users_deviceSessions from "../features/users/deviceSes
 import type * as features_users_preferences from "../features/users/preferences.js";
 import type * as features_users_projectAccess from "../features/users/projectAccess.js";
 import type * as features_users_users from "../features/users/users.js";
+import type * as features_variables_bulkJobs from "../features/variables/bulkJobs.js";
 import type * as features_variables_helpers from "../features/variables/helpers.js";
 import type * as features_variables_mutations from "../features/variables/mutations.js";
+import type * as features_variables_notifications from "../features/variables/notifications.js";
 import type * as features_variables_queries from "../features/variables/queries.js";
 import type * as features_variables_requests_actions from "../features/variables/requests/actions.js";
 import type * as features_variables_requests_helpers from "../features/variables/requests/helpers.js";
@@ -126,14 +129,17 @@ import type * as features_vault_vault from "../features/vault/vault.js";
 import type * as lib_audit from "../lib/audit.js";
 import type * as lib_authHelpers from "../lib/authHelpers.js";
 import type * as lib_authz from "../lib/authz.js";
+import type * as lib_batchLimits from "../lib/batchLimits.js";
 import type * as lib_capabilities from "../lib/capabilities.js";
 import type * as lib_fileLimits from "../lib/fileLimits.js";
 import type * as lib_identity from "../lib/identity.js";
 import type * as lib_integrationLimits from "../lib/integrationLimits.js";
+import type * as lib_pool from "../lib/pool.js";
 import type * as lib_rateLimits from "../lib/rateLimits.js";
 import type * as lib_roleCompat from "../lib/roleCompat.js";
 import type * as lib_roleProfiles from "../lib/roleProfiles.js";
 import type * as lib_seedData from "../lib/seedData.js";
+import type * as lib_urlValidation from "../lib/urlValidation.js";
 import type * as lib_users from "../lib/users.js";
 
 import type {
@@ -229,6 +235,7 @@ declare const fullApi: ApiFromModules<{
   "features/permissions/variablePermissions/queries": typeof features_permissions_variablePermissions_queries;
   "features/projects/deletion": typeof features_projects_deletion;
   "features/projects/favorites": typeof features_projects_favorites;
+  "features/projects/fromTemplate": typeof features_projects_fromTemplate;
   "features/projects/helpers": typeof features_projects_helpers;
   "features/projects/members": typeof features_projects_members;
   "features/projects/mutations": typeof features_projects_mutations;
@@ -245,8 +252,10 @@ declare const fullApi: ApiFromModules<{
   "features/users/preferences": typeof features_users_preferences;
   "features/users/projectAccess": typeof features_users_projectAccess;
   "features/users/users": typeof features_users_users;
+  "features/variables/bulkJobs": typeof features_variables_bulkJobs;
   "features/variables/helpers": typeof features_variables_helpers;
   "features/variables/mutations": typeof features_variables_mutations;
+  "features/variables/notifications": typeof features_variables_notifications;
   "features/variables/queries": typeof features_variables_queries;
   "features/variables/requests/actions": typeof features_variables_requests_actions;
   "features/variables/requests/helpers": typeof features_variables_requests_helpers;
@@ -261,14 +270,17 @@ declare const fullApi: ApiFromModules<{
   "lib/audit": typeof lib_audit;
   "lib/authHelpers": typeof lib_authHelpers;
   "lib/authz": typeof lib_authz;
+  "lib/batchLimits": typeof lib_batchLimits;
   "lib/capabilities": typeof lib_capabilities;
   "lib/fileLimits": typeof lib_fileLimits;
   "lib/identity": typeof lib_identity;
   "lib/integrationLimits": typeof lib_integrationLimits;
+  "lib/pool": typeof lib_pool;
   "lib/rateLimits": typeof lib_rateLimits;
   "lib/roleCompat": typeof lib_roleCompat;
   "lib/roleProfiles": typeof lib_roleProfiles;
   "lib/seedData": typeof lib_seedData;
+  "lib/urlValidation": typeof lib_urlValidation;
   "lib/users": typeof lib_users;
 }>;
 

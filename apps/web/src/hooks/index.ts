@@ -15,10 +15,12 @@ export { useOrganizationProjects, useProjectBySlug } from "./useProjects";
 export { useAutoPageSize } from "./useAutoPageSize";
 export {
   useCreateProject,
+  useCreateProjectFromTemplate,
   useUpdateProject,
   useDeleteProject,
   useMoveProject,
 } from "./useProjectActions";
+export { useBulkJob } from "./useBulkJob";
 
 // Variable hooks
 export { useVariableHistory } from "./useVariables";

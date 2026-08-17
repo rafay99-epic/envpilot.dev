@@ -2017,4 +2017,43 @@ export default defineSchema({
     .index("by_provider", ["provider"])
     .index("by_tier_and_provider", ["tierName", "provider"])
     .index("by_product_id", ["productId"]),
+
+  // ==========================================
+  // BULK JOBS (progress for pooled vault operations)
+  // ==========================================
+  // Live progress for template provisioning, import and export. Exists
+  // because the workflow component's status reports which STEP is running,
+  // not how many items within a step have landed, and because import and
+  // export deliberately do not run as workflows at all (their items carry
+  // secret plaintext, which a workflow journal would persist).
+  //
+  // Holds counts only. No key, no value, no vault ref: nothing here is worth
+  // reading and rows are disposable once the client has seen the outcome.
+  bulkJobs: defineTable({
+    organizationId: v.id("organizations"),
+    projectId: v.id("projects"),
+    kind: v.union(
+      v.literal("template"),
+      v.literal("import"),
+      v.literal("export")
+    ),
+    status: v.union(
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    // Items in the batch, known up front.
+    total: v.number(),
+    completed: v.number(),
+    failed: v.number(),
+    // User-facing failure text. Set only when status is "failed".
+    error: v.optional(v.string()),
+    createdBy: v.id("users"),
+    startedAt: v.number(),
+    finishedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_status", ["projectId", "status"])
+    .index("by_organization", ["organizationId"])
+    .index("by_started_at", ["startedAt"]),
 });

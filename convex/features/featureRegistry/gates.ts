@@ -118,12 +118,20 @@ export async function checkNumericLimit(
  * itself expensive (org-wide fan-out across projects, etc). `checkNumericLimit`
  * stays available for callers with an already-cheap or already-computed count.
  */
+/**
+ * `additional` is how many rows the caller is about to add. It defaults to 1
+ * (the single-create case, where `current < limit` and `current + 1 <= limit`
+ * are the same test). A batch passes its size so the whole batch is admitted
+ * or refused as a unit, instead of being admitted here and then failing
+ * partway through the loop.
+ */
 export async function checkCountedLimit(
   db: DatabaseReader,
   organizationId: Id<"organizations">,
   featureKey: string,
   countFn: (limit: number) => Promise<number>,
-  context?: OrgGateContext
+  context?: OrgGateContext,
+  additional = 1
 ): Promise<{
   allowed: boolean;
   current: number;
@@ -150,7 +158,7 @@ export async function checkCountedLimit(
   }
 
   const currentCount = await countFn(limit);
-  const allowed = currentCount < limit;
+  const allowed = currentCount + additional <= limit;
   return {
     allowed,
     current: currentCount,
@@ -158,7 +166,9 @@ export async function checkCountedLimit(
     tierName: resolved.tierName,
     reason: allowed
       ? undefined
-      : `Limit reached (${currentCount}/${limit}). Upgrade your tier for more.`,
+      : additional > 1
+        ? `This would put you at ${currentCount + additional} of ${limit}. Upgrade your tier for more.`
+        : `Limit reached (${currentCount}/${limit}). Upgrade your tier for more.`,
   };
 }
 

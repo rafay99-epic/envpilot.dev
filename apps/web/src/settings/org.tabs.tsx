@@ -44,7 +44,7 @@ export function orgSettingsTabs({
       label: "General",
       locked: isOwner ? undefined : OWNER_ONLY,
       render: () => (
-        <GeneralTab slug={slug} organization={organization} orgTier={orgTier} />
+        <GeneralTab organization={organization} orgTier={orgTier} />
       ),
     },
     {
@@ -78,7 +78,11 @@ export function orgSettingsTabs({
       tone: "danger",
       locked: isOwner ? undefined : OWNER_ONLY,
       render: () => (
-        <DangerTab slug={slug} organizationName={organization.name} />
+        <DangerTab
+          slug={slug}
+          organizationId={organization._id}
+          organizationName={organization.name}
+        />
       ),
     },
   ];

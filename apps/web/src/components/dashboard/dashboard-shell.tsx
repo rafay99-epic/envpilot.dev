@@ -1,5 +1,6 @@
 import { AuthErrorBoundary } from "@/components/auth/auth-error-boundary";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { CommandPalette } from "@/components/command-palette";
 import { UpdateBanner } from "@/components/dashboard/update-banner";
 import { KeyboardShortcutsProvider } from "@/components/keyboard/keyboard-shortcuts-provider";
@@ -40,6 +41,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         {/* Main Content */}
         <main className="relative z-10 flex-1 overflow-auto">
           <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
+            {/* One place, derived from the route. Pages used to each carry
+                their own hardcoded arrow to a fixed parent, which is the
+                wrong destination whenever you arrive from search or the
+                command palette. Renders null at the dashboard root. */}
+            <Breadcrumbs className="mb-5" />
             {children}
           </div>
         </main>

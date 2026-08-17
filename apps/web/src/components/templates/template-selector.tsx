@@ -58,10 +58,6 @@ export function TemplateSelector({
     TemplateCategory | "all"
   >("all");
 
-  const popularTemplates = useMemo(() => {
-    return BUILT_IN_TEMPLATES.filter((t) => t.isPopular);
-  }, []);
-
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: BUILT_IN_TEMPLATES.length };
     for (const cat of Object.keys(TEMPLATE_CATEGORIES) as TemplateCategory[]) {
@@ -90,39 +86,39 @@ export function TemplateSelector({
     return templates;
   }, [searchQuery, selectedCategory]);
 
-  const showPopular = selectedCategory === "all" && !searchQuery;
-
   return (
-    <div className="space-y-4">
-      {/* Search */}
-      <div className="relative">
+    <div>
+      {/* Search. An underline rather than a filled box: it sits above a list
+          of rows, and a second bordered rectangle there was one of eleven
+          competing at the same weight. */}
+      <div className="flex items-center gap-2.5 border-b px-4 py-2.5 border-line">
         <label htmlFor={searchId} className="sr-only">
           Search templates
         </label>
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+        <Search className="h-3.5 w-3.5 shrink-0 text-ink-faint" />
         <input
           id={searchId}
           type="text"
-          placeholder="Search templates..."
+          placeholder={`Search ${BUILT_IN_TEMPLATES.length} templates...`}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-lg border py-2 pl-10 pr-4 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+          className="w-full border-0 bg-transparent p-0 font-mono text-xs focus:outline-none focus:ring-0 text-ink placeholder-ink-faint"
         />
       </div>
 
       {/* Category Pills */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex gap-1.5 overflow-x-auto border-b px-4 py-2.5 border-line [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
           onClick={() => setSelectedCategory("all")}
-          className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+          className={`flex shrink-0 items-center gap-1.5 rounded border px-2 py-0.5 font-mono text-[10.5px] transition-colors ${
             selectedCategory === "all"
-              ? "bg-accent-soft text-accent ring-1 ring-accent-line"
-              : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
+              ? "border-accent-line bg-accent-soft text-accent"
+              : "border-line text-ink-faint hover:text-ink"
           }`}
         >
-          All
-          <span className="text-ink-subtle">{categoryCounts.all}</span>
+          all
+          <span className="text-ink-faint">{categoryCounts.all}</span>
         </button>
         {(Object.keys(TEMPLATE_CATEGORIES) as TemplateCategory[]).map((cat) => {
           const { label, icon } = TEMPLATE_CATEGORIES[cat];
@@ -132,86 +128,54 @@ export function TemplateSelector({
               key={cat}
               type="button"
               onClick={() => setSelectedCategory(cat)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
+              className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded border px-2 py-0.5 font-mono text-[10.5px] transition-colors ${
                 selectedCategory === cat
-                  ? "bg-accent-soft text-accent ring-1 ring-accent-line"
-                  : "bg-surface-raised text-ink-muted hover:bg-surface-hover hover:text-ink"
+                  ? "border-accent-line bg-accent-soft text-accent"
+                  : "border-line text-ink-faint hover:text-ink"
               }`}
             >
               {IconComponent && <IconComponent className="h-3 w-3" />}
-              {label}
-              <span className="text-ink-subtle">{categoryCounts[cat]}</span>
+              {label.toLowerCase()}
+              <span className="text-ink-faint">{categoryCounts[cat]}</span>
             </button>
           );
         })}
       </div>
 
-      {/* "Start from Scratch" row -- always visible at top */}
+      {/* Start from scratch, as the first row of the list rather than a
+          dashed box above it. */}
       <button
         type="button"
         onClick={() => onSelectTemplate(null)}
-        className={`flex w-full items-center gap-3 rounded-lg border-2 px-3 py-2.5 text-left transition-all ${
+        className={`flex w-full items-center gap-3 border-b px-4 py-2.5 text-left transition-colors border-line ${
           selectedTemplateId === null
-            ? "border-line bg-surface-raised"
-            : "border-dashed border-line hover:border-line-strong"
+            ? "bg-accent-soft shadow-[inset_2px_0_0_var(--color-accent)]"
+            : "hover:bg-surface-hover"
         }`}
       >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-hover">
+        <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded bg-surface-raised">
           {selectedTemplateId === null ? (
-            <Check className="h-4 w-4 text-ink" />
+            <Check className="h-3.5 w-3.5 text-accent" />
           ) : (
-            <Plus className="h-4 w-4 text-ink-muted" />
+            <Plus className="h-3.5 w-3.5 text-ink-faint" />
           )}
         </div>
-        <div>
-          <p className="text-sm font-medium text-ink">Start from Scratch</p>
-          <p className="text-xs text-ink-muted">
+        <div className="min-w-0">
+          <p className="text-[13.5px] font-medium text-ink">
+            Start from scratch
+          </p>
+          <p className="text-xs text-ink-subtle">
             Empty project, add variables manually
           </p>
         </div>
+        <span className="ml-auto shrink-0 font-mono text-[11px] text-ink-faint">
+          0 vars
+        </span>
       </button>
 
-      {/* Popular Templates Row */}
-      {showPopular && popularTemplates.length > 0 && (
-        <div>
-          <div className="mb-2 flex items-center gap-1.5">
-            <TrendingUp className="h-3 w-3 text-ink-muted" />
-            <span className="text-xs font-medium text-ink-muted">Popular</span>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {popularTemplates.map((template) => (
-              <button
-                key={template.id}
-                type="button"
-                onClick={() => onSelectTemplate(template)}
-                className={`flex min-w-[180px] shrink-0 items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all ${
-                  selectedTemplateId === template.id
-                    ? "border-line bg-surface-raised/80"
-                    : "border-line bg-surface hover:border-line-strong"
-                }`}
-              >
-                <div
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
-                  style={{ backgroundColor: template.color + "15" }}
-                >
-                  <FrameworkLogo projectType={template.projectType} size={18} />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-medium text-ink">
-                    {template.name}
-                  </p>
-                  <p className="text-xs text-ink-subtle">
-                    {template.variables.length} vars
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Template List -- compact single-column list, no expand */}
-      <div className="space-y-1">
+      {/* Template list. Rows are flush and separated by hairlines, the same
+          idiom as the variables table. */}
+      <div>
         <AnimatePresence mode="popLayout">
           {filteredTemplates.map((template, i) => (
             <motion.div
@@ -234,7 +198,7 @@ export function TemplateSelector({
 
       {/* No Results */}
       {filteredTemplates.length === 0 && (
-        <div className="rounded-lg border border-dashed px-4 py-6 text-center border-line">
+        <div className="px-4 py-10 text-center">
           <p className="text-sm text-ink-muted">No templates found</p>
           <button
             type="button"
@@ -271,25 +235,25 @@ function TemplateRow({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
+      className={`flex w-full items-center gap-3 border-b px-4 py-2.5 text-left transition-colors border-line ${
         isSelected
-          ? "border-line bg-surface-raised/80"
-          : "border-transparent hover:bg-surface-hover/50"
+          ? "bg-accent-soft shadow-[inset_2px_0_0_var(--color-accent)]"
+          : "hover:bg-surface-hover"
       }`}
     >
       <div
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
+        className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded"
         style={{ backgroundColor: template.color + "15" }}
       >
-        <FrameworkLogo projectType={template.projectType} size={18} />
+        <FrameworkLogo projectType={template.projectType} size={15} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <p className="truncate text-sm font-medium text-ink">
+          <p className="truncate text-[13.5px] font-medium text-ink">
             {template.name}
           </p>
           {template.version && (
-            <span className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium bg-surface-raised text-ink-muted">
+            <span className="shrink-0 font-mono text-[10px] text-ink-faint">
               {template.version}
             </span>
           )}
@@ -298,12 +262,12 @@ function TemplateRow({
           {template.description}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <span className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-surface-raised text-ink-muted">
-          {template.variables.length}
+      <div className="flex shrink-0 items-center gap-2">
+        {sensitiveCount > 0 && <Lock className="h-3 w-3 text-ink-faint" />}
+        <span className="font-mono text-[11px] text-ink-faint">
+          {template.variables.length} vars
         </span>
-        {sensitiveCount > 0 && <Lock className="h-3 w-3 text-ink-subtle" />}
-        {isSelected && <Check className="h-4 w-4 text-ink" />}
+        {isSelected && <Check className="h-3.5 w-3.5 text-accent" />}
       </div>
     </button>
   );

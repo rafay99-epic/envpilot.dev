@@ -7,10 +7,14 @@ import { TerminalButton } from "@/components/dashboard/terminal-ui";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { getEffectiveShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { validateBinding } from "@/lib/shortcut-validation";
+import { useSavePreferences } from "@/hooks/usePreferences";
+import { createLogger } from "@/lib/logger";
 import {
   initialShortcutRecorderState,
   shortcutRecorderReducer,
 } from "./shortcut-recorder-state";
+
+const log = createLogger("settings/customization");
 
 const shortcutCategories = [
   { key: "navigation" as const, label: "Navigation" },
@@ -23,6 +27,7 @@ export function CustomizationSettings() {
   const updateBinding = useKeyboardStore((s) => s.updateBinding);
   const removeBinding = useKeyboardStore((s) => s.removeBinding);
   const resetAllBindings = useKeyboardStore((s) => s.resetAllBindings);
+  const savePreferences = useSavePreferences();
 
   const [recorder, dispatch] = useReducer(
     shortcutRecorderReducer,
@@ -114,14 +119,11 @@ export function CustomizationSettings() {
     updateBinding(shortcutId, binding);
 
     try {
-      await fetch("/api/users/me/preferences", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyboardShortcuts: newBindings }),
-      });
+      await savePreferences({ keyboardShortcuts: newBindings });
       setSaveMessage("Saved");
       setTimeout(() => setSaveMessage(null), 2000);
-    } catch {
+    } catch (err) {
+      log.error("shortcut_save_failed", { shortcutId, binding }, err);
       // Revert on error
       removeBinding(shortcutId);
     }
@@ -135,12 +137,9 @@ export function CustomizationSettings() {
     removeBinding(shortcutId);
     const { [shortcutId]: _, ...rest } = customBindings;
     try {
-      await fetch("/api/users/me/preferences", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyboardShortcuts: rest }),
-      });
-    } catch {
+      await savePreferences({ keyboardShortcuts: rest });
+    } catch (err) {
+      log.error("shortcut_remove_failed", { shortcutId }, err);
       // Revert
       updateBinding(shortcutId, customBindings[shortcutId]);
     }
@@ -149,15 +148,13 @@ export function CustomizationSettings() {
   async function handleResetAll() {
     resetAllBindings();
     try {
-      await fetch("/api/users/me/preferences", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyboardShortcuts: {} }),
-      });
+      await savePreferences({ keyboardShortcuts: {} });
       setSaveMessage("All shortcuts reset to defaults");
       setTimeout(() => setSaveMessage(null), 2000);
-    } catch {
-      // Silently fail
+    } catch (err) {
+      // Was "silently fail". A reset that does not persist looks identical to
+      // one that did until the next reload.
+      log.error("shortcut_reset_all_failed", {}, err);
     }
   }
 

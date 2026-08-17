@@ -8,6 +8,7 @@ import {
   createVariable,
   deleteVariableByKey,
   getWorkerProjectSlug,
+  resolveOwnedProject,
   trackClientErrors,
 } from "./support";
 
@@ -101,24 +102,10 @@ test.describe.serial("Public REST API v1", () => {
       environments: ["production"],
     });
 
-    const orgsResponse = await page.request.get("/api/organizations");
-    expect(orgsResponse.ok(), await orgsResponse.text()).toBeTruthy();
-    const { organizations } = (await orgsResponse.json()) as {
-      organizations: Array<{ _id: string; role: string }>;
-    };
-    const ownedOrg = organizations.find((o) => o.role === "owner");
-    if (!ownedOrg) throw new Error("The e2e test user owns no organization.");
-
-    const projectsResponse = await page.request.get(
-      `/api/projects?organizationId=${ownedOrg._id}`
+    const { organizationId, project } = await resolveOwnedProject(
+      page,
+      projectSlug
     );
-    expect(projectsResponse.ok(), await projectsResponse.text()).toBeTruthy();
-    const { projects } = (await projectsResponse.json()) as {
-      projects: Array<{ _id: string; slug: string }>;
-    };
-    const project = projects.find((p) => p.slug === projectSlug);
-    if (!project)
-      throw new Error("Worker fixture project not found via /api/projects.");
 
     if (!CONVEX_URL) {
       throw new Error(
@@ -129,7 +116,7 @@ test.describe.serial("Public REST API v1", () => {
     convex.setAuth(await fetchOwnerAccessToken());
 
     const minted = (await convex.action(fn.createApiKey, {
-      organizationId: ownedOrg._id,
+      organizationId,
       name: `E2E Public API key ${Date.now()}`,
       scopeProjects: [project._id],
       // Production-only on purpose — the "wrong environment" test below

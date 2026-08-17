@@ -6,11 +6,20 @@ import { Download, Loader2 } from "lucide-react";
 import {
   ALL_FORMATS,
   FORMAT_LABELS,
+  serialize,
+  getFileExtension,
+  getContentType,
   type FormatType,
 } from "@/lib/format-converter";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
+import { useAction } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { sanitizeConvexError } from "@/lib/error-messages";
+import { createLogger } from "@/lib/logger";
 import type { Id } from "@convex/_generated/dataModel";
+
+const log = createLogger("variables/export");
 
 interface ExportDrawerProps {
   isOpen: boolean;
@@ -31,6 +40,7 @@ export function ExportDialog({
   const [environment, setEnvironment] = useState("all");
   const [isExporting, setIsExporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const exportValues = useAction(api.features.variables.values.exportValues);
   const { allowed, tierName } = useFeatureGate(organizationId, "bulk_export");
   const uid = useId();
   const formatFieldId = `${uid}-format`;
@@ -40,25 +50,21 @@ export function ExportDialog({
     setIsExporting(true);
     setNotice(null);
     try {
-      const params = new URLSearchParams({ format });
-      if (environment !== "all") {
-        params.set("environment", environment);
-      }
+      // The backend returns decrypted pairs; the file is built here. Both the
+      // serializer and the format catalogue already run in the browser, so a
+      // route existed only to call the same two functions server-side.
+      const { values } = await exportValues({
+        projectId: projectId as Id<"projects">,
+        environment: environment === "all" ? undefined : environment,
+      });
 
-      const response = await fetch(
-        `/api/projects/${projectId}/export?${params.toString()}`
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Export failed");
-      }
-
-      const blob = await response.blob();
-      const disposition = response.headers.get("Content-Disposition");
-      const filenameMatch = disposition?.match(/filename="(.+)"/);
-      const filename =
-        filenameMatch?.[1] || `${projectName}-${environment}.${format}`;
+      const vars = Object.fromEntries(values.map((v) => [v.key, v.value]));
+      const body = serialize(vars, format, {
+        projectName,
+        environment: environment === "all" ? undefined : environment,
+      });
+      const filename = `${projectName}-${environment}.${getFileExtension(format)}`;
+      const blob = new Blob([body], { type: getContentType(format) });
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -71,12 +77,17 @@ export function ExportDialog({
 
       setNotice(`Exported as ${FORMAT_LABELS[format]}`);
     } catch (err) {
-      setNotice(
-        `Error: ${err instanceof Error ? err.message : "Export failed"}`
+      log.error(
+        "variable_export_failed",
+        { projectId, organizationId, environment, format },
+        err
       );
-    } finally {
-      setIsExporting(false);
+      setNotice(`Error: ${sanitizeConvexError(err) || "Export failed"}`);
     }
+    // After the try/catch, not in a `finally`: React Compiler bails on the
+    // whole component when a try carries a finalizer. The catch swallows, so
+    // this clears on both paths.
+    setIsExporting(false);
   };
 
   const handleClose = () => {

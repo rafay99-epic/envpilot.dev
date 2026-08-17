@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Modal } from "@/components/ui";
+import { useState } from "react";
+import { DrawerPanel } from "@/components/ui";
 import type { Id } from "@convex/_generated/dataModel";
 import { useTimeZone } from "@/hooks/useTimeZone";
 import { formatDateTime } from "@/lib/format";
@@ -48,8 +48,15 @@ export function VariableHistory({
   const [isRollingBack, setIsRollingBack] = useState(false);
   const [rollbackTarget, setRollbackTarget] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<FilterType>("all");
-  const [compareMode, setCompareMode] = useState(false);
-  const [selectedVersions, setSelectedVersions] = useState<number[]>([]);
+  // Opens comparing the two most recent versions rather than showing a flat
+  // list: "what changed" is the question people open history to answer, and
+  // it used to take two clicks and a mode switch to reach.
+  const [compareMode, setCompareMode] = useState(true);
+  // null means "the caller has not chosen yet", which is distinct from an
+  // explicitly cleared selection. Kept nullable so the default below can be
+  // DERIVED rather than written into state by an effect watching `history` —
+  // that adjustment showed the stale selection for a frame on every push.
+  const [picked, setPicked] = useState<number[] | null>(null);
 
   const timeZone = useTimeZone();
 
@@ -103,6 +110,16 @@ export function VariableHistory({
     });
   };
 
+  // Default: the two most recent versions, so the diff is on screen the
+  // moment the drawer opens.
+  const selectedVersions =
+    picked ??
+    (history.length >= 2 ? [history[1]!.version, history[0]!.version] : []);
+
+  const setSelectedVersions = (
+    next: number[] | ((prev: number[]) => number[])
+  ) => setPicked(typeof next === "function" ? next(selectedVersions) : next);
+
   const getCompareVersions = () => {
     if (selectedVersions.length !== 2) return null;
     const sorted = [...selectedVersions].sort((a, b) => a - b);
@@ -122,21 +139,21 @@ export function VariableHistory({
   const olderEnvironmentSet = new Set(compareVersions?.older.environments);
   const newerEnvironmentSet = new Set(compareVersions?.newer.environments);
 
-  // Reset state when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      setFilterType("all");
-      setCompareMode(false);
-      setSelectedVersions([]);
-    }
-  }, [isOpen]);
+  // Reset on the way out rather than in an effect watching isOpen: every
+  // dismissal path (Escape, backdrop, the close button) routes through here.
+  const close = () => {
+    setFilterType("all");
+    setCompareMode(true);
+    setPicked(null);
+    onClose();
+  };
 
   return (
-    <Modal
+    <DrawerPanel
       isOpen={isOpen}
-      onClose={onClose}
-      title={`Version History: ${variableKey}`}
-      size="xl"
+      onClose={close}
+      title={`${variableKey} / history`}
+      width="lg"
     >
       {/* Filter and Compare Controls */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-4 border-line">
@@ -484,6 +501,6 @@ export function VariableHistory({
           </div>
         )}
       </div>
-    </Modal>
+    </DrawerPanel>
   );
 }

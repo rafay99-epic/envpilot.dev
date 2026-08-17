@@ -1,4 +1,5 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
+import { validateHttpUrl, urlValidationMessage } from "../../lib/urlValidation";
 import { mutation } from "../../_generated/server";
 import {
   checkBooleanFeature,
@@ -48,6 +49,15 @@ function assertWithinEnvironmentScope(
 // ==========================================
 // MUTATIONS
 // ==========================================
+
+/**
+ * Reject a `websiteUrl` that is not a well-formed http(s) URL. The rule lives
+ * in lib/urlValidation so it is unit-testable without the Convex runtime.
+ */
+function assertValidWebsiteUrl(websiteUrl: string | undefined): void {
+  const error = validateHttpUrl(websiteUrl);
+  if (error) throw new ConvexError(urlValidationMessage(error));
+}
 
 export const create = mutation({
   args: {
@@ -118,6 +128,8 @@ export const create = mutation({
           `Shared account limit reached (${numGate.current}/${numGate.limit}). Upgrade your tier for more.`
       );
     }
+
+    assertValidWebsiteUrl(args.websiteUrl);
 
     const accountId = await ctx.db.insert("projectAccounts", {
       name: args.name,
@@ -243,9 +255,11 @@ export const update = mutation({
     if (updates.name !== undefined) updateData.name = updates.name;
     // An empty string clears the optional field. Convex patch treats an
     // explicit `undefined` as field removal, so map "" → undefined.
-    if (updates.websiteUrl !== undefined)
+    if (updates.websiteUrl !== undefined) {
+      assertValidWebsiteUrl(updates.websiteUrl);
       updateData.websiteUrl =
         updates.websiteUrl === "" ? undefined : updates.websiteUrl;
+    }
     if (updates.description !== undefined)
       updateData.description =
         updates.description === "" ? undefined : updates.description;

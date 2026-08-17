@@ -1737,4 +1737,74 @@ Available on Pro.`,
 - **Variable history** is unchanged: every version, who changed it, and rollback
 - The version comparison inside a variable's history panel is a separate feature and stays`,
   },
+  // ============================================================
+  // v1.64.0 — Dashboard on Convex, template provisioning (2026-08-18)
+  // ============================================================
+  {
+    title: "Creating a Project From a Template Is Now One Step",
+    version: "v1.64.0",
+    type: "feature",
+    publishedAt: ts("2026-08-18T09:00:00Z"),
+    content: `Picking a template used to send one request per variable from your browser, one after another, while you watched a spinner. A template with eight variables meant eight round trips before the page moved.
+
+### What Changed
+- Creating the project is a single call. You land on the project as soon as it exists, instead of waiting for every secret to be encrypted first
+- Secrets are encrypted several at a time rather than one after another
+- A status line along the bottom of the variables panel shows the count as it climbs, and disappears when the rows arrive
+
+### All Or Nothing
+- Every variable is written in one transaction. A template either lands complete or does not land at all, so you will never open a new project and find half of it there
+- If a template names the same key twice for the same environment, it is refused before anything is written, and the message names the key
+- The same key across different environments is still allowed, exactly as before
+
+### Import And Export Too
+- Both now encrypt and decrypt several values at a time instead of one after another, so large files finish noticeably sooner
+- A key the platform cannot accept is skipped and counted rather than failing the whole file`,
+  },
+  {
+    title: "Fixed: Template Variables Could Go Missing",
+    version: "v1.64.0",
+    type: "fix",
+    publishedAt: ts("2026-08-18T09:05:00Z"),
+    content: `A project created from a template could come up with variables missing, with nothing on screen to say so. If you have created projects from templates in quick succession, it is worth checking them.
+
+### What Happened
+- Variable creation is rate limited to 30 a minute per organisation, which is a sensible limit and was working correctly
+- The browser sent one request per variable and did not check whether each one succeeded, so once the limit was reached the refusals were discarded silently
+- One template on its own stayed under the limit. Creating several projects within the same minute did not
+
+### What It Looks Like Now
+- The whole batch is counted against the limit once, before any work starts
+- A refusal stops the create and tells you why, instead of a project quietly arriving short
+- A batch that fails partway leaves no project behind and no stored secrets stranded
+
+### Worth Checking
+- Open any project you created from a template shortly after another one and compare its variable list against the template`,
+  },
+  {
+    title: "Navigation, Dialogs and Notices",
+    version: "v1.64.0",
+    type: "improvement",
+    publishedAt: ts("2026-08-18T09:10:00Z"),
+    content: `A pass over the parts of the dashboard that had drifted away from the rest of it.
+
+### Getting Around
+- Every dashboard page now carries a breadcrumb trail with a back control. The arrow returns you to wherever you came from, and the trail moves up the tree, which matters when you arrived from search or the command palette
+- Pages used to carry their own back arrow pointing at a fixed destination, which was the wrong one whenever you had not come from there
+
+### Dialogs
+- Opening a dialog dimmed the page but left the sidebar fully lit. It now covers the whole window
+- Deleting a variable asks you to type its name, the same as deleting an organisation
+- Confirmation dialogs are quieter, and severity is carried by the frame rather than a large filled button
+
+### Notices
+- Success and error messages are toasts. They used to be a full width banner that pushed the page down when it appeared and again when it left
+
+### Version History
+- Opens in a side drawer and starts on the comparison between the two most recent versions, rather than a list you had to switch modes to compare
+
+### Creating A Project
+- The template picker and the project form are full width, separated by a single rule instead of nested panels
+- Templates read as a list of rows, with search and category filters to narrow them`,
+  },
 ];

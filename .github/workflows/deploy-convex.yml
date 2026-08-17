@@ -1,16 +1,36 @@
 name: Deploy Convex
 
 # Called by ci.yml when convex/** changed (strict — shared config changes
-# re-run convex checks but never redeploy). workflow_dispatch is the manual
-# escape hatch and force-deploys unconditionally.
+# re-run convex checks but never redeploy), and only on a push to main.
+# workflow_dispatch is the manual escape hatch; it force-deploys and seeds
+# everything, and is itself refused on any ref other than main.
 
 on:
   workflow_call:
+    inputs:
+      # Each seed runs only when its own source data changed in the push.
+      # Defaulting to false means a caller that says nothing seeds nothing;
+      # the seeds are idempotent, but a silent full re-seed on every deploy
+      # is what this replaced.
+      seed_features:
+        type: boolean
+        default: false
+      seed_tiers:
+        type: boolean
+        default: false
+      seed_roles:
+        type: boolean
+        default: false
+      seed_changelog:
+        type: boolean
+        default: false
     secrets:
       ENVPILOT_TOKEN:
         required: false
       ENVPILOT_PROD_TOKEN:
         required: false
+  # Manual escape hatch. Deploys, and seeds everything, because a hand-run
+  # deploy has no push range to compare against.
   workflow_dispatch:
 
 permissions:
@@ -25,6 +45,10 @@ jobs:
     name: Deploy to Convex
     runs-on: ubuntu-latest
     environment: Production
+    # Production only. ci.yml already gates the call on a push to main, but
+    # workflow_dispatch can be fired from any branch, and this job holds a
+    # production deploy key. Belt and braces on purpose.
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/load-env
@@ -36,24 +60,39 @@ jobs:
       - name: Deploy Convex functions
         run: bunx convex deploy
 
-      # Feature-registry + tier-override seeds MUST follow every deploy so a
-      # release that introduces a new gated feature (e.g. cicd_service_tokens)
-      # is registered the moment its code is live — otherwise gates resolve
-      # to "denied" until someone remembers to seed manually. All handlers
-      # are idempotent upserts.
-      # seed-role-registry + migrate-roles keep the dynamic role system in
-      # sync on every deploy (system roles synced from code, custom roles
-      # insert-only, legacy slugs normalized) — same idempotent upsert model.
-      # seed-changelog rides along for the same reason: changelog entries
-      # live in code (convex/features/community/changelog/seed.ts), so the
-      # website changelog updates the moment a release with new entries
-      # deploys — no manual admin-panel step.
-      # Uses the INTERNAL migrations:run entrypoint — callable only with the
-      # deploy key, so no shared secret is involved at all.
-      - name: Seed feature registry + tier overrides
+      # Seeds run ONLY when their own source data changed in this push, and
+      # always after the deploy above, so a seed never writes a feature key
+      # or role the live code does not have yet.
+      #
+      # A manual workflow_dispatch has no push range to compare against, so
+      # it seeds everything. Every handler is an idempotent upsert, so that
+      # is safe, just slower.
+      #
+      # Order matters and is expressed by step order: the feature registry
+      # must exist before tier values that reference its keys.
+      #
+      # migrate-roles is deliberately absent. The unified-role migration is
+      # done; re-running it on every deploy was work with nothing left to do.
+      - name: Seed feature registry
+        if: inputs.seed_features || github.event_name == 'workflow_dispatch'
         run: |
-          for migration in seed-feature-registry seed-tier-features seed-role-registry migrate-roles seed-changelog; do
-            echo "Running $migration..."
-            bunx convex run features/admin/migrations:run \
-              "$(jq -cn --arg name "$migration" '{name: $name}')"
-          done
+          bunx convex run features/admin/migrations:run \
+            "$(jq -cn '{name: "seed-feature-registry"}')"
+
+      - name: Seed tier features
+        if: inputs.seed_tiers || github.event_name == 'workflow_dispatch'
+        run: |
+          bunx convex run features/admin/migrations:run \
+            "$(jq -cn '{name: "seed-tier-features"}')"
+
+      - name: Seed role registry
+        if: inputs.seed_roles || github.event_name == 'workflow_dispatch'
+        run: |
+          bunx convex run features/admin/migrations:run \
+            "$(jq -cn '{name: "seed-role-registry"}')"
+
+      - name: Seed changelog
+        if: inputs.seed_changelog || github.event_name == 'workflow_dispatch'
+        run: |
+          bunx convex run features/admin/migrations:run \
+            "$(jq -cn '{name: "seed-changelog"}')"

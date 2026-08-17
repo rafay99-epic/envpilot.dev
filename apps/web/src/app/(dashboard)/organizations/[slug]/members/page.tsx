@@ -3,7 +3,7 @@
 import { useState, use, useId, useReducer, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useQuery } from "convex/react";
+import { useConvex, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Users } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
@@ -69,6 +69,9 @@ function OrganizationMembersPageContent({
   const { slug } = use(params);
   const { user } = useAuthContext();
   const { convexUserId } = useConvexUser(user?.id);
+  // Imperative client: this runs per keystroke inside an async handler, not
+  // as a subscription, so useQuery is the wrong shape here.
+  const convex = useConvex();
   const timeZone = useTimeZone();
   // Names the project checkbox group in the invite drawer, which has no single
   // input to attach a <label> to.
@@ -382,16 +385,26 @@ function OrganizationMembersPageContent({
 
     dispatchInvite({ kind: "search-started" });
     try {
-      const response = await fetch(
-        `/api/users/search?q=${encodeURIComponent(query)}&organizationId=${orgId}&limit=5`
+      const results = await convex.query(
+        api.features.users.users.searchForInvite,
+        {
+          searchTerm: query,
+          organizationId: orgId as Id<"organizations">,
+          limit: 5,
+        }
       );
-      if (response.ok) {
-        const data = await response.json();
-        dispatchInvite({
-          kind: "search-succeeded",
-          results: data.users || [],
-        });
-      }
+      dispatchInvite({
+        kind: "search-succeeded",
+        results: results.map((u) => ({
+          _id: u._id,
+          email: u.email,
+          name: u.name,
+          avatarUrl: u.avatarUrl,
+          // The picker's field names; the query returns the same two facts.
+          isMember: u.isMember,
+          hasPendingInvitation: u.hasPendingInvitation,
+        })),
+      });
     } catch (err) {
       log.error(
         "member_search_failed",
