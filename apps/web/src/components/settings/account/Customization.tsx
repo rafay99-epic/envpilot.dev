@@ -218,11 +218,20 @@ export function CustomizationSettings() {
 
                       <div className="flex shrink-0 items-center gap-2">
                         {isEditing ? (
+                          // A key-capture surface, not a button: a button
+                          // would swallow Enter and Space, which are both
+                          // bindable. `textbox` is the closest role for a
+                          // focusable control that takes keystrokes, and
+                          // aria-readonly says the keys are captured rather
+                          // than typed into it.
                           <div
                             className="flex items-center gap-2"
                             onKeyDown={handleKeyDown}
                             tabIndex={0}
                             autoFocus
+                            role="textbox"
+                            aria-readonly
+                            aria-label={`Recording a shortcut for ${def.description}. Press a key combination, or Escape to cancel.`}
                           >
                             <span className="rounded-panel border border-premium-line bg-surface px-3 py-1.5">
                               {recorder.isRecordingSequence &&
