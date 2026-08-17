@@ -1,13 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check, Sparkles, MessageSquare, Terminal } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Sparkles,
+  MessageSquare,
+  Terminal,
+  TriangleAlert,
+} from "lucide-react";
 import { SITE_URLS } from "@envpilot/ui";
 
 interface LLMActionsProps {
   slug: string;
   title: string;
 }
+
+type CopyState = "idle" | "copied" | "failed";
 
 const pillClassName =
   "inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-mono text-[11px] text-ink-subtle transition-colors hover:border-accent-line hover:text-accent";
@@ -18,26 +27,42 @@ const pillClassName =
  * or Cursor.
  */
 export function LLMActions({ slug, title }: LLMActionsProps) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<CopyState>("idle");
 
   const prompt = `Read ${SITE_URLS.docs}/md/${slug} and help me with "${title}" from the Envpilot docs.`;
   const encodedPrompt = encodeURIComponent(prompt);
 
   async function handleCopy() {
-    const res = await fetch(`/md/${slug}`);
-    const text = await res.text();
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      const res = await fetch(`/md/${slug}`);
+      // Without this guard a 404 HTML error page lands on the clipboard
+      // looking exactly like the doc the reader asked for.
+      if (!res.ok) throw new Error(`/md/${slug} responded ${res.status}`);
+      await navigator.clipboard.writeText(await res.text());
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+    setTimeout(() => setCopyState("idle"), 2000);
   }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button type="button" onClick={handleCopy} className={pillClassName}>
-        {copied ? (
+      <button
+        type="button"
+        onClick={handleCopy}
+        aria-live="polite"
+        className={pillClassName}
+      >
+        {copyState === "copied" ? (
           <>
             <Check className="h-3 w-3" />
             copied ✓
+          </>
+        ) : copyState === "failed" ? (
+          <>
+            <TriangleAlert className="h-3 w-3" />
+            copy failed
           </>
         ) : (
           <>

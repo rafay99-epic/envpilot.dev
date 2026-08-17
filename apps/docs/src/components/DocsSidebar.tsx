@@ -1,43 +1,7 @@
 import Link from "next/link";
-import {
-  Terminal,
-  Monitor,
-  Puzzle,
-  Rocket,
-  Shield,
-  Users,
-  FileText,
-  Zap,
-  BookOpen,
-  Plug,
-  Github,
-  Network,
-  Gauge,
-  ExternalLink,
-  ChevronRight,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronRight, ExternalLink } from "lucide-react";
 import { DocsSearch } from "@/components/DocsSearch";
-
-/**
- * Shared icon map for docs frontmatter `icon` keys.
- * Used by the sidebar sections and the article header.
- */
-export const DOC_ICONS: Record<string, LucideIcon> = {
-  "chevron-right": Rocket,
-  terminal: Terminal,
-  puzzle: Puzzle,
-  monitor: Monitor,
-  shield: Shield,
-  users: Users,
-  "file-text": FileText,
-  zap: Zap,
-  book: BookOpen,
-  plug: Plug,
-  github: Github,
-  network: Network,
-  gauge: Gauge,
-};
+import { DOC_ICONS } from "@/components/doc-icons";
 
 const RESOURCES = [
   {
@@ -119,6 +83,8 @@ export function DocsSidebar({
   activeSlug: string;
 }) {
   const activeSection = activeSlug.split("/")[0];
+  const activeItems =
+    sections.find((section) => section.slug === activeSection)?.items ?? [];
 
   return (
     <>
@@ -207,26 +173,23 @@ export function DocsSidebar({
         </div>
 
         <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {sections
-            .filter((section) => section.slug === activeSection)
-            .flatMap((section) => section.items)
-            .map((item) => {
-              const active = item.slug === activeSlug;
-              return (
-                <Link
-                  key={item.slug}
-                  href={`/${item.slug}`}
-                  aria-current={active ? "page" : undefined}
-                  className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
-                    active
-                      ? "bg-accent-soft text-accent"
-                      : "text-ink-subtle hover:text-ink"
-                  }`}
-                >
-                  {item.title}
-                </Link>
-              );
-            })}
+          {activeItems.map((item) => {
+            const active = item.slug === activeSlug;
+            return (
+              <Link
+                key={item.slug}
+                href={`/${item.slug}`}
+                aria-current={active ? "page" : undefined}
+                className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
+                  active
+                    ? "bg-accent-soft text-accent"
+                    : "text-ink-subtle hover:text-ink"
+                }`}
+              >
+                {item.title}
+              </Link>
+            );
+          })}
         </div>
       </nav>
     </>

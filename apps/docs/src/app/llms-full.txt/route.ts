@@ -32,7 +32,6 @@ Source: ${SITE_URLS.docs}/${doc.slug}
 
 ${cleaned}`;
     })
-    .filter(Boolean)
     .join("\n\n\n");
 
   const text = `# Envpilot — Complete Documentation

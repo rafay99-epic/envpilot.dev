@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getNavigation } from "@/lib/content";
 import { DocsShell } from "@/components/shell";
 import { DocsSearch } from "@/components/DocsSearch";
-import { DOC_ICONS } from "@/components/DocsSidebar";
+import { DOC_ICONS } from "@/components/doc-icons";
 import { GlowCard, GlowDivider, Reveal, SITE_URLS } from "@envpilot/ui";
 
 export const metadata: Metadata = {
