@@ -233,7 +233,7 @@ export default function NewProjectPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="space-y-6">
       {/* No back arrow here any more: the shell renders breadcrumbs with a
           history-back control above every dashboard page. */}
       <PageHeader
@@ -259,98 +259,40 @@ export default function NewProjectPage() {
         </div>
       )}
 
-      {/* Master-Detail Layout */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        {/* Left: Template Selector */}
-        <div className="lg:col-span-3">
-          <div className="rounded-xl border p-4 border-line bg-surface">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-ink-muted">
-              Choose a template
-            </p>
-            <TemplateSelector
-              selectedTemplateId={
-                fromScratch ? null : selectedTemplate?.id || undefined
-              }
-              onSelectTemplate={handleTemplateSelect}
-            />
-          </div>
+      {/* One hairline splits the two halves. The page carried two bordered
+          panels with nine more bordered elements nested inside them, all at
+          the same weight; the separators do that work now. Full width too —
+          this was max-w-6xl inside a max-w-7xl shell, so the page with the
+          most content was the narrowest in the app. */}
+      <div className="grid grid-cols-1 border-t border-line lg:grid-cols-[1.55fr_1fr]">
+        <div className="border-line lg:border-r">
+          <TemplateSelector
+            selectedTemplateId={
+              fromScratch ? null : selectedTemplate?.id || undefined
+            }
+            onSelectTemplate={handleTemplateSelect}
+          />
         </div>
 
-        {/* Right: Project Details Form (sticky) */}
-        <div className="lg:col-span-2">
+        <div>
           <div className="lg:sticky lg:top-6">
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-5 rounded-xl border p-4 border-line bg-surface"
-            >
-              <p className="text-xs font-medium uppercase tracking-wider text-ink-muted">
-                Project Details
-              </p>
-
-              {/* Template Badge */}
-              {selectedTemplate && (
-                <div className="flex items-center gap-2.5 rounded-lg border px-3 py-2 border-line bg-surface-raised/50">
-                  <div
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded"
-                    style={{
-                      backgroundColor: selectedTemplate.color + "20",
-                    }}
-                  >
-                    <FrameworkLogo
-                      projectType={selectedTemplate.projectType}
-                      size={16}
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-ink">
-                      {selectedTemplate.name}
-                    </p>
-                    <p className="text-[10px] text-ink-muted">
-                      {selectedTemplate.variables.length} variables included
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Preview */}
-              <div className="flex items-center gap-3 rounded-lg p-3 bg-surface-raised/50">
-                <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-                  style={{
-                    backgroundColor: isFrameworkIcon(formData.icon)
-                      ? "transparent"
-                      : formData.color,
-                  }}
-                >
-                  <ProjectIcon
-                    icon={formData.icon}
-                    size={isFrameworkIcon(formData.icon) ? 32 : 20}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-ink">
-                    {formData.name || "Project Name"}
-                  </p>
-                  <p className="truncate text-xs text-ink-muted">
-                    {formData.slug || "project-slug"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Name */}
+            <form onSubmit={handleSubmit} className="space-y-5 px-5 py-4">
+              {/* Name. Underline inputs: a filled, bordered box per field was
+                  a large part of what made this page read as a stack of
+                  containers rather than a form. */}
               <div>
                 <label
                   htmlFor="name"
-                  className="block text-xs font-medium text-ink-muted"
+                  className="block font-mono text-[10.5px] uppercase tracking-wider text-ink-faint"
                 >
-                  Project Name
+                  name
                 </label>
                 <input
                   type="text"
                   id="name"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border px-3 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+                  className="mt-1 block w-full border-0 border-b bg-transparent px-0 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-0 border-line text-ink placeholder-ink-faint"
                   placeholder="My Awesome Project"
                   required
                 />
@@ -360,12 +302,12 @@ export default function NewProjectPage() {
               <div>
                 <label
                   htmlFor="slug"
-                  className="block text-xs font-medium text-ink-muted"
+                  className="block font-mono text-[10.5px] uppercase tracking-wider text-ink-faint"
                 >
-                  Slug
+                  slug
                 </label>
-                <div className="mt-1 flex rounded-lg border border-line bg-surface-raised">
-                  <span className="flex items-center px-2.5 text-xs text-ink-muted">
+                <div className="mt-1 flex items-center border-b border-line">
+                  <span className="font-mono text-xs text-ink-faint">
                     /projects/
                   </span>
                   <input
@@ -373,7 +315,7 @@ export default function NewProjectPage() {
                     id="slug"
                     value={formData.slug}
                     onChange={(e) => handleSlugChange(e.target.value)}
-                    className="block w-full rounded-r-lg border-0 bg-transparent px-0 py-1.5 text-sm focus:outline-none focus:ring-0 text-ink placeholder-ink-subtle"
+                    className="block w-full border-0 bg-transparent px-0 py-1.5 font-mono text-xs focus:outline-none focus:ring-0 text-ink placeholder-ink-faint"
                     placeholder="my-awesome-project"
                     required
                   />
@@ -384,9 +326,9 @@ export default function NewProjectPage() {
               <div>
                 <label
                   htmlFor="description"
-                  className="block text-xs font-medium text-ink-muted"
+                  className="block font-mono text-[10.5px] uppercase tracking-wider text-ink-faint"
                 >
-                  Description <span className="text-ink-muted">(optional)</span>
+                  description <span className="normal-case">(optional)</span>
                 </label>
                 <textarea
                   id="description"
@@ -398,14 +340,14 @@ export default function NewProjectPage() {
                     }))
                   }
                   rows={2}
-                  className="mt-1 block w-full rounded-lg border px-3 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle"
+                  className="mt-1 block w-full resize-none border-0 border-b bg-transparent px-0 py-1.5 text-sm focus:border-line-strong focus:outline-none focus:ring-0 border-line text-ink placeholder-ink-faint"
                   placeholder="A brief description..."
                 />
               </div>
 
               {/* Icon & Color -- hidden when using framework logo */}
               {isFrameworkIcon(formData.icon) ? (
-                <div className="flex items-center justify-between rounded-lg border px-3 py-2 border-line bg-surface-raised/50">
+                <div className="flex items-center justify-between border-b py-2 border-line">
                   <div className="flex items-center gap-2">
                     <ProjectIcon icon={formData.icon} size={18} />
                     <span className="text-xs text-ink-muted">
@@ -435,9 +377,9 @@ export default function NewProjectPage() {
                   <div>
                     <span
                       id={iconLabelId}
-                      className="block text-xs font-medium text-ink-muted"
+                      className="block font-mono text-[10.5px] uppercase tracking-wider text-ink-faint"
                     >
-                      Icon
+                      icon
                     </span>
                     <div
                       role="group"
@@ -453,10 +395,10 @@ export default function NewProjectPage() {
                           }
                           aria-label={icon}
                           aria-pressed={formData.icon === icon}
-                          className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+                          className={`flex h-[26px] w-[26px] items-center justify-center rounded border transition-colors ${
                             formData.icon === icon
-                              ? "bg-accent-soft ring-1 ring-accent-line"
-                              : "bg-surface-raised hover:bg-surface-hover"
+                              ? "border-accent-line bg-accent-soft"
+                              : "border-line hover:bg-surface-hover"
                           }`}
                         >
                           <ProjectIcon
@@ -477,9 +419,9 @@ export default function NewProjectPage() {
                   <div>
                     <span
                       id={colorLabelId}
-                      className="block text-xs font-medium text-ink-muted"
+                      className="block font-mono text-[10.5px] uppercase tracking-wider text-ink-faint"
                     >
-                      Color
+                      colour
                     </span>
                     <div
                       role="group"
@@ -495,9 +437,9 @@ export default function NewProjectPage() {
                           }
                           aria-label={color}
                           aria-pressed={formData.color === color}
-                          className={`h-7 w-7 rounded-lg transition-all ${
+                          className={`h-[19px] w-[19px] rounded transition-all ${
                             formData.color === color
-                              ? "ring-2 ring-offset-1 ring-line"
+                              ? "outline outline-2 outline-offset-1 outline-ink"
                               : ""
                           }`}
                           style={{ backgroundColor: color }}
@@ -514,7 +456,7 @@ export default function NewProjectPage() {
               )}
 
               {/* Actions */}
-              <div className="flex items-center gap-2 pt-2">
+              <div className="flex items-center gap-2 border-t pt-4 border-line">
                 <Link
                   href="/dashboard/projects"
                   className="rounded-lg px-3 py-1.5 text-xs font-medium text-ink-muted hover:bg-surface-hover"
