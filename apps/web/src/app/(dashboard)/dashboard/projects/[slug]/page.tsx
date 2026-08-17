@@ -38,7 +38,7 @@ import {
   TagFilter,
   type VariableFormData,
 } from "@/components/variables";
-import { BulkJobProgress } from "@/components/variables/BulkJobProgress";
+import { BulkJobStatusLine } from "@/components/variables/BulkJobStatusLine";
 import { useRevealSecret } from "@/hooks/useRevealSecret";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
@@ -643,10 +643,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         }
       />
 
-      {/* Live vault progress for template provisioning, import and export.
-          Renders itself to null when nothing is running. */}
-      <BulkJobProgress projectId={project._id} />
-
       {notice && (
         <div className="rounded-lg border p-4 border-accent-line bg-accent-soft">
           <p className="text-sm text-accent">{notice}</p>
@@ -954,6 +950,13 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             </>
           )}
         </div>
+
+        {/* Pinned to the panel's bottom edge, inside its border. Renders null
+            when nothing is running, and because it lives here rather than
+            above the panel it never pushes the table down on appear or leave
+            a gap on finish. The rows landing directly above it are the
+            confirmation that the batch committed. */}
+        <BulkJobStatusLine projectId={project._id} />
       </div>
 
       <VariableCreateDrawer
