@@ -13,6 +13,7 @@ import { useTimeZone } from "@/hooks/useTimeZone";
 import { formatDateWith } from "@/lib/format";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { useOrganizationBySlug, useOrganizationMemberCount } from "@/hooks";
+import { OrgLogo } from "@/components/shared/org-logo";
 import {
   normalizeOrgRole,
   roleLabel,
@@ -93,9 +94,10 @@ export default function OrganizationPage({
         // The org's own logo (or its initial) — identity, not decoration.
         leading={
           organization.logoUrl ? (
-            <img
+            <OrgLogo
               src={organization.logoUrl}
               alt={organization.name}
+              size={40}
               className="h-10 w-10 shrink-0 rounded-lg object-cover"
             />
           ) : (

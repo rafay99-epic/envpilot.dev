@@ -14,6 +14,7 @@ import { useAuthContext } from "@/components/auth";
 import { normalizeOrgRole, roleLabel } from "@/lib/roles";
 import { Plus, Building2, ChevronRight } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
+import { OrgLogo } from "@/components/shared/org-logo";
 
 interface Organization {
   _id: string;
@@ -145,9 +146,10 @@ export default function OrganizationsPage() {
               >
                 <div className="flex items-start gap-4">
                   {org.logoUrl ? (
-                    <img
+                    <OrgLogo
                       src={org.logoUrl}
                       alt={org.name}
+                      size={48}
                       className="h-12 w-12 rounded-lg object-cover"
                     />
                   ) : (

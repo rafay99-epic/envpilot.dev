@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 import { APP_VERSIONS } from "./src/lib/versions";
+import { remoteImagePatterns } from "./src/lib/image-hosts";
 
 const sentryTunnelRoute = "/api/telemetry-envelope";
 
@@ -95,16 +96,10 @@ const nextConfig: NextConfig = {
   },
 
   // ── Image optimization ─────────────────────────────────────────────
-  // Allow external avatar/logo domains for next/image
+  // Derived from OPTIMIZED_IMAGE_HOSTS so the runtime host check in
+  // isOptimizableImageHost cannot disagree with what the optimizer accepts.
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "**.workos.com" },
-      { protocol: "https", hostname: "workoscdn.com" },
-      { protocol: "https", hostname: "**.workoscdn.com" },
-      { protocol: "https", hostname: "**.googleusercontent.com" },
-      { protocol: "https", hostname: "**.githubusercontent.com" },
-      { protocol: "https", hostname: "svgl.app" },
-    ],
+    remotePatterns: remoteImagePatterns,
   },
 
   // ── Keep heavy server-only packages out of the client bundle ───────

@@ -8,6 +8,7 @@ import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { roleLabel } from "@/lib/roles";
 import { useTimeZone } from "@/hooks/useTimeZone";
 import { formatDateWith } from "@/lib/format";
+import { OrgLogo } from "@/components/shared/org-logo";
 
 interface InvitationDetails {
   email: string;
@@ -294,9 +295,10 @@ export default function InvitationAcceptPage({
       <div className="w-full max-w-md">
         <div className="rounded-xl border p-8 text-center border-line bg-surface">
           {invitation.organization.logoUrl ? (
-            <img
+            <OrgLogo
               src={invitation.organization.logoUrl}
               alt={invitation.organization.name}
+              size={64}
               className="mx-auto h-16 w-16 rounded-xl object-cover"
             />
           ) : (
