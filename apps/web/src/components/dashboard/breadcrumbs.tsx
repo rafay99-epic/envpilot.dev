@@ -36,17 +36,25 @@ const LABELS: Record<string, string> = {
   new: "new",
 };
 
-export type Crumb = { label: string; href?: string };
+export type Crumb = { label: string; href?: string; key: string };
 
 function buildCrumbs(pathname: string, overrides?: Crumb[]): Crumb[] {
   if (overrides) return overrides;
   const parts = pathname.split("/").filter(Boolean);
-  const crumbs: Crumb[] = [{ label: "dashboard", href: "/dashboard" }];
+  const crumbs: Crumb[] = [
+    { key: "/dashboard", label: "dashboard", href: "/dashboard" },
+  ];
   let href = "";
   for (const part of parts) {
     href += `/${part}`;
     if (SKIP.has(part)) continue;
-    crumbs.push({ label: LABELS[part] ?? decodeURIComponent(part), href });
+    // The accumulated path is unique per level and stable across renders,
+    // which the array index is not once a trail gains or loses a segment.
+    crumbs.push({
+      key: href,
+      label: LABELS[part] ?? decodeURIComponent(part),
+      href,
+    });
   }
   // The last crumb is where you already are, so it is not a link.
   const last = crumbs[crumbs.length - 1];
@@ -86,10 +94,7 @@ export function Breadcrumbs({
       <span aria-hidden="true" className="h-3.5 w-px bg-line-strong" />
       <ol className="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px]">
         {crumbs.map((crumb, i) => (
-          <li
-            key={`${crumb.label}-${i}`}
-            className="flex min-w-0 items-center gap-1.5"
-          >
+          <li key={crumb.key} className="flex min-w-0 items-center gap-1.5">
             {i > 0 && (
               <span aria-hidden="true" className="text-ink-faint">
                 /

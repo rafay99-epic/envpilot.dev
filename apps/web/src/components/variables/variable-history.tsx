@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { DrawerPanel } from "@/components/ui";
 import type { Id } from "@convex/_generated/dataModel";
 import { useTimeZone } from "@/hooks/useTimeZone";
@@ -52,7 +52,11 @@ export function VariableHistory({
   // list: "what changed" is the question people open history to answer, and
   // it used to take two clicks and a mode switch to reach.
   const [compareMode, setCompareMode] = useState(true);
-  const [selectedVersions, setSelectedVersions] = useState<number[]>([]);
+  // null means "the caller has not chosen yet", which is distinct from an
+  // explicitly cleared selection. Kept nullable so the default below can be
+  // DERIVED rather than written into state by an effect watching `history` —
+  // that adjustment showed the stale selection for a frame on every push.
+  const [picked, setPicked] = useState<number[] | null>(null);
 
   const timeZone = useTimeZone();
 
@@ -106,6 +110,16 @@ export function VariableHistory({
     });
   };
 
+  // Default: the two most recent versions, so the diff is on screen the
+  // moment the drawer opens.
+  const selectedVersions =
+    picked ??
+    (history.length >= 2 ? [history[1]!.version, history[0]!.version] : []);
+
+  const setSelectedVersions = (
+    next: number[] | ((prev: number[]) => number[])
+  ) => setPicked(typeof next === "function" ? next(selectedVersions) : next);
+
   const getCompareVersions = () => {
     if (selectedVersions.length !== 2) return null;
     const sorted = [...selectedVersions].sort((a, b) => a - b);
@@ -125,24 +139,19 @@ export function VariableHistory({
   const olderEnvironmentSet = new Set(compareVersions?.older.environments);
   const newerEnvironmentSet = new Set(compareVersions?.newer.environments);
 
-  // Reset when the drawer closes, and seed the default comparison so the
-  // diff is on screen the moment it opens.
-  useEffect(() => {
-    if (!isOpen) {
-      setFilterType("all");
-      setCompareMode(true);
-      setSelectedVersions([]);
-      return;
-    }
-    if (history.length >= 2) {
-      setSelectedVersions([history[1]!.version, history[0]!.version]);
-    }
-  }, [isOpen, history]);
+  // Reset on the way out rather than in an effect watching isOpen: every
+  // dismissal path (Escape, backdrop, the close button) routes through here.
+  const close = () => {
+    setFilterType("all");
+    setCompareMode(true);
+    setPicked(null);
+    onClose();
+  };
 
   return (
     <DrawerPanel
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={close}
       title={`${variableKey} / history`}
       width="lg"
     >
