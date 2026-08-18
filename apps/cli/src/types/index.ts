@@ -128,6 +128,8 @@ export const variablesMetaSchema = z
     environmentScope: z.array(z.string()).nullable().optional(),
     hasWriteAccess: z.boolean().optional(),
     scopeRestricted: z.boolean().optional(),
+    // The server's row cap when the read was capped, else absent.
+    truncatedAt: z.number().optional(),
     // Resolved capability map (additive; absent on older deployments).
     capabilities: z.record(z.string(), z.boolean()).optional(),
   })

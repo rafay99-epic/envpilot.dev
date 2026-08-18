@@ -252,6 +252,12 @@ type PullMeta = {
   hasWriteAccess: boolean;
   scopeRestricted: boolean;
   decryptionFailures?: string[];
+  /**
+   * The server's row cap when the read was capped. Absent on deployments
+   * predating truncation reporting, which is indistinguishable from "not
+   * truncated" — that is the pre-existing behaviour, not a regression.
+   */
+  truncatedAt?: number;
   /** Resolved capability map (additive; absent on older deployments). */
   capabilities?: Record<string, boolean>;
 };
@@ -761,6 +767,7 @@ export class APIClient {
     variables: Variable[];
     meta: VariablesMeta | undefined;
     decryptionFailures: string[];
+    truncatedAt: number | undefined;
   }> {
     // Direct Convex action (encrypts/decrypts server-side) — replaces the
     // deleted GET /api/cli/variables vault route.
@@ -807,6 +814,7 @@ export class APIClient {
       hasWriteAccess: result.meta.hasWriteAccess,
       scopeRestricted: result.meta.scopeRestricted,
       decryptionFailures: result.meta.decryptionFailures,
+      truncatedAt: result.meta.truncatedAt,
       capabilities: result.meta.capabilities,
     } as unknown as VariablesMeta;
 
@@ -814,6 +822,7 @@ export class APIClient {
       variables,
       meta,
       decryptionFailures: result.meta.decryptionFailures ?? [],
+      truncatedAt: result.meta.truncatedAt,
     };
   }
 

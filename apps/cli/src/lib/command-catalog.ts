@@ -19,6 +19,8 @@ import { createUICommand } from "../commands/ui.js";
 import { requestCommand } from "../commands/request.js";
 import { requestsCommand } from "../commands/requests.js";
 import { secretsCommand } from "../commands/secrets.js";
+import { doctorCommand } from "../commands/doctor.js";
+import { exportCommand } from "../commands/export.js";
 
 export type CommandCategory =
   | "Get Started"
@@ -283,20 +285,25 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     description:
       "Inject project secrets into a child process without writing a .env file (envpilot run -- bun dev).",
     argv: ["run"],
-    args: "[--env <environment>] [--project <name-or-id>] [--keep-existing] [--print] -- <command> [args...]",
+    args: "[--env <environment>] [--project <name-or-id>] [--require <keys>] [--preserve-env <keys>] [--no-heal] [--mount <path>] [--print] -- <command> [args...]",
     examples: [
       ["run", "--", "bun", "dev"],
       ["run", "--env", "production", "--", "node", "server.js"],
       ["run", "--project", "api", "--", "pnpm", "test"],
       ["run", "--print"],
-      ["run", "--keep-existing", "--", "bun", "dev"],
+      ["run", "--require", "DATABASE_URL,API_KEY", "--", "bun", "dev"],
+      ["run", "--preserve-env", "PORT,DEBUG", "--", "bun", "dev"],
+      ["run", "--mount", ".env", "--", "docker", "compose", "up"],
     ],
-    websiteSurface: "Maps to `/api/cli/variables` for read access.",
+    websiteSurface:
+      "Reads variable values through the Convex vault action (features/variables/values:pullValues).",
     notes: [
       "Use `--` to separate envpilot flags from the command to execute.",
-      "Secrets override existing shell vars by default; pass --keep-existing to flip.",
-      "On Windows, the command is run through the shell so .cmd / .bat files resolve.",
-      "Signals (SIGINT, SIGTERM, SIGHUP, SIGQUIT) are forwarded to the child process.",
+      "Refuses to start when a variable failed to decrypt, the server capped its read, or a --require key is missing. Pass --allow-partial to override.",
+      "Secrets override existing shell vars by default; --preserve-env <keys> pins individual keys to your shell value.",
+      "A NODE_OPTIONS shim re-delivers secrets to Node children, so wrappers that filter the environment (Turborepo strict mode, for one) cannot silently drop them. Disable with --no-heal.",
+      "The command is spawned WITHOUT a shell so arguments pass through verbatim; cross-spawn resolves .cmd/.exe on Windows. Pass --shell to opt into shell semantics.",
+      "SIGTERM and SIGHUP are forwarded to the child. SIGINT and SIGQUIT are not, because the terminal already delivers them to the whole foreground process group.",
       "Use --print to inspect what would be injected without executing anything.",
     ],
     keywords: [
@@ -309,9 +316,73 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
       "ephemeral",
       "no-file",
       "doppler",
+      "heal",
+      "mount",
+      "require",
     ],
     topLevel: true,
     createCommand: () => runCommand,
+  },
+  {
+    id: "doctor",
+    title: "Diagnose secret delivery",
+    category: "Get Started",
+    description:
+      "Check that this machine, this repo and this project can actually deliver secrets to your app, and name the broken link when they cannot.",
+    argv: ["doctor"],
+    args: "[--project <name-or-id>] [--env <environment>] [--json] [--fix]",
+    examples: [
+      ["doctor"],
+      ["doctor", "--env", "production"],
+      ["doctor", "--json"],
+      ["doctor", "--fix"],
+    ],
+    websiteSurface:
+      "Read-only. Combines local repo inspection with the same resolve path `run` uses.",
+    notes: [
+      "Checks identity, project link, server reachability, the resolved secret set, delivery, and hygiene.",
+      "The delivery group statically scans turbo.json, docker-compose.yml, package.json scripts and Procfile for wrappers that filter the environment. That is the only way to catch a wrapper nested several levels below the command you typed.",
+      "Runs the delivery and hygiene groups even when signed out, so it is useful before login.",
+      "Exits 1 when any check fails, so it works as a CI gate. --json emits the same tree as structured data.",
+      "--fix only applies repairs to files the CLI owns (.gitignore, the run cache). It never edits turbo.json, docker-compose.yml or package.json.",
+      "Never prints secret values, only key names and counts.",
+    ],
+    keywords: [
+      "doctor",
+      "diagnose",
+      "check",
+      "verify",
+      "health",
+      "debug",
+      "troubleshoot",
+    ],
+    topLevel: true,
+    createCommand: () => doctorCommand,
+  },
+  {
+    id: "export",
+    title: "Print secrets to stdout",
+    category: "Sync",
+    description:
+      'Print secrets for eval or redirection (eval "$(envpilot export)").',
+    argv: ["export"],
+    args: "[--env <environment>] [--project <name-or-id>] [--format <format>]",
+    examples: [
+      ["export"],
+      ["export", "--format", "env"],
+      ["export", "--env", "production", "--format", "json"],
+    ],
+    websiteSurface:
+      "Reads variable values through the Convex vault action (features/variables/values:pullValues).",
+    notes: [
+      'eval "$(envpilot export)" loads secrets into your CURRENT shell, which survives every wrapper because your shell is the process holding them.',
+      "Secrets then live in your shell for the whole session and are inherited by everything you start from it. Right for CI and one-off shells, wrong as a daily default; prefer `envpilot run`.",
+      "stdout carries only the payload. Warnings go to stderr so eval stays clean.",
+      "Refuses to emit an incomplete set unless --allow-partial is passed.",
+    ],
+    keywords: ["export", "eval", "shell", "stdout", "source", "dotenv"],
+    topLevel: true,
+    createCommand: () => exportCommand,
   },
   {
     id: "list",

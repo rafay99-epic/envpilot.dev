@@ -177,7 +177,18 @@ export function getActiveAccountId(): string | undefined {
 export function setActiveAccount(id: string): boolean {
   const accounts = readAccounts();
   if (!accounts[id]) return false;
+  const previous = config.get("activeAccountId");
   config.set("activeAccountId", id);
+  // Switching identity must purge the decrypted-secret cache, exactly as
+  // clearAuth does on logout. Without this the incoming account can be served
+  // the outgoing account's secrets straight from disk.
+  if (previous !== id) {
+    try {
+      clearRunCache();
+    } catch {
+      // Non-fatal — the cache is a performance aid, not load-bearing.
+    }
+  }
   return true;
 }
 

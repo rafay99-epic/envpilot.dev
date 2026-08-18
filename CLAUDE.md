@@ -29,6 +29,32 @@ reviews and verifies it personally before merge.
 - **Never start the dev server** — Convex and Next.js are always running during development. Do not run `bun run dev`, `bun run dev:web`, or `bun run dev:convex`.
 - **Verify work using built-in checks only**: `bun run typecheck`, `bun run lint`, `bun run format:check`, or `bun run check:all` (runs all three).
 
+### Building the CLI / extension — use the sandbox, NEVER read prod env (CRITICAL)
+
+`apps/cli/scripts/sandbox.sh` is the ONLY sanctioned way to build or run a
+local CLI or extension. It enforces what used to be a convention:
+
+- Build values come from `apps/cli/scripts/sandbox.env` (gitignored) and
+  **nowhere else**. There is deliberately NO fallback to the repo's
+  `.env.local`, to `~/Code/ENV_Connect`, or to the ambient shell.
+- **Never read the developer's production working folder** (`~/Code/...`) or
+  its `.env.local` for build values, not even the public ones. Ask, or use
+  the sandbox file.
+- Builds run under `env -i`, so a `WORKOS_*` or `NEXT_PUBLIC_CONVEX_URL`
+  already exported in the calling shell cannot leak into the artifact.
+- The run path forces a throwaway `$HOME`, and the script refuses to start if
+  that path is inside the real home directory.
+- Every invocation fingerprints the production CLI config before and after and
+  **aborts loudly if it changed**.
+
+```bash
+cp apps/cli/scripts/sandbox.env.example apps/cli/scripts/sandbox.env  # once
+apps/cli/scripts/sandbox.sh build             # CLI
+apps/cli/scripts/sandbox.sh build-extension   # VS Code extension
+apps/cli/scripts/sandbox.sh doctor            # run any command
+apps/cli/scripts/sandbox.sh reset             # wipe the sandbox home
+```
+
 ### CLI local testing — MUST be isolated from the production CLI (CRITICAL)
 
 The developer has the **production `@envpilot/cli` installed globally** and uses it for real projects. The CLI stores accounts/tokens in a global config `conf` locates via `$HOME` (`~/Library/Preferences/envpilot-nodejs/config.json` on macOS).

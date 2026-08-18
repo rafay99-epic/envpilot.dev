@@ -112,20 +112,26 @@ function printHardBlock(min: string, latest: string | undefined): void {
   console.error();
 }
 
+/**
+ * stderr, not stdout. This notice fires from a preAction hook ahead of EVERY
+ * command, including ones whose stdout is a payload: `envpilot export` is
+ * eval'd by a shell, and `envpilot doctor --json` is parsed. A banner on
+ * stdout corrupts both.
+ */
 function printUpdateAvailable(latest: string): void {
-  console.log();
-  console.log(
+  console.error();
+  console.error(
     chalk.yellow("  Update available:"),
     chalk.dim(CLI_VERSION),
     chalk.yellow("→"),
     chalk.green(latest)
   );
-  console.log(
+  console.error(
     chalk.dim("  Run"),
     chalk.cyan("npm install -g @envpilot/cli@latest"),
     chalk.dim("to update")
   );
-  console.log();
+  console.error();
 }
 
 /** Fetch the manifest and persist latest/min. Never throws (fetch fails soft). */

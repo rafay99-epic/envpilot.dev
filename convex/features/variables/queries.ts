@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { query, internalQuery, type QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
@@ -33,6 +33,22 @@ import {
 // QUERIES
 // ==========================================
 
+/**
+ * Read window shared by the take()-based list queries below. Reading
+ * LIST_READ_CAP + 1 rows is how a capped read is detected at all: if the extra
+ * row comes back, the window was too small and the tail is missing.
+ */
+const LIST_READ_CAP = 500;
+
+/**
+ * Every active variable in a project (optionally narrowed to one environment).
+ *
+ * Backs the push/import diff in values.ts, so a short read is not a cosmetic
+ * bug: a missing key looks like "not created yet" and the write path either
+ * duplicates it or, in replace mode, leaves it behind. Same refuse-partial
+ * contract as features/api/reads.ts. A project past the window fails loudly
+ * rather than handing back a set that looks complete.
+ */
 export const listByProject = query({
   args: {
     projectId: v.id("projects"),
@@ -40,15 +56,19 @@ export const listByProject = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const allVariables = await ctx.db
+    const limit = args.limit ?? LIST_READ_CAP;
+    const variables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_deleted", (q) =>
         q.eq("projectId", args.projectId).eq("deletedAt", undefined)
       )
-      .take(args.limit ?? 500);
-    const variables = allVariables.filter(
-      (variable) => variable.deletedAt === undefined
-    );
+      .take(limit + 1);
+
+    if (variables.length > limit) {
+      throw new ConvexError(
+        `Project has more than ${limit} active variables, refusing a partial read. Contact support to raise the limit.`
+      );
+    }
 
     if (args.environment) {
       return variables.filter((v) =>
@@ -515,29 +535,37 @@ export const getVersionHistory = query({
 async function listWithAccessCore(
   ctx: QueryCtx,
   args: { projectId: Id<"projects">; userId: Id<"users">; limit?: number }
-) {
+): Promise<{
+  variables: ReturnType<typeof mapVariableRow>[];
+  truncatedAt: number | undefined;
+}> {
   const resolved = await resolveProjectAccessContext(
     ctx,
     args.projectId,
     args.userId
   );
   if (!resolved) {
-    return [];
+    return { variables: [], truncatedAt: undefined };
   }
   const { access } = resolved;
 
+  // Read one past the window so a capped read is detectable. The extra row is
+  // dropped and reported as `truncatedAt` instead of silently vanishing.
+  // Access filtering below makes row counts unreliable as a cap signal.
+  const limit = args.limit ?? LIST_READ_CAP;
   const allVariables = await ctx.db
     .query("environmentVariables")
     .withIndex("by_project_deleted", (q) =>
       q.eq("projectId", args.projectId).eq("deletedAt", undefined)
     )
-    .take(args.limit ?? 500);
+    .take(limit + 1);
+  const truncatedAt = allVariables.length > limit ? limit : undefined;
+  if (truncatedAt !== undefined) allVariables.pop();
+
   // Scoped developers never receive out-of-scope variables at all —
   // not even their metadata/keys
-  const variables = allVariables.filter(
-    (variable) =>
-      variable.deletedAt === undefined &&
-      isEnvironmentScopeAllowed(access.environmentScope, variable.environments)
+  const variables = allVariables.filter((variable) =>
+    isEnvironmentScopeAllowed(access.environmentScope, variable.environments)
   );
 
   const variablesWithAccess = variables.map((variable) =>
@@ -547,13 +575,39 @@ async function listWithAccessCore(
   // Assigned members (and owners) may list metadata for every variable;
   // grant-only viewers see just the variables shared with them.
   if (!access.isOwner && !access.assigned) {
-    return variablesWithAccess.filter((v) => v.hasAccess);
+    return {
+      variables: variablesWithAccess.filter((v) => v.hasAccess),
+      truncatedAt,
+    };
   }
 
-  return variablesWithAccess;
+  return { variables: variablesWithAccess, truncatedAt };
 }
 
 export const listWithAccess = query({
+  args: {
+    projectId: v.id("projects"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const { variables } = await listWithAccessCore(ctx, {
+      ...args,
+      userId: actor._id,
+    });
+    return variables;
+  },
+});
+
+/**
+ * listWithAccess plus the cap signal, for pullValues.
+ *
+ * listWithAccess itself must keep returning a bare array, since the CLI and
+ * the Playwright suite call it by name, so the truncation report rides on
+ * this internal sibling. `truncatedAt` is the window that was hit; absent
+ * means the whole project fit, which clients read as "you got everything".
+ */
+export const _listWithAccessCapped = internalQuery({
   args: {
     projectId: v.id("projects"),
     limit: v.optional(v.number()),
@@ -750,6 +804,10 @@ export const searchInProject = query({
  * List variable metadata (keys, versions, environments) WITHOUT vault refs.
  * Used by the VS Code extension via WebSocket subscription to detect changes
  * reactively, then fetch decrypted values via HTTP only when needed.
+ *
+ * The subscription drives what the extension believes exists, so a short read
+ * makes missing keys indistinguishable from deleted ones. Refuses a partial
+ * read for the same reason listByProject does.
  */
 export const listMetadataByProject = query({
   args: {
@@ -758,15 +816,19 @@ export const listMetadataByProject = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const allVariables = await ctx.db
+    const limit = args.limit ?? LIST_READ_CAP;
+    const variables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_deleted", (q) =>
         q.eq("projectId", args.projectId).eq("deletedAt", undefined)
       )
-      .take(args.limit ?? 500);
-    const variables = allVariables.filter(
-      (variable) => variable.deletedAt === undefined
-    );
+      .take(limit + 1);
+
+    if (variables.length > limit) {
+      throw new ConvexError(
+        `Project has more than ${limit} active variables, refusing a partial read. Contact support to raise the limit.`
+      );
+    }
 
     const filtered = args.environment
       ? variables.filter((v) => v.environments.includes(args.environment!))

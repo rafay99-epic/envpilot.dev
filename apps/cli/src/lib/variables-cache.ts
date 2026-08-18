@@ -14,8 +14,8 @@
  *
  * Security: cache files are written with mode 0o600 (owner read/write only),
  * the same protection level as a .env file. Cache is keyed by a hash of
- * projectId + environment + organizationId + the first 16 chars of the access
- * token so that switching accounts or servers automatically invalidates entries.
+ * projectId + environment + organizationId + the ACTIVE ACCOUNT ID, so one
+ * account can never be served another account's decrypted secrets.
  */
 
 import { createHash } from "node:crypto";
@@ -31,7 +31,7 @@ import {
 } from "node:fs";
 import { join, dirname } from "node:path";
 import type { Variable } from "../types/index.js";
-import { getConfigPath, getApiUrl, getAccessToken } from "./config.js";
+import { getConfigPath, getApiUrl, getActiveAccountId } from "./config.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -67,6 +67,19 @@ export interface CacheEntry {
    * environment scope. Stored so cache-served runs can repeat the notice.
    */
   scopeRestricted?: boolean;
+  /**
+   * The server's row cap when the read was capped, else undefined. A capped
+   * set is short by an unknown amount, so it must keep reporting as such on
+   * every cache-served run instead of looking complete after the first.
+   */
+  truncatedAt?: number;
+  /**
+   * Accessible keys that live only in OTHER environments, as of the last
+   * server contact. Cached so the "not in this environment" notice survives a
+   * cache hit: recomputing it would mean a network call on the one path whose
+   * entire purpose is not making one.
+   */
+  foreignKeys?: Array<{ key: string; environments: string[] }>;
 }
 
 /**
@@ -94,10 +107,13 @@ function getCacheKey(
   environment: string,
   organizationId: string
 ): string {
-  // Include a token slice so a different user / logout+login cycle misses.
-  const tokenSlice = (getAccessToken() ?? "").slice(0, 16);
+  // Key on the account id, NOT a slice of the access token. Every RS256 JWT
+  // begins with the same base64 header ("eyJhbGciOiJSUzI1..."), so a token
+  // prefix carries zero account entropy and the old key was shared by every
+  // user of a project. The account id is stable across token refresh.
+  const accountId = getActiveAccountId() ?? "anonymous";
   return createHash("sha256")
-    .update(`${projectId}:${environment}:${organizationId}:${tokenSlice}`)
+    .update(`${projectId}:${environment}:${organizationId}:${accountId}`)
     .digest("hex")
     .slice(0, 20);
 }
@@ -205,7 +221,12 @@ export function writeCache(
    */
   serverFingerprint?: string,
   /** Fetch-time warnings to repeat on cache-served runs. */
-  meta?: { decryptionFailures?: string[]; scopeRestricted?: boolean }
+  meta?: {
+    decryptionFailures?: string[];
+    scopeRestricted?: boolean;
+    truncatedAt?: number;
+    foreignKeys?: Array<{ key: string; environments: string[] }>;
+  }
 ): void {
   try {
     const cacheDir = getCacheDir();
@@ -226,6 +247,10 @@ export function writeCache(
         ? { decryptionFailures: meta.decryptionFailures }
         : {}),
       ...(meta?.scopeRestricted ? { scopeRestricted: true } : {}),
+      ...(meta?.truncatedAt !== undefined
+        ? { truncatedAt: meta.truncatedAt }
+        : {}),
+      ...(meta?.foreignKeys?.length ? { foreignKeys: meta.foreignKeys } : {}),
     };
     writeFileSync(path, JSON.stringify(entry, null, 2), {
       encoding: "utf-8",

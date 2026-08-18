@@ -11,7 +11,7 @@ import {
   invalidInput,
   handleError,
 } from "../lib/errors.js";
-import { validateEnvironment } from "../lib/validators.js";
+import { resolveEnvironment, ENVIRONMENTS } from "../lib/validators.js";
 
 const KEY_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
@@ -78,12 +78,14 @@ function resolveTarget(options: SecretsOptions): {
   }
 
   // Validates BOTH the -e flag and the stored config value (guards against a
-  // hand-edited .envpilot), and narrows the type for the request path.
-  const environment =
+  // hand-edited .envpilot). resolveEnvironment also folds shorthand like
+  // "prod" into the canonical name the request path needs.
+  const requested =
     options.env !== undefined ? options.env : project.environment;
-  if (!validateEnvironment(environment)) {
+  const environment = resolveEnvironment(requested);
+  if (!environment) {
     throw invalidInput(
-      `Unknown environment "${environment}". Valid environments: development, staging, production.`
+      `Unknown environment "${requested}". Valid environments: ${ENVIRONMENTS.join(", ")}.`
     );
   }
 

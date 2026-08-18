@@ -41,6 +41,8 @@ type PullResult = {
     hasWriteAccess: boolean;
     scopeRestricted: boolean;
     decryptionFailures?: string[];
+    /** The read window, present only when the project overflowed it. */
+    truncatedAt?: number;
     autoUnsyncOnClose?: boolean;
     /** Resolved capability map — capability-aware clients prefer this. */
     capabilities: Record<string, boolean>;
@@ -104,6 +106,11 @@ const DECRYPTION_FAILED = "[DECRYPTION_FAILED]";
  * `environments` array; meta carries both legacy and unified fields). The CLI's
  * listVariables() and the extension's getVariables() map it into the exact
  * shapes their commands already expect.
+ *
+ * Completeness: the underlying read is windowed, so `meta.truncatedAt` carries
+ * the window whenever the project overflowed it and the tail was dropped. A
+ * client that ignores the field silently injects a short secret set, which is
+ * the failure this field exists to make visible.
  */
 export const pullValues = action({
   args: {
@@ -137,6 +144,10 @@ export const pullValues = action({
       hasWriteAccess: v.boolean(),
       scopeRestricted: v.boolean(),
       decryptionFailures: v.optional(v.array(v.string())),
+      // The read window, present only when the project overflowed it and the
+      // tail was dropped. Absent means the caller received every variable.
+      // Optional so older clients that ignore it stay valid.
+      truncatedAt: v.optional(v.number()),
       // Effective unsync-on-close for the caller (member override ??
       // project default ?? true; pro gate re-checked at read time).
       // Optional so older payload consumers stay valid.
@@ -167,8 +178,8 @@ export const pullValues = action({
       throw new Error("You are not a member of this organization");
     }
 
-    const rows = await ctx.runQuery(
-      api.features.variables.queries.listWithAccess,
+    const { variables: rows, truncatedAt } = await ctx.runQuery(
+      internal.features.variables.queries._listWithAccessCapped,
       {
         projectId: args.projectId,
       }
@@ -290,6 +301,7 @@ export const pullValues = action({
         scopeRestricted,
         decryptionFailures:
           decryptionFailures.length > 0 ? decryptionFailures : undefined,
+        truncatedAt,
         autoUnsyncOnClose,
         capabilities: legacy.capabilities,
       },
@@ -730,6 +742,10 @@ export const updateWithValue = action({
  * export). Returns key/value pairs; the route serializes them into the chosen
  * format. Authorization is enforced by listWithAccess (identity-verified — it
  * only returns a vaultRef for entries the caller may read).
+ *
+ * Refuses a windowed read rather than handing back a short file: an export
+ * that silently drops its tail is downloaded, committed, and deployed as if
+ * it were complete.
  */
 export const exportValues = action({
   args: {
@@ -743,12 +759,17 @@ export const exportValues = action({
     ctx,
     args
   ): Promise<{ values: Array<{ key: string; value: string }> }> => {
-    const rows = await ctx.runQuery(
-      api.features.variables.queries.listWithAccess,
+    const { variables: rows, truncatedAt } = await ctx.runQuery(
+      internal.features.variables.queries._listWithAccessCapped,
       {
         projectId: args.projectId,
       }
     );
+    if (truncatedAt !== undefined) {
+      throw new ConvexError(
+        `Project has more than ${truncatedAt} active variables, refusing a partial export. Contact support to raise the limit.`
+      );
+    }
 
     const environment = args.environment;
     const accessible = rows

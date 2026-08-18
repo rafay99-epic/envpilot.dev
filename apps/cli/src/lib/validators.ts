@@ -27,6 +27,8 @@ export const environmentSchema = z.enum([
   "production",
 ]);
 
+type Environment = z.infer<typeof environmentSchema>;
+
 /**
  * Project slug validation
  */
@@ -93,12 +95,38 @@ export function validateEnvVars(vars: Record<string, string>): {
 }
 
 /**
- * Validate environment name
+ * Shorthand people actually type. Rejecting `-e prod` taught users the tool
+ * was fussy rather than that they had made a mistake.
  */
-export function validateEnvironment(
-  env: string
-): env is "development" | "staging" | "production" {
-  return environmentSchema.safeParse(env).success;
+const ENVIRONMENT_ALIASES: Record<string, Environment> = {
+  dev: "development",
+  develop: "development",
+  local: "development",
+  stage: "staging",
+  staging: "staging",
+  prod: "production",
+  production: "production",
+  development: "development",
+};
+
+/**
+ * Resolve a user-supplied environment name to its canonical form, or null
+ * when it is not an environment at all. Case-insensitive.
+ */
+export function resolveEnvironment(env: string): Environment | null {
+  return ENVIRONMENT_ALIASES[env.trim().toLowerCase()] ?? null;
+}
+
+/** The canonical environment names, for error messages and help text. */
+export const ENVIRONMENTS = ["development", "staging", "production"] as const;
+
+/**
+ * Validate environment name. Accepts aliases, so this is a guard on the
+ * INPUT rather than on the canonical value — call resolveEnvironment to get
+ * the value itself.
+ */
+export function validateEnvironment(env: string): boolean {
+  return resolveEnvironment(env) !== null;
 }
 
 /**

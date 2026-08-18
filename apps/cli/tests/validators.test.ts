@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   validateEnvVars,
   validateEnvironment,
+  resolveEnvironment,
   validateProjectSlug,
   validateUrl,
   validateToken,
@@ -15,10 +16,40 @@ describe("validateEnvironment", () => {
     expect(validateEnvironment("production")).toBe(true);
   });
 
-  it("rejects anything else", () => {
-    expect(validateEnvironment("prod")).toBe(false);
+  // Shorthand and casing used to be rejected outright, which read as the tool
+  // being fussy rather than the user having made a mistake. They now resolve.
+  it("accepts shorthand and any casing", () => {
+    expect(validateEnvironment("prod")).toBe(true);
+    expect(validateEnvironment("Development")).toBe(true);
+  });
+
+  it("rejects anything that is not an environment", () => {
     expect(validateEnvironment("")).toBe(false);
-    expect(validateEnvironment("Development")).toBe(false);
+    expect(validateEnvironment("prodution")).toBe(false);
+  });
+});
+
+describe("resolveEnvironment", () => {
+  it("passes canonical names through", () => {
+    expect(resolveEnvironment("development")).toBe("development");
+    expect(resolveEnvironment("staging")).toBe("staging");
+    expect(resolveEnvironment("production")).toBe("production");
+  });
+
+  it("resolves the shorthand people actually type", () => {
+    expect(resolveEnvironment("dev")).toBe("development");
+    expect(resolveEnvironment("prod")).toBe("production");
+    expect(resolveEnvironment("stage")).toBe("staging");
+    expect(resolveEnvironment("local")).toBe("development");
+  });
+
+  it("ignores case and surrounding whitespace", () => {
+    expect(resolveEnvironment("  PROD ")).toBe("production");
+  });
+
+  it("returns null for anything else", () => {
+    expect(resolveEnvironment("prodution")).toBeNull();
+    expect(resolveEnvironment("")).toBeNull();
   });
 });
 
