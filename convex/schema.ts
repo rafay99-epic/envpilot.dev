@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { surfaceValidator } from "./lib/surfaces";
 
 /**
  * Convex Schema for Envpilot
@@ -68,7 +69,8 @@ export default defineSchema({
     logoUrl: v.optional(v.string()),
     // LEGACY — write path removed, field retained so existing rows validate; drop after a cleanup migration unsets it.
     // (`teamLeadsCanCreateProjects` was never consulted by any authorization check — a pre-unified-RBAC leftover.
-    //  The `cleanup-dead-data` migration in admin.ts unsets `settings` on all orgs.)
+    //  The `cleanup-dead-data` migration that used to unset this was deleted in the
+    //  migrations cleanup; nothing prunes these rows now.)
     settings: v.optional(
       v.object({
         teamLeadsCanCreateProjects: v.boolean(),
@@ -920,15 +922,9 @@ export default defineSchema({
     // the behavior it was minted under). New keys always set it explicitly.
     // github_action keys are constrained at create time to a single project
     // + the "variables" resource (the only shape the Action pull accepts).
-    surfaces: v.optional(
-      v.array(
-        v.union(
-          v.literal("github_action"),
-          v.literal("rest_api"),
-          v.literal("mcp_server")
-        )
-      )
-    ),
+    // The union comes from lib/surfaces so the table and the create mutation
+    // can never disagree about which surfaces exist.
+    surfaces: v.optional(v.array(surfaceValidator)),
     createdBy: v.id("users"),
     createdAt: v.number(),
     // Set on every successful authorized use that opts into recording it
@@ -1144,57 +1140,6 @@ export default defineSchema({
     .index("by_voter_email", ["voterEmail"])
     .index("by_feature_and_user", ["featureRequestId", "userId"])
     .index("by_feature_and_email", ["featureRequestId", "voterEmail"]),
-
-  // ==========================================
-  // CHANGELOG ENTRIES
-  // ==========================================
-  changelog: defineTable({
-    // Entry title
-    title: v.string(),
-    // Markdown content describing the changes
-    content: v.string(),
-    // Version tag (e.g., "v1.0.0", "v1.2.3")
-    version: v.string(),
-    // Type of change (primary — kept for backward compat)
-    type: v.union(
-      v.literal("feature"), // New feature
-      v.literal("fix"), // Bug fix
-      v.literal("improvement"), // Enhancement/improvement
-      v.literal("security"), // Security update
-      v.literal("breaking") // Breaking change
-    ),
-    // Multiple change types (e.g., ["feature", "security"])
-    types: v.optional(
-      v.array(
-        v.union(
-          v.literal("feature"),
-          v.literal("fix"),
-          v.literal("improvement"),
-          v.literal("security"),
-          v.literal("breaking")
-        )
-      )
-    ),
-    // Whether the entry is published and visible
-    isPublished: v.boolean(),
-    // Publication date (when made public)
-    publishedAt: v.optional(v.number()),
-    // Scheduled publish timestamp (future date for auto-publish)
-    scheduledFor: v.optional(v.number()),
-    // Publish status: "draft" | "scheduled" | "published"
-    publishStatus: v.optional(v.string()),
-    // Timestamps
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_published", ["isPublished"])
-    .index("by_published_at", ["publishedAt"])
-    // Cursor pagination needs the sort to come from the index — a JS sort per
-    // page cannot order rows it has not read.
-    .index("by_published_and_date", ["isPublished", "publishedAt"])
-    .index("by_version", ["version"])
-    .index("by_type", ["type"])
-    .index("by_publish_status", ["publishStatus"]),
 
   // ==========================================
   // AUDIT LOGS
@@ -1486,8 +1431,9 @@ export default defineSchema({
   // USAGE COUNTERS (Consumption-based metrics per user)
   // DEAD — never inserted into anywhere; consumption tracking was never wired up.
   // All code references removed; table declaration retained only so a potential
-  // stray row still validates. The `cleanup-dead-data` migration in admin.ts
-  // deletes any rows; drop this defineTable in a later PR once confirmed empty.
+  // stray row still validates. The `cleanup-dead-data` migration that deleted
+  // stray rows is gone, so nothing prunes this — drop the defineTable once a
+  // deployment confirms it is empty.
   // ==========================================
   usageCounters: defineTable({
     // Reference to the user
@@ -1911,10 +1857,10 @@ export default defineSchema({
   // ==========================================
   // TIER DEFINITIONS (Dynamic, admin-managed tiers)
   // ==========================================
-  // DEPRECATED / DRAIN-ONLY: no code inserts or patches this table anymore; the
-  // only remaining readers are the one-shot `migrate-phase6` handler in admin.ts
-  // (organizationTiers -> userTiers). Will be removed after that migration has
-  // cleared remaining records in every environment.
+  // DEAD: no code inserts, patches or reads this table. Its last reader was the
+  // one-shot `migrate-phase6` handler (organizationTiers -> userTiers), deleted
+  // in the migrations cleanup. The declaration is retained only so a stray row
+  // still validates; drop it once a deployment confirms the table is empty.
   organizationTiers: defineTable({
     organizationId: v.id("organizations"),
     tier: v.string(),

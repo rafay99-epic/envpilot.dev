@@ -1,0 +1,20 @@
+{
+  "name": "@envpilot/docker-image",
+  "version": "1.0.0",
+  "description": "Statically linked Go binary that pulls Envpilot variables and secret files into a Docker build or a running container",
+  "private": true,
+  "license": "MIT",
+  "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
+  "homepage": "https://www.envpilot.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rafay99-epic/envpilot.dev"
+  },
+  "scripts": {
+    "build": "./build.sh",
+    "smoke": "./scripts/smoke.sh",
+    "stub": "bun scripts/stub-api.ts",
+    "test": "go test ./...",
+    "vet": "go vet ./..."
+  }
+}

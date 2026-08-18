@@ -11,8 +11,20 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import { authorizeVariableAccess } from "../../lib/authHelpers";
 import { assertOrgMembership, hasCapability } from "../../lib/authz";
-import { checkBooleanFeature } from "../featureRegistry/gates";
+import {
+  checkBooleanFeature,
+  checkCountedLimit,
+  countActiveKeysForSurface,
+} from "../featureRegistry/gates";
 import { getRetentionCutoff } from "../audit/helpers";
+import {
+  SURFACE_GATE,
+  SURFACE_GATE_MESSAGE,
+  SURFACE_LABEL,
+  SURFACE_LIMIT,
+  surfaceValidator,
+} from "../../lib/surfaces";
+import type { Surface } from "../../lib/surfaces";
 import { createAuditLog } from "../../lib/audit";
 
 /**
@@ -60,20 +72,13 @@ export const VALID_RESOURCES = [
 ];
 const MAX_KEYS_PER_ORG = 25; // hygiene bound, not a tier limit
 
-export const surfaceValidator = v.union(
-  v.literal("github_action"),
-  v.literal("rest_api"),
-  v.literal("mcp_server")
-);
-type Surface = "github_action" | "rest_api" | "mcp_server";
-
-// Which registry flag gates minting a key for a surface. github_action rides
-// public_api — the Action pulls through /api/v1/secrets (⚖️ PLAN D2).
-const SURFACE_GATE: Record<Surface, "public_api" | "mcp_server"> = {
-  github_action: "public_api",
-  rest_api: "public_api",
-  mcp_server: "mcp_server",
-};
+export {
+  SURFACE_GATE,
+  SURFACE_GATE_MESSAGE,
+  surfaceValidator,
+  type Surface,
+  type SurfaceGate,
+} from "../../lib/surfaces";
 
 function assertValidName(name: string): void {
   if (name.trim().length === 0 || name.length > 100) {
@@ -175,6 +180,22 @@ function assertValidSurfaces(
     if (scopeResources.includes("requests")) {
       throw new ConvexError(
         'A GitHub Action key cannot carry the "requests" resource — CI cannot wait on human approval; the Action stays pure read'
+      );
+    }
+  }
+  if (surfaces.includes("docker")) {
+    // Deliberately NOT the Action's single-project rule: the image passes
+    // --project on every call (/api/v1/projects/{slug}/variables and
+    // /api/v1/files?project=), so one key can legitimately serve several
+    // services. Per-service keys are still the recommendation, but that is
+    // operational advice, not something to enforce here.
+    const allowedForDocker = new Set(["variables", "files"]);
+    if (
+      !scopeResources.includes("variables") ||
+      scopeResources.some((r) => !allowedForDocker.has(r))
+    ) {
+      throw new ConvexError(
+        'A Docker key must carry "variables", and may additionally carry "files" — nothing else, so a credential shipped inside a container image never doubles as broader REST/MCP access'
       );
     }
   }
@@ -290,10 +311,32 @@ export const _store = internalMutation({
         gateFeature
       );
       if (!gate.allowed) {
+        throw new ConvexError(SURFACE_GATE_MESSAGE[gateFeature]);
+      }
+    }
+
+    // Per-surface key COUNT, checked after the boolean gates so an org that
+    // cannot use a surface at all hears that first rather than a quota
+    // message. checkCountedLimit (not checkNumericLimit) so an org whose tier
+    // resolves to unlimited never pays for the scan.
+    for (const surface of new Set(args.surfaces)) {
+      const limitKey = SURFACE_LIMIT[surface];
+      if (!limitKey) continue;
+      const limit = await checkCountedLimit(
+        ctx.db,
+        args.organizationId,
+        limitKey,
+        () =>
+          countActiveKeysForSurface(
+            ctx.db,
+            args.organizationId,
+            surface,
+            Date.now()
+          )
+      );
+      if (!limit.allowed) {
         throw new ConvexError(
-          gateFeature === "mcp_server"
-            ? "The MCP server is available on the Pro plan. Upgrade to create MCP keys."
-            : "The public API is available on the Pro plan. Upgrade to create API keys."
+          `Your plan allows ${limit.limit} active ${SURFACE_LABEL[surface]} key${limit.limit === 1 ? "" : "s"} and you already have ${limit.current}. Revoke one, or upgrade.`
         );
       }
     }

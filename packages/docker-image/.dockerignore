@@ -1,0 +1,26 @@
+# The image is FROM scratch and performs exactly one COPY, so nothing here can
+# leak into it — this file only keeps the build context small.
+#
+# Exclusions are LISTED rather than written as `*` plus `!build` re-includes.
+# The negation form is what broke the first CI run: this file still said
+# `!dist/envpilot` after the Dockerfile moved to build/<os>/<arch>/, so `*`
+# excluded everything, the context transferred 2 bytes, and the COPY failed
+# with an opaque "failed to compute cache key ... not found". An explicit list
+# fails toward sending too much, which is slow, instead of too little, which
+# is a broken build.
+node_modules
+src
+scripts
+*.md
+*.json
+*.ts
+LICENSE
+Dockerfile
+.dockerignore
+.gitignore
+.turbo
+*.mjs
+*.go
+go.mod
+go.sum
+build.sh

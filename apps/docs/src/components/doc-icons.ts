@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  Container,
   FileText,
   Gauge,
   Github,
@@ -31,6 +32,7 @@ export const DOC_ICONS: Record<string, LucideIcon> = {
   book: BookOpen,
   plug: Plug,
   github: Github,
+  container: Container,
   network: Network,
   gauge: Gauge,
 };

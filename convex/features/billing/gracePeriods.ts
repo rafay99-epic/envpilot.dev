@@ -16,8 +16,8 @@ import { getDefaultTierName, isCronPaused } from "./tierLimits";
  * DEAD DATA: the `usageCounters` table this operated on is never inserted into
  * anywhere in the codebase (consumption tracking was never wired up), so this
  * was always a no-op. Body removed to drop the last code reference to
- * `usageCounters` (so the table declaration can be dropped in a later PR after
- * the `cleanup-dead-data` migration clears any rows). Kept as a no-op stub so
+ * `usageCounters`, so the table declaration can be dropped once a deployment
+ * confirms the table is empty. Kept as a no-op stub so
  * the four billing-webhook call sites remain unchanged. Zero behavior change.
  */
 export const _resetUsageCounters = internalMutation({

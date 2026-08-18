@@ -1,0 +1,149 @@
+---
+title: Docker reference
+description: Every command, flag, environment variable and exit code.
+icon: container
+version: "{{dockerVersion}}"
+---
+
+# Docker reference
+
+```
+ghcr.io/rafay99-epic/envpilot:1
+ghcr.io/rafay99-epic/envpilot:{{dockerVersion}}
+```
+
+Multi-arch: `linux/amd64` and `linux/arm64`. The image contains one file, `/envpilot`, and nothing else — no shell, no package manager, no runtime, no libc. It is a statically linked Go binary, which is what lets the same file run in `scratch` and in `alpine` (musl) and in `debian` (glibc).
+
+The binary sits at the image root rather than on a `PATH` on purpose: you choose the name it takes in your image, so it can never shadow the [Envpilot CLI](/cli/overview) on a developer machine.
+
+## Commands
+
+### pull
+
+```
+envpilot pull [flags]
+```
+
+Writes variables as dotenv text. Stdout by default, or to `--out <path>` at mode `0600`.
+
+Every value is single-quoted with embedded quotes escaped, so values containing spaces, `#`, `$` or newlines survive `set -a; . file` and Compose's `env_file`.
+
+```bash
+envpilot pull --project checkout-api --env production
+envpilot pull --project checkout-api --env production --out .env.production
+```
+
+### files
+
+```
+envpilot files [flags]
+```
+
+Writes secret files to their recorded paths under `--dir` (default: the working directory), at mode `0600` or `0400` as configured on each file.
+
+Requires the `files` resource on the key, which is never granted by default.
+
+```bash
+envpilot files --project mobile --env production --dir /build
+```
+
+### exec
+
+```
+envpilot exec [flags] -- <command> [args...]
+```
+
+Fetches variables, merges them into the child's environment, and runs the command. Nothing decrypted is written to a filesystem. Envpilot values overwrite entries already present, because a Dockerfile `ENV` is a default and Envpilot is the source of truth.
+
+Add `--files` to write secret files first.
+
+```bash
+envpilot exec --project checkout-api --env production -- ./server
+envpilot exec --files --dir /secrets -- ./server
+```
+
+Everything after `--` belongs to your command and is passed through untouched, including its own flags.
+
+## Flags
+
+| Flag               | Short | Applies to      | Default                    | Meaning                              |
+| ------------------ | ----- | --------------- | -------------------------- | ------------------------------------ |
+| `--project <slug>` | `-p`  | all             | `$ENVPILOT_PROJECT`        | Project slug                         |
+| `--env <name>`     | `-e`  | all             | `$ENVPILOT_ENVIRONMENT`    | Environment name                     |
+| `--out <path>`     | `-o`  | `pull`          | stdout                     | Write here at `0600`                 |
+| `--dir <path>`     | `-d`  | `files`, `exec` | working directory          | Output directory for secret files    |
+| `--files`          |       | `exec`          | off                        | Write secret files before running    |
+| `--api-url <url>`  |       | all             | `https://www.envpilot.dev` | API base URL                         |
+| `--quiet`          | `-q`  | all             | off                        | Suppress the progress line on stderr |
+| `--help`           | `-h`  |                 |                            | Usage                                |
+| `--version`        | `-v`  |                 |                            | Version                              |
+
+Flags win over environment variables, so one image can serve several environments.
+
+## Environment variables
+
+| Variable               | Required | Meaning                                              |
+| ---------------------- | -------- | ---------------------------------------------------- |
+| `ENVPILOT_TOKEN_FILE`  | one of   | Path to a mounted secret holding the key. Preferred. |
+| `ENVPILOT_TOKEN`       | one of   | The key inline.                                      |
+| `ENVPILOT_PROJECT`     | Yes\*    | Project slug. \*Unless `--project` is passed.        |
+| `ENVPILOT_ENVIRONMENT` | Yes\*    | Environment. \*Unless `--env` is passed.             |
+| `ENVPILOT_API_URL`     | No       | API base URL.                                        |
+
+`ENVPILOT_TOKEN_FILE` wins when both credentials are set. A trailing newline in the file is trimmed, since mounted secrets almost always carry one.
+
+There is no `--token` flag by design: a credential on a command line is visible in `ps`, in shell history, and in build logs.
+
+## Exit codes
+
+| Code         | Meaning                                                               |
+| ------------ | --------------------------------------------------------------------- |
+| `0`          | Success                                                               |
+| `1`          | Request or write failure                                              |
+| `2`          | Bad invocation: missing key, project, environment, or an unknown flag |
+| child's code | `exec` exits with whatever your command exited with                   |
+| `128 + N`    | `exec`, when the child was killed by signal `N`                       |
+
+## Key requirements
+
+Create keys in **Organization → Settings → API Keys**.
+
+| Need                    | Grant                                                |
+| ----------------------- | ---------------------------------------------------- |
+| `pull`, `exec`          | `variables` resource                                 |
+| `files`, `exec --files` | `files` resource (never granted by default)          |
+| Any command             | Scope to one project and the environments you deploy |
+
+Docker is an independent surface. The key must carry the **Docker** surface, and your plan must include the `docker_image` feature. A key scoped only to the REST API or the GitHub Action is refused, and disabling the public API does not disable Docker.
+
+Every request the image makes sends `surface=docker`, so both the key's scope and the plan feature are checked on each call, not just at mint time.
+
+## Behaviour worth knowing
+
+**Failures are total.** If any variable comes back without a value, the entire pull aborts. Partial configuration fails later and in a worse place than a container that refuses to start.
+
+**Rate limits are honoured.** On a `429` the binary waits exactly as long as the server's `Retry-After` header asks, capped at 60 seconds, for up to five attempts. Large secret-file pulls are split into batches under 6 MiB, so they can legitimately hit the limit mid-pull.
+
+Docker has its own bucket — 120 requests of burst refilling at 30/min per key — so a restarting fleet cannot spend your CI pipeline's budget, and vice versa. See [rate limits](/limits/rate-limits). Your plan also caps how many active Docker keys an organization may hold.
+
+**Values are never logged.** Progress goes to stderr and names keys, paths and byte counts only. Contents never reach the log in the first place, which is why `pull` can stream dotenv text on stdout safely.
+
+**Paths are checked locally.** Secret file paths come from the server and the server validates them, but the binary re-checks anyway: absolute paths, traversal, and writes through a symlink are all refused. Files are staged through an exclusive temp and renamed into place, so an existing file never holds new secret contents at its old permissions.
+
+## Errors
+
+| Message                                             | Cause                                                                             |
+| --------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `No API key`                                        | Neither credential variable was set.                                              |
+| `ENVPILOT_TOKEN_FILE points at … could not be read` | Wrong mount path. The Compose/BuildKit default is `/run/secrets/<id>`.            |
+| `No project` / `No environment`                     | Missing flag and missing environment variable.                                    |
+| `Invalid or revoked` (401)                          | Unknown, revoked or expired key.                                                  |
+| `not scoped to` (403)                               | Key does not cover that environment or project.                                   |
+| A message naming Pro (403)                          | Org plan does not include the public API.                                         |
+| `Refusing a partial pull`                           | A variable could not be decrypted. Retry; if it persists, re-save it in Envpilot. |
+
+The full REST error list is in the [API errors](/api/errors) reference.
+
+## Source
+
+The image is built from `packages/docker-image` and published to [rafay99-epic/envpilot-docker](https://github.com/rafay99-epic/envpilot-docker) on every release. MIT licensed.

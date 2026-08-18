@@ -48,7 +48,7 @@ jobs:
       published: ${{ steps.guard.outputs.should_publish }}
       version: ${{ steps.guard.outputs.local_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

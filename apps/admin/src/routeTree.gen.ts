@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from "./routes/__root"
 import { Route as LoginRouteImport } from "./routes/login"
 import { Route as AuthenticatedRouteImport } from "./routes/_authenticated"
 import { Route as AuthenticatedIndexRouteImport } from "./routes/_authenticated/index"
-import { Route as AuthenticatedWebTrafficRouteImport } from "./routes/_authenticated/web-traffic"
 import { Route as AuthenticatedUsersRouteImport } from "./routes/_authenticated/users"
 import { Route as AuthenticatedTiersRouteImport } from "./routes/_authenticated/tiers"
 import { Route as AuthenticatedTicketsRouteImport } from "./routes/_authenticated/tickets"
@@ -35,11 +34,6 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: "/",
   path: "/",
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedWebTrafficRoute = AuthenticatedWebTrafficRouteImport.update({
-  id: "/web-traffic",
-  path: "/web-traffic",
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
@@ -102,7 +96,6 @@ export interface FileRoutesByFullPath {
   "/tickets": typeof AuthenticatedTicketsRoute
   "/tiers": typeof AuthenticatedTiersRoute
   "/users": typeof AuthenticatedUsersRoute
-  "/web-traffic": typeof AuthenticatedWebTrafficRoute
 }
 export interface FileRoutesByTo {
   "/login": typeof LoginRoute
@@ -115,7 +108,6 @@ export interface FileRoutesByTo {
   "/tickets": typeof AuthenticatedTicketsRoute
   "/tiers": typeof AuthenticatedTiersRoute
   "/users": typeof AuthenticatedUsersRoute
-  "/web-traffic": typeof AuthenticatedWebTrafficRoute
   "/": typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
@@ -131,7 +123,6 @@ export interface FileRoutesById {
   "/_authenticated/tickets": typeof AuthenticatedTicketsRoute
   "/_authenticated/tiers": typeof AuthenticatedTiersRoute
   "/_authenticated/users": typeof AuthenticatedUsersRoute
-  "/_authenticated/web-traffic": typeof AuthenticatedWebTrafficRoute
   "/_authenticated/": typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
@@ -148,7 +139,6 @@ export interface FileRouteTypes {
     | "/tickets"
     | "/tiers"
     | "/users"
-    | "/web-traffic"
   fileRoutesByTo: FileRoutesByTo
   to:
     | "/login"
@@ -161,7 +151,6 @@ export interface FileRouteTypes {
     | "/tickets"
     | "/tiers"
     | "/users"
-    | "/web-traffic"
     | "/"
   id:
     | "__root__"
@@ -176,7 +165,6 @@ export interface FileRouteTypes {
     | "/_authenticated/tickets"
     | "/_authenticated/tiers"
     | "/_authenticated/users"
-    | "/_authenticated/web-traffic"
     | "/_authenticated/"
   fileRoutesById: FileRoutesById
 }
@@ -206,13 +194,6 @@ declare module "@tanstack/react-router" {
       path: "/"
       fullPath: "/"
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    "/_authenticated/web-traffic": {
-      id: "/_authenticated/web-traffic"
-      path: "/web-traffic"
-      fullPath: "/web-traffic"
-      preLoaderRoute: typeof AuthenticatedWebTrafficRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     "/_authenticated/users": {
@@ -291,7 +272,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedTicketsRoute: typeof AuthenticatedTicketsRoute
   AuthenticatedTiersRoute: typeof AuthenticatedTiersRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
-  AuthenticatedWebTrafficRoute: typeof AuthenticatedWebTrafficRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
@@ -305,7 +285,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedTicketsRoute: AuthenticatedTicketsRoute,
   AuthenticatedTiersRoute: AuthenticatedTiersRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
-  AuthenticatedWebTrafficRoute: AuthenticatedWebTrafficRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 

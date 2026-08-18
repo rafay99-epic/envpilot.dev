@@ -352,9 +352,25 @@ const surfaceArg = v.optional(
     // The files route IS the Action's pull path, so a github_action-scoped
     // key has to be able to present that surface — otherwise the scope the
     // key form now allows would be denied at CI time.
-    v.literal("github_action")
+    v.literal("github_action"),
+    // The Docker image reads variables and files through these same actions,
+    // but declares itself so authorize.ts checks the docker_image gate rather
+    // than public_api. Without this it would silently ride the REST gate.
+    v.literal("docker")
   )
 );
+
+/**
+ * Which bucket a VALUE-returning pull charges.
+ *
+ * Docker gets its own so a restarting container fleet cannot exhaust the
+ * budget CI deploys depend on, and vice versa — the same independence the
+ * docker_image tier gate gives the surface. Metadata reads never come here;
+ * they charge apiMetadata regardless of surface.
+ */
+function valueBucket(surface: string | undefined): "cicdPull" | "dockerPull" {
+  return surface === "docker" ? "dockerPull" : "cicdPull";
+}
 
 export const getOrganization = action({
   args: { token: v.string(), gateFeature: gateFeatureArg, surface: surfaceArg },
@@ -539,7 +555,7 @@ export const getProjectVariables = action({
     const tokenHash = await hashToken(args.token);
     await consumeRateLimit(
       ctx,
-      metadataOnly ? "apiMetadata" : "cicdPull",
+      metadataOnly ? "apiMetadata" : valueBucket(args.surface),
       tokenHash
     );
 
@@ -695,7 +711,7 @@ export const getProjectAccounts = action({
     const tokenHash = await hashToken(args.token);
     await consumeRateLimit(
       ctx,
-      metadataOnly ? "apiMetadata" : "cicdPull",
+      metadataOnly ? "apiMetadata" : valueBucket(args.surface),
       tokenHash
     );
 
@@ -899,7 +915,7 @@ export const getProjectFiles = action({
     const tokenHash = await hashToken(args.token);
     await consumeRateLimit(
       ctx,
-      metadataOnly ? "apiMetadata" : "cicdPull",
+      metadataOnly ? "apiMetadata" : valueBucket(args.surface),
       tokenHash
     );
 

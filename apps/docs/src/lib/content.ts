@@ -110,6 +110,13 @@ export const SECTIONS: DocSection[] = [
     pages: ["overview", "reference", "secret-files", "recipes", "security"],
   },
   {
+    slug: "docker",
+    label: "Docker",
+    blurb: "Pull variables and secret files into a build or a container.",
+    icon: "container",
+    pages: ["overview", "build-time", "runtime", "compose", "reference"],
+  },
+  {
     slug: "api",
     label: "API Reference",
     blurb: "Read-only REST over org-scoped API keys.",
@@ -195,6 +202,7 @@ const PACKAGE_VERSIONS: Record<string, string> = {
   cliVersion: readVersion("../cli/package.json"),
   extensionVersion: readVersion("../vscode-extension/package.json"),
   actionVersion: readVersion("../../packages/github-action/package.json"),
+  dockerVersion: readVersion("../../packages/docker-image/package.json"),
   webVersion: readVersion("../web/package.json"),
 };
 

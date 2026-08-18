@@ -1,0 +1,138 @@
+---
+title: Build time
+description: Secrets available while docker build runs, with nothing left in a layer.
+icon: container
+---
+
+# Build time
+
+Use this when the build itself needs a credential: installing from a private registry, compiling against a licensed SDK, running a migration, signing an artifact.
+
+The rule for all of it: **the values must not survive into the image.** Two BuildKit features do that for you.
+
+- `--mount=type=secret` puts the API key in the build without it entering image history.
+- `--mount=from=` mounts the Envpilot binary for one instruction, so it never becomes a layer either.
+
+## Variables
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM node:22-alpine
+WORKDIR /app
+COPY package.json package-lock.json ./
+
+RUN --mount=type=secret,id=envpilot_token \
+    --mount=from=ghcr.io/rafay99-epic/envpilot:1,source=/envpilot,target=/envpilot \
+    ENVPILOT_TOKEN_FILE=/run/secrets/envpilot_token \
+    /envpilot exec --project checkout-api --env production -- npm ci
+
+COPY . .
+RUN npm run build
+```
+
+Build it with the key passed as a secret:
+
+```bash
+docker build --secret id=envpilot_token,src=./.envpilot-token .
+```
+
+`npm ci` sees `NPM_TOKEN` (or whatever your project stores) in its environment. The next layer does not.
+
+The `# syntax=docker/dockerfile:1` line is required — it opts the build into BuildKit's mount syntax.
+
+## Secret files
+
+Same shape. The difference is that files land on the filesystem, so delete them in the **same** `RUN` instruction. A file removed in a later instruction is still recoverable from the earlier layer.
+
+```dockerfile
+RUN --mount=type=secret,id=envpilot_token \
+    --mount=from=ghcr.io/rafay99-epic/envpilot:1,source=/envpilot,target=/envpilot \
+    ENVPILOT_TOKEN_FILE=/run/secrets/envpilot_token \
+    /envpilot files --project mobile --env production --dir /build \
+ && ./gradlew assembleRelease \
+ && rm -rf /build/*.jks
+```
+
+The key needs the `files` resource, which is never granted by default.
+
+## Both at once
+
+`exec --files` writes the secret files, then runs your command with the variables injected:
+
+```dockerfile
+RUN --mount=type=secret,id=envpilot_token \
+    --mount=from=ghcr.io/rafay99-epic/envpilot:1,source=/envpilot,target=/envpilot \
+    ENVPILOT_TOKEN_FILE=/run/secrets/envpilot_token \
+    /envpilot exec --project mobile --env production --files --dir /build \
+      -- ./gradlew assembleRelease \
+ && rm -rf /build/*.jks
+```
+
+## A dotenv file for a later step
+
+When a build tool insists on reading a file rather than the environment, write one and remove it in the same instruction:
+
+```dockerfile
+RUN --mount=type=secret,id=envpilot_token \
+    --mount=from=ghcr.io/rafay99-epic/envpilot:1,source=/envpilot,target=/envpilot \
+    ENVPILOT_TOKEN_FILE=/run/secrets/envpilot_token \
+    /envpilot pull --project web --env production --out .env.production \
+ && npm run build \
+ && rm -f .env.production
+```
+
+`pull --out` writes at mode `0600`.
+
+## Getting the key to the build
+
+In CI you usually already have it in a secret store. Feed it in without ever writing it to the workspace:
+
+```bash
+# GitHub Actions
+docker build --secret id=envpilot_token,env=ENVPILOT_TOKEN .
+```
+
+```bash
+# Locally, from a file you keep out of git
+echo ".envpilot-token" >> .gitignore
+docker build --secret id=envpilot_token,src=./.envpilot-token .
+```
+
+Compose reads the same secrets in a `build:` block — see [Docker Compose](/docker/compose#build-secrets).
+
+## What not to do
+
+<Callout type="danger" title="Never bake the key in">
+Never put the key in an `ARG` or an `ENV`. Build arguments are stored in image history and travel to everyone who pulls the image. `docker history --no-trunc <image>` will show it.
+</Callout>
+
+```dockerfile
+# Wrong — the key is now permanently in the image
+ARG ENVPILOT_TOKEN
+RUN /envpilot pull --out .env
+```
+
+```dockerfile
+# Wrong — .env is baked into this layer forever, even if a later RUN deletes it
+RUN --mount=type=secret,id=envpilot_token /envpilot pull --out .env
+RUN npm run build
+RUN rm .env
+```
+
+Keep the fetch, the use, and the cleanup inside one `RUN`.
+
+## Caching
+
+BuildKit caches a `RUN` layer on its instruction text, not on what the secret contained. A rotated variable will **not** invalidate the cache on its own. If a build must always see current values, either bust it explicitly or move the fetch to [runtime](/docker/runtime), which is the better answer for anything that is not needed to produce the artifact.
+
+## Troubleshooting
+
+| What you see                                              | What it means                                                                              |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `--mount option is not supported`                         | BuildKit is off. Add `# syntax=docker/dockerfile:1` and set `DOCKER_BUILDKIT=1`.           |
+| `ENVPILOT_TOKEN_FILE points at … which could not be read` | The `--secret id=` name does not match the path. The default mount is `/run/secrets/<id>`. |
+| `no such file or directory: /envpilot`                    | The `--mount=from=` line is missing, or `source=`/`target=` do not match.                  |
+| A 403 naming the environment                              | The key is not scoped to that environment.                                                 |
+| A 403 mentioning Pro                                      | The org is not on a plan that includes the public API.                                     |
+
+Every exit code is listed in the [reference](/docker/reference#exit-codes).

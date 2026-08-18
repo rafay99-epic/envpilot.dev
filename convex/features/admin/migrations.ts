@@ -2,9 +2,6 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { query, mutation, internalMutation } from "../../_generated/server";
 import type { MutationCtx } from "../../_generated/server";
-import { normalizeOrgRole } from "../../lib/authz";
-import { SEED_CHANGELOG } from "../community/changelog/seed";
-import { SEED_FEATURE_REQUESTS } from "../community/featureRequests/seed";
 import { SEED_FEATURES, SEED_ROLES } from "../../lib/seedData";
 import { mergeSystemRoleCapabilities } from "../../lib/roleProfiles";
 import { requireAdmin } from "./auth";
@@ -19,7 +16,7 @@ export const listMigrations = query({
         name: "seed-feature-registry",
         description:
           "Seeds all gatable features into the featureRegistry table. Idempotent — skips existing keys.",
-        category: "Feature & Tier System",
+        category: "Core",
         priority: 1,
         destructive: false,
         runOnce: false,
@@ -28,25 +25,25 @@ export const listMigrations = query({
         name: "seed-tier-features",
         description:
           "Seeds default tier-feature overrides for free and pro tiers. Idempotent — skips existing overrides.",
-        category: "Feature & Tier System",
+        category: "Core",
         priority: 2,
         destructive: false,
         runOnce: false,
       },
       {
-        name: "resync-doc-tier-features",
+        name: "purge-retired-features",
         description:
-          "FORCE-SETS the three documentation tier overrides (project_docs, max_docs_per_project, max_docs_per_org) to their code values on every tier. seed-tier-features only INSERTS, so the free-tier flip from gated to available never reaches an organization whose row was seeded when docs were Pro-only. Run once after the deploy that ships documentation on Free. Overwrites deliberate admin edits to these three keys — nothing else.",
-        category: "Feature & Tier System",
+          "DELETES registry rows for features whose code no longer exists, plus every tierFeatures override pointing at them. Currently: anomaly_detection and anomaly_detection_limit, removed from the product in July 2026 but still seeded into any deployment that ran seed-feature-registry before then — they render in Tiers & Limits as dials that control nothing. Reads RETIRED_FEATURE_KEYS, so retiring another feature is one array entry. Idempotent: a second run finds nothing and reports zero.",
+        category: "Core",
         priority: 2,
-        destructive: false,
-        runOnce: true,
+        destructive: true,
+        runOnce: false,
       },
       {
         name: "seed-tier-definitions",
         description:
           "Seeds or updates default 'free' and 'pro' tier definitions (upsert). Safe to run multiple times — updates existing tiers with latest pricing and display fields.",
-        category: "Feature & Tier System",
+        category: "Core",
         priority: 3,
         destructive: false,
         runOnce: false,
@@ -55,17 +52,8 @@ export const listMigrations = query({
         name: "seed-role-registry",
         description:
           "Seeds the role registry from SEED_ROLES: system-role metadata and levels sync from code; system capability matrices MERGE (new code defaults fill in, admin edits survive) except owner, which stays fully code-synced. Seeded custom roles (editor/viewer) keep their admin-owned METADATA after the first seed, but their capability maps merge the same way system roles do — a newly shipped capability fills in, every explicit admin choice survives. Idempotent.",
-        category: "Feature & Tier System",
+        category: "Core",
         priority: 4,
-        destructive: false,
-        runOnce: false,
-      },
-      {
-        name: "migrate-roles",
-        description:
-          "Role-registry migration: normalizes surviving legacy role values (admin→owner, member→developer) on organizationMembers and pending invitations, then VERIFIES every stored role slug resolves in the registry. Reports anomalies without changing them. Idempotent.",
-        category: "Feature & Tier System",
-        priority: 5,
         destructive: false,
         runOnce: false,
       },
@@ -73,89 +61,17 @@ export const listMigrations = query({
         name: "seed-payment-products",
         description:
           "Seeds payment product mappings from tierDefinitions.polarProductId into the paymentProducts table. Idempotent — skips existing mappings.",
-        category: "Feature & Tier System",
+        category: "Core",
         priority: 4,
         destructive: false,
         runOnce: false,
       },
 
       // ── Content Seeding ──
-      {
-        name: "seed-changelog",
-        description:
-          "Seeds all historical changelog entries (v0.1.0 through v1.59.4). Idempotent — skips entries that already exist, removes duplicates. Safe to run multiple times.",
-        category: "Content Seeding",
-        priority: 1,
-        destructive: false,
-        runOnce: false,
-      },
-      {
-        name: "seed-feature-requests",
-        description:
-          "Seeds planned team features into the featureRequests table from FEATURES.md reference. Idempotent — skips entries that already exist by title. Safe to run multiple times.",
-        category: "Content Seeding",
-        priority: 2,
-        destructive: false,
-        runOnce: false,
-      },
 
       // ── Destructive / Reset ──
-      {
-        name: "clear-changelog",
-        description:
-          "Deletes ALL changelog entries from the database. Use before re-seeding or to start fresh.",
-        category: "Destructive",
-        priority: 1,
-        destructive: true,
-        runOnce: false,
-      },
-      {
-        name: "clear-feature-requests",
-        description:
-          "Deletes ALL feature requests and their votes from the database.",
-        category: "Destructive",
-        priority: 2,
-        destructive: true,
-        runOnce: false,
-      },
 
       // ── One-Time Migrations ──
-      {
-        name: "migrate-phase6",
-        description:
-          "Phase 6 migration: strips legacy limits/features from tierDefinitions, migrates organizationTiers to userTiers, backfills userId on subscriptions. Run ONCE after deploying Phase 6 schema.",
-        category: "One-Time Migrations",
-        priority: 1,
-        destructive: false,
-        runOnce: true,
-      },
-      {
-        name: "migrate-unified-roles",
-        description:
-          "Migrates legacy roles to the unified 4-role system: admin→owner, team_lead→project_manager, member→developer (or team_lead if they managed a project); pending invitations migrate the same way; variable permission admin→write. Then backfills a read grant for every developer on every variable in their assigned projects so no existing user loses visibility. Idempotent — safe to re-run.",
-        category: "One-Time Migrations",
-        priority: 2,
-        destructive: false,
-        runOnce: true,
-      },
-      {
-        name: "cleanup-dead-data",
-        description:
-          "Drains legacy data left behind by the backend cleanup: unsets the removed `settings` field (the dead teamLeadsCanCreateProjects toggle) on all organizations and deletes any orphaned usageCounters rows. Bounded to 500 writes per run and idempotent — re-run until it reports 0 remaining, after which both schema declarations can be dropped in a later PR.",
-        category: "One-Time Migrations",
-        priority: 3,
-        destructive: false,
-        runOnce: true,
-      },
-      {
-        name: "backfill-doc-content-status",
-        description:
-          "Backfills docContent.status from the parent doc for body rows written before the field existed — without it those pages can never match a published-only body search. Bounded to 200 rows per run; re-run while it reports hadMore: true.",
-        category: "One-Time Migrations",
-        priority: 4,
-        destructive: false,
-        runOnce: true,
-      },
     ] as Array<{
       name: string;
       description: string;
@@ -188,10 +104,30 @@ export const run = internalMutation({
 });
 
 /**
- * Per-tier feature overrides. Module scope so `seed-tier-features` (insert
- * only, admin edits survive) and `resync-doc-tier-features` (force-set, the
- * one-off availability flip) can never drift apart.
+ * Per-tier feature overrides, read by `seed-tier-features`.
+ *
+ * That handler INSERTS only — an existing row is never overwritten, so admin
+ * edits survive a re-seed. The corollary: changing a value here is a no-op on
+ * any deployment already seeded. Shipping a changed default needs a one-off
+ * force-setting migration alongside it.
  */
+/**
+ * Feature keys that no longer have any code behind them.
+ *
+ * Dropping a key from SEED_FEATURES stops it being re-seeded but does NOT
+ * delete the row that is already there — seed-feature-registry upserts, it
+ * never prunes. The orphan keeps rendering in the admin Tiers & Limits page
+ * as a toggle that gates nothing, which is worse than no toggle at all.
+ * `purge-retired-features` deletes these and their tier overrides.
+ */
+const RETIRED_FEATURE_KEYS = [
+  // Behavioral anomaly detection: shipped April 2026, deleted July 2026
+  // (commit 8615b7b5). The engine, tables, admin console and crons are all
+  // gone; only these registry rows survived the removal.
+  "anomaly_detection",
+  "anomaly_detection_limit",
+];
+
 const TIER_CONFIGS: Record<string, Record<string, string>> = {
   free: {
     max_projects: "3",
@@ -213,6 +149,9 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
     sso_enabled: "false",
     public_api: "false",
     mcp_server: "false",
+    docker_image: "false",
+    docker_image_limit: "0",
+    github_action_limit: "0",
     team_notifications: "false",
     team_notifications_limit: "0",
     secret_rotation: "false",
@@ -256,6 +195,9 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
     sso_enabled: "false",
     public_api: "true",
     mcp_server: "true",
+    docker_image: "true",
+    docker_image_limit: "10",
+    github_action_limit: "10",
     team_notifications: "true",
     team_notifications_limit: "10",
     secret_rotation: "true",
@@ -563,120 +505,43 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
     };
   }
 
-  if (args.name === "migrate-roles") {
-    const now = Date.now();
-    let normalizedMembers = 0;
-    let normalizedInvitations = 0;
-    const anomalies: string[] = [];
+  if (args.name === "purge-retired-features") {
+    let registryDeleted = 0;
+    let overridesDeleted = 0;
+    const purged: string[] = [];
 
-    // Registry slugs for verification
-    const registryRows = await ctx.db.query("roleRegistry").collect();
-    const activeSlugs = new Set(
-      registryRows.filter((r: any) => r.isActive).map((r: any) => r.slug)
-    );
-    if (activeSlugs.size === 0) {
-      return {
-        success: false,
-        error:
-          "Role registry is empty — run seed-role-registry before migrate-roles.",
-      };
-    }
-
-    const LEGACY_MAP: Record<string, string> = {
-      admin: "owner",
-      member: "developer",
-    };
-
-    const members = await ctx.db.query("organizationMembers").collect();
-    for (const m of members) {
-      const mapped = LEGACY_MAP[m.role];
-      if (mapped) {
-        await ctx.db.patch(m._id, { role: mapped });
-        normalizedMembers++;
-        continue;
+    for (const key of RETIRED_FEATURE_KEYS) {
+      // Tier overrides first: deleting the registry row while its overrides
+      // survive would leave rows that no UI lists and no resolver reads.
+      const overrides = await ctx.db
+        .query("tierFeatures")
+        .withIndex("by_feature", (q: any) => q.eq("featureKey", key))
+        .collect();
+      for (const override of overrides) {
+        await ctx.db.delete(override._id);
+        overridesDeleted++;
       }
-      if (!activeSlugs.has(m.role)) {
-        anomalies.push(
-          `organizationMembers ${m._id}: unknown role slug "${m.role}"`
-        );
-      }
-    }
 
-    const invitations = await ctx.db.query("invitations").collect();
-    for (const inv of invitations) {
-      if (inv.status !== "pending") continue;
-      const mapped = LEGACY_MAP[inv.role];
-      if (mapped) {
-        await ctx.db.patch(inv._id, { role: mapped });
-        normalizedInvitations++;
-        continue;
-      }
-      if (!activeSlugs.has(inv.role)) {
-        anomalies.push(
-          `invitations ${inv._id}: unknown role slug "${inv.role}"`
-        );
-      }
-    }
-
-    // Anomalies are REPORTED, never auto-fixed: an unknown slug means a
-    // member is fail-closed (zero capabilities) until a human decides.
-    return {
-      success: true,
-      normalizedMembers,
-      normalizedInvitations,
-      anomalies,
-      verifiedAt: now,
-    };
-  }
-
-  if (args.name === "resync-doc-tier-features") {
-    const DOC_KEYS = [
-      "project_docs",
-      "max_docs_per_project",
-      "max_docs_per_org",
-    ];
-    let updated = 0;
-    let created = 0;
-    let unchanged = 0;
-    const now = Date.now();
-
-    for (const [tierName, features] of Object.entries(TIER_CONFIGS)) {
-      for (const key of DOC_KEYS) {
-        const value = features[key];
-        if (value === undefined) continue;
-
-        const existing = await ctx.db
-          .query("tierFeatures")
-          .withIndex("by_tier_and_feature", (q: any) =>
-            q.eq("tierName", tierName).eq("featureKey", key)
-          )
-          .first();
-
-        if (!existing) {
-          await ctx.db.insert("tierFeatures", {
-            tierName,
-            featureKey: key,
-            value,
-            updatedAt: now,
-          });
-          created++;
-          continue;
-        }
-        if (existing.value === value) {
-          unchanged++;
-          continue;
-        }
-        await ctx.db.patch(existing._id, { value, updatedAt: now });
-        updated++;
+      const registryRow = await ctx.db
+        .query("featureRegistry")
+        .withIndex("by_key", (q: any) => q.eq("key", key))
+        .first();
+      if (registryRow) {
+        await ctx.db.delete(registryRow._id);
+        registryDeleted++;
+        purged.push(key);
       }
     }
 
     return {
       success: true,
-      total: Object.keys(TIER_CONFIGS).length * DOC_KEYS.length,
-      migrated: created,
-      updated,
-      skipped: unchanged,
+      total: RETIRED_FEATURE_KEYS.length,
+      migrated: registryDeleted,
+      updated: overridesDeleted,
+      skipped: RETIRED_FEATURE_KEYS.length - registryDeleted,
+      details: purged.length
+        ? `Purged ${purged.join(", ")} and ${overridesDeleted} tier override(s).`
+        : "Nothing to purge — no retired feature rows present.",
     };
   }
 
@@ -719,141 +584,6 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
     };
   }
 
-  if (args.name === "migrate-phase6") {
-    const results = {
-      tierDefsCleanedLimits: 0,
-      tierDefsCleanedFeatures: 0,
-      orgTiersMigrated: 0,
-      orgTiersDeleted: 0,
-      subscriptionsBackfilled: 0,
-      polarCustomersBackfilled: 0,
-    };
-
-    const now = Date.now();
-
-    // 1. Strip limits/features from tierDefinitions
-    const tierDefs = await ctx.db.query("tierDefinitions").collect();
-    for (const td of tierDefs) {
-      const updates: Record<string, undefined> = {};
-      if ((td as Record<string, unknown>).limits !== undefined) {
-        updates.limits = undefined;
-        results.tierDefsCleanedLimits++;
-      }
-      if ((td as Record<string, unknown>).features !== undefined) {
-        updates.features = undefined;
-        results.tierDefsCleanedFeatures++;
-      }
-      if ((td as Record<string, unknown>).dynamicFeatures !== undefined) {
-        updates.dynamicFeatures = undefined;
-        results.tierDefsCleanedLimits++;
-      }
-      if (Object.keys(updates).length > 0) {
-        await ctx.db.patch(td._id, updates);
-      }
-    }
-
-    // 2. Migrate organizationTiers -> userTiers
-    const orgTiers = await ctx.db.query("organizationTiers").collect();
-    for (const ot of orgTiers) {
-      const org = await ctx.db.get(ot.organizationId);
-      if (org) {
-        const existing = await ctx.db
-          .query("userTiers")
-          .withIndex("by_user", (q) => q.eq("userId", org.createdBy))
-          .first();
-        if (!existing) {
-          await ctx.db.insert("userTiers", {
-            userId: org.createdBy,
-            tier: ot.tier,
-            updatedAt: now,
-            reason: "migration.phase6",
-          });
-          results.orgTiersMigrated++;
-        }
-      }
-    }
-
-    // 3. Delete all organizationTiers records
-    for (const ot of orgTiers) {
-      await ctx.db.delete(ot._id);
-      results.orgTiersDeleted++;
-    }
-
-    // 4. Backfill userId on subscriptions
-    const subs = await ctx.db.query("subscriptions").collect();
-    for (const sub of subs) {
-      if (!sub.userId) {
-        const org = await ctx.db.get(sub.organizationId);
-        if (org) {
-          await ctx.db.patch(sub._id, { userId: org.createdBy });
-          results.subscriptionsBackfilled++;
-        }
-      }
-    }
-
-    // 5. Backfill userId on polarCustomers
-    const customers = await ctx.db.query("polarCustomers").collect();
-    for (const sc of customers) {
-      if (!sc.userId) {
-        const org = await ctx.db.get(sc.organizationId);
-        if (org) {
-          await ctx.db.patch(sc._id, { userId: org.createdBy });
-          results.polarCustomersBackfilled++;
-        }
-      }
-    }
-
-    return { success: true, ...results };
-  }
-
-  if (args.name === "seed-changelog") {
-    let created = 0;
-    let skipped = 0;
-    let deduped = 0;
-    const now = Date.now();
-
-    for (const entry of SEED_CHANGELOG) {
-      const existing = await ctx.db
-        .query("changelog")
-        .withIndex("by_version", (q: any) => q.eq("version", entry.version))
-        .collect();
-
-      const matches = existing.filter(
-        (e: { title: string }) => e.title === entry.title
-      );
-
-      if (matches.length > 0) {
-        // Keep first, delete any duplicates
-        for (let i = 1; i < matches.length; i++) {
-          await ctx.db.delete(matches[i]._id);
-          deduped++;
-        }
-        skipped++;
-        continue;
-      }
-
-      await ctx.db.insert("changelog", {
-        title: entry.title,
-        content: entry.content,
-        version: entry.version,
-        type: entry.type,
-        isPublished: true,
-        publishedAt: entry.publishedAt,
-        createdAt: entry.publishedAt,
-        updatedAt: now,
-      });
-      created++;
-    }
-
-    return {
-      success: true,
-      total: SEED_CHANGELOG.length,
-      migrated: created,
-      skipped,
-      duplicatesRemoved: deduped,
-    };
-  }
-
   /**
    * Backfill `docContent.status` from the parent `docs` row.
    *
@@ -868,103 +598,6 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
    * orphans are deleted rather than skipped, so every run makes progress:
    * re-run until `hadMore` is false.
    */
-  if (args.name === "backfill-doc-content-status") {
-    const BATCH = 20;
-    const rows = await ctx.db
-      .query("docContent")
-      .filter((q) => q.eq(q.field("status"), undefined))
-      .take(BATCH);
-    let updated = 0;
-    let orphaned = 0;
-
-    for (const row of rows) {
-      const doc = await ctx.db.get(row.docId);
-      if (!doc) {
-        // Unreachable garbage — its parent is gone, so nothing can ever read
-        // it. Deleting is what lets the batch drain; skipping would leave it
-        // matching the filter forever and pin `hadMore` to true.
-        await ctx.db.delete(row._id);
-        orphaned++;
-        continue;
-      }
-      await ctx.db.patch(row._id, { status: doc.status });
-      updated++;
-    }
-
-    return {
-      success: true,
-      total: rows.length,
-      updated,
-      orphaned,
-      hadMore: rows.length === BATCH,
-    };
-  }
-
-  if (args.name === "clear-changelog") {
-    const all = await ctx.db.query("changelog").collect();
-    for (const entry of all) {
-      await ctx.db.delete(entry._id);
-    }
-    return { success: true, deleted: all.length };
-  }
-
-  if (args.name === "seed-feature-requests") {
-    let created = 0;
-    let skipped = 0;
-    const now = Date.now();
-
-    for (const entry of SEED_FEATURE_REQUESTS) {
-      // Check if a feature request with this exact title already exists
-      const existing = await ctx.db.query("featureRequests").collect();
-      const match = existing.find(
-        (e: { title: string }) => e.title === entry.title
-      );
-
-      if (match) {
-        skipped++;
-        continue;
-      }
-
-      await ctx.db.insert("featureRequests", {
-        title: entry.title,
-        description: entry.description,
-        submitterName: "Envpilot Team",
-        status: entry.status,
-        category: entry.category,
-        adminNotes: entry.adminNotes,
-        voteCount: 0,
-        createdAt: now,
-        updatedAt: now,
-      });
-      created++;
-    }
-
-    return {
-      success: true,
-      total: SEED_FEATURE_REQUESTS.length,
-      created,
-      skipped,
-    };
-  }
-
-  if (args.name === "clear-feature-requests") {
-    const allRequests = await ctx.db.query("featureRequests").collect();
-    const allVotes = await ctx.db.query("featureVotes").collect();
-
-    for (const vote of allVotes) {
-      await ctx.db.delete(vote._id);
-    }
-    for (const req of allRequests) {
-      await ctx.db.delete(req._id);
-    }
-
-    return {
-      success: true,
-      deletedRequests: allRequests.length,
-      deletedVotes: allVotes.length,
-    };
-  }
-
   if (args.name === "seed-payment-products") {
     const tiers = await ctx.db.query("tierDefinitions").collect();
     const existingProducts = await ctx.db.query("paymentProducts").collect();
@@ -996,182 +629,6 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
     return { success: true, created, skipped };
   }
 
-  if (args.name === "migrate-unified-roles") {
-    const results = {
-      orgMembersToOwner: 0,
-      orgMembersToProjectManager: 0,
-      orgMembersToTeamLead: 0,
-      orgMembersToDeveloper: 0,
-      orgMembersSkipped: 0,
-      invitationsMigrated: 0,
-      invitationsSkipped: 0,
-      variablePermissionsMigrated: 0,
-      variablePermissionsSkipped: 0,
-      developerReadGrantsBackfilled: 0,
-      developerReadGrantsSkipped: 0,
-    };
-
-    const orgMembers = await ctx.db.query("organizationMembers").collect();
-
-    // "team_lead" exists in BOTH the legacy and the unified model, so it is
-    // ambiguous on its own. An un-migrated org always contains at least one
-    // legacy "admin" row (the creator) or "member" row; an org with neither
-    // is already on the unified model, so its "team_lead" rows are new-model
-    // values and must be left alone. This keeps the migration idempotent.
-    const legacyOrgIds = new Set<string>();
-    for (const member of orgMembers) {
-      if (member.role === "admin" || member.role === "member") {
-        legacyOrgIds.add(member.organizationId.toString());
-      }
-    }
-
-    // a. organizationMembers:
-    //    admin → owner; team_lead → project_manager (legacy orgs only);
-    //    member → team_lead if they hold a legacy "manager" project role on
-    //    a non-deleted project in the same org, else developer.
-    for (const member of orgMembers) {
-      if (member.role === "admin") {
-        await ctx.db.patch(member._id, { role: "owner" });
-        results.orgMembersToOwner++;
-      } else if (
-        member.role === "team_lead" &&
-        legacyOrgIds.has(member.organizationId.toString())
-      ) {
-        await ctx.db.patch(member._id, { role: "project_manager" });
-        results.orgMembersToProjectManager++;
-      } else if (member.role === "member") {
-        let promoted = false;
-        const projectMemberships = await ctx.db
-          .query("projectMembers")
-          .withIndex("by_user", (q) => q.eq("userId", member.userId))
-          .collect();
-        for (const pm of projectMemberships) {
-          if (pm.role !== "manager") continue;
-          const project = await ctx.db.get(pm.projectId);
-          if (
-            project &&
-            !project.deletedAt &&
-            project.organizationId === member.organizationId
-          ) {
-            promoted = true;
-            break;
-          }
-        }
-        if (promoted) {
-          await ctx.db.patch(member._id, { role: "team_lead" });
-          results.orgMembersToTeamLead++;
-        } else {
-          await ctx.db.patch(member._id, { role: "developer" });
-          results.orgMembersToDeveloper++;
-        }
-      } else {
-        // Already on a unified-model value
-        results.orgMembersSkipped++;
-      }
-    }
-
-    // b. Pending invitations: admin → owner; team_lead → project_manager
-    //    (legacy orgs only, same ambiguity rule as above); member → developer
-    const pendingInvitations = await ctx.db
-      .query("invitations")
-      .withIndex("by_status", (q) => q.eq("status", "pending"))
-      .collect();
-    for (const invitation of pendingInvitations) {
-      if (invitation.role === "admin") {
-        await ctx.db.patch(invitation._id, { role: "owner" });
-        results.invitationsMigrated++;
-      } else if (
-        invitation.role === "team_lead" &&
-        legacyOrgIds.has(invitation.organizationId.toString())
-      ) {
-        await ctx.db.patch(invitation._id, { role: "project_manager" });
-        results.invitationsMigrated++;
-      } else if (invitation.role === "member") {
-        await ctx.db.patch(invitation._id, { role: "developer" });
-        results.invitationsMigrated++;
-      } else {
-        results.invitationsSkipped++;
-      }
-    }
-
-    // c. variablePermissions: legacy "admin" permission → "write"
-    const allVariablePermissions = await ctx.db
-      .query("variablePermissions")
-      .collect();
-    for (const perm of allVariablePermissions) {
-      if (perm.permission === "admin") {
-        await ctx.db.patch(perm._id, { permission: "write" });
-        results.variablePermissionsMigrated++;
-      } else {
-        results.variablePermissionsSkipped++;
-      }
-    }
-
-    // d. Backfill developer read grants — flow preservation.
-    //    Under the old model a project-level "developer" could read ALL
-    //    variables in their assigned projects; the unified model makes
-    //    developer access grant-based, so without this pass existing
-    //    developers would lose visibility the moment roles migrate. Give
-    //    every developer a read grant on every (non-deleted) variable in
-    //    their assigned projects. Runs AFTER the role passes so it reads
-    //    final roles. Idempotent: skips variables that already have an
-    //    active grant for the user.
-    //    NOTE: this is the only write-heavy part of the migration
-    //    (developers × their variables). Bounded and fine at current scale;
-    //    if the dataset ever grows very large, split it into its own
-    //    chunked migration to stay under the per-mutation write limit.
-    const now = Date.now();
-    const migratedMembers = await ctx.db.query("organizationMembers").collect();
-    for (const member of migratedMembers) {
-      if (normalizeOrgRole(member.role) !== "developer") continue;
-      const assignments = await ctx.db
-        .query("projectMembers")
-        .withIndex("by_user", (q) => q.eq("userId", member.userId))
-        .collect();
-      for (const pm of assignments) {
-        const project = await ctx.db.get(pm.projectId);
-        if (
-          !project ||
-          project.deletedAt ||
-          project.organizationId !== member.organizationId
-        ) {
-          continue;
-        }
-        const projectVariables = await ctx.db
-          .query("environmentVariables")
-          .withIndex("by_project", (q) => q.eq("projectId", pm.projectId))
-          .collect();
-        for (const variable of projectVariables) {
-          if (variable.deletedAt) continue;
-          const existingGrants = await ctx.db
-            .query("variablePermissions")
-            .withIndex("by_variable_and_user", (q) =>
-              q.eq("variableId", variable._id).eq("userId", member.userId)
-            )
-            .collect();
-          const hasActiveGrant = existingGrants.some(
-            (g) => g.isActive && (!g.expiresAt || g.expiresAt > now)
-          );
-          if (hasActiveGrant) {
-            results.developerReadGrantsSkipped++;
-            continue;
-          }
-          await ctx.db.insert("variablePermissions", {
-            variableId: variable._id,
-            userId: member.userId,
-            permission: "read",
-            grantedBy: member.userId,
-            grantedAt: now,
-            isActive: true,
-          });
-          results.developerReadGrantsBackfilled++;
-        }
-      }
-    }
-
-    return { success: true, ...results };
-  }
-
   // Drains legacy/dead data so the corresponding schema declarations can be
   // dropped in a later PR:
   //   a. `organizations.settings` — the write path (teamLeadsCanCreateProjects)
@@ -1181,37 +638,5 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
   // Idempotent and bounded: writes are capped per run (org patches limited to
   // BATCH, counters deleted in batches of BATCH). Re-run until both
   // `orgSettingsRemaining` is 0 and `usageCountersMayHaveMore` is false.
-  if (args.name === "cleanup-dead-data") {
-    const BATCH = 500;
-
-    // a. Unset legacy `settings` on organizations.
-    const orgs = await ctx.db.query("organizations").collect();
-    let orgSettingsUnset = 0;
-    let orgSettingsRemaining = 0;
-    for (const org of orgs) {
-      if (org.settings === undefined) continue;
-      if (orgSettingsUnset >= BATCH) {
-        orgSettingsRemaining++;
-        continue;
-      }
-      await ctx.db.patch(org._id, { settings: undefined });
-      orgSettingsUnset++;
-    }
-
-    // b. Delete dead usageCounters rows (expected to be none).
-    const counters = await ctx.db.query("usageCounters").take(BATCH);
-    for (const counter of counters) {
-      await ctx.db.delete(counter._id);
-    }
-
-    return {
-      success: true,
-      orgSettingsUnset,
-      orgSettingsRemaining,
-      usageCountersDeleted: counters.length,
-      usageCountersMayHaveMore: counters.length === BATCH,
-    };
-  }
-
   throw new ConvexError(`Unknown migration: ${args.name}`);
 }

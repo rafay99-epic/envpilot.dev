@@ -64,6 +64,7 @@ jobs:
       run_cli: ${{ steps.flags.outputs.run_cli }}
       run_extension: ${{ steps.flags.outputs.run_extension }}
       run_action: ${{ steps.flags.outputs.run_action }}
+      run_docker_image: ${{ steps.flags.outputs.run_docker_image }}
       run_convex: ${{ steps.flags.outputs.run_convex }}
       deploy_convex: ${{ steps.flags.outputs.deploy_convex }}
       seed_features: ${{ steps.filter.outputs.seed_features }}
@@ -75,15 +76,17 @@ jobs:
       admin_version: ${{ steps.versions.outputs.admin }}
       cli_version: ${{ steps.versions.outputs.cli }}
       ext_version: ${{ steps.versions.outputs.extension }}
+      action_version: ${{ steps.versions.outputs.action }}
+      docker_version: ${{ steps.versions.outputs.docker }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Detect changed paths
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             web:
@@ -100,6 +103,8 @@ jobs:
               - 'apps/vscode-extension/**'
             action:
               - 'packages/github-action/**'
+            docker_image:
+              - 'packages/docker-image/**'
             convex:
               - 'convex/**'
             # One filter per seed, so a deploy runs only the seeds whose
@@ -132,6 +137,7 @@ jobs:
           CLI: ${{ steps.filter.outputs.cli }}
           EXTENSION: ${{ steps.filter.outputs.extension }}
           ACTION: ${{ steps.filter.outputs.action }}
+          DOCKER_IMAGE: ${{ steps.filter.outputs.docker_image }}
           CONVEX: ${{ steps.filter.outputs.convex }}
           SHARED: ${{ steps.filter.outputs.shared }}
         run: |
@@ -146,6 +152,7 @@ jobs:
           run_cli=$(bool "$CLI" "$SHARED")
           run_extension=$(bool "$EXTENSION" "$SHARED")
           run_action=$(bool "$ACTION" "$SHARED")
+          run_docker_image=$(bool "$DOCKER_IMAGE" "$SHARED")
           # Shared changes (lockfile, configs) can break convex typecheck,
           # so they re-run the convex CHECK — but only convex/** changes
           # trigger a convex DEPLOY.
@@ -153,7 +160,7 @@ jobs:
           deploy_convex="$CONVEX"
 
           any=false
-          for f in "$run_web" "$run_blog" "$run_docs" "$run_admin" "$run_cli" "$run_extension" "$run_convex" "$run_action"; do
+          for f in "$run_web" "$run_blog" "$run_docs" "$run_admin" "$run_cli" "$run_extension" "$run_convex" "$run_action" "$run_docker_image"; do
             [ "$f" = "true" ] && any=true
           done
 
@@ -165,6 +172,7 @@ jobs:
             echo "run_cli=$run_cli"
             echo "run_extension=$run_extension"
             echo "run_action=$run_action"
+            echo "run_docker_image=$run_docker_image"
             echo "run_convex=$run_convex"
             echo "deploy_convex=$deploy_convex"
             echo "any=$any"
@@ -181,6 +189,7 @@ jobs:
             echo "| CLI | $run_cli | $run_cli |"
             echo "| Extension | $run_extension | $run_extension |"
             echo "| Convex | $run_convex | $deploy_convex |"
+            echo "| Docker image | $run_docker_image | $run_docker_image |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Read package versions
@@ -192,6 +201,8 @@ jobs:
             echo "admin=$(jq -r '.version' apps/admin/package.json)"
             echo "cli=$(jq -r '.version' apps/cli/package.json)"
             echo "extension=$(jq -r '.version' apps/vscode-extension/package.json)"
+            echo "action=$(jq -r '.version' packages/github-action/package.json)"
+            echo "docker=$(jq -r '.version' packages/docker-image/package.json)"
           } >> "$GITHUB_OUTPUT"
 
   # ------------------------------------------------------------------
@@ -212,7 +223,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.ref == 'refs/heads/main' && 'Production' || 'development' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - name: Secret scan (gitleaks)
         # Standing guard: fail the gate if any real credential is committed.
@@ -255,7 +266,7 @@ jobs:
             NEXT_PUBLIC_CONVEX_URL
             WORKOS_CLIENT_ID
       - name: Cache Turborepo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
@@ -263,8 +274,13 @@ jobs:
             turbo-${{ runner.os }}-
       - name: Prettier check
         run: bunx prettier --check .
+      # docker-image is excluded: it is a Go package, and this job has no Go
+      # toolchain. Its build, vet and tests run in smoke-docker-image.yml,
+      # which is gated on the same path filter and blocks the publish.
       - name: Build, lint, typecheck, test (turbo)
-        run: bunx turbo build lint typecheck test --cache-dir=.turbo
+        run: |
+          bunx turbo build lint typecheck test --cache-dir=.turbo \
+            --filter='!@envpilot/docker-image'
       - name: Typecheck Convex functions
         # CI config adds Node type roots so process.env usage resolves without
         # a Convex deployment. See convex/tsconfig.ci.json.
@@ -333,7 +349,7 @@ jobs:
       NEXT_PUBLIC_APP_URL: http://localhost:3000
       WORKOS_REDIRECT_URI: http://localhost:3000/callback
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/load-env
         with:
           token: ${{ secrets.ENVPILOT_DEV_TOKEN }}
@@ -404,7 +420,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ github.sha }}
           path: apps/web/playwright-report
@@ -424,7 +440,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: Production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/load-env
         with:
           token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
@@ -440,7 +456,7 @@ jobs:
         working-directory: apps/cli
         run: npm pack
       - name: Upload CLI artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: envpilot-cli-${{ github.sha }}
           path: apps/cli/*.tgz
@@ -458,7 +474,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: Production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/load-env
         with:
           token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
@@ -475,7 +491,7 @@ jobs:
         working-directory: apps/vscode-extension
         run: bunx @vscode/vsce package --no-dependencies
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: envpilot-vsix-${{ github.sha }}
           path: apps/vscode-extension/*.vsix
@@ -613,6 +629,41 @@ jobs:
     permissions:
       contents: read
 
+  # Runs on PRs too — it publishes NOTHING, needs no secrets, and exercises the
+  # binary against a localhost stub, so a fork PR can run it safely. This is
+  # the job that proves the "works in any base image" claim; unit tests cannot.
+  smoke-docker-image:
+    name: Smoke Docker image
+    needs: [changes, checks-passed]
+    if: |
+      !failure() && !cancelled() &&
+      needs.changes.outputs.run_docker_image == 'true'
+    uses: ./.github/workflows/smoke-docker-image.yml
+    permissions:
+      contents: read
+
+  deploy-docker-image:
+    name: Deploy Docker image
+    # Backend FIRST, same strict ordering as deploy-cli/deploy-action: the
+    # published image reads /api/v1/projects/*/variables and /api/v1/files, so
+    # a release changing both must never ship the image before the backend it
+    # calls. The !failure() guard lets a SKIPPED deploy-convex (no convex
+    # changes) fall through, while a FAILED one blocks.
+    needs: [changes, checks-passed, e2e, deploy-convex, smoke-docker-image]
+    if: |
+      !failure() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
+      needs.smoke-docker-image.result == 'success' &&
+      needs.changes.outputs.run_docker_image == 'true'
+    uses: ./.github/workflows/deploy-docker-image.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      # GHCR push authenticates with GITHUB_TOKEN — GitHub Packages rejects
+      # fine-grained PATs, so this permission is what makes the push possible.
+      packages: write
+
   deploy-extension:
     name: Deploy extension
     needs: [changes, build-extension, e2e, deploy-convex]
@@ -658,6 +709,8 @@ jobs:
       - deploy-cli
       - deploy-extension
       - deploy-homebrew
+      - deploy-action
+      - deploy-docker-image
     # Skipped deploys (surface unchanged) must not block the release,
     # so check for failure/cancelled explicitly instead of success().
     # A failed e2e gate DOES block the release — nothing shipped.
@@ -667,6 +720,10 @@ jobs:
     # deploy-homebrew is listed in needs only for its status row in the
     # release notes — a failed Homebrew push must NOT block the release.
     # Retry failed Homebrew pushes via workflow_dispatch on that workflow.
+    #
+    # deploy-action and deploy-docker-image DO block, like the CLI and the
+    # extension: both publish a tag consumers pin (@v1, :1), so a release
+    # that announced them without the tag having moved would be a lie.
     if: |
       always() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
@@ -686,13 +743,17 @@ jobs:
       needs.deploy-cli.result != 'failure' &&
       needs.deploy-cli.result != 'cancelled' &&
       needs.deploy-extension.result != 'failure' &&
-      needs.deploy-extension.result != 'cancelled'
+      needs.deploy-extension.result != 'cancelled' &&
+      needs.deploy-action.result != 'failure' &&
+      needs.deploy-action.result != 'cancelled' &&
+      needs.deploy-docker-image.result != 'failure' &&
+      needs.deploy-docker-image.result != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -739,15 +800,19 @@ jobs:
             echo "| CLI | ${{ needs.changes.outputs.cli_version }} | $(status '${{ needs.deploy-cli.result }}') |"
             echo "| Extension | ${{ needs.changes.outputs.ext_version }} | $(status '${{ needs.deploy-extension.result }}') |"
             echo "| Homebrew | ${{ needs.changes.outputs.cli_version }} | $(status '${{ needs.deploy-homebrew.result }}') |"
+            echo "| GitHub Action | ${{ needs.changes.outputs.action_version }} | $(status '${{ needs.deploy-action.result }}') |"
+            echo "| Docker image | ${{ needs.changes.outputs.docker_version }} | $(status '${{ needs.deploy-docker-image.result }}') |"
             echo ""
             echo "**Install:** \`npm i -g @envpilot/cli\` · \`brew install rafay99-epic/apps/envpilot\` · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot)"
+            echo ""
+            echo "**Machine surfaces:** \`uses: rafay99-epic/envpilot-action@v1\` · \`docker pull ghcr.io/rafay99-epic/envpilot:1\`"
           } > /tmp/release-body.md
           cat /tmp/release-body.md
 
       - name: Download CLI artifact
         if: needs.changes.outputs.run_cli == 'true'
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: envpilot-cli-${{ github.sha }}
           path: release-artifacts
@@ -755,13 +820,13 @@ jobs:
       - name: Download VSIX artifact
         if: needs.changes.outputs.run_extension == 'true'
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: envpilot-vsix-${{ github.sha }}
           path: release-artifacts
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Envpilot ${{ steps.tag.outputs.tag }}

@@ -93,7 +93,6 @@ export const BROWSABLE_TABLES = [
   "invitations",
   "featureRequests",
   "featureVotes",
-  "changelog",
   "auditLogs",
   "subscriptions",
   "polarCustomers",

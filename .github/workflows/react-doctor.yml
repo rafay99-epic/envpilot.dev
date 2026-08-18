@@ -51,7 +51,7 @@ jobs:
     name: React Doctor
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Full history: without it the Action cannot resolve the merge base
           # and reports every pre-existing issue as introduced by the PR.

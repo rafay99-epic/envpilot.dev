@@ -122,6 +122,13 @@ const PRESETS = [
     resources: ["variables"],
   },
   {
+    id: "docker",
+    label: "Docker",
+    blurb: "containers, VPS",
+    surfaces: ["docker"],
+    resources: ["variables"],
+  },
+  {
     id: "rest",
     label: "REST read-only",
     blurb: "scripts, dashboards",
@@ -139,13 +146,14 @@ const PRESETS = [
 
 type PresetId = (typeof PRESETS)[number]["id"];
 
-const SURFACES = ["rest_api", "mcp_server", "github_action"] as const;
+const SURFACES = ["rest_api", "mcp_server", "github_action", "docker"] as const;
 type Surface = (typeof SURFACES)[number];
 
 const SURFACE_LABEL: Record<Surface, string> = {
   rest_api: "REST API",
   mcp_server: "MCP server",
   github_action: "GitHub Action",
+  docker: "Docker",
 };
 
 const CHIP_BASE =
@@ -168,7 +176,7 @@ interface ApiKeysSectionProps {
 
 /**
  * "API Keys" organization settings section — org-scoped, multi-resource
- * keys for the public REST API, MCP server, and GitHub Action (the one
+ * keys for the public REST API, MCP server, GitHub Action and Docker image (the one
  * machine credential). Pro-gated via the `public_api`
  * registry feature (server enforces the same gate — this is UX, not the
  * security boundary).
@@ -234,7 +242,7 @@ function ApiKeysSectionInner({
   return (
     <SettingsSection
       title="API keys"
-      description="Scoped keys for the public REST API, MCP server, and GitHub Action. Read-only — except keys with the requests resource, which may file variable requests for human approval."
+      description="Scoped keys for the public REST API, MCP server, GitHub Action, and Docker image. Read-only — except keys with the requests resource, which may file variable requests for human approval."
     >
       <div className="flex justify-end">
         <TerminalButton type="button" variant="primary" onClick={openCreate}>

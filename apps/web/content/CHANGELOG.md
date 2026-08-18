@@ -15,6 +15,92 @@
 
 <!-- entry -->
 ---
+title: Clearing Out What No Longer Runs
+version: v1.12.0
+date: 2026-08-19
+types: [improvement]
+---
+
+Four pieces of the platform were costing something and returning nothing. All of them are gone.
+
+### Anomaly Detection Is Off the Tier Sheet
+
+Behavioral anomaly detection was removed from the product in July 2026 — the engine, its tables, its crons and its admin console all went in one commit. What survived was two rows in the feature registry, `anomaly_detection` and `anomaly_detection_limit`, still rendering in Tiers & Limits as switches that gated code which no longer existed.
+
+Dropping a key from the seed file stops it being re-created but never deletes the row already there. A new `purge-retired-features` migration does the deleting, for the registry entries and every per-tier override pointing at them. It reads a list, so retiring the next feature is one array entry rather than another migration.
+
+### Sixteen Migrations Down to Six
+
+The migrations page had accumulated four categories and sixteen entries, most of them one-shot drains that had already been run everywhere, seeds for tables the product no longer reads, and wipe buttons for data nothing seeds. Ten are gone.
+
+What is left is one category, **Core**, holding the five seeds the platform actually needs plus the registry purge above. Three of those five run automatically on every deploy; the page now says which three, instead of naming two that never did.
+
+The deleted seeds took 1,996 lines of dead seed data with them, and the roles page no longer offers to run a migration that does not exist.
+
+### Web Traffic Dashboard Removed
+
+The admin panel had a Web Traffic page that polled Umami's API for pageviews and visitor counts. Umami's API is no longer on a free plan, so every load of that page spent real money and real error budget to re-render a dashboard Umami already serves better on its own site.
+
+The page, its Convex actions, and the `UMAMI_API_KEY` / `UMAMI_WEBSITE_ID` / `UMAMI_SHARE_URL` environment variables behind them are removed. Client-side pageview tracking is untouched — the data is still being collected, it is just read where it lives.
+
+### The Changelog Table Is Gone From the Database
+
+This page stopped reading from the database in v1.65.0, when entries moved into a markdown file in the repository. The `changelog` table stayed behind anyway, along with its queries, its scheduled-publish mutation and an admin CRUD module that no screen had linked to since the move.
+
+The table is now out of the schema, and with it the publish path, the query module, and the entry in the admin data browser's table list. Production data was already cleared, so nothing is being dropped that anyone can still reach.
+
+### Every Action Off the Node 20 Runtime
+
+GitHub is retiring Node 20 for Actions. Thirteen pinned actions still declared it and were being force-run on Node 24, which is a warning today and a failure later. Each is now on a major that declares `node24`, verified against its published manifest rather than assumed.
+
+The Node the project builds with has not changed: CI still installs Node 22 LTS. The runtime an action declares is the one GitHub executes that action's own JavaScript on, and there it offers only the deprecated Node 20 or Node 24.
+
+<!-- entry -->
+---
+title: "Docker: Variables and Secret Files in Any Image"
+version: v1.0.0
+date: 2026-08-19
+types: [feature]
+---
+
+Envpilot now ships a Docker image. Copy one binary into your Dockerfile and your project's variables and secret files are there, at build time and at runtime.
+
+```dockerfile
+FROM python:3.12-slim
+COPY --from=ghcr.io/rafay99-epic/envpilot:1 /envpilot /usr/local/bin/envpilot
+ENTRYPOINT ["envpilot", "exec", "--"]
+CMD ["python", "app.py"]
+```
+
+### What Changed
+
+- `ghcr.io/rafay99-epic/envpilot:1` is a single statically linked binary with no runtime and no libc of its own, so it works in `scratch`, distroless, `alpine` (musl), `python`, `golang` and `eclipse-temurin` alike. It is 5 MB
+- Three commands: `pull` writes a dotenv file, `files` writes secret files at their recorded permissions, and `exec` injects variables into your process without anything touching a filesystem
+- At build time the binary is mounted rather than copied, so neither it nor your values become a layer in the finished image
+- The credential is read from a mounted secret through `ENVPILOT_TOKEN_FILE`, never from a command-line flag where `ps` and build logs would capture it
+- `exec` forwards signals and exits with your process's exit code, so `docker stop`, restart policies and health checks behave exactly as they did before
+
+### Worth Knowing
+
+- A pull that cannot decrypt every variable aborts. A container that refuses to start is easier to diagnose than one running on half its configuration
+- Variables are read once, at start. A rotated value reaches the container on its next restart
+- Docker is its own surface with its own plan feature, not a mode of the REST API. Create a key with the **Docker** preset under Organization → Settings → API Keys; it needs the `variables` resource, plus `files` if you pull secret files
+- Because it is independent, your plan can include container delivery without including the public API, and disabling one never disables the other
+- Docker also gets its own rate-limit bucket, sized from the real workload: a container start costs at most two value-returning calls, and the burst covers 60 of them starting at once. A restarting fleet cannot spend your CI pipeline's budget, and a crash-looping container cannot throttle your deploys
+- Your plan caps how many active Docker keys an organization may hold, with the same cap now applying to GitHub Action keys. Revoking a key frees its slot immediately, so rotating a credential works even at the limit
+
+### How It Ships
+
+The image releases the same way the GitHub Action does. Bumping `packages/docker-image/package.json` is the release, and the pipeline runs in order: a change to the package triggers the smoke job, which builds the binary and runs it inside `scratch`, `alpine`, `python`, `golang` and both distroless variants before anything is published. Only once that passes and Convex has deployed does the image push to GHCR, tagged with the exact version and the floating `:1`, and mirror its Dockerfile, README and LICENSE to the public repo. The GitHub release then reports both.
+
+Nothing rebuilds when the package has not changed.
+
+The fetcher is written in Go for one reason worth stating plainly: it has to run inside whatever base image you picked. A binary compiled from TypeScript links against a libc and dies with `exec: no such file or directory` in an image that does not ship the matching loader. Go with `CGO_ENABLED=0` has no loader dependency at all, which is what makes the `scratch` case above possible — and it is 5 MB rather than 95 MB.
+
+Full documentation is at [docs.envpilot.dev/docker/overview](https://docs.envpilot.dev/docker/overview).
+
+<!-- entry -->
+---
 title: A Faster, Static Changelog
 version: v1.65.0
 date: 2026-08-18

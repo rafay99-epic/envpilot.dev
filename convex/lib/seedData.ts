@@ -322,13 +322,49 @@ export const SEED_FEATURES = [
     sortOrder: 2,
   },
   {
+    // The Docker image is its own surface with its own gate, NOT a rider on
+    // public_api. A plan can sell container delivery without selling the
+    // whole REST API, and revoking one must not revoke the other.
+    key: "docker_image",
+    displayName: "Docker Image",
+    valueType: "boolean" as const,
+    category: "Integrations",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 3,
+  },
+  {
+    // Counts ACTIVE keys carrying the docker surface. Each one is a standing
+    // credential that pulls plaintext on every container start, so the cost
+    // being bounded is live credentials in circulation, not storage.
+    key: "docker_image_limit",
+    displayName: "Max Docker Keys",
+    valueType: "numeric" as const,
+    category: "Integrations",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 4,
+  },
+  {
+    // Same unit for the Action: active keys carrying the github_action
+    // surface. The Action has no boolean of its own (it rides public_api),
+    // so this is the only per-surface dial it has.
+    key: "github_action_limit",
+    displayName: "Max GitHub Action Keys",
+    valueType: "numeric" as const,
+    category: "Integrations",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 5,
+  },
+  {
     key: "team_notifications",
     displayName: "Slack & Discord Notifications",
     valueType: "boolean" as const,
     category: "Integrations",
     defaultValue: "false",
     resettable: false,
-    sortOrder: 3,
+    sortOrder: 6,
   },
   {
     key: "team_notifications_limit",
@@ -337,7 +373,7 @@ export const SEED_FEATURES = [
     category: "Integrations",
     defaultValue: "0",
     resettable: false,
-    sortOrder: 4,
+    sortOrder: 7,
   },
   // Available on every tier — documentation is how a project explains itself,
   // and gating it entirely would make the free tier worse at onboarding, the

@@ -56,12 +56,17 @@ export async function GET(request: Request) {
     searchParams.get("metadataOnly") === "1" ||
     searchParams.get("metadataOnly") === "true";
   const paths = searchParams.getAll("path");
-  // The Envpilot Action identifies itself so a github_action-scoped key
-  // authorizes correctly; other REST clients omit it and fall back to the
-  // rest_api inference in authorize.ts.
+  // Clients that hold a surface-scoped key identify themselves so authorize.ts
+  // checks the right key scope AND the right tier gate: the Action presents
+  // github_action (public_api), the Docker image presents docker
+  // (docker_image). Anything else omits it and falls back to the rest_api
+  // inference in authorize.ts. An unrecognised value is dropped rather than
+  // trusted, so a caller cannot name its way into a cheaper gate.
   const surfaceParam = searchParams.get("surface");
   const surface =
-    surfaceParam === "github_action" ? "github_action" : undefined;
+    surfaceParam === "github_action" || surfaceParam === "docker"
+      ? surfaceParam
+      : undefined;
 
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!convexUrl) {

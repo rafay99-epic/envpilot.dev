@@ -18,6 +18,12 @@ scope:github-action:
   - changed-files:
       - any-glob-to-any-file: packages/github-action/**
 
+scope:docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/docker-image/**
+          - apps/docs/content/docker/**
+
 scope:mcp:
   - changed-files:
       - any-glob-to-any-file:
