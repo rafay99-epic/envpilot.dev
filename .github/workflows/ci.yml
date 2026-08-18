@@ -270,8 +270,13 @@ jobs:
             turbo-${{ runner.os }}-
       - name: Prettier check
         run: bunx prettier --check .
+      # docker-image is excluded: it is a Go package, and this job has no Go
+      # toolchain. Its build, vet and tests run in smoke-docker-image.yml,
+      # which is gated on the same path filter and blocks the publish.
       - name: Build, lint, typecheck, test (turbo)
-        run: bunx turbo build lint typecheck test --cache-dir=.turbo
+        run: |
+          bunx turbo build lint typecheck test --cache-dir=.turbo \
+            --filter='!@envpilot/docker-image'
       - name: Typecheck Convex functions
         # CI config adds Node type roots so process.env usage resolves without
         # a Convex deployment. See convex/tsconfig.ci.json.

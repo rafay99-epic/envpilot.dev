@@ -1,7 +1,7 @@
 {
   "name": "@envpilot/docker-image",
   "version": "1.0.0",
-  "description": "Docker image that pulls Envpilot variables and secret files into a build or a running container",
+  "description": "Statically linked Go binary that pulls Envpilot variables and secret files into a Docker build or a running container",
   "private": true,
   "license": "MIT",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
@@ -11,19 +11,10 @@
     "url": "https://github.com/rafay99-epic/envpilot.dev"
   },
   "scripts": {
-    "build": "bun build ./src/index.ts --compile --minify --target=bun-linux-x64 --outfile build/linux/amd64/envpilot && bun build ./src/index.ts --compile --minify --target=bun-linux-arm64 --outfile build/linux/arm64/envpilot",
+    "build": "./build.sh",
     "smoke": "./scripts/smoke.sh",
     "stub": "bun scripts/stub-api.ts",
-    "lint": "eslint \"src/**/*.ts\"",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
-  },
-  "devDependencies": {
-    "@envpilot/eslint-config": "workspace:*",
-    "@envpilot/tsconfig": "workspace:*",
-    "@types/node": "^22.10.10",
-    "eslint": "^9",
-    "typescript": "^5.7.3",
-    "vitest": "^3.0.4"
+    "test": "go test ./...",
+    "vet": "go vet ./..."
   }
 }

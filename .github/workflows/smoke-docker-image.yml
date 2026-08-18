@@ -8,7 +8,10 @@ name: Smoke Docker Image
 #
 # What it is really checking is the one claim the whole package makes: that a
 # single binary drops into ANY base image. Unit tests cannot prove that; only
-# running it inside alpine, python, golang and distroless can.
+# running it inside alpine (musl), python/golang (glibc), distroless and
+# scratch can. That claim was false once already — a Bun-compiled binary needs
+# a dynamic loader and died with "exec: no such file or directory" in scratch,
+# which is exactly what this job now exists to catch.
 
 on:
   workflow_call:
@@ -25,9 +28,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          # No go.sum: the fetcher uses the standard library only, so there is
+          # nothing to download and nothing to cache.
+          cache: false
+
+      - name: Vet and test
+        working-directory: packages/docker-image
+        run: |
+          go vet ./...
+          go test ./...
+
       - name: Build binaries
         working-directory: packages/docker-image
-        run: bun run build
+        run: ./build.sh
 
       # Fail here, with a readable message, rather than inside BuildKit. The
       # first CI run died on "failed to compute cache key ... not found",
@@ -89,7 +105,10 @@ jobs:
       - name: Runs in every base image
         run: |
           set -euo pipefail
-          for BASE in alpine:3 python:3.12-slim golang:1.23 gcr.io/distroless/base-debian12; do
+          # scratch is FIRST and non-negotiable: it has no libc and no dynamic
+          # loader, so it is the case that proves the binary is genuinely
+          # static. alpine covers musl, the rest cover glibc.
+          for BASE in scratch alpine:3 python:3.12-slim golang:1.23 gcr.io/distroless/base-debian12 gcr.io/distroless/static-debian12; do
             echo "── $BASE"
             printf 'FROM %s\nCOPY --from=envpilot-smoke:local /envpilot /usr/local/bin/envpilot\n' "$BASE" \
               > /tmp/Dockerfile.probe

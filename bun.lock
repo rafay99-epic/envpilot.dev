@@ -21,7 +21,7 @@
     },
     "apps/admin": {
       "name": "@envpilot/admin",
-      "version": "1.10.0",
+      "version": "1.12.0",
       "dependencies": {
         "@dnd-kit/core": "^6.3.1",
         "@dnd-kit/utilities": "^3.2.2",
@@ -124,7 +124,7 @@
     },
     "apps/docs": {
       "name": "@envpilot/docs",
-      "version": "2.2.1",
+      "version": "2.3.0",
       "dependencies": {
         "@envpilot/ui": "workspace:*",
         "gray-matter": "^4.0.3",
@@ -231,14 +231,6 @@
     "packages/docker-image": {
       "name": "@envpilot/docker-image",
       "version": "1.0.0",
-      "devDependencies": {
-        "@envpilot/eslint-config": "workspace:*",
-        "@envpilot/tsconfig": "workspace:*",
-        "@types/node": "^22.10.10",
-        "eslint": "^9",
-        "typescript": "^5.7.3",
-        "vitest": "^3.0.4",
-      },
     },
     "packages/eslint-config": {
       "name": "@envpilot/eslint-config",

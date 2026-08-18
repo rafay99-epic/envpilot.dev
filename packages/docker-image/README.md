@@ -2,7 +2,7 @@
 
 Pull environment variables and secret files from [Envpilot](https://www.envpilot.dev) into a Docker build or a running container.
 
-One static binary, no runtime dependencies. It works in any base image — `alpine`, `python`, `golang`, `eclipse-temurin`, distroless, whatever you are already on.
+One statically linked binary, no runtime dependencies and no libc. It works in any base image — `scratch`, distroless, `alpine` (musl), `python`, `golang`, `eclipse-temurin`, whatever you are already on.
 
 ```
 ghcr.io/rafay99-epic/envpilot:1

@@ -20,3 +20,7 @@ Dockerfile
 .gitignore
 .turbo
 *.mjs
+*.go
+go.mod
+go.sum
+build.sh

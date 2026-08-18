@@ -24,7 +24,7 @@ CMD ["python", "app.py"]
 
 ## Any base image
 
-The binary is statically linked and carries no runtime, so it drops into whatever you are already using.
+The binary is statically linked and carries no runtime and no libc, so it drops into whatever you are already using — including `scratch`, which has no dynamic loader at all.
 
 ```dockerfile
 # Go, distroless

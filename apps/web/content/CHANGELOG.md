@@ -62,7 +62,7 @@ CMD ["python", "app.py"]
 
 ### What Changed
 
-- `ghcr.io/rafay99-epic/envpilot:1` is a single statically linked binary with no runtime of its own, so it works in `alpine`, `python`, `golang`, `eclipse-temurin` and distroless alike
+- `ghcr.io/rafay99-epic/envpilot:1` is a single statically linked binary with no runtime and no libc of its own, so it works in `scratch`, distroless, `alpine` (musl), `python`, `golang` and `eclipse-temurin` alike. It is 5 MB
 - Three commands: `pull` writes a dotenv file, `files` writes secret files at their recorded permissions, and `exec` injects variables into your process without anything touching a filesystem
 - At build time the binary is mounted rather than copied, so neither it nor your values become a layer in the finished image
 - The credential is read from a mounted secret through `ENVPILOT_TOKEN_FILE`, never from a command-line flag where `ps` and build logs would capture it

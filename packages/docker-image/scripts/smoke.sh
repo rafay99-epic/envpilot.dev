@@ -41,12 +41,13 @@ die() {
 }
 
 command -v docker >/dev/null || die "docker is not installed or not running"
+command -v go >/dev/null || die "go is not installed — the fetcher is a Go binary"
 
 # ── Build ───────────────────────────────────────────────────────────────────
 
 step "Compiling the binary"
-bun run build
-ok "linux/amd64 and linux/arm64 built"
+./build.sh
+ok "linux/amd64 and linux/arm64 built (static, no libc)"
 
 step "Building the image (local only, never pushed)"
 docker buildx build \
@@ -109,7 +110,8 @@ run() {
 
 step "Running inside every base image"
 mkdir -p /tmp/envpilot-smoke
-for BASE in alpine:3 python:3.12-slim golang:1.23 gcr.io/distroless/base-debian12; do
+# scratch first: no libc, no loader — the case that proves static linking.
+for BASE in scratch alpine:3 python:3.12-slim golang:1.23 gcr.io/distroless/base-debian12; do
   printf 'FROM %s\nCOPY --from=%s /envpilot /usr/local/bin/envpilot\n' "$BASE" "$TAG" \
     >/tmp/envpilot-smoke/Dockerfile
   docker build -q -t probe:local /tmp/envpilot-smoke >/dev/null

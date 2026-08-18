@@ -69,16 +69,28 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "major=v${VERSION%%.*}" >> "$GITHUB_OUTPUT"
 
-      # Cross-compile per target OUTSIDE Docker. Bun's --compile embeds a
-      # runtime per platform, so one build cannot serve both architectures —
-      # buildx assembles the manifest from these two binaries.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          # No go.sum: the fetcher uses the standard library only, so there is
+          # nothing to download and nothing to cache.
+          cache: false
+
+      - name: Vet and test
+        working-directory: packages/docker-image
+        run: |
+          go vet ./...
+          go test ./...
+
+      # Cross-compile per target OUTSIDE Docker; buildx assembles the
+      # multi-arch manifest from these two static binaries.
       #
       # Built DIRECTLY, never through turbo — same rule as the CLI and the
       # extension, where turbo once dropped build-time inputs and shipped a
       # broken artifact.
       - name: Build binaries
         working-directory: packages/docker-image
-        run: bun run build
+        run: ./build.sh
 
       - name: Verify the binary runs and reports the right version
         working-directory: packages/docker-image

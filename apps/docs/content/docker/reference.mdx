@@ -12,7 +12,7 @@ ghcr.io/rafay99-epic/envpilot:1
 ghcr.io/rafay99-epic/envpilot:{{dockerVersion}}
 ```
 
-Multi-arch: `linux/amd64` and `linux/arm64`. The image contains one file, `/envpilot`, and nothing else — no shell, no package manager, no runtime.
+Multi-arch: `linux/amd64` and `linux/arm64`. The image contains one file, `/envpilot`, and nothing else — no shell, no package manager, no runtime, no libc. It is a statically linked Go binary, which is what lets the same file run in `scratch` and in `alpine` (musl) and in `debian` (glibc).
 
 The binary sits at the image root rather than on a `PATH` on purpose: you choose the name it takes in your image, so it can never shadow the [Envpilot CLI](/cli/overview) on a developer machine.
 
