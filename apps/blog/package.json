@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/blog",
-  "version": "1.7.2",
+  "version": "1.8.0",
   "private": true,
   "description": "Envpilot Blog — engineering, security, and building in public",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
