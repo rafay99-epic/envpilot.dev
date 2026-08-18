@@ -15,13 +15,13 @@
 
 <!-- entry -->
 ---
-title: Removing Two Things That Did Nothing
+title: Clearing Out What No Longer Runs
 version: v1.12.0
-date: 2026-08-18
+date: 2026-08-19
 types: [improvement]
 ---
 
-Two pieces of the admin panel were costing something and returning nothing. Both are gone.
+Four pieces of the platform were costing something and returning nothing. All of them are gone.
 
 ### Anomaly Detection Is Off the Tier Sheet
 
@@ -43,11 +43,23 @@ The admin panel had a Web Traffic page that polled Umami's API for pageviews and
 
 The page, its Convex actions, and the `UMAMI_API_KEY` / `UMAMI_WEBSITE_ID` / `UMAMI_SHARE_URL` environment variables behind them are removed. Client-side pageview tracking is untouched — the data is still being collected, it is just read where it lives.
 
+### The Changelog Table Is Gone From the Database
+
+This page stopped reading from the database in v1.65.0, when entries moved into a markdown file in the repository. The `changelog` table stayed behind anyway, along with its queries, its scheduled-publish mutation and an admin CRUD module that no screen had linked to since the move.
+
+The table is now out of the schema, and with it the publish path, the query module, and the entry in the admin data browser's table list. Production data was already cleared, so nothing is being dropped that anyone can still reach.
+
+### Every Action Off the Node 20 Runtime
+
+GitHub is retiring Node 20 for Actions. Thirteen pinned actions still declared it and were being force-run on Node 24, which is a warning today and a failure later. Each is now on a major that declares `node24`, verified against its published manifest rather than assumed.
+
+The Node the project builds with has not changed: CI still installs Node 22 LTS. The runtime an action declares is the one GitHub executes that action's own JavaScript on, and there it offers only the deprecated Node 20 or Node 24.
+
 <!-- entry -->
 ---
 title: "Docker: Variables and Secret Files in Any Image"
 version: v1.0.0
-date: 2026-08-18
+date: 2026-08-19
 types: [feature]
 ---
 
@@ -76,6 +88,14 @@ CMD ["python", "app.py"]
 - Because it is independent, your plan can include container delivery without including the public API, and disabling one never disables the other
 - Docker also gets its own rate-limit bucket, sized from the real workload: a container start costs at most two value-returning calls, and the burst covers 60 of them starting at once. A restarting fleet cannot spend your CI pipeline's budget, and a crash-looping container cannot throttle your deploys
 - Your plan caps how many active Docker keys an organization may hold, with the same cap now applying to GitHub Action keys. Revoking a key frees its slot immediately, so rotating a credential works even at the limit
+
+### How It Ships
+
+The image releases the same way the GitHub Action does. Bumping `packages/docker-image/package.json` is the release, and the pipeline runs in order: a change to the package triggers the smoke job, which builds the binary and runs it inside `scratch`, `alpine`, `python`, `golang` and both distroless variants before anything is published. Only once that passes and Convex has deployed does the image push to GHCR, tagged with the exact version and the floating `:1`, and mirror its Dockerfile, README and LICENSE to the public repo. The GitHub release then reports both.
+
+Nothing rebuilds when the package has not changed.
+
+The fetcher is written in Go for one reason worth stating plainly: it has to run inside whatever base image you picked. A binary compiled from TypeScript links against a libc and dies with `exec: no such file or directory` in an image that does not ship the matching loader. Go with `CGO_ENABLED=0` has no loader dependency at all, which is what makes the `scratch` case above possible — and it is 5 MB rather than 95 MB.
 
 Full documentation is at [docs.envpilot.dev/docker/overview](https://docs.envpilot.dev/docker/overview).
 

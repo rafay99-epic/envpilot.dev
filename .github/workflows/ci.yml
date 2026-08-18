@@ -76,6 +76,8 @@ jobs:
       admin_version: ${{ steps.versions.outputs.admin }}
       cli_version: ${{ steps.versions.outputs.cli }}
       ext_version: ${{ steps.versions.outputs.extension }}
+      action_version: ${{ steps.versions.outputs.action }}
+      docker_version: ${{ steps.versions.outputs.docker }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -199,6 +201,8 @@ jobs:
             echo "admin=$(jq -r '.version' apps/admin/package.json)"
             echo "cli=$(jq -r '.version' apps/cli/package.json)"
             echo "extension=$(jq -r '.version' apps/vscode-extension/package.json)"
+            echo "action=$(jq -r '.version' packages/github-action/package.json)"
+            echo "docker=$(jq -r '.version' packages/docker-image/package.json)"
           } >> "$GITHUB_OUTPUT"
 
   # ------------------------------------------------------------------
@@ -705,6 +709,8 @@ jobs:
       - deploy-cli
       - deploy-extension
       - deploy-homebrew
+      - deploy-action
+      - deploy-docker-image
     # Skipped deploys (surface unchanged) must not block the release,
     # so check for failure/cancelled explicitly instead of success().
     # A failed e2e gate DOES block the release — nothing shipped.
@@ -714,6 +720,10 @@ jobs:
     # deploy-homebrew is listed in needs only for its status row in the
     # release notes — a failed Homebrew push must NOT block the release.
     # Retry failed Homebrew pushes via workflow_dispatch on that workflow.
+    #
+    # deploy-action and deploy-docker-image DO block, like the CLI and the
+    # extension: both publish a tag consumers pin (@v1, :1), so a release
+    # that announced them without the tag having moved would be a lie.
     if: |
       always() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
@@ -733,7 +743,11 @@ jobs:
       needs.deploy-cli.result != 'failure' &&
       needs.deploy-cli.result != 'cancelled' &&
       needs.deploy-extension.result != 'failure' &&
-      needs.deploy-extension.result != 'cancelled'
+      needs.deploy-extension.result != 'cancelled' &&
+      needs.deploy-action.result != 'failure' &&
+      needs.deploy-action.result != 'cancelled' &&
+      needs.deploy-docker-image.result != 'failure' &&
+      needs.deploy-docker-image.result != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -786,8 +800,12 @@ jobs:
             echo "| CLI | ${{ needs.changes.outputs.cli_version }} | $(status '${{ needs.deploy-cli.result }}') |"
             echo "| Extension | ${{ needs.changes.outputs.ext_version }} | $(status '${{ needs.deploy-extension.result }}') |"
             echo "| Homebrew | ${{ needs.changes.outputs.cli_version }} | $(status '${{ needs.deploy-homebrew.result }}') |"
+            echo "| GitHub Action | ${{ needs.changes.outputs.action_version }} | $(status '${{ needs.deploy-action.result }}') |"
+            echo "| Docker image | ${{ needs.changes.outputs.docker_version }} | $(status '${{ needs.deploy-docker-image.result }}') |"
             echo ""
             echo "**Install:** \`npm i -g @envpilot/cli\` · \`brew install rafay99-epic/apps/envpilot\` · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot)"
+            echo ""
+            echo "**Machine surfaces:** \`uses: rafay99-epic/envpilot-action@v1\` · \`docker pull ghcr.io/rafay99-epic/envpilot:1\`"
           } > /tmp/release-body.md
           cat /tmp/release-body.md
 
