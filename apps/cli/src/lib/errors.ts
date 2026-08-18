@@ -30,6 +30,7 @@ export const ErrorCodes = {
   TIER_LIMIT_EXCEEDED: "TIER_LIMIT_EXCEEDED",
   FILE_NOT_FOUND: "FILE_NOT_FOUND",
   INVALID_INPUT: "INVALID_INPUT",
+  INCOMPLETE_SECRETS: "INCOMPLETE_SECRETS",
   UNKNOWN_ERROR: "UNKNOWN_ERROR",
 } as const;
 
@@ -149,6 +150,9 @@ export async function handleError(error: unknown): Promise<never> {
       case ErrorCodes.TIER_LIMIT_EXCEEDED:
         process.exit(4);
         break;
+      case ErrorCodes.INCOMPLETE_SECRETS:
+        process.exit(5);
+        break;
       default:
         process.exit(1);
     }
@@ -237,6 +241,22 @@ export function isConnectivityError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /fetch failed|network|socket hang up|getaddrinfo|connect timeout/i.test(
     message
+  );
+}
+
+/**
+ * The resolved secret set cannot be trusted to boot an app: keys failed to
+ * decrypt, the server capped its read, or a declared requirement is missing.
+ *
+ * `run` throws this INSTEAD of spawning. Continuing with a short set is what
+ * turned a clear failure into an obscure one somewhere downstream, which is
+ * the whole reason this error exists.
+ */
+export function incompleteSecrets(reasons: readonly string[]): CLIError {
+  return new CLIError(
+    `Refusing to run with an incomplete environment:\n  ${reasons.join("\n  ")}`,
+    ErrorCodes.INCOMPLETE_SECRETS,
+    "Fix the variables above, or pass --allow-partial to run anyway."
   );
 }
 

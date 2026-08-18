@@ -41,6 +41,8 @@ type PullResult = {
     hasWriteAccess: boolean;
     scopeRestricted: boolean;
     decryptionFailures?: string[];
+    /** The read window, present only when the project overflowed it. */
+    truncatedAt?: number;
     autoUnsyncOnClose?: boolean;
     /** Resolved capability map — capability-aware clients prefer this. */
     capabilities: Record<string, boolean>;
@@ -104,6 +106,11 @@ const DECRYPTION_FAILED = "[DECRYPTION_FAILED]";
  * `environments` array; meta carries both legacy and unified fields). The CLI's
  * listVariables() and the extension's getVariables() map it into the exact
  * shapes their commands already expect.
+ *
+ * Completeness: the underlying read is windowed, so `meta.truncatedAt` carries
+ * the window whenever the project overflowed it and the tail was dropped. A
+ * client that ignores the field silently injects a short secret set, which is
+ * the failure this field exists to make visible.
  */
 export const pullValues = action({
   args: {
@@ -137,6 +144,10 @@ export const pullValues = action({
       hasWriteAccess: v.boolean(),
       scopeRestricted: v.boolean(),
       decryptionFailures: v.optional(v.array(v.string())),
+      // The read window, present only when the project overflowed it and the
+      // tail was dropped. Absent means the caller received every variable.
+      // Optional so older clients that ignore it stay valid.
+      truncatedAt: v.optional(v.number()),
       // Effective unsync-on-close for the caller (member override ??
       // project default ?? true; pro gate re-checked at read time).
       // Optional so older payload consumers stay valid.
@@ -167,8 +178,8 @@ export const pullValues = action({
       throw new Error("You are not a member of this organization");
     }
 
-    const rows = await ctx.runQuery(
-      api.features.variables.queries.listWithAccess,
+    const { variables: rows, truncatedAt } = await ctx.runQuery(
+      internal.features.variables.queries._listWithAccessCapped,
       {
         projectId: args.projectId,
       }
@@ -290,6 +301,7 @@ export const pullValues = action({
         scopeRestricted,
         decryptionFailures:
           decryptionFailures.length > 0 ? decryptionFailures : undefined,
+        truncatedAt,
         autoUnsyncOnClose,
         capabilities: legacy.capabilities,
       },
@@ -494,6 +506,20 @@ export const pushBulk = action({
     let deleted = 0;
     let skipped = 0;
     const deniedKeys: string[] = [];
+    /**
+     * New variables, written as ONE batch after the loop. Creating them one
+     * mutation at a time charges variableCreate per row against a bucket of
+     * 30, so a push of more than 30 new keys failed partway through.
+     * Authorization for a create is project-wide rather than per key, so
+     * batching cannot swallow a per-key denial the loop would have caught.
+     */
+    const pendingCreates: Array<{
+      key: string;
+      vaultRef: string;
+      description?: string;
+      environments: string[];
+      isSensitive: boolean;
+    }> = [];
 
     for (const variable of args.variables) {
       // Validate key format (invalid keys are skipped, not denied).
@@ -567,16 +593,14 @@ export const pushBulk = action({
             }
           );
 
-          await ctx.runMutation(api.features.variables.mutations.create, {
+          // Deferred, not written here: see the batch flush below.
+          pendingCreates.push({
             key: variable.key,
             vaultRef: vault.id,
             description: variable.description,
             environments: [args.environment],
-            projectId: args.projectId,
             isSensitive: variable.isSensitive ?? false,
           });
-
-          created++;
         }
       } catch (error) {
         // Variables the caller lacks write access to are skipped rather than
@@ -592,6 +616,22 @@ export const pushBulk = action({
         // Mark processed so replace-mode does not try to delete it afterwards.
         existingByKey.delete(variable.key);
       }
+    }
+
+    // Flush the new variables as one batch, with one rate-limit reservation
+    // covering all of them. Runs before replace-mode deletion so a refused
+    // batch cannot leave the project emptied of the keys it was meant to gain.
+    if (pendingCreates.length > 0) {
+      const createdBy = await ctx.runMutation(
+        internal.features.variables.mutations.reserveBatchCreate,
+        { projectId: args.projectId, count: pendingCreates.length }
+      );
+      await ctx.runMutation(internal.features.variables.mutations.createMany, {
+        projectId: args.projectId,
+        createdBy,
+        variables: pendingCreates,
+      });
+      created += pendingCreates.length;
     }
 
     if (mode === "replace") {
@@ -730,6 +770,10 @@ export const updateWithValue = action({
  * export). Returns key/value pairs; the route serializes them into the chosen
  * format. Authorization is enforced by listWithAccess (identity-verified — it
  * only returns a vaultRef for entries the caller may read).
+ *
+ * Refuses a windowed read rather than handing back a short file: an export
+ * that silently drops its tail is downloaded, committed, and deployed as if
+ * it were complete.
  */
 export const exportValues = action({
   args: {
@@ -743,12 +787,17 @@ export const exportValues = action({
     ctx,
     args
   ): Promise<{ values: Array<{ key: string; value: string }> }> => {
-    const rows = await ctx.runQuery(
-      api.features.variables.queries.listWithAccess,
+    const { variables: rows, truncatedAt } = await ctx.runQuery(
+      internal.features.variables.queries._listWithAccessCapped,
       {
         projectId: args.projectId,
       }
     );
+    if (truncatedAt !== undefined) {
+      throw new ConvexError(
+        `Project has more than ${truncatedAt} active variables, refusing a partial export. Contact support to raise the limit.`
+      );
+    }
 
     const environment = args.environment;
     const accessible = rows
@@ -1001,33 +1050,46 @@ export const importValues = action({
     // interleaved version had.
     for (const entry of entries) existingByKey.delete(entry.key);
 
+    // Creates go out as ONE batch. Calling the per-variable create mutation in
+    // a loop charges variableCreate once per row, and that bucket holds 30, so
+    // a 48-variable import used to fail from the 31st key on while the first
+    // 30 landed. One reserve plus one transaction also means the import cannot
+    // leave the project half-populated.
+    const creates = ops.flatMap((op) =>
+      op.kind === "create"
+        ? [
+            {
+              key: op.key,
+              vaultRef: op.vaultRef,
+              environments: [args.environment],
+              isSensitive: false,
+            },
+          ]
+        : []
+    );
+
+    const createdBy = await ctx.runMutation(
+      internal.features.variables.mutations.reserveBatchCreate,
+      { projectId: args.projectId, count: creates.length }
+    );
+
+    if (creates.length > 0) {
+      await ctx.runMutation(internal.features.variables.mutations.createMany, {
+        projectId: args.projectId,
+        createdBy,
+        variables: creates,
+      });
+      created += creates.length;
+    }
+
     for (const op of ops) {
-      switch (op.kind) {
-        case "update":
-          await ctx.runMutation(api.features.variables.mutations.update, {
-            variableId: op.variableId,
-            vaultRef: op.vaultRef,
-            changeReason: args.changeReason,
-          });
-          updated++;
-          break;
-        case "create":
-          await ctx.runMutation(api.features.variables.mutations.create, {
-            key: op.key,
-            vaultRef: op.vaultRef,
-            environments: [args.environment],
-            projectId: args.projectId,
-            isSensitive: false,
-          });
-          created++;
-          break;
-        case "unchanged":
-          break;
-        default: {
-          const _exhaustive: never = op;
-          return _exhaustive;
-        }
-      }
+      if (op.kind !== "update") continue;
+      await ctx.runMutation(api.features.variables.mutations.update, {
+        variableId: op.variableId,
+        vaultRef: op.vaultRef,
+        changeReason: args.changeReason,
+      });
+      updated++;
     }
 
     if (args.mode === "replace") {

@@ -71,3 +71,8 @@ apps/web/tests/e2e/.auth/
 
 .firecrawl/
 claude_html/
+
+# Sandbox build values for the CLI / extension. Never committed: it is the one
+# file that decides which deployment a local build talks to.
+apps/cli/scripts/sandbox.env
+apps/vscode-extension/scripts/sandbox.env

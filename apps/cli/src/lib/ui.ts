@@ -252,3 +252,30 @@ export function projectRoleNotice(role: string | null | undefined): void {
     );
   }
 }
+
+/**
+ * Build picker rows for a project list.
+ *
+ * The name alone, because `icon` holds an identifier like "framework:t3" and
+ * printing it produced rows reading "framework:t3 hello-2". Only slug is
+ * unique per organization though, so when two projects share a name the slug
+ * is appended dimmed. Without that the picker shows two identical rows and
+ * there is no way to tell which one you are choosing.
+ */
+export function projectChoices<
+  T extends { _id: string; name: string; slug?: string },
+>(projects: readonly T[]): Array<{ name: string; value: string }> {
+  const seen = new Map<string, number>();
+  for (const project of projects) {
+    const key = project.name || project.slug || project._id;
+    seen.set(key, (seen.get(key) ?? 0) + 1);
+  }
+  return projects.map((project) => {
+    const label = project.name || project.slug || project._id;
+    const ambiguous = (seen.get(label) ?? 0) > 1 && project.slug;
+    return {
+      name: ambiguous ? `${label} ${chalk.dim(project.slug)}` : label,
+      value: project._id,
+    };
+  });
+}

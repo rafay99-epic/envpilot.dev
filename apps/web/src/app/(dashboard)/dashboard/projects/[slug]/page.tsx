@@ -301,7 +301,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     setShowBulkDeleteConfirm(false);
   };
 
-  const handleCreateVariable = async (data: VariableFormData) => {
+  const handleCreateVariable = async (
+    data: VariableFormData,
+    options?: { silent?: boolean }
+  ) => {
     if (!projectId) return;
     try {
       const result = await createVariable.mutateAsync({
@@ -315,10 +318,14 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         tagIds: data.tagIds,
       });
 
-      if (result.requested) {
-        toast.success("Variable request submitted for admin approval.");
-      } else {
-        toast.success("Variable created successfully.");
+      // A bulk paste reports its own single summary, so per-variable toasts
+      // would stack one per entry behind it.
+      if (!options?.silent) {
+        toast.success(
+          result.requested
+            ? "Variable request submitted for admin approval."
+            : "Variable created successfully."
+        );
       }
     } catch (err) {
       // Convex redacts plain Error messages to "Server Error" in production,
@@ -340,9 +347,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         },
         err
       );
-      toast.error(message);
+      if (!options?.silent) toast.error(message);
       // Re-throw with the friendly message — the create drawer's form shows
-      // err.message in its inline banner, never the raw backend text.
+      // err.message in its inline banner, never the raw backend text. A silent
+      // caller still needs the throw: that is how it counts the failure.
       throw new Error(message);
     }
   };

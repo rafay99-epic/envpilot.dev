@@ -16,7 +16,15 @@ import { useOrganizationTags, useCreateTag } from "@/hooks";
 interface VariableCreateDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (data: VariableFormData) => Promise<void>;
+  /**
+   * `silent` suppresses the caller's own per-variable toast. A bulk paste
+   * calls this once per entry, so without it 16 failures meant 16 toasts on
+   * top of the one summary. The caller still logs and still throws.
+   */
+  onCreate: (
+    data: VariableFormData,
+    options?: { silent?: boolean }
+  ) => Promise<void>;
   organizationId?: string;
   projectId?: string;
   title?: string;
@@ -82,9 +90,16 @@ export function VariableCreateDrawer({
   async function handleBulkSubmit(entries: VariableFormData[]) {
     const failures: Array<{ key: string; error: string }> = [];
 
+    // Sequential on purpose. Firing these concurrently is what the rule
+    // suggests and is exactly wrong here: each create writes to the vault and
+    // spends from the per-variable rate bucket, so a parallel fan-out of a
+    // pasted 48-key block is the throttle this whole change exists to remove.
+    // The pooled server paths serialize their first write for the same reason
+    // (vault key derivation races on a cold project).
     for (const entry of entries) {
       try {
-        await onCreate(entry);
+        // react-doctor-disable-next-line react-doctor/async-await-in-loop
+        await onCreate(entry, { silent: true });
       } catch (err) {
         failures.push({
           key: entry.key,
@@ -107,19 +122,33 @@ export function VariableCreateDrawer({
     // ran the same test twice per entry to answer both halves of it.
     const isDuplicate = /already exists/i;
     const duplicateKeys: string[] = [];
-    const otherFailures: typeof failures = [];
+    // Group the rest BY MESSAGE. Pasting 48 variables and hitting one server
+    // condition used to print that same condition 48 times, joined with " · ",
+    // which is how a single throttle became an unreadable wall of identical
+    // text. One line per distinct cause, with the keys it hit.
+    const byMessage = new Map<string, string[]>();
     for (const failure of failures) {
-      if (isDuplicate.test(failure.error)) duplicateKeys.push(failure.key);
-      else otherFailures.push(failure);
+      if (isDuplicate.test(failure.error)) {
+        duplicateKeys.push(failure.key);
+        continue;
+      }
+      const keys = byMessage.get(failure.error);
+      if (keys) keys.push(failure.key);
+      else byMessage.set(failure.error, [failure.key]);
     }
+
     const parts: string[] = [];
     if (duplicateKeys.length > 0) {
       parts.push(
-        `Already exist in the selected environment(s): ${duplicateKeys.join(", ")} — the same key is allowed in a different environment`
+        `Already exist in the selected environment(s): ${summarizeKeys(duplicateKeys)} — the same key is allowed in a different environment`
       );
     }
-    for (const f of otherFailures) {
-      parts.push(`${f.key}: ${f.error}`);
+    for (const [message, keys] of byMessage) {
+      parts.push(
+        keys.length === 1
+          ? `${keys[0]}: ${message}`
+          : `${message} (${keys.length} variables: ${summarizeKeys(keys)})`
+      );
     }
 
     toast.error(
@@ -223,4 +252,13 @@ export function VariableCreateDrawer({
       )}
     </DrawerPanel>
   );
+}
+
+/**
+ * Keys as a readable list. A bulk paste can fail on dozens at once, and a
+ * toast that prints every one of them is the wall this replaces.
+ */
+function summarizeKeys(keys: readonly string[]): string {
+  const shown = keys.slice(0, 5).join(", ");
+  return keys.length > 5 ? `${shown}, +${keys.length - 5} more` : shown;
 }

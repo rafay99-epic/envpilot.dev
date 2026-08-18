@@ -103,3 +103,32 @@ describe("parseEnvFile — audit edge cases", () => {
     expect(parseEnvFile('KEY="value" # comment')).toEqual({ KEY: "value" });
   });
 });
+
+describe("value escaping round-trip", () => {
+  // A .env written by `pull` must read back byte-identical. These are the
+  // shapes that used to come back corrupted.
+  const cases: Array<[string, string]> = [
+    ["windows path", "C:\\nope\\path"],
+    ["literal backslash-n beside a space", "a \\n b"],
+    ["json containing escapes", '{"re": "\\\\d+"}'],
+    ["real newline", "line1\nline2"],
+    ["quotes inside", 'say "hello"'],
+    ["hash and space", "value # not a comment"],
+    ["tab", "a\tb"],
+    ["trailing space", "padded "],
+    ["single quotes", "it's fine"],
+    ["empty", ""],
+    ["private key shape", "-----BEGIN KEY-----\nabc+/=\n-----END KEY-----"],
+  ];
+
+  for (const [name, value] of cases) {
+    it(`round-trips ${name}`, () => {
+      const text = stringifyEnv({ K: value });
+      expect(parseEnvFile(text).K).toBe(value);
+    });
+  }
+
+  it("still drops a genuine inline comment after a quoted value", () => {
+    expect(parseEnvFile('K="value" # a real comment\n').K).toBe("value");
+  });
+});

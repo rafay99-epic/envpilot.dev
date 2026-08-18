@@ -53,6 +53,45 @@ export function parseEnvFile(content: string): Record<string, string> {
 }
 
 /**
+ * Index of the quote that closes a double-quoted value, or -1.
+ *
+ * Must skip escaped quotes. Scanning with indexOf stops at the `"` inside
+ * `{\"re\": \"x\"}` and truncates the value to a couple of characters.
+ */
+function findClosingDoubleQuote(value: string): number {
+  for (let i = 1; i < value.length; i++) {
+    const char = value[i];
+    if (char === "\\") {
+      i++; // Skip whatever this escapes, including a quote.
+      continue;
+    }
+    if (char === '"') return i;
+  }
+  return -1;
+}
+
+/**
+ * Unescape a double-quoted body in ONE pass.
+ *
+ * Chained replaces cannot do this: running \\n -> newline before \\\\ -> \\ turns the
+ * literal two-character sequence backslash-n into a real newline, so a value
+ * like a Windows path or a JSON regex comes back corrupted.
+ */
+function unescapeDoubleQuoted(inner: string): string {
+  let out = "";
+  for (let i = 0; i < inner.length; i++) {
+    if (inner[i] !== "\\" || i === inner.length - 1) {
+      out += inner[i];
+      continue;
+    }
+    const next = inner[++i];
+    out +=
+      next === "n" ? "\n" : next === "r" ? "\r" : next === "t" ? "\t" : next; // covers \" and \\, and leaves any other escape literal
+  }
+  return out;
+}
+
+/**
  * Parse a value, handling quotes and escapes
  */
 function parseValue(value: string): string {
@@ -64,18 +103,11 @@ function parseValue(value: string): string {
   // single quotes are literal.
   const quote = value[0];
   if (quote === '"' || quote === "'") {
-    const closingIndex = value.indexOf(quote, 1);
+    const closingIndex =
+      quote === '"' ? findClosingDoubleQuote(value) : value.indexOf(quote, 1);
     if (closingIndex !== -1) {
       const inner = value.slice(1, closingIndex);
-      if (quote === '"') {
-        return inner
-          .replace(/\\n/g, "\n")
-          .replace(/\\r/g, "\r")
-          .replace(/\\t/g, "\t")
-          .replace(/\\"/g, '"')
-          .replace(/\\\\/g, "\\");
-      }
-      return inner;
+      return quote === '"' ? unescapeDoubleQuoted(inner) : inner;
     }
     // No closing quote — fall through and treat as an unquoted value.
   }
@@ -139,6 +171,10 @@ function formatValue(value: string): string {
   const needsQuotes =
     value.includes("\n") ||
     value.includes("\r") ||
+    value.includes("\t") ||
+    // A bare backslash survives our own round trip but is eaten by `source`
+    // and by docker --env-file, so always take the escaped path for it.
+    value.includes("\\") ||
     value.includes('"') ||
     value.includes("'") ||
     value.includes(" ") ||

@@ -1,0 +1,150 @@
+---
+title: "The Error Names the Process That Noticed, Not the One That Broke"
+description: "Four bugs in one afternoon of debugging envpilot run, and every single error message pointed at innocent software. What we measured instead, and the NODE_OPTIONS trick that turned out to fix the whole class of problem."
+date: "2026-08-19"
+tags: ["engineering", "cli"]
+keywords:
+  [
+    "turborepo strict env mode",
+    "environment variables missing",
+    "node_options require",
+    "secret injection cli",
+    "debugging environment variables",
+  ]
+author:
+  name: "Abdul Rafay"
+---
+
+`envpilot run -- bun run dev` is supposed to be simple. Fetch the project's secrets, put them in the environment, start the command. No `.env` on disk, nothing to leak, nothing to forget to rotate.
+
+It did not work. Over an afternoon it failed four separate ways, and every error message named software that was behaving perfectly.
+
+## Report one: the file we do not write
+
+> When I run `envpilot run` in prod it creates a `.env.local` containing only Convex variables. Why does the app do this?
+
+The first thing to check is whether we do that at all. We do not:
+
+```bash
+$ grep -rn "\.env\.local" apps/cli/src/
+lib/env-file.ts:273         # getDefaultEnvPath, used by pull
+lib/env-file.ts:284         # getEnvPathForEnvironment
+lib/project-config.ts:348   # gitignore seeding
+lib/format-converter.ts:122 # pull --format default filename
+commands/run.ts: no matches
+```
+
+`run` injects into the child process in memory and stops there. So something else wrote that file, and the contents name the culprit: `CONVEX_DEPLOYMENT` and `NEXT_PUBLIC_CONVEX_URL` are what the Convex CLI writes into `.env.local` when it starts, creating the file if it is missing.
+
+The developer had deleted `.env.local` on the reasonable theory that `envpilot run` made it unnecessary. `convex dev` recreated it with exactly two keys. Nothing was broken. The file was just younger and emptier than it looked.
+
+## Report two: the variable that was definitely there
+
+> `WORKOS_COOKIE_PASSWORD` is in the dashboard, `envpilot run` injects it, and the dev command says nope and breaks.
+
+Both halves of that sentence were true, which is what made it interesting.
+
+The first answer we reached for was "your Turborepo config filters it, add `passThroughEnv`." That answer is defensible and it is also a bad answer, because it makes the user responsible for a failure they had no way to anticipate. It also only fixes one repository. So before writing it down, we measured.
+
+A throwaway monorepo, one task, one leaf process that prints what it can see:
+
+```
+turbo 2.8.14, task declares no env key, parent exports all of these
+
+WORKOS_COOKIE_PASSWORD   stripped
+NEXT_PUBLIC_CONVEX_URL   PASSED
+NODE_OPTIONS             PASSED
+ENVPILOT_RUN_ID          stripped
+ENVPILOT_MOUNT           stripped
+PATH  HOME  SHELL  LANG  PASSED
+TERM  NODE_ENV  CI  TMPDIR  stripped
+total env keys visible: 38
+```
+
+Turborepo 2.0 made strict environment mode the default. A task receives only what `env`, `globalEnv` or `passThroughEnv` names. The repository's `dev` task named nothing, so nothing survived. That much we expected.
+
+The second line is the one that mattered twice.
+
+`NEXT_PUBLIC_CONVEX_URL` **passes**. So the developer's description was not approximately right, it was exactly right: the only variables reaching the app really were the Convex ones. We had been about to tell them their wording was loose. It was not.
+
+And `NODE_OPTIONS` passes, because tooling needs it to. That is a channel into the leaf process that the filter does not close.
+
+## What the maintainers already knew
+
+The pull request that made strict mode the default says this in its own description:
+
+> This isn't foolproof, since the app/package could gracefully handle the missing variable.
+
+They shipped knowing the residual risk was silent degradation, and that is precisely what happened. An app that reads `process.env.WORKOS_COOKIE_PASSWORD` and gets `undefined` does not announce it. It fails later, somewhere unrelated, in a stack trace that names neither Turborepo nor the secrets tool.
+
+That reframes the problem. Delivering secrets by process inheritance is not unreliable because of a bug. It is unreliable because inheritance is a lossy channel that anything in the middle can sever, and `sudo`, `docker`, `ssh` and systemd all sever it too. A tool whose one delivery mechanism `sudo` can silently break is not a tool you should trust with your production configuration.
+
+## Riding the channel that survives
+
+Doppler solved the file-shaped version of this years ago by mounting secrets as a named pipe. 1Password's forums are full of people asking why `op run -- echo $token` prints nothing. Everyone in this category eventually concludes that one channel is not enough.
+
+Ours came from that second measured line. `NODE_OPTIONS` survives the filter, and `NODE_OPTIONS` can carry `--require`. So:
+
+1. Serve the resolved secrets over a named pipe, which has no backing store, so nothing is written to disk.
+2. Write a tiny CommonJS shim into a private temp directory, with the pipe's path baked into its source.
+3. Pass `NODE_OPTIONS=--require /path/to/shim.cjs`.
+
+The shim loads inside the leaf process, before the application's first line, reads the pipe, and fills in any variable that is `undefined`. Measured end to end through real Turborepo:
+
+```
+--- without the shim ---
+WORKOS_COOKIE_PASSWORD   <MISSING>
+POLAR_ACCESS_TOKEN       <MISSING>
+
+--- with the shim ---
+WORKOS_COOKIE_PASSWORD   cookie-pw-from-vault
+POLAR_ACCESS_TOKEN       polar-tok-from-vault
+```
+
+No change to `turbo.json`. No change to the application. It only fills variables that are missing, so a deliberate override upstream still wins, and it fails open on any read error, because a broken pipe must never be the reason a server will not boot.
+
+Two details cost real time. `fs.openSync(fifo, "w")` **deadlocks the process**: opening a pipe for writing blocks until a reader arrives, and that blocks the event loop that would have served it. The stream API opens on the threadpool and works. And the payload carries a terminator line, because two children can open the same pipe at once and split one payload between them, and a child that silently boots with half its configuration is worse than one that boots with none.
+
+## The honest limit
+
+No channel is universal. The shim needs a Node process and needs `NODE_OPTIONS` itself to survive, which it does not inside Docker. So the promise cannot be "your secrets always arrive."
+
+The promise we can keep is: **if they do not arrive, the tool stops and tells you which ones and why.** `envpilot run` now refuses to spawn when a variable failed to decrypt or a required key is missing, and a companion `envpilot doctor` statically scans the repository for wrappers that filter the environment. Pointed at the repository this all started in:
+
+```
+Delivery
+  warn  Turbo passes the environment through
+        envMode strict filters injected variables out of 6 tasks:
+        dev, lint, typecheck, test, test:unit, test:e2e
+```
+
+That is the original bug, found without a login, without a network call, and without anyone having to already suspect Turborepo.
+
+## Report three, which was ours
+
+With all of that shipped, the command still died:
+
+```
+[convex] convex dev exited with code 1
+```
+
+Convex was fine. Local CLI builds run inside a sandbox so a development build can never read or overwrite the production login, and that sandbox worked by pointing `HOME` at a throwaway directory, because that is where the config library looks for its file.
+
+`HOME` is inherited by every child process. `convex dev` went looking for its own credentials in `~/.convex` inside a directory that had never held them, and exited. Every tool that keeps state in a home directory would have failed the same way.
+
+The isolation was correct in intent and far too blunt in mechanism. The CLI now reads `ENVPILOT_CONFIG_DIR`, which moves only its own accounts and cache, so children keep the real home and the production login stays exactly as unreachable as before.
+
+## The pattern
+
+Four failures. In every one, the error named the process that noticed the problem rather than the one that caused it.
+
+| The error said                          | The cause was                               |
+| --------------------------------------- | ------------------------------------------- |
+| `envpilot run` wrote a bad `.env.local` | `convex dev` wrote it, `run` writes nothing |
+| `WORKOS_COOKIE_PASSWORD` is missing     | Turborepo stripped it two levels up         |
+| `convex: command not found`             | dependencies were never installed           |
+| `convex dev exited with code 1`         | our sandbox moved its home directory        |
+
+Environment variables make this worse than most subjects, because the failure mode is absence. A wrong value throws something you can read. A missing one is `undefined`, and `undefined` is indistinguishable from "not configured yet" to every piece of code that receives it. The gap between the process that dropped the variable and the process that noticed can be three levels of tooling and several seconds.
+
+Which is the actual lesson, and it is duller than the `NODE_OPTIONS` trick: read the error, then go and measure the thing it is accusing before you believe it. Half an hour building a throwaway repository to print `process.env` produced the one line that solved the whole problem, and no amount of reading documentation would have surfaced it, because the documentation does not list what strict mode lets through.

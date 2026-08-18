@@ -313,6 +313,42 @@ export const create = mutation({
 });
 
 /**
+ * Charge the batch-create budget once for a bulk write, and hand back the
+ * actor so the caller can pass it to `createMany`.
+ *
+ * Bulk paths that create variables one call at a time charge `variableCreate`
+ * per row, which is why a 48-variable import died on the 31st: the bucket
+ * holds 30. Actions cannot resolve the caller or touch the limiter directly,
+ * so they reserve through here first. Same explicit-reserve shape
+ * `startFromTemplate` uses; keeping it explicit means every bulk entry point
+ * is greppable rather than relying on a hidden charge somewhere downstream.
+ */
+export const reserveBatchCreate = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    count: v.number(),
+  },
+  returns: v.id("users"),
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      throw new ConvexError("Project not found");
+    }
+    // A push that only updates existing rows creates nothing, so it should not
+    // spend create budget.
+    if (args.count > 0) {
+      await rateLimiter.limit(ctx, "variableBatchCreate", {
+        key: project.organizationId,
+        count: args.count,
+        throws: true,
+      });
+    }
+    return actor._id;
+  },
+});
+
+/**
  * Persist a whole batch of already-encrypted variables in ONE transaction.
  *
  * Every row, its version row, its creator grant and its audit entry either all

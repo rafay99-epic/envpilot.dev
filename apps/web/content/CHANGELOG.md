@@ -15,6 +15,56 @@
 
 <!-- entry -->
 ---
+title: A Sandbox That Only Sandboxed What It Meant To
+version: v1.22.2
+date: 2026-08-19
+types: [fix]
+---
+
+`envpilot run -- bun run dev` started the command, injected all 48 variables, and then watched the dev server die on `convex: command not found` and, once that was resolved, `convex dev exited with code 1`. The secrets were never the problem. The isolation around them was.
+
+### The CLI Config Moved, Not Your Home Directory
+
+Local builds run through a sandbox so a development CLI can never read or overwrite the production login. It did that by pointing `HOME` at a throwaway directory, because that is where the config library looks.
+
+`HOME` is inherited by every child process. So the command `run` spawned inherited it too, and `convex dev` went looking for its own credentials in `~/.convex` inside a directory that had never held them. It exited 1. Anything else that keeps state in a home directory (git, ssh, tool caches) would have failed the same way, for the same reason, with an error naming a tool that was working perfectly.
+
+The CLI now understands `ENVPILOT_CONFIG_DIR`, which moves only its own accounts and run cache. The sandbox sets that instead, so a child process keeps the real home and the production login stays just as unreachable. The variable is useful outside the sandbox too: CI can hold a separate login without touching `HOME` either.
+
+### Project Names in the Project Picker
+
+`envpilot init` and `envpilot switch` printed the stored icon identifier beside each project, so the list read `framework:t3 hello-2` and `folder hello5` and `globe hello`. It shows the name now. Where two projects in one organization share a name, and only slugs are unique, the slug is appended dimmed so the rows stay distinguishable.
+
+<!-- entry -->
+---
+title: Importing a Real .env File
+version: v1.65.1
+date: 2026-08-19
+types: [fix]
+---
+
+Importing a 48-variable `.env` failed from the 31st key onward and reported it as sixteen copies of a JSON blob with a stack trace attached. Three separate defects, all fixed.
+
+### One Reservation Per Import, Not One Per Variable
+
+The import path created variables one call at a time, and each call spent from a bucket holding thirty per minute. A file with more than thirty new keys therefore imported partially and failed loudly on the rest, which is exactly what the rate limit was never meant to do: throttle a single legitimate action.
+
+Imports, `envpilot push` and project templates now reserve their whole budget once and write through a single transaction. An import either lands completely or not at all, so the project can no longer come up half-populated. The same batch path already existed for templates; the import and push paths simply were not using it.
+
+The per-variable bucket has also been raised, since it now only ever sees someone adding variables by hand in the dashboard: 60 a minute, with a burst of 120.
+
+### Errors People Can Read
+
+A throttled write surfaced as `{"kind":"RateLimited","name":"variableCreate","retryAfter":396.0000000000207}` followed by a `node_modules` stack. Two reasons: the sanitizer only unwrapped string payloads, and its stack-stripping pattern did not match the `at async handler (...)` frames a Convex action produces.
+
+Both are fixed, so that becomes one sentence with a retry time. Bulk paste also groups failures by cause instead of repeating the same message once per key, and no longer fires a toast per variable on top of its own summary. Sixteen identical lines collapse to one that names the cause and counts the keys.
+
+### Project Picker Shows Project Names
+
+`envpilot init` and `envpilot switch` rendered the stored icon identifier next to each project, so the list read `framework:t3 hello-2` and `folder hello5`. It now shows the name, with the slug appended only when two projects in the same organization share one.
+
+<!-- entry -->
+---
 title: Clearing Out What No Longer Runs
 version: v1.12.0
 date: 2026-08-19

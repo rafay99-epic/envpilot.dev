@@ -2,11 +2,13 @@ import {
   readFileSync,
   writeFileSync,
   existsSync,
+  statSync,
   unlinkSync,
   renameSync,
 } from "node:fs";
 import { execSync } from "node:child_process";
-import { join } from "node:path";
+import { homedir } from "node:os";
+import { join, dirname, parse as parsePath } from "node:path";
 import {
   projectConfigSchema,
   projectConfigV2Schema,
@@ -40,19 +42,63 @@ function atomicWriteFileSync(filePath: string, content: string): void {
 }
 
 /**
- * Get the path to the project config file
+ * Find the nearest .envpilot at or above `directory`.
+ *
+ * git, npm and dotenv all walk up; only this did not, so `cd apps/web &&
+ * envpilot run` failed with "not initialized" in the exact monorepo layout
+ * this tool exists to serve.
+ *
+ * The walk is BOUNDED at the repository root and at the home directory. An
+ * unbounded walk reaches ~/.envpilot, and a single stray file there would
+ * silently bind every project on the machine to one link. Stopping at the
+ * repo root also keeps the answer stable regardless of where the repo is
+ * checked out.
+ *
+ * Returns the DIRECTORY holding the config, or null when there is none.
+ */
+function isConfigFile(path: string): boolean {
+  // Must be a FILE. The VS Code extension keeps its session state in a
+  // DIRECTORY called ~/.envpilot, and an existsSync check happily matches it,
+  // which would make the walk stop somewhere that holds no project link.
+  return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
+}
+
+export function findProjectConfigDir(
+  directory: string = process.cwd()
+): string | null {
+  const { root } = parsePath(directory);
+  const home = homedir();
+  let current = directory;
+  for (;;) {
+    if (isConfigFile(join(current, CONFIG_FILE_NAME))) return current;
+    // The repo root is the last directory worth checking: a config above it
+    // belongs to some other project, or to nobody.
+    if (existsSync(join(current, ".git"))) return null;
+    if (current === root || current === home) return null;
+    const parent = dirname(current);
+    // dirname() is a fixed point at the root on every platform; guard against
+    // it so a malformed path cannot spin here forever.
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
+/**
+ * Get the path to the project config file, searching upwards from
+ * `directory`. Falls back to `directory` itself when no config exists, so
+ * callers that WRITE a new config still get a sensible path.
  */
 export function getProjectConfigPath(
   directory: string = process.cwd()
 ): string {
-  return join(directory, CONFIG_FILE_NAME);
+  return join(findProjectConfigDir(directory) ?? directory, CONFIG_FILE_NAME);
 }
 
 /**
- * Check if a project config file exists
+ * Check if a project config file exists at or above `directory`.
  */
 export function hasProjectConfig(directory: string = process.cwd()): boolean {
-  return existsSync(getProjectConfigPath(directory));
+  return findProjectConfigDir(directory) !== null;
 }
 
 // ── V2 Read / Write ──────────────────────────────────────────────────
