@@ -88,7 +88,6 @@ export function MarketingShell({
       navLinks={NAV_LINKS}
       navActions={<PublicHeaderButtons />}
       footerColumns={FOOTER_COLUMNS}
-      statusUrl="/api/status"
     >
       {children}
     </UIMarketingShell>

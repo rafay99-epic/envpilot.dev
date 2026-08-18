@@ -15,14 +15,12 @@ export function MarketingShell({
   navLinks,
   navActions,
   footerColumns,
-  statusUrl,
 }: {
   children: ReactNode;
   className?: string;
   navLinks: NavLink[];
   navActions?: ReactNode;
   footerColumns: FooterColumn[];
-  statusUrl?: string;
 }) {
   return (
     <div
@@ -30,7 +28,7 @@ export function MarketingShell({
     >
       <MarketingNav links={navLinks} actions={navActions} />
       <main className="relative pt-16">{children}</main>
-      <MarketingFooter columns={footerColumns} statusUrl={statusUrl} />
+      <MarketingFooter columns={footerColumns} />
     </div>
   );
 }

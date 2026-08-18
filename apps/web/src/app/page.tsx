@@ -6,7 +6,7 @@ import { api } from "@convex/_generated/api";
 import type { PricingData } from "@/components/pricing/PricingContent";
 import { FAQ_ITEMS } from "@/components/landing/faq-data";
 
-export const revalidate = 300; // refresh pricing data every 5 minutes
+export const revalidate = 3600; // pricing changes on the order of months
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },

@@ -81,17 +81,6 @@ crons.interval(
   internal.features.docs.shareCleanup.cleanupExpiredDocShares
 );
 
-// Auto-publish scheduled changelog entries hourly. A marketing changelog
-// entry going live up to ~55 minutes after its scheduledFor timestamp has
-// no user-facing consequence — publishedAt is still set to the original
-// scheduledFor value (see changelog.ts), so displayed ordering/dates are
-// unaffected by the coarser cadence.
-crons.interval(
-  "publish scheduled changelog entries",
-  { hours: 1 },
-  internal.features.community.changelog.publish.publishScheduledEntries
-);
-
 // Clean up acknowledged membership tombstones (exit notices) after 30 days
 crons.daily(
   "cleanup membership tombstones",

@@ -1,20 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { usePaginatedQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
 import { terminal } from "@/components/marketing";
 import { useTimeZone } from "@/hooks/useTimeZone";
 import { formatDate } from "@/lib/format";
-
-type ChangelogType =
-  | "feature"
-  | "fix"
-  | "improvement"
-  | "security"
-  | "breaking";
+import { CHANGELOG_TYPES, type ChangelogType } from "@/lib/changelog-schema";
 
 /**
  * Brand palette is locked to green / amber / zinc:
@@ -56,54 +46,40 @@ const TYPE_CONFIG: Record<
   },
 };
 
-const ALL_TYPES: ChangelogType[] = [
-  "feature",
-  "fix",
-  "improvement",
-  "security",
-  "breaking",
-];
-
-export interface ChangelogEntry {
-  _id: string;
-  title: string;
-  content: string;
-  version: string;
-  type: string;
-  types?: string[];
-  publishedAt?: number;
-  createdAt: number;
-}
-
 export const CHANGELOG_PAGE_SIZE = 10;
 
+/**
+ * One rendered entry. `body` arrives already compiled by the server through
+ * the shared docs MDX pipeline, so this component never parses markdown.
+ */
+export interface RenderedChangelogEntry {
+  id: string;
+  version: string;
+  title: string;
+  publishedAt: number;
+  types: ChangelogType[];
+  body: React.ReactNode;
+}
+
 export function ChangelogContent({
-  initialEntries,
+  entries,
 }: {
-  initialEntries: ChangelogEntry[];
+  entries: RenderedChangelogEntry[];
 }) {
   const [selectedType, setSelectedType] = useState<ChangelogType | null>(null);
-
-  const { results, status, loadMore } = usePaginatedQuery(
-    api.features.community.changelog.queries.listPublishedPaginated,
-    {},
-    { initialNumItems: CHANGELOG_PAGE_SIZE }
-  );
-
-  // The server rendered the first page for SEO and first paint; the client
-  // query takes over as soon as it has anything.
-  const entries: ChangelogEntry[] =
-    results.length > 0 ? (results as ChangelogEntry[]) : initialEntries;
+  const [visibleCount, setVisibleCount] = useState(CHANGELOG_PAGE_SIZE);
 
   const filteredEntries = selectedType
-    ? entries.filter((entry) => {
-        const entryTypes = entry.types ?? [entry.type];
-        return entryTypes.includes(selectedType);
-      })
+    ? entries.filter((entry) => entry.types.includes(selectedType))
     : entries;
 
-  const canLoadMore = status === "CanLoadMore";
-  const isLoadingMore = status === "LoadingMore";
+  const visibleEntries = filteredEntries.slice(0, visibleCount);
+  const canLoadMore = visibleCount < filteredEntries.length;
+
+  function selectType(type: ChangelogType | null) {
+    setSelectedType(type);
+    setVisibleCount(CHANGELOG_PAGE_SIZE);
+  }
 
   return (
     <>
@@ -114,17 +90,17 @@ export function ChangelogContent({
         </span>
         <FilterPill
           active={selectedType === null}
-          onClick={() => setSelectedType(null)}
+          onClick={() => selectType(null)}
         >
           all
         </FilterPill>
-        {ALL_TYPES.map((type) => {
+        {CHANGELOG_TYPES.map((type) => {
           const config = TYPE_CONFIG[type];
           return (
             <FilterPill
               key={type}
               active={selectedType === type}
-              onClick={() => setSelectedType(type)}
+              onClick={() => selectType(type)}
             >
               <span className="text-accent">{config.prefix}</span>{" "}
               {config.label}
@@ -135,7 +111,7 @@ export function ChangelogContent({
 
       {/* Timeline */}
       <div className="mt-12">
-        {filteredEntries.length > 0 ? (
+        {visibleEntries.length > 0 ? (
           <div className="relative">
             {/* Left rail */}
             <div
@@ -144,16 +120,8 @@ export function ChangelogContent({
             />
 
             <div className="space-y-8">
-              {filteredEntries.map((entry) => (
-                <ChangelogEntryCard
-                  key={entry._id}
-                  title={entry.title}
-                  content={entry.content}
-                  version={entry.version}
-                  type={entry.type as ChangelogType}
-                  types={(entry.types ?? [entry.type]) as ChangelogType[]}
-                  publishedAt={entry.publishedAt ?? entry.createdAt}
-                />
+              {visibleEntries.map((entry) => (
+                <ChangelogEntryCard key={entry.id} entry={entry} />
               ))}
             </div>
           </div>
@@ -165,25 +133,22 @@ export function ChangelogContent({
             </p>
             <p className="mt-2 font-sans text-[15px] text-ink-muted">
               {selectedType
-                ? `No ${TYPE_CONFIG[selectedType].label} updates in the entries loaded so far.`
+                ? `No ${TYPE_CONFIG[selectedType].label} updates yet.`
                 : "No updates yet. Check back soon."}
             </p>
           </div>
         )}
 
-        {/* Paging — a filter narrows what is loaded, so the button stays
-            reachable while filtered. */}
         <div className="mt-10 flex flex-col items-center gap-2">
-          {canLoadMore || isLoadingMore ? (
+          {canLoadMore ? (
             <button
-              onClick={() => loadMore(CHANGELOG_PAGE_SIZE)}
-              disabled={isLoadingMore}
-              className="rounded-md px-5 py-2.5 font-sans text-[15px] text-ink-muted ring-1 ring-line transition-colors hover:text-ink hover:ring-line-strong disabled:opacity-50"
+              onClick={() => setVisibleCount((n) => n + CHANGELOG_PAGE_SIZE)}
+              className="rounded-md px-5 py-2.5 font-sans text-[15px] text-ink-muted ring-1 ring-line transition-colors hover:text-ink hover:ring-line-strong"
             >
-              {isLoadingMore ? "Loading…" : "Load more"}
+              Load more
             </button>
           ) : (
-            status === "Exhausted" && (
+            filteredEntries.length > 0 && (
               <p className={`${terminal.mono} text-[12px] text-ink-faint`}>
                 # end of changelog
               </p>
@@ -191,8 +156,8 @@ export function ChangelogContent({
           )}
           <p className={`${terminal.mono} text-[11px] text-ink-faint`}>
             {selectedType
-              ? `${filteredEntries.length} of ${entries.length} loaded entries match`
-              : `${entries.length} entries loaded`}
+              ? `${filteredEntries.length} of ${entries.length} entries match`
+              : `${entries.length} entries`}
           </p>
         </div>
       </div>
@@ -223,28 +188,13 @@ function FilterPill({
   );
 }
 
-function ChangelogEntryCard({
-  title,
-  content,
-  version,
-  type,
-  types,
-  publishedAt,
-}: {
-  title: string;
-  content: string;
-  version: string;
-  type: ChangelogType;
-  types?: ChangelogType[];
-  publishedAt: number;
-}) {
-  const entryTypes = types ?? [type];
-  const primaryConfig = TYPE_CONFIG[entryTypes[0]];
+function ChangelogEntryCard({ entry }: { entry: RenderedChangelogEntry }) {
+  const primaryConfig = TYPE_CONFIG[entry.types[0]];
   const timeZone = useTimeZone();
-  const formattedDate = formatDate(publishedAt, timeZone);
+  const formattedDate = formatDate(entry.publishedAt, timeZone);
 
   return (
-    <article className="group relative md:pl-10">
+    <article id={entry.id} className="group relative scroll-mt-24 md:pl-10">
       {/* Timeline node */}
       <span
         aria-hidden
@@ -258,11 +208,13 @@ function ChangelogEntryCard({
         <div
           className={`flex flex-wrap items-center gap-3 ${terminal.mono} text-[11px]`}
         >
-          <span className="text-ink-muted">v{version.replace(/^v/i, "")}</span>
-          {entryTypes.map((t) => {
-            const cfg = TYPE_CONFIG[t];
+          <span className="text-ink-muted">
+            v{entry.version.replace(/^v/i, "")}
+          </span>
+          {entry.types.map((type) => {
+            const cfg = TYPE_CONFIG[type];
             return (
-              <span key={t} className={`rounded px-2 py-0.5 ${cfg.badge}`}>
+              <span key={type} className={`rounded px-2 py-0.5 ${cfg.badge}`}>
                 {cfg.prefix} {cfg.label}
               </span>
             );
@@ -275,13 +227,11 @@ function ChangelogEntryCard({
           <span aria-hidden className="mt-0.5 font-mono text-accent">
             ❯
           </span>
-          {title}
+          {entry.title}
         </h2>
 
-        {/* Markdown Content */}
-        <div className="mt-4 font-sans text-[15px] leading-relaxed text-ink-muted [&_a]:text-accent [&_a]:hover:underline [&_code]:rounded [&_code]:bg-surface-raised [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[13px] [&_code]:text-accent [&_h3]:mt-4 [&_h3]:font-semibold [&_h3]:text-ink [&_h4]:mt-3 [&_h4]:font-medium [&_h4]:text-ink-muted [&_li]:ml-4 [&_li]:list-disc [&_p]:mt-2 [&_ul]:mt-2 [&_ul]:space-y-1">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-        </div>
+        {/* Body — rendered by the shared docs MDX components */}
+        <div className="mt-4">{entry.body}</div>
       </div>
     </article>
   );

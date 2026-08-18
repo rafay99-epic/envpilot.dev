@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import { convex } from "@/lib/convex-client";
-import { api } from "@convex/_generated/api";
+import { MDXRemote } from "next-mdx-remote/rsc";
+import remarkGfm from "remark-gfm";
+import rehypePrettyCode from "rehype-pretty-code";
+import { docsComponents, MermaidChart, remarkMermaid } from "@envpilot/ui";
 import { MarketingShell, PageHero, terminal } from "@/components/marketing";
-import {
-  ChangelogContent,
-  CHANGELOG_PAGE_SIZE,
-  type ChangelogEntry,
-} from "@/components/changelog/ChangelogContent";
+import { ChangelogContent } from "@/components/changelog/ChangelogContent";
+import { getChangelog } from "@/lib/changelog";
 
 export const metadata: Metadata = {
   title: "Changelog | Envpilot",
@@ -15,22 +14,44 @@ export const metadata: Metadata = {
   alternates: { canonical: "/changelog" },
 };
 
-export const revalidate = 60; // revalidate every 60 seconds for fresh changelog data
+// Same MDX pipeline as the blog and the docs: shared component overrides,
+// mermaid fences, and terminal-framed code blocks.
+const mdxComponents = { ...docsComponents, MermaidChart };
 
-export default async function ChangelogPage() {
-  let entries: ChangelogEntry[] = [];
-  try {
-    entries =
-      // First page only — the client pages the rest in on demand.
-      ((await convex.query(
-        api.features.community.changelog.queries.listPublished,
+const mdxOptions = {
+  mdxOptions: {
+    remarkPlugins: [remarkGfm, remarkMermaid],
+    rehypePlugins: [
+      [
+        rehypePrettyCode,
         {
-          limit: CHANGELOG_PAGE_SIZE,
-        }
-      )) as ChangelogEntry[]) ?? [];
-  } catch {
-    // Graceful fallback — client will render empty state; page still builds in CI
-  }
+          theme: "github-dark-default",
+          keepBackground: true,
+          defaultLang: "bash",
+          bypassInlineCode: true,
+        },
+      ],
+    ],
+  },
+};
+
+export default function ChangelogPage() {
+  // content/CHANGELOG.md is read at build time. No Convex round trip, no
+  // revalidate, no ISR writes — the page is fully static.
+  const entries = getChangelog().map((entry) => ({
+    id: entry.id,
+    version: entry.version,
+    title: entry.title,
+    publishedAt: entry.publishedAt,
+    types: entry.types,
+    body: (
+      <MDXRemote
+        source={entry.content}
+        components={mdxComponents}
+        options={mdxOptions as never}
+      />
+    ),
+  }));
 
   return (
     <MarketingShell>
@@ -46,7 +67,7 @@ export default async function ChangelogPage() {
 
       <section className="pb-24">
         <div className={terminal.shell}>
-          <ChangelogContent initialEntries={entries} />
+          <ChangelogContent entries={entries} />
         </div>
       </section>
     </MarketingShell>

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { GlowDivider } from "./backgrounds";
-import { StatusIndicator } from "./StatusIndicator";
 
 export interface FooterLink {
   label: string;
@@ -17,13 +16,7 @@ export interface FooterColumn {
  * Shared marketing footer: link columns, install snippet, watermark wordmark.
  * Link destinations are app-specific, so the caller supplies `columns`.
  */
-export function MarketingFooter({
-  columns,
-  statusUrl,
-}: {
-  columns: FooterColumn[];
-  statusUrl?: string;
-}) {
+export function MarketingFooter({ columns }: { columns: FooterColumn[] }) {
   return (
     <footer className="relative overflow-hidden border-t border-line bg-canvas">
       <div className="mx-auto max-w-6xl px-4 pt-16 pb-8 sm:px-6">
@@ -82,7 +75,6 @@ export function MarketingFooter({
         <GlowDivider className="mt-12" />
 
         <div className="flex flex-col items-center justify-between gap-4 pt-6 sm:flex-row">
-          <StatusIndicator statusUrl={statusUrl} />
           <p className="font-mono text-xs text-ink-faint">
             &copy; {new Date().getFullYear()} Envpilot &middot; Built at{" "}
             <a
