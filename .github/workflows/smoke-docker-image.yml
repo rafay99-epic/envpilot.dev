@@ -150,19 +150,54 @@ jobs:
       - name: Refuses a bad credential and a bad invocation
         run: |
           set -euo pipefail
-          probe() { docker run --rm --network host \
-            -e ENVPILOT_API_URL=http://127.0.0.1:41777 "$@" envpilot-smoke:local; }
 
-          set +e
-          probe -e ENVPILOT_TOKEN=wrong -e ENVPILOT_PROJECT=checkout \
-                -e ENVPILOT_ENVIRONMENT=production pull --quiet; CODE=$?
-          set -e
-          [ "$CODE" = "1" ] || { echo "::error::bad token exited $CODE, expected 1"; exit 1; }
+          # Written out in full, deliberately. A helper that interpolated the
+          # arguments BEFORE the image name made docker read the first one
+          # ("pull") as the image, which failed with exit 125 and was reported
+          # as the app returning the wrong code. `docker run` takes its own
+          # flags, THEN the image, THEN the command — never reorder that.
+          expect_code() {
+            local want="$1"; shift
+            local label="$1"; shift
+            set +e
+            "$@"
+            local code=$?
+            set -e
+            # 125/126/127 come from the docker CLI itself (bad invocation,
+            # not executable, not found), never from the fetcher. Treat them
+            # as a broken test, not as a failing assertion.
+            case "$code" in
+              125|126|127)
+                echo "::error::$label: docker itself failed with $code — the test harness is wrong, not the binary"
+                exit 1 ;;
+            esac
+            [ "$code" = "$want" ] || {
+              echo "::error::$label exited $code, expected $want"; exit 1; }
+            echo "  $label -> $code"
+          }
 
-          set +e
-          probe -e ENVPILOT_PROJECT=checkout -e ENVPILOT_ENVIRONMENT=production pull; CODE=$?
-          set -e
-          [ "$CODE" = "2" ] || { echo "::error::missing key exited $CODE, expected 2"; exit 1; }
+          expect_code 1 "bad credential" \
+            docker run --rm --network host \
+              -e ENVPILOT_API_URL=http://127.0.0.1:41777 \
+              -e ENVPILOT_TOKEN=wrong \
+              -e ENVPILOT_PROJECT=checkout \
+              -e ENVPILOT_ENVIRONMENT=production \
+              envpilot-smoke:local pull --quiet
+
+          expect_code 2 "missing credential" \
+            docker run --rm --network host \
+              -e ENVPILOT_API_URL=http://127.0.0.1:41777 \
+              -e ENVPILOT_PROJECT=checkout \
+              -e ENVPILOT_ENVIRONMENT=production \
+              envpilot-smoke:local pull
+
+          expect_code 2 "unknown flag" \
+            docker run --rm --network host \
+              -e ENVPILOT_API_URL=http://127.0.0.1:41777 \
+              -e ENVPILOT_TOKEN=envpk_smoke \
+              -e ENVPILOT_PROJECT=checkout \
+              -e ENVPILOT_ENVIRONMENT=production \
+              envpilot-smoke:local pull --nope
 
       - name: Secret files land at the right mode
         run: |
