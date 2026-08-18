@@ -316,7 +316,7 @@ function RolesPage() {
         <QueryState
           data={roles}
           empty={{
-            command: "migrate-roles",
+            command: "seed-role-registry",
             message:
               "No roles in the registry. Run the seed-role-registry migration to create the system roles.",
           }}

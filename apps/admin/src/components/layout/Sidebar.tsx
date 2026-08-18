@@ -10,7 +10,6 @@ import {
   Database,
   ArrowUpDown,
   LogOut,
-  Globe,
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@workos-inc/authkit-react";
@@ -18,7 +17,6 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/web-traffic", label: "Web Traffic", icon: Globe },
   { to: "/tiers", label: "Tiers & Limits", icon: Crown },
   { to: "/roles", label: "Roles", icon: ShieldCheck },
   { to: "/messages", label: "Messages", icon: Mail },

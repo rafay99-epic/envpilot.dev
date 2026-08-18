@@ -15,6 +15,72 @@
 
 <!-- entry -->
 ---
+title: Removing Two Things That Did Nothing
+version: v1.12.0
+date: 2026-08-18
+types: [improvement]
+---
+
+Two pieces of the admin panel were costing something and returning nothing. Both are gone.
+
+### Anomaly Detection Is Off the Tier Sheet
+
+Behavioral anomaly detection was removed from the product in July 2026 — the engine, its tables, its crons and its admin console all went in one commit. What survived was two rows in the feature registry, `anomaly_detection` and `anomaly_detection_limit`, still rendering in Tiers & Limits as switches that gated code which no longer existed.
+
+Dropping a key from the seed file stops it being re-created but never deletes the row already there. A new `purge-retired-features` migration does the deleting, for the registry entries and every per-tier override pointing at them. It reads a list, so retiring the next feature is one array entry rather than another migration.
+
+### Sixteen Migrations Down to Six
+
+The migrations page had accumulated four categories and sixteen entries, most of them one-shot drains that had already been run everywhere, seeds for tables the product no longer reads, and wipe buttons for data nothing seeds. Ten are gone.
+
+What is left is one category, **Core**, holding the five seeds the platform actually needs plus the registry purge above. Three of those five run automatically on every deploy; the page now says which three, instead of naming two that never did.
+
+The deleted seeds took 1,996 lines of dead seed data with them, and the roles page no longer offers to run a migration that does not exist.
+
+### Web Traffic Dashboard Removed
+
+The admin panel had a Web Traffic page that polled Umami's API for pageviews and visitor counts. Umami's API is no longer on a free plan, so every load of that page spent real money and real error budget to re-render a dashboard Umami already serves better on its own site.
+
+The page, its Convex actions, and the `UMAMI_API_KEY` / `UMAMI_WEBSITE_ID` / `UMAMI_SHARE_URL` environment variables behind them are removed. Client-side pageview tracking is untouched — the data is still being collected, it is just read where it lives.
+
+<!-- entry -->
+---
+title: "Docker: Variables and Secret Files in Any Image"
+version: v1.0.0
+date: 2026-08-18
+types: [feature]
+---
+
+Envpilot now ships a Docker image. Copy one binary into your Dockerfile and your project's variables and secret files are there, at build time and at runtime.
+
+```dockerfile
+FROM python:3.12-slim
+COPY --from=ghcr.io/rafay99-epic/envpilot:1 /envpilot /usr/local/bin/envpilot
+ENTRYPOINT ["envpilot", "exec", "--"]
+CMD ["python", "app.py"]
+```
+
+### What Changed
+
+- `ghcr.io/rafay99-epic/envpilot:1` is a single statically linked binary with no runtime of its own, so it works in `alpine`, `python`, `golang`, `eclipse-temurin` and distroless alike
+- Three commands: `pull` writes a dotenv file, `files` writes secret files at their recorded permissions, and `exec` injects variables into your process without anything touching a filesystem
+- At build time the binary is mounted rather than copied, so neither it nor your values become a layer in the finished image
+- The credential is read from a mounted secret through `ENVPILOT_TOKEN_FILE`, never from a command-line flag where `ps` and build logs would capture it
+- `exec` forwards signals and exits with your process's exit code, so `docker stop`, restart policies and health checks behave exactly as they did before
+
+### Worth Knowing
+
+- A pull that cannot decrypt every variable aborts. A container that refuses to start is easier to diagnose than one running on half its configuration
+- Variables are read once, at start. A rotated value reaches the container on its next restart
+- Docker is its own surface with its own plan feature, not a mode of the REST API. Create a key with the **Docker** preset under Organization → Settings → API Keys; it needs the `variables` resource, plus `files` if you pull secret files
+- Because it is independent, your plan can include container delivery without including the public API, and disabling one never disables the other
+- Docker also gets its own rate-limit bucket, sized from the real workload: a container start costs at most two value-returning calls, and the burst covers 60 of them starting at once. A restarting fleet cannot spend your CI pipeline's budget, and a crash-looping container cannot throttle your deploys
+- Your plan caps how many active Docker keys an organization may hold, with the same cap now applying to GitHub Action keys. Revoking a key frees its slot immediately, so rotating a credential works even at the limit
+
+Full documentation is at [docs.envpilot.dev/docker/overview](https://docs.envpilot.dev/docker/overview).
+
+<!-- entry -->
+---
 title: A Faster, Static Changelog
 version: v1.65.0
 date: 2026-08-18

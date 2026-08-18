@@ -48,6 +48,12 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 
   const { searchParams } = new URL(request.url);
+  // Same contract as /api/v1/files: a client holding a surface-scoped key
+  // names its surface so authorize.ts checks that surface's tier gate. The
+  // Docker image presents "docker" (gated on docker_image, NOT public_api).
+  // An unrecognised value is dropped rather than trusted.
+  const surfaceParam = searchParams.get("surface");
+  const surface = surfaceParam === "docker" ? surfaceParam : undefined;
   const parsed = querySchema.safeParse({
     environment: searchParams.get("environment") ?? undefined,
     keys: searchParams.get("keys") ?? undefined,
@@ -113,6 +119,7 @@ export async function GET(request: Request, { params }: RouteParams) {
           : undefined,
         prefix,
         metadataOnly,
+        ...(surface ? { surface } : {}),
       }
     );
 

@@ -10,7 +10,9 @@ ghcr.io/rafay99-epic/envpilot:1
 
 ## Quick start
 
-**1. Create an API key.** Envpilot dashboard → Organization → Settings → API Keys. Scope it to one project and one environment, and grant the `variables` resource (add `files` only if you need secret files).
+**1. Create an API key.** Envpilot dashboard → Organization → Settings → API Keys → pick the **Docker** preset. Scope it to the project and environment it serves, and grant the `variables` resource (add `files` only if you need secret files).
+
+Docker is its own surface: a key minted only for the REST API or the GitHub Action will not work here.
 
 **2. Wrap your entrypoint.**
 

@@ -5,6 +5,36 @@ import { MAX_BATCH_VARIABLES } from "./batchLimits";
 import { MAX_SHARE_RECIPIENTS } from "../features/docs/shareGuards";
 
 /**
+ * Sizing inputs for the Docker bucket, named so the numbers below are DERIVED
+ * rather than picked. Change these, not the bucket.
+ *
+ * A container start makes at most two VALUE-returning requests: the variables
+ * pull, plus one file-content batch when the entrypoint runs `exec --files`.
+ * The file manifest in between is metadata (no decrypt) and is charged to
+ * apiMetadata instead, so it does not appear here.
+ *
+ * Projects whose secret files exceed one 6 MiB batch issue more than one
+ * content request. That is rare, and the image retries a 429 for exactly the
+ * cooldown the server asks for, so those pulls slow down instead of failing.
+ */
+const DOCKER_VALUE_REQUESTS_PER_START = 2;
+
+/**
+ * Containers one key is expected to start simultaneously. Sized for a rolling
+ * restart of a large replica set, or a Compose stack coming up cold, on a
+ * single shared credential. Per-service keys are the documented
+ * recommendation, so this is deliberately generous rather than tight.
+ */
+const DOCKER_CONCURRENT_STARTS = 60;
+
+/**
+ * Refill window for one full fleet restart. Four minutes means a crash-looping
+ * service drains the burst and then settles to a rate no healthy deployment
+ * ever reaches, while a real rolling deploy never notices the bucket.
+ */
+const DOCKER_BURST_REFILL_MINUTES = 4;
+
+/**
  * Rate limiter configuration for Envpilot backend.
  *
  * Uses @convex-dev/rate-limiter component to protect against
@@ -26,6 +56,30 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     rate: 30,
     period: 60_000,
     capacity: 30,
+  },
+
+  // Docker container secret pulls. Its OWN bucket, not a share of cicdPull:
+  // a fleet of containers restarting must not consume the CI pipeline's
+  // budget, and a crash-looping container must not throttle deploys. Same
+  // reason the Docker surface carries its own tier gate.
+  //
+  // capacity = DOCKER_VALUE_REQUESTS_PER_START * DOCKER_CONCURRENT_STARTS
+  //          = 2 * 60 = 120 — one full fleet restart fits in a single burst.
+  // rate     = capacity / DOCKER_BURST_REFILL_MINUTES per minute
+  //          = 120 / 4  = 30/min, i.e. 15 sustained container starts a minute.
+  //
+  // capacity >> rate for the reason fileDownload documents: the burst covers
+  // one legitimate cold start of any fleet this key can serve, while the slow
+  // refill means a caller cannot SUSTAIN that rate. This endpoint returns
+  // plaintext, so the profile being bounded is exfiltration, not CPU.
+  // Documented publicly in docs/limits/rate-limits — keep the page in sync.
+  dockerPull: {
+    kind: "token bucket",
+    rate:
+      (DOCKER_VALUE_REQUESTS_PER_START * DOCKER_CONCURRENT_STARTS) /
+      DOCKER_BURST_REFILL_MINUTES,
+    period: 60_000,
+    capacity: DOCKER_VALUE_REQUESTS_PER_START * DOCKER_CONCURRENT_STARTS,
   },
 
   // Public API metadata reads (REST + MCP): 120 per minute per key. No

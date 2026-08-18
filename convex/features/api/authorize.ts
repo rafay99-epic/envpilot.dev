@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { checkBooleanFeature } from "../featureRegistry/gates";
-import { surfaceValidator } from "./keys";
+import { SURFACE_GATE, surfaceValidator } from "../../lib/surfaces";
 import { createAuditLog, resolveAuditProjectId } from "../../lib/audit";
 
 /**
@@ -185,9 +185,7 @@ export const _authorizeRequest = internalMutation({
       ctx.db,
       key.organizationId,
       args.surface !== undefined
-        ? args.surface === "mcp_server"
-          ? "mcp_server"
-          : "public_api"
+        ? SURFACE_GATE[args.surface]
         : (args.gateFeature ?? "public_api")
     );
     if (!gate.allowed) {

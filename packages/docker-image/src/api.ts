@@ -1,11 +1,18 @@
 import type { ResolvedConfig } from "./config.js";
 
 /**
- * Client for the two public REST endpoints this image reads. Both authorize
- * through `_authorizeRequest` on the server, which defaults an omitted
- * `surface` to `rest_api` — so a plain API key works here with no
- * Action-specific query parameter.
+ * Client for the two public REST endpoints this image reads.
+ *
+ * Every request declares `surface=docker`. That is not cosmetic: the server
+ * uses it to check BOTH that the key was minted for this surface and that the
+ * org's plan includes the `docker_image` feature. Omitting it would fall back
+ * to the server's `rest_api` inference, so the image would ride the REST
+ * API's tier gate and any REST-scoped key would work here — exactly the
+ * coupling this surface exists to avoid.
  */
+
+/** Identifies this client to the server's single authorization core. */
+const SURFACE = "docker";
 
 export interface EnvpilotVariable {
   key: string;
@@ -90,7 +97,8 @@ export async function fetchVariables(
   const response = await get(
     config,
     `/api/v1/projects/${encodeURIComponent(config.project)}/variables` +
-      `?environment=${encodeURIComponent(config.environment)}`
+      `?environment=${encodeURIComponent(config.environment)}` +
+      `&surface=${SURFACE}`
   );
   const body = (await response.json()) as {
     variables?: { key: string; value?: string }[];
@@ -122,6 +130,7 @@ export async function fetchFiles(
   const query = new URLSearchParams({
     project: config.project,
     environment: config.environment,
+    surface: SURFACE,
   });
   if (paths === undefined) {
     query.set("metadataOnly", "1");

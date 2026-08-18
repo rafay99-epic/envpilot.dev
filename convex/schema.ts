@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { surfaceValidator } from "./lib/surfaces";
 
 /**
  * Convex Schema for Envpilot
@@ -68,7 +69,8 @@ export default defineSchema({
     logoUrl: v.optional(v.string()),
     // LEGACY — write path removed, field retained so existing rows validate; drop after a cleanup migration unsets it.
     // (`teamLeadsCanCreateProjects` was never consulted by any authorization check — a pre-unified-RBAC leftover.
-    //  The `cleanup-dead-data` migration in admin.ts unsets `settings` on all orgs.)
+    //  The `cleanup-dead-data` migration that used to unset this was deleted in the
+    //  migrations cleanup; nothing prunes these rows now.)
     settings: v.optional(
       v.object({
         teamLeadsCanCreateProjects: v.boolean(),
@@ -920,15 +922,9 @@ export default defineSchema({
     // the behavior it was minted under). New keys always set it explicitly.
     // github_action keys are constrained at create time to a single project
     // + the "variables" resource (the only shape the Action pull accepts).
-    surfaces: v.optional(
-      v.array(
-        v.union(
-          v.literal("github_action"),
-          v.literal("rest_api"),
-          v.literal("mcp_server")
-        )
-      )
-    ),
+    // The union comes from lib/surfaces so the table and the create mutation
+    // can never disagree about which surfaces exist.
+    surfaces: v.optional(v.array(surfaceValidator)),
     createdBy: v.id("users"),
     createdAt: v.number(),
     // Set on every successful authorized use that opts into recording it
@@ -1486,8 +1482,9 @@ export default defineSchema({
   // USAGE COUNTERS (Consumption-based metrics per user)
   // DEAD — never inserted into anywhere; consumption tracking was never wired up.
   // All code references removed; table declaration retained only so a potential
-  // stray row still validates. The `cleanup-dead-data` migration in admin.ts
-  // deletes any rows; drop this defineTable in a later PR once confirmed empty.
+  // stray row still validates. The `cleanup-dead-data` migration that deleted
+  // stray rows is gone, so nothing prunes this — drop the defineTable once a
+  // deployment confirms it is empty.
   // ==========================================
   usageCounters: defineTable({
     // Reference to the user
@@ -1911,10 +1908,10 @@ export default defineSchema({
   // ==========================================
   // TIER DEFINITIONS (Dynamic, admin-managed tiers)
   // ==========================================
-  // DEPRECATED / DRAIN-ONLY: no code inserts or patches this table anymore; the
-  // only remaining readers are the one-shot `migrate-phase6` handler in admin.ts
-  // (organizationTiers -> userTiers). Will be removed after that migration has
-  // cleared remaining records in every environment.
+  // DEAD: no code inserts, patches or reads this table. Its last reader was the
+  // one-shot `migrate-phase6` handler (organizationTiers -> userTiers), deleted
+  // in the migrations cleanup. The declaration is retained only so a stray row
+  // still validates; drop it once a deployment confirms the table is empty.
   organizationTiers: defineTable({
     organizationId: v.id("organizations"),
     tier: v.string(),

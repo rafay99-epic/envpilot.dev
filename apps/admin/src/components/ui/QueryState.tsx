@@ -21,7 +21,7 @@ import { EmptyState } from "./EmptyState";
  *   empty={{ command: "list tickets", message: "No tickets yet" }}
  *   error={errMsg}
  *   onRetry={refetch}
- *   notConfigured={{ envVar: "UMAMI_API_KEY", hint: "Set it on the Convex deployment" }}
+ *   notConfigured={{ envVar: "POLAR_ACCESS_TOKEN", hint: "Set it on the Convex deployment" }}
  * >
  *   {(rows) => <TicketTable rows={rows} />}
  * </QueryState>

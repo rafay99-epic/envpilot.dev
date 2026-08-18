@@ -211,7 +211,23 @@ Package versions to bump when making changes:
 - **Blog / Docs apps** (`apps/blog/`, `apps/docs/`): bump their package.json —
   NOT in `versions.ts`/`APP_VERSIONS` (static sites, not polling clients).
 - **GitHub Action** (`packages/github-action/`): bump `packages/github-action/package.json` — the bump IS the release trigger (deploy-action publishes it, tags `vX.Y.Z`, and moves the floating `v1` so `@v1` consumers always get the latest). Does NOT go in `versions.ts`/`APP_VERSIONS` — the action is tag-pinned, not a polling client.
+- **Docker image** (`packages/docker-image/`): bump `packages/docker-image/package.json` — the bump IS the release trigger (deploy-docker-image builds the multi-arch image, pushes `ghcr.io/rafay99-epic/envpilot:X.Y.Z`, force-moves the floating `:1`, and mirrors Dockerfile/README/LICENSE to the public repo with matching `vX.Y.Z` tags). Does NOT go in `versions.ts`/`APP_VERSIONS` — the image is tag-pinned, not a polling client. The publish job asserts the compiled binary's `--version` equals this file before it pushes anything, so the two can never drift.
 - **Root monorepo** (`package.json`): bump when features span multiple packages
+
+#### Every user-visible release gets a changelog entry
+
+Add a block at the TOP of `apps/web/content/CHANGELOG.md`, directly below the
+opening HTML comment, separated by `<!-- entry -->`. Frontmatter is validated
+by `changelogFrontmatterSchema` (`apps/web/src/lib/changelog-schema.ts`):
+`title`, `version` (`vX.Y.Z`), `date` (`YYYY-MM-DD`), and `types` from
+feature/fix/improvement/security/breaking. A malformed entry is DROPPED at
+build time with a log line, so it fails quietly — check the page renders.
+
+Use the version of the surface the entry is about: a Docker image release
+carries the image's version, an extension fix carries the extension's. Do NOT
+bump `apps/web/package.json` just to have a number for the entry — that would
+force a matching `APP_VERSIONS.web` change for a release the web app was not
+part of.
 
 #### Release manifest — `package.json` is NOT the only file (CRITICAL)
 

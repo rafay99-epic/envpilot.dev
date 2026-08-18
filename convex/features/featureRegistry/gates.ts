@@ -1,6 +1,7 @@
 import type { DatabaseReader } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
 import { resolveFeatureValue, type OrgGateContext } from "./resolver";
+import type { Surface } from "../../lib/surfaces";
 
 // ==========================================
 // PAGINATION SHAPE (structural — matches Convex's query builder return type)
@@ -212,6 +213,38 @@ async function countMatchingUpTo<Doc>(
   void limit;
   const rows = await makeQuery().collect();
   return rows.filter(isCounted).length;
+}
+
+/**
+ * Count ACTIVE keys carrying `surface` in an organization.
+ *
+ * "Active" means not revoked and not expired — a revoked key occupies no slot,
+ * which is what makes rotating a credential possible at the limit.
+ *
+ * Reads the org's keys in full rather than `.take(threshold)`. That is safe
+ * here, and deliberate: `MAX_KEYS_PER_ORG` (features/api/keys.ts) hard-bounds
+ * this set at 25 rows, and there is no by_organization_and_revoked index — a
+ * bounded take would count revoked rows toward the threshold and could report
+ * a full quota for an org whose live keys are all rotated-out.
+ */
+export async function countActiveKeysForSurface(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">,
+  surface: Surface,
+  now: number
+): Promise<number> {
+  const keys = await db
+    .query("apiKeys")
+    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+    .collect();
+
+  return keys.filter((key) => {
+    if (key.revokedAt !== undefined) return false;
+    if (key.expiresAt !== undefined && key.expiresAt <= now) return false;
+    // An absent surfaces array is a grandfathered key, valid on EVERY
+    // surface — so it genuinely occupies a slot on this one.
+    return key.surfaces === undefined || key.surfaces.includes(surface);
+  }).length;
 }
 
 export async function countActiveProjects(

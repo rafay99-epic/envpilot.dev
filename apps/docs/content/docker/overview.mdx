@@ -26,7 +26,7 @@ No Node, no Python, no shell required. It runs in `alpine`, `python:3.12-slim`, 
 
 ### Create a key
 
-In Envpilot, go to **Organization → Settings → API Keys**. Create a key scoped to **one project** and the environment you are deploying, with the `variables` resource. Add `files` only if you need secret files — it is never granted by default.
+In Envpilot, go to **Organization → Settings → API Keys** and choose the **Docker** preset. Scope it to the project and environment you are deploying. It carries the `variables` resource; add `files` only if you need secret files, which is never granted by default.
 
 Save the key somewhere your deploy process can reach. It starts with `envpk_`.
 
@@ -111,4 +111,8 @@ ghcr.io/rafay99-epic/envpilot:{{dockerVersion}}   # exact, you control upgrades
 
 ## Requirements
 
-The image reads the [public REST API](/api/overview), which is a Pro feature — the same gate the [GitHub Action](/action/overview) sits behind. A key scoped to a single project keeps the blast radius of a leaked container credential to that one project.
+Docker is its own surface, with its own plan feature (`docker_image`) and its own place on your API keys. It is not a mode of the REST API: your plan can include container delivery without including the public API, and turning one off never touches the other.
+
+Create the key under **Organization → Settings → API Keys** and pick the **Docker** preset, or tick **Docker** under Advanced. A key minted only for the REST API or the GitHub Action will be refused here, on purpose.
+
+Scope the key to the projects and environments it actually serves. One key per service keeps a leaked container credential from reaching everything else.

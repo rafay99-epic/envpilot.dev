@@ -13,11 +13,6 @@ import {
   XCircle,
   Loader2,
   Layers,
-  Database,
-  Trash2,
-  Clock,
-  ChevronRight,
-  GitBranch,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/migrations")({
@@ -38,13 +33,14 @@ interface MigrationResult {
   [key: string]: unknown;
 }
 
-/** These five run automatically on every CI deploy — manual runs are just for out-of-band fixes. */
+/**
+ * The three `deploy-convex.yml` runs on every deploy — manual runs are only
+ * for out-of-band fixes. Everything else in the list is manual by design.
+ */
 const CI_MANAGED_KEYS = new Set([
   "seed-feature-registry",
   "seed-tier-features",
   "seed-role-registry",
-  "migrate-roles",
-  "seed-changelog",
 ]);
 
 const CATEGORY_CONFIG: Record<
@@ -58,46 +54,14 @@ const CATEGORY_CONFIG: Record<
     description: string;
   }
 > = {
-  "Feature & Tier System": {
+  Core: {
     icon: <Layers className="h-4 w-4" />,
     dot: "bg-premium",
     border: "border-premium-line",
     bg: "bg-premium-soft",
     text: "text-premium",
-    description: "Run these when adding new features or updating tier limits",
-  },
-  "Content Seeding": {
-    icon: <Database className="h-4 w-4" />,
-    dot: "bg-info",
-    border: "border-info-line",
-    bg: "bg-info-soft",
-    text: "text-info",
-    description: "Populate database tables with initial or historical data",
-  },
-  Destructive: {
-    icon: <Trash2 className="h-4 w-4" />,
-    dot: "bg-danger",
-    border: "border-danger-line",
-    bg: "bg-danger-soft",
-    text: "text-danger",
-    description: "Wipe data — use before re-seeding or to start fresh",
-  },
-  "One-Time Migrations": {
-    icon: <Clock className="h-4 w-4" />,
-    dot: "bg-warning",
-    border: "border-warning-line",
-    bg: "bg-warning-soft",
-    text: "text-warning",
-    description: "Schema migrations that should only be run once per deploy",
-  },
-  "Active Bridge": {
-    icon: <GitBranch className="h-4 w-4" />,
-    dot: "bg-warning",
-    border: "border-warning-line",
-    bg: "bg-warning-soft",
-    text: "text-warning",
     description:
-      "Ongoing compatibility bridge — safe to re-run, keep running until the legacy path is retired",
+      "The seeds the platform needs to function, plus the registry purge. Everything here is idempotent unless flagged destructive.",
   },
 };
 
@@ -275,7 +239,6 @@ function MigrationsPage() {
 
   const [runningName, setRunningName] = useState<string | null>(null);
   const [results, setResults] = useState<ResultMap>({});
-  const [legacyOpen, setLegacyOpen] = useState(false);
 
   const handleRun = async (migration: Migration) => {
     if (migration.destructive) {
@@ -346,21 +309,11 @@ function MigrationsPage() {
             items.sort((a, b) => a.priority - b.priority);
           }
 
-          const seedsCategories = [
-            "Feature & Tier System",
-            "Content Seeding",
-            "Destructive",
-          ].filter((c) => grouped.has(c));
-          const bridgeItems = grouped.get("Active Bridge");
-          const legacyItems = grouped.get("One-Time Migrations");
-
-          const knownCategories = new Set([
-            ...seedsCategories,
-            "Active Bridge",
-            "One-Time Migrations",
-          ]);
-          const otherCategories = [...grouped.keys()].filter(
-            (c) => !knownCategories.has(c)
+          // One category now. Anything the backend adds under a new name still
+          // renders — it lands in `extraCategories` rather than disappearing.
+          const coreItems = grouped.get("Core");
+          const extraCategories = [...grouped.keys()].filter(
+            (c) => c !== "Core"
           );
 
           if (list.length === 0) {
@@ -373,89 +326,20 @@ function MigrationsPage() {
 
           return (
             <div className="space-y-10">
-              {/* Seeds & Tools */}
-              {seedsCategories.length > 0 && (
-                <section>
-                  <h2 className="mb-3 font-mono text-xs uppercase tracking-wide text-ink-subtle">
-                    Seeds &amp; Tools
-                  </h2>
-                  <p className="mb-4 font-mono text-[11px] text-ink-subtle">
-                    seed-feature-registry, seed-tier-features,
-                    seed-role-registry, migrate-roles, seed-changelog — runs
-                    automatically on every deploy
-                  </p>
-                  <div className="space-y-8">
-                    {seedsCategories.map((category) => (
-                      <CategoryGroup
-                        key={category}
-                        category={category}
-                        items={grouped.get(category)!}
-                        runningName={runningName}
-                        results={results}
-                        onRun={handleRun}
-                      />
-                    ))}
-                  </div>
-                </section>
+              {coreItems && coreItems.length > 0 && (
+                <CategoryGroup
+                  category="Core"
+                  items={coreItems}
+                  runningName={runningName}
+                  results={results}
+                  onRun={handleRun}
+                />
               )}
 
-              {/* Active Bridge */}
-              {bridgeItems && bridgeItems.length > 0 && (
-                <section>
-                  <h2 className="mb-3 font-mono text-xs uppercase tracking-wide text-ink-subtle">
-                    Active Bridge
-                  </h2>
-                  <CategoryGroup
-                    category="Active Bridge"
-                    items={bridgeItems}
-                    runningName={runningName}
-                    results={results}
-                    onRun={handleRun}
-                  />
-                </section>
-              )}
-
-              {/* Legacy — collapsed by default */}
-              {legacyItems && legacyItems.length > 0 && (
-                <section>
-                  <button
-                    type="button"
-                    aria-expanded={legacyOpen}
-                    onClick={() => setLegacyOpen((v) => !v)}
-                    className="mb-3 flex w-full items-center gap-2 font-mono text-xs uppercase tracking-wide text-ink-subtle hover:text-ink-muted"
-                  >
-                    <ChevronRight
-                      className={`h-3.5 w-3.5 transition-transform ${
-                        legacyOpen ? "rotate-90" : ""
-                      }`}
-                    />
-                    Legacy
-                    <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[10px] normal-case text-ink-subtle">
-                      {legacyItems.length}
-                    </span>
-                  </button>
-                  {legacyOpen && (
-                    <>
-                      <p className="mb-4 font-mono text-[11px] text-ink-subtle">
-                        one-shot drains — run once, confirm 0 remaining, then
-                        these get deleted
-                      </p>
-                      <CategoryGroup
-                        category="One-Time Migrations"
-                        items={legacyItems}
-                        runningName={runningName}
-                        results={results}
-                        onRun={handleRun}
-                      />
-                    </>
-                  )}
-                </section>
-              )}
-
-              {/* Unknown categories, appended at the end */}
-              {otherCategories.length > 0 && (
+              {/* Any category the backend introduces later. */}
+              {extraCategories.length > 0 && (
                 <section className="space-y-8">
-                  {otherCategories.map((category) => (
+                  {extraCategories.map((category) => (
                     <CategoryGroup
                       key={category}
                       category={category}

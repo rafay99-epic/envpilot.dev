@@ -114,13 +114,17 @@ Create keys in **Organization → Settings → API Keys**.
 | `files`, `exec --files` | `files` resource (never granted by default)          |
 | Any command             | Scope to one project and the environments you deploy |
 
-The image reads the [public REST API](/api/overview), which is Pro-tier — the same gate the [GitHub Action](/action/overview) sits behind.
+Docker is an independent surface. The key must carry the **Docker** surface, and your plan must include the `docker_image` feature. A key scoped only to the REST API or the GitHub Action is refused, and disabling the public API does not disable Docker.
+
+Every request the image makes sends `surface=docker`, so both the key's scope and the plan feature are checked on each call, not just at mint time.
 
 ## Behaviour worth knowing
 
 **Failures are total.** If any variable comes back without a value, the entire pull aborts. Partial configuration fails later and in a worse place than a container that refuses to start.
 
 **Rate limits are honoured.** On a `429` the binary waits exactly as long as the server's `Retry-After` header asks, capped at 60 seconds, for up to five attempts. Large secret-file pulls are split into batches under 6 MiB, so they can legitimately hit the limit mid-pull.
+
+Docker has its own bucket — 120 requests of burst refilling at 30/min per key — so a restarting fleet cannot spend your CI pipeline's budget, and vice versa. See [rate limits](/limits/rate-limits). Your plan also caps how many active Docker keys an organization may hold.
 
 **Values are never logged.** Progress goes to stderr and names keys, paths and byte counts only. Contents never reach the log in the first place, which is why `pull` can stream dotenv text on stdout safely.
 

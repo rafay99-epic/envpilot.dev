@@ -12,7 +12,6 @@ import type * as crons from "../crons.js";
 import type * as features_accounts_mutations from "../features/accounts/mutations.js";
 import type * as features_accounts_queries from "../features/accounts/queries.js";
 import type * as features_accounts_values from "../features/accounts/values.js";
-import type * as features_admin_analytics from "../features/admin/analytics.js";
 import type * as features_admin_auth from "../features/admin/auth.js";
 import type * as features_admin_changelog from "../features/admin/changelog.js";
 import type * as features_admin_crons from "../features/admin/crons.js";
@@ -48,10 +47,8 @@ import type * as features_billing_webhooks from "../features/billing/webhooks.js
 import type * as features_cicd_pull from "../features/cicd/pull.js";
 import type * as features_community_changelog_publish from "../features/community/changelog/publish.js";
 import type * as features_community_changelog_queries from "../features/community/changelog/queries.js";
-import type * as features_community_changelog_seed from "../features/community/changelog/seed.js";
 import type * as features_community_featureRequests_mutations from "../features/community/featureRequests/mutations.js";
 import type * as features_community_featureRequests_queries from "../features/community/featureRequests/queries.js";
-import type * as features_community_featureRequests_seed from "../features/community/featureRequests/seed.js";
 import type * as features_dashboard_dashboard from "../features/dashboard/dashboard.js";
 import type * as features_docs_content from "../features/docs/content.js";
 import type * as features_docs_gc from "../features/docs/gc.js";
@@ -139,6 +136,7 @@ import type * as lib_rateLimits from "../lib/rateLimits.js";
 import type * as lib_roleCompat from "../lib/roleCompat.js";
 import type * as lib_roleProfiles from "../lib/roleProfiles.js";
 import type * as lib_seedData from "../lib/seedData.js";
+import type * as lib_surfaces from "../lib/surfaces.js";
 import type * as lib_urlValidation from "../lib/urlValidation.js";
 import type * as lib_users from "../lib/users.js";
 
@@ -153,7 +151,6 @@ declare const fullApi: ApiFromModules<{
   "features/accounts/mutations": typeof features_accounts_mutations;
   "features/accounts/queries": typeof features_accounts_queries;
   "features/accounts/values": typeof features_accounts_values;
-  "features/admin/analytics": typeof features_admin_analytics;
   "features/admin/auth": typeof features_admin_auth;
   "features/admin/changelog": typeof features_admin_changelog;
   "features/admin/crons": typeof features_admin_crons;
@@ -189,10 +186,8 @@ declare const fullApi: ApiFromModules<{
   "features/cicd/pull": typeof features_cicd_pull;
   "features/community/changelog/publish": typeof features_community_changelog_publish;
   "features/community/changelog/queries": typeof features_community_changelog_queries;
-  "features/community/changelog/seed": typeof features_community_changelog_seed;
   "features/community/featureRequests/mutations": typeof features_community_featureRequests_mutations;
   "features/community/featureRequests/queries": typeof features_community_featureRequests_queries;
-  "features/community/featureRequests/seed": typeof features_community_featureRequests_seed;
   "features/dashboard/dashboard": typeof features_dashboard_dashboard;
   "features/docs/content": typeof features_docs_content;
   "features/docs/gc": typeof features_docs_gc;
@@ -280,6 +275,7 @@ declare const fullApi: ApiFromModules<{
   "lib/roleCompat": typeof lib_roleCompat;
   "lib/roleProfiles": typeof lib_roleProfiles;
   "lib/seedData": typeof lib_seedData;
+  "lib/surfaces": typeof lib_surfaces;
   "lib/urlValidation": typeof lib_urlValidation;
   "lib/users": typeof lib_users;
 }>;
