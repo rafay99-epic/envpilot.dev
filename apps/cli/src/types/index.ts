@@ -116,24 +116,22 @@ export type Variable = z.infer<typeof variableSchema>;
 // Every field is optional so legacy server responses still parse; the unified
 // backend uses these to describe the caller's access to the project so the CLI
 // can build a ProjectAccess and decide file protection / write gating.
-export const variablesMetaSchema = z
-  .object({
-    total: z.number().optional(),
-    page: z.number().optional(),
-    limit: z.number().optional(),
-    decryptionFailures: z.array(z.string()).optional(),
-    unifiedRole: z.string().nullable().optional(),
-    assigned: z.boolean().optional(),
-    grantOnly: z.boolean().optional(),
-    environmentScope: z.array(z.string()).nullable().optional(),
-    hasWriteAccess: z.boolean().optional(),
-    scopeRestricted: z.boolean().optional(),
-    // The server's row cap when the read was capped, else absent.
-    truncatedAt: z.number().optional(),
-    // Resolved capability map (additive; absent on older deployments).
-    capabilities: z.record(z.string(), z.boolean()).optional(),
-  })
-  .passthrough();
+export const variablesMetaSchema = z.looseObject({
+  total: z.number().optional(),
+  page: z.number().optional(),
+  limit: z.number().optional(),
+  decryptionFailures: z.array(z.string()).optional(),
+  unifiedRole: z.string().nullable().optional(),
+  assigned: z.boolean().optional(),
+  grantOnly: z.boolean().optional(),
+  environmentScope: z.array(z.string()).nullable().optional(),
+  hasWriteAccess: z.boolean().optional(),
+  scopeRestricted: z.boolean().optional(),
+  // The server's row cap when the read was capped, else absent.
+  truncatedAt: z.number().optional(),
+  // Resolved capability map (additive; absent on older deployments).
+  capabilities: z.record(z.string(), z.boolean()).optional(),
+});
 
 export type VariablesMeta = z.infer<typeof variablesMetaSchema>;
 

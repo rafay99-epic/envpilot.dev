@@ -148,13 +148,13 @@ function scanTurbo(root: string): TurboScan {
 
   const filteringTasks = globalPassThroughAll
     ? []
-    : Object.entries(tasks)
-        .filter(([, task]) => {
-          const mode = task.envMode ?? rootMode;
-          if (mode === "loose") return false;
-          return !task.env?.length && !task.passThroughEnv?.length;
-        })
-        .map(([name]) => name);
+    : Object.entries(tasks).flatMap(([name, task]) => {
+        const mode = task.envMode ?? rootMode;
+        if (mode === "loose") return [];
+        const declaresNothing =
+          !task.env?.length && !task.passThroughEnv?.length;
+        return declaresNothing ? [name] : [];
+      });
 
   return {
     present: true,

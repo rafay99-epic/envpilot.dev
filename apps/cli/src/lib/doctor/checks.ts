@@ -115,8 +115,12 @@ export async function runDoctor(
     probeVersion(),
   ]);
 
-  const projectProbe = await probeProject(session, project);
-  const secrets = await probeSecrets(session, project, environment);
+  // Neither probe consumes the other's result, and probeSecrets pays for a
+  // full vault decrypt, so running them back to back doubled the wait.
+  const [projectProbe, secrets] = await Promise.all([
+    probeProject(session, project),
+    probeSecrets(session, project, environment),
+  ]);
 
   const scan = scanDelivery(root, {
     injectedKeys: secrets.kind === "ok" ? secrets.keys : undefined,

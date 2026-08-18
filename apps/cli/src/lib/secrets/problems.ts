@@ -85,14 +85,14 @@ export function checkRequired(
 /** Parse comma-joined and/or repeated flag values into unique, trimmed keys. */
 export function parseKeyList(raw: string[] | undefined): string[] {
   if (!raw) return [];
-  return [
-    ...new Set(
-      raw
-        .flatMap((entry) => entry.split(","))
-        .map((key) => key.trim())
-        .filter(Boolean)
-    ),
-  ];
+  const keys = new Set<string>();
+  for (const entry of raw) {
+    for (const part of entry.split(",")) {
+      const key = part.trim();
+      if (key) keys.add(key);
+    }
+  }
+  return [...keys];
 }
 
 const MAX_LISTED = 5;
