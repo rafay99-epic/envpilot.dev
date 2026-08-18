@@ -1,0 +1,5 @@
+# Cross-compiled binaries produced by `bun run build` and by CI. Unlike the
+# GitHub Action, nothing built here is committed — the image on GHCR is the
+# published artifact, so a ~50MB binary per platform never enters git.
+build/
+dist/

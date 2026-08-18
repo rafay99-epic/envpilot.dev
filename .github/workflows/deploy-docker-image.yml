@@ -1,0 +1,159 @@
+name: Deploy Docker Image
+
+# Builds the Envpilot Docker image and publishes it two places:
+#
+#   1. GHCR — ghcr.io/rafay99-epic/envpilot:X.Y.Z plus the floating major tag,
+#      as a multi-arch manifest (linux/amd64 + linux/arm64).
+#   2. The PUBLIC rafay99-epic/envpilot-docker repo — Dockerfile, README and
+#      LICENSE only, never monorepo source. Same rule the Action follows.
+#
+# Two DIFFERENT credentials, because they authenticate to two different things:
+#
+#   * GHCR uses the built-in GITHUB_TOKEN with `packages: write`. This is not a
+#     preference — GitHub Packages only supports personal access tokens
+#     (CLASSIC) for registry auth, so a fine-grained PAT physically cannot push
+#     here. GITHUB_TOKEN can, and the package lands in the rafay99-epic
+#     namespace linked to this repo. No long-lived registry credential exists.
+#
+#   * The public repo push uses DOCKER_PUBLISH_TOKEN from Envpilot: a
+#     fine-grained PAT with Contents read/write on rafay99-epic/envpilot-docker
+#     ONLY. The default GITHUB_TOKEN cannot push to a different repository.
+#     Packages permission is deliberately NOT needed on it.
+#
+# Tagging mirrors the Action exactly: every publish creates the exact tag
+# (v1.2.3) and force-moves the floating major tag (v1), so consumers pinning
+# `:1` receive non-breaking updates.
+
+on:
+  workflow_call:
+    secrets:
+      ENVPILOT_TOKEN:
+        required: false
+      ENVPILOT_PROD_TOKEN:
+        required: false
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-docker-image-main
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish envpilot-docker
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
+          required: DOCKER_PUBLISH_TOKEN
+      - uses: ./.github/actions/setup
+
+      - name: Verify publish token is configured
+        run: |
+          if [ -z "$DOCKER_PUBLISH_TOKEN" ]; then
+            echo "::error::DOCKER_PUBLISH_TOKEN is missing — add a fine-grained PAT with Contents read/write on rafay99-epic/envpilot-docker to the Envpilot production environment."
+            exit 1
+          fi
+
+      - name: Read version
+        id: meta
+        run: |
+          VERSION=$(jq -r '.version' packages/docker-image/package.json)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "major=v${VERSION%%.*}" >> "$GITHUB_OUTPUT"
+
+      # Cross-compile per target OUTSIDE Docker. Bun's --compile embeds a
+      # runtime per platform, so one build cannot serve both architectures —
+      # buildx assembles the manifest from these two binaries.
+      #
+      # Built DIRECTLY, never through turbo — same rule as the CLI and the
+      # extension, where turbo once dropped build-time inputs and shipped a
+      # broken artifact.
+      - name: Build binaries
+        working-directory: packages/docker-image
+        run: bun run build
+
+      - name: Verify the binary runs and reports the right version
+        working-directory: packages/docker-image
+        run: |
+          set -euo pipefail
+          chmod +x build/linux/amd64/envpilot build/linux/arm64/envpilot
+          ACTUAL=$(./build/linux/amd64/envpilot --version)
+          EXPECTED="${{ steps.meta.outputs.version }}"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::binary reports $ACTUAL but package.json says $EXPECTED"
+            exit 1
+          fi
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      # GITHUB_TOKEN, not DOCKER_PUBLISH_TOKEN: GHCR rejects fine-grained PATs
+      # outright (GitHub Packages supports classic PATs only), and the job's
+      # `packages: write` permission is the supported path from inside a
+      # workflow. It also means no registry credential outlives this run.
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push the multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: packages/docker-image
+          file: packages/docker-image/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: false
+          build-args: VERSION=${{ steps.meta.outputs.version }}
+          tags: |
+            ghcr.io/rafay99-epic/envpilot:${{ steps.meta.outputs.version }}
+            ghcr.io/rafay99-epic/envpilot:${{ steps.meta.outputs.major }}
+
+      - name: Publish the source surface to the public repo
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          MAJOR: ${{ steps.meta.outputs.major }}
+        run: |
+          set -euo pipefail
+          git clone "https://x-access-token:${DOCKER_PUBLISH_TOKEN}@github.com/rafay99-epic/envpilot-docker.git" /tmp/public-docker
+          cd /tmp/public-docker
+          git config user.name "envpilot-release-bot"
+          git config user.email "hello@envpilot.dev"
+
+          # Sync ONLY the published surface — never monorepo source.
+          rm -rf Dockerfile README.md LICENSE
+          cp "$GITHUB_WORKSPACE/packages/docker-image/Dockerfile" Dockerfile
+          cp "$GITHUB_WORKSPACE/packages/docker-image/README.md" README.md
+          cp "$GITHUB_WORKSPACE/packages/docker-image/LICENSE" LICENSE
+
+          if git diff --quiet && git diff --cached --quiet && ! git status --porcelain | grep -q .; then
+            echo "No content changes to publish."
+          else
+            git add -A
+            git commit -m "release: v${VERSION}"
+            git push origin HEAD
+          fi
+
+          # Exact tag: only create if this version was never tagged.
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "Tag v${VERSION} already exists — skipping."
+          else
+            git tag "v${VERSION}"
+            git push origin "v${VERSION}"
+          fi
+
+          # Floating major tag always moves to the newest release.
+          git tag -f "$MAJOR"
+          git push -f origin "$MAJOR"
+
+          echo "Published envpilot-docker v${VERSION} (${MAJOR} moved), image ghcr.io/rafay99-epic/envpilot:${VERSION}."

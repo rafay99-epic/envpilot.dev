@@ -1,0 +1,114 @@
+---
+title: Docker overview
+description: One binary that drops into any image and brings your variables and secret files with it.
+icon: container
+version: "{{dockerVersion}}"
+---
+
+# Docker overview
+
+`ghcr.io/rafay99-epic/envpilot:1` is a single statically linked binary. Copy it into your image, or mount it during a build, and your project's variables and [secret files](/docker/runtime#secret-files) are there.
+
+No Node, no Python, no shell required. It runs in `alpine`, `python:3.12-slim`, `golang`, `eclipse-temurin`, distroless — whatever base image you are already on.
+
+## Pick your case
+
+| You want                                     | Read                              |
+| -------------------------------------------- | --------------------------------- |
+| Secrets available while `docker build` runs  | [Build time](/docker/build-time)  |
+| Secrets in the app when the container starts | [Runtime](/docker/runtime)        |
+| A Compose stack                              | [Docker Compose](/docker/compose) |
+| Every flag and exit code                     | [Reference](/docker/reference)    |
+
+## Sixty-second setup
+
+<Steps>
+
+### Create a key
+
+In Envpilot, go to **Organization → Settings → API Keys**. Create a key scoped to **one project** and the environment you are deploying, with the `variables` resource. Add `files` only if you need secret files — it is never granted by default.
+
+Save the key somewhere your deploy process can reach. It starts with `envpk_`.
+
+### Wrap your entrypoint
+
+```dockerfile
+FROM python:3.12-slim
+COPY --from=ghcr.io/rafay99-epic/envpilot:1 /envpilot /usr/local/bin/envpilot
+COPY . /app
+WORKDIR /app
+
+ENTRYPOINT ["envpilot", "exec", "--"]
+CMD ["python", "app.py"]
+```
+
+### Pass the key at run time
+
+```bash
+docker run \
+  -v /etc/envpilot/token:/run/secrets/envpilot_token:ro \
+  -e ENVPILOT_TOKEN_FILE=/run/secrets/envpilot_token \
+  -e ENVPILOT_PROJECT=checkout-api \
+  -e ENVPILOT_ENVIRONMENT=production \
+  myapp:latest
+```
+
+</Steps>
+
+Your variables are in the environment before `python app.py` starts, and nothing was written to disk.
+
+## How it gets in
+
+Two mechanisms, depending on when you need the secrets.
+
+**At build time** the binary is _mounted_, so it never becomes a layer in your image and neither do the values:
+
+```dockerfile
+RUN --mount=type=secret,id=envpilot_token \
+    --mount=from=ghcr.io/rafay99-epic/envpilot:1,source=/envpilot,target=/envpilot \
+    ENVPILOT_TOKEN_FILE=/run/secrets/envpilot_token \
+    /envpilot exec --project checkout-api --env production -- npm ci
+```
+
+**At runtime** the binary is _copied_ in, because it has to be present when the container starts:
+
+```dockerfile
+COPY --from=ghcr.io/rafay99-epic/envpilot:1 /envpilot /usr/local/bin/envpilot
+ENTRYPOINT ["envpilot", "exec", "--"]
+```
+
+Same binary, same flags, both cases.
+
+## The three commands
+
+| Command                  | Does                                                          |
+| ------------------------ | ------------------------------------------------------------- |
+| `envpilot pull`          | Write variables as dotenv text. Stdout unless `--out` is set. |
+| `envpilot files`         | Write secret files to their recorded paths at `0600`/`0400`.  |
+| `envpilot exec -- <cmd>` | Inject variables into `<cmd>` and run it. Nothing hits disk.  |
+
+There is no `login` and no config file. The binary reads its inputs, makes one or two HTTPS calls, and does one thing.
+
+## Passing the key
+
+| Variable              | Notes                                    |
+| --------------------- | ---------------------------------------- |
+| `ENVPILOT_TOKEN_FILE` | Path to a mounted secret. **Preferred.** |
+| `ENVPILOT_TOKEN`      | The key inline.                          |
+
+`ENVPILOT_TOKEN_FILE` wins when both are set.
+
+Prefer the file. An environment variable is readable through `docker inspect` and `/proc/<pid>/environ` by anyone with access to the daemon, while a Compose or BuildKit secret is a tmpfs mount that never touches the image.
+
+There is deliberately no `--token` flag: a credential on a command line shows up in `ps`, in shell history, and in build logs.
+
+## Pinning
+
+```
+ghcr.io/rafay99-epic/envpilot:1        # floating major, gets non-breaking updates
+ghcr.io/rafay99-epic/envpilot:{{dockerVersion}}   # exact, you control upgrades
+```
+
+## Requirements
+
+The image reads the [public REST API](/api/overview), which is a Pro feature — the same gate the [GitHub Action](/action/overview) sits behind. A key scoped to a single project keeps the blast radius of a leaked container credential to that one project.

@@ -64,6 +64,7 @@ jobs:
       run_cli: ${{ steps.flags.outputs.run_cli }}
       run_extension: ${{ steps.flags.outputs.run_extension }}
       run_action: ${{ steps.flags.outputs.run_action }}
+      run_docker_image: ${{ steps.flags.outputs.run_docker_image }}
       run_convex: ${{ steps.flags.outputs.run_convex }}
       deploy_convex: ${{ steps.flags.outputs.deploy_convex }}
       seed_features: ${{ steps.filter.outputs.seed_features }}
@@ -100,6 +101,8 @@ jobs:
               - 'apps/vscode-extension/**'
             action:
               - 'packages/github-action/**'
+            docker_image:
+              - 'packages/docker-image/**'
             convex:
               - 'convex/**'
             # One filter per seed, so a deploy runs only the seeds whose
@@ -132,6 +135,7 @@ jobs:
           CLI: ${{ steps.filter.outputs.cli }}
           EXTENSION: ${{ steps.filter.outputs.extension }}
           ACTION: ${{ steps.filter.outputs.action }}
+          DOCKER_IMAGE: ${{ steps.filter.outputs.docker_image }}
           CONVEX: ${{ steps.filter.outputs.convex }}
           SHARED: ${{ steps.filter.outputs.shared }}
         run: |
@@ -146,6 +150,7 @@ jobs:
           run_cli=$(bool "$CLI" "$SHARED")
           run_extension=$(bool "$EXTENSION" "$SHARED")
           run_action=$(bool "$ACTION" "$SHARED")
+          run_docker_image=$(bool "$DOCKER_IMAGE" "$SHARED")
           # Shared changes (lockfile, configs) can break convex typecheck,
           # so they re-run the convex CHECK — but only convex/** changes
           # trigger a convex DEPLOY.
@@ -153,7 +158,7 @@ jobs:
           deploy_convex="$CONVEX"
 
           any=false
-          for f in "$run_web" "$run_blog" "$run_docs" "$run_admin" "$run_cli" "$run_extension" "$run_convex" "$run_action"; do
+          for f in "$run_web" "$run_blog" "$run_docs" "$run_admin" "$run_cli" "$run_extension" "$run_convex" "$run_action" "$run_docker_image"; do
             [ "$f" = "true" ] && any=true
           done
 
@@ -165,6 +170,7 @@ jobs:
             echo "run_cli=$run_cli"
             echo "run_extension=$run_extension"
             echo "run_action=$run_action"
+            echo "run_docker_image=$run_docker_image"
             echo "run_convex=$run_convex"
             echo "deploy_convex=$deploy_convex"
             echo "any=$any"
@@ -181,6 +187,7 @@ jobs:
             echo "| CLI | $run_cli | $run_cli |"
             echo "| Extension | $run_extension | $run_extension |"
             echo "| Convex | $run_convex | $deploy_convex |"
+            echo "| Docker image | $run_docker_image | $run_docker_image |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Read package versions
@@ -612,6 +619,41 @@ jobs:
     secrets: inherit
     permissions:
       contents: read
+
+  # Runs on PRs too — it publishes NOTHING, needs no secrets, and exercises the
+  # binary against a localhost stub, so a fork PR can run it safely. This is
+  # the job that proves the "works in any base image" claim; unit tests cannot.
+  smoke-docker-image:
+    name: Smoke Docker image
+    needs: [changes, checks-passed]
+    if: |
+      !failure() && !cancelled() &&
+      needs.changes.outputs.run_docker_image == 'true'
+    uses: ./.github/workflows/smoke-docker-image.yml
+    permissions:
+      contents: read
+
+  deploy-docker-image:
+    name: Deploy Docker image
+    # Backend FIRST, same strict ordering as deploy-cli/deploy-action: the
+    # published image reads /api/v1/projects/*/variables and /api/v1/files, so
+    # a release changing both must never ship the image before the backend it
+    # calls. The !failure() guard lets a SKIPPED deploy-convex (no convex
+    # changes) fall through, while a FAILED one blocks.
+    needs: [changes, checks-passed, e2e, deploy-convex, smoke-docker-image]
+    if: |
+      !failure() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
+      needs.smoke-docker-image.result == 'success' &&
+      needs.changes.outputs.run_docker_image == 'true'
+    uses: ./.github/workflows/deploy-docker-image.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      # GHCR push authenticates with GITHUB_TOKEN — GitHub Packages rejects
+      # fine-grained PATs, so this permission is what makes the push possible.
+      packages: write
 
   deploy-extension:
     name: Deploy extension

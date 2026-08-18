@@ -1,0 +1,118 @@
+---
+title: Runtime
+description: Variables and secret files in the container when your app starts, never on disk.
+icon: container
+---
+
+# Runtime
+
+This is the one most people want. The container starts, Envpilot fetches, your app gets its environment, and nothing decrypted is ever written to a filesystem.
+
+Copy the binary into your image and make it the entrypoint.
+
+```dockerfile
+FROM python:3.12-slim
+COPY --from=ghcr.io/rafay99-epic/envpilot:1 /envpilot /usr/local/bin/envpilot
+COPY . /app
+WORKDIR /app
+
+ENTRYPOINT ["envpilot", "exec", "--"]
+CMD ["python", "app.py"]
+```
+
+`ENTRYPOINT` plus `CMD` is the useful split: `CMD` stays overridable, so `docker run myapp python manage.py migrate` still works and still gets the variables.
+
+## Any base image
+
+The binary is statically linked and carries no runtime, so it drops into whatever you are already using.
+
+```dockerfile
+# Go, distroless
+FROM gcr.io/distroless/base-debian12
+COPY --from=ghcr.io/rafay99-epic/envpilot:1 /envpilot /usr/local/bin/envpilot
+COPY --from=build /out/server /server
+ENTRYPOINT ["/usr/local/bin/envpilot", "exec", "--"]
+CMD ["/server"]
+```
+
+```dockerfile
+# Java
+FROM eclipse-temurin:21-jre-alpine
+COPY --from=ghcr.io/rafay99-epic/envpilot:1 /envpilot /usr/local/bin/envpilot
+COPY target/app.jar /app.jar
+ENTRYPOINT ["envpilot", "exec", "--"]
+CMD ["java", "-jar", "/app.jar"]
+```
+
+## Passing the key
+
+Mount it as a file. An environment variable is readable through `docker inspect` and `/proc/<pid>/environ` by anyone with access to the daemon.
+
+```bash
+docker run \
+  -v /etc/envpilot/token:/run/secrets/envpilot_token:ro \
+  -e ENVPILOT_TOKEN_FILE=/run/secrets/envpilot_token \
+  -e ENVPILOT_PROJECT=checkout-api \
+  -e ENVPILOT_ENVIRONMENT=production \
+  myapp:latest
+```
+
+Project and environment are ordinary configuration, not secrets, so environment variables are fine for those. Keeping them out of the image is what lets one image serve staging and production.
+
+## Secret files
+
+Certs, keystores and SSH keys land at their recorded paths just before your app starts:
+
+```dockerfile
+ENTRYPOINT ["envpilot", "exec", "--files", "--"]
+CMD ["/server"]
+```
+
+Add `--dir` to place them somewhere other than the working directory. The key needs the `files` resource, which is never granted by default.
+
+For anything long-lived, mount a tmpfs so the values never touch the container's writable layer:
+
+```bash
+docker run --tmpfs /secrets:rw,mode=0700 \
+  -e ENVPILOT_TOKEN_FILE=/run/secrets/envpilot_token \
+  myapp:latest
+```
+
+## Signals and exit codes
+
+`exec` is a thin wrapper, not a supervisor. It forwards `SIGINT`, `SIGTERM`, `SIGHUP` and `SIGQUIT` to your process, so `docker stop` reaches your app and your graceful shutdown runs normally.
+
+Your app's exit code becomes the container's exit code. A process killed by a signal reports `128 + signal`, the same convention a shell uses. Restart policies, health checks and `docker wait` behave exactly as they would without the wrapper.
+
+## When it cannot fetch
+
+The container **does not start**. That is deliberate: an app running on half its configuration fails later, in a harder place to diagnose, and often after it has already accepted traffic. A container that refuses to start is caught by your restart policy and your alerting immediately.
+
+The same rule applies mid-pull. If any variable comes back without a value, the whole pull aborts rather than handing your app a blank credential.
+
+## Rotation
+
+Variables are read once, at start. A value changed in Envpilot reaches the container on its next restart:
+
+```bash
+docker restart checkout-api
+```
+
+If you need something faster than a restart, pull on a schedule with [`envpilot pull --out`](/docker/reference#pull) and have your app watch the file, or write a small unit that restarts the service after a successful pull.
+
+## Startup cost
+
+One or two HTTPS requests, typically well under a second. If your platform runs an aggressive startup probe, give it a couple of seconds of grace.
+
+Container restarts share a per-key rate limit. A fleet restarting at once on a **single** key will hit it — the binary honours the server's `Retry-After` and backs off, but the cleaner fix is one key per service, which also shrinks what a leaked credential can reach.
+
+## Troubleshooting
+
+| What you see                                     | What it means                                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `exec: envpilot: not found`                      | The `COPY --from` line is missing, or the target is not on `PATH`.                    |
+| `envpilot: No API key`                           | Neither `ENVPILOT_TOKEN_FILE` nor `ENVPILOT_TOKEN` reached the container.             |
+| `envpilot: No project` / `No environment`        | Pass `--project` / `--env`, or set `ENVPILOT_PROJECT` / `ENVPILOT_ENVIRONMENT`.       |
+| Container exits `2` immediately                  | Bad invocation, not a network problem. The message names what is missing.             |
+| `rate limited … waiting Ns`                      | Expected on a mass restart. Split keys per service.                                   |
+| The app sees a Dockerfile `ENV` value, not yours | It does not — Envpilot values overwrite existing entries. Check the environment name. |

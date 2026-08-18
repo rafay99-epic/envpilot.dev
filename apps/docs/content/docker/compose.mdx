@@ -1,0 +1,158 @@
+---
+title: Docker Compose
+description: Wire the token in as a Compose secret and let every service pull its own environment.
+icon: container
+---
+
+# Docker Compose
+
+Compose has real secret support. Use it — the token arrives as a tmpfs mount instead of an environment variable, so it stays out of `docker inspect`.
+
+## The whole thing
+
+```yaml
+services:
+  api:
+    build: .
+    environment:
+      ENVPILOT_TOKEN_FILE: /run/secrets/envpilot_token
+      ENVPILOT_PROJECT: checkout-api
+      ENVPILOT_ENVIRONMENT: production
+    secrets: [envpilot_token]
+    ports: ["8080:8080"]
+
+secrets:
+  envpilot_token:
+    file: ./.envpilot-token
+```
+
+With the Dockerfile from [runtime](/docker/runtime):
+
+```dockerfile
+FROM python:3.12-slim
+COPY --from=ghcr.io/rafay99-epic/envpilot:1 /envpilot /usr/local/bin/envpilot
+COPY . /app
+WORKDIR /app
+ENTRYPOINT ["envpilot", "exec", "--"]
+CMD ["python", "app.py"]
+```
+
+Then:
+
+```bash
+echo ".envpilot-token" >> .gitignore
+docker compose up
+```
+
+## Several services, one project
+
+Each service names its own environment, so a single Compose file can run production and a staging worker side by side.
+
+```yaml
+services:
+  api:
+    build: ./api
+    environment:
+      ENVPILOT_TOKEN_FILE: /run/secrets/envpilot_token
+      ENVPILOT_PROJECT: checkout-api
+      ENVPILOT_ENVIRONMENT: production
+    secrets: [envpilot_token]
+
+  worker:
+    build: ./worker
+    environment:
+      ENVPILOT_TOKEN_FILE: /run/secrets/envpilot_token
+      ENVPILOT_PROJECT: checkout-api
+      ENVPILOT_ENVIRONMENT: production
+    secrets: [envpilot_token]
+
+secrets:
+  envpilot_token:
+    file: ./.envpilot-token
+```
+
+A key per service is better than one shared key when you can manage it: revoking a leaked worker credential should not take the API down with it, and it keeps each service off the others' rate-limit bucket.
+
+## Reading the token from the host environment
+
+Useful in CI, where the key is already in a secret store and you would rather not write it to a file:
+
+```yaml
+secrets:
+  envpilot_token:
+    environment: ENVPILOT_TOKEN
+```
+
+```bash
+ENVPILOT_TOKEN="envpk_…" docker compose up
+```
+
+Compose still delivers it to the container as a file at `/run/secrets/envpilot_token`, so nothing in the service definition changes.
+
+## Build secrets
+
+Compose passes secrets to a build the same way. See [build time](/docker/build-time) for what to do with them inside the Dockerfile.
+
+```yaml
+services:
+  web:
+    build:
+      context: .
+      secrets: [envpilot_token]
+    environment:
+      ENVPILOT_TOKEN_FILE: /run/secrets/envpilot_token
+      ENVPILOT_PROJECT: web
+      ENVPILOT_ENVIRONMENT: production
+    secrets: [envpilot_token]
+
+secrets:
+  envpilot_token:
+    file: ./.envpilot-token
+```
+
+The `secrets:` under `build:` and the one under the service are separate: the first is available during `docker compose build`, the second inside the running container.
+
+## For an image you do not control
+
+Sometimes you cannot add a binary to the image — a third-party database, an off-the-shelf service. Pull on the host and hand the result over as an env file:
+
+```bash
+envpilot_pull() {
+  docker run --rm \
+    -v "$PWD/.envpilot-token:/run/secrets/envpilot_token:ro" \
+    -e ENVPILOT_TOKEN_FILE=/run/secrets/envpilot_token \
+    ghcr.io/rafay99-epic/envpilot:1 \
+    pull --project "$1" --env "$2" --quiet
+}
+
+envpilot_pull checkout-api production > .env.runtime
+docker compose --env-file .env.runtime up -d
+rm -f .env.runtime
+```
+
+<Callout type="warning" title="This one does touch disk">
+  Values written to a file and passed through `env_file` are visible in `docker
+  inspect` and live on the host until you delete them. Prefer the in-image
+  `exec` wrapper whenever you control the Dockerfile.
+</Callout>
+
+## Health checks
+
+`exec` execs your process, so a health check written against your app works unchanged:
+
+```yaml
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+  interval: 30s
+  start_period: 10s
+```
+
+Give `start_period` a couple of seconds more than usual to cover the fetch.
+
+## Picking up rotated values
+
+Variables are read at start, so a change in Envpilot reaches the stack on the next restart:
+
+```bash
+docker compose restart api
+```
