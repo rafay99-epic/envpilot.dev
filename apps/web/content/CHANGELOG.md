@@ -15,6 +15,34 @@
 
 <!-- entry -->
 ---
+title: Importing a Real .env File
+version: v1.65.1
+date: 2026-08-19
+types: [fix]
+---
+
+Importing a 48-variable `.env` failed from the 31st key onward and reported it as sixteen copies of a JSON blob with a stack trace attached. Three separate defects, all fixed.
+
+### One Reservation Per Import, Not One Per Variable
+
+The import path created variables one call at a time, and each call spent from a bucket holding thirty per minute. A file with more than thirty new keys therefore imported partially and failed loudly on the rest, which is exactly what the rate limit was never meant to do: throttle a single legitimate action.
+
+Imports, `envpilot push` and project templates now reserve their whole budget once and write through a single transaction. An import either lands completely or not at all, so the project can no longer come up half-populated. The same batch path already existed for templates; the import and push paths simply were not using it.
+
+The per-variable bucket has also been raised, since it now only ever sees someone adding variables by hand in the dashboard: 60 a minute, with a burst of 120.
+
+### Errors People Can Read
+
+A throttled write surfaced as `{"kind":"RateLimited","name":"variableCreate","retryAfter":396.0000000000207}` followed by a `node_modules` stack. Two reasons: the sanitizer only unwrapped string payloads, and its stack-stripping pattern did not match the `at async handler (...)` frames a Convex action produces.
+
+Both are fixed, so that becomes one sentence with a retry time. Bulk paste also groups failures by cause instead of repeating the same message once per key, and no longer fires a toast per variable on top of its own summary. Sixteen identical lines collapse to one that names the cause and counts the keys.
+
+### Project Picker Shows Project Names
+
+`envpilot init` and `envpilot switch` rendered the stored icon identifier next to each project, so the list read `framework:t3 hello-2` and `folder hello5`. It now shows the name, with the slug appended only when two projects in the same organization share one.
+
+<!-- entry -->
+---
 title: Clearing Out What No Longer Runs
 version: v1.12.0
 date: 2026-08-19

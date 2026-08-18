@@ -12,19 +12,23 @@ Envpilot is an open-source platform, and its rate limits are documented so you c
 
 Each limit is scoped **per key**. Two keys never share a bucket.
 
-| Bucket              | Limit                       | Applies to                                                                     |
-| ------------------- | --------------------------- | ------------------------------------------------------------------------------ |
-| Value pulls         | 30 / min                    | CI/CD secret pulls (GitHub Action), and any REST/MCP call that decrypts values |
-| Docker pulls        | refill 30 / min, burst 120  | Container secret pulls — every call the Docker image makes that returns values |
-| Metadata reads      | 120 / min                   | REST + MCP metadata calls — org, project lists, `metadata_only=true` reads     |
-| Secret file reads   | refill 60 / min, burst 1000 | Any call returning secret-file **contents** — CLI pull, Action, REST, MCP      |
-| Secret file uploads | 20 / min                    | Uploading a secret file (per user, dashboard or CLI)                           |
-| Variable requests   | 5 / hour, burst 2           | Machine-filed variable requests (`envpilot_request_variable`)                  |
-| Documentation pages | 30 / hour, burst 10         | Machine-authored documentation drafts (`envpilot_create_doc`)                  |
+| Bucket               | Limit                       | Applies to                                                                     |
+| -------------------- | --------------------------- | ------------------------------------------------------------------------------ |
+| Value pulls          | 30 / min                    | CI/CD secret pulls (GitHub Action), and any REST/MCP call that decrypts values |
+| Docker pulls         | refill 30 / min, burst 120  | Container secret pulls — every call the Docker image makes that returns values |
+| Metadata reads       | 120 / min                   | REST + MCP metadata calls — org, project lists, `metadata_only=true` reads     |
+| Secret file reads    | refill 60 / min, burst 1000 | Any call returning secret-file **contents** — CLI pull, Action, REST, MCP      |
+| Secret file uploads  | 20 / min                    | Uploading a secret file (per user, dashboard or CLI)                           |
+| Variable writes      | 60 / min, burst 120         | Creating one variable at a time in the dashboard                               |
+| Bulk variable writes | refill 300 / min, burst 500 | Imports, `envpilot push`, and project templates — charged once per batch       |
+| Variable requests    | 5 / hour, burst 2           | Machine-filed variable requests (`envpilot_request_variable`)                  |
+| Documentation pages  | 30 / hour, burst 10         | Machine-authored documentation drafts (`envpilot_create_doc`)                  |
 
 The **value-pull** bucket has full capacity available as a burst (deploys fan out matrix builds, so a spike is normal) while the sustained rate stays at 30/min. The **metadata** bucket is higher because those reads never touch the vault — no decrypt cost.
 
 The **Docker** bucket is separate from value pulls on purpose: a fleet of containers restarting must not spend the budget your CI pipeline depends on, and a crash-looping container must not throttle your deploys. Its numbers come from the workload rather than a round number — a container start costs at most two value-returning calls (the variables pull, plus one file-content batch when the entrypoint uses `--files`), and the burst is sized for 60 of them starting at once, so one rolling restart of a large replica set fits in a single burst. It then refills that full burst over four minutes, which is far above any healthy restart rate and far below a loop. The image honours `Retry-After` automatically, so a project whose secret files span several batches slows down rather than failing.
+
+The **bulk variable write** bucket is what an import, a `envpilot push`, or a project template spends, and it is charged **once for the whole batch** rather than once per variable. That distinction matters: charging per variable meant a 48-variable `.env` import stopped at the 31st key and left the project half-populated. A batch is now one reservation and one transaction, so it either lands completely or not at all. The burst equals the 500-variable ceiling a single batch may contain, so any batch the write path accepts can always be paid for in one go.
 
 The **secret file read** bucket is the odd one, and deliberately: burst and refill are different numbers. Clients fetch one file per call, so a cold pull of a large project is a burst of hundreds — a bucket that refilled as fast as it drained would license a sustained 10 files/second forever, which is exactly an exfiltration profile. Splitting them gives a first pull its one-off burst and then settles to one file per second. The burst equals the hard ceiling of 1000 files per project, so any project that can exist can always be pulled in one go. A second pull moments later is served from files already in sync and decrypts nothing at all.
 

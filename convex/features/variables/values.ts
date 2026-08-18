@@ -506,6 +506,20 @@ export const pushBulk = action({
     let deleted = 0;
     let skipped = 0;
     const deniedKeys: string[] = [];
+    /**
+     * New variables, written as ONE batch after the loop. Creating them one
+     * mutation at a time charges variableCreate per row against a bucket of
+     * 30, so a push of more than 30 new keys failed partway through.
+     * Authorization for a create is project-wide rather than per key, so
+     * batching cannot swallow a per-key denial the loop would have caught.
+     */
+    const pendingCreates: Array<{
+      key: string;
+      vaultRef: string;
+      description?: string;
+      environments: string[];
+      isSensitive: boolean;
+    }> = [];
 
     for (const variable of args.variables) {
       // Validate key format (invalid keys are skipped, not denied).
@@ -579,16 +593,14 @@ export const pushBulk = action({
             }
           );
 
-          await ctx.runMutation(api.features.variables.mutations.create, {
+          // Deferred, not written here: see the batch flush below.
+          pendingCreates.push({
             key: variable.key,
             vaultRef: vault.id,
             description: variable.description,
             environments: [args.environment],
-            projectId: args.projectId,
             isSensitive: variable.isSensitive ?? false,
           });
-
-          created++;
         }
       } catch (error) {
         // Variables the caller lacks write access to are skipped rather than
@@ -604,6 +616,22 @@ export const pushBulk = action({
         // Mark processed so replace-mode does not try to delete it afterwards.
         existingByKey.delete(variable.key);
       }
+    }
+
+    // Flush the new variables as one batch, with one rate-limit reservation
+    // covering all of them. Runs before replace-mode deletion so a refused
+    // batch cannot leave the project emptied of the keys it was meant to gain.
+    if (pendingCreates.length > 0) {
+      const createdBy = await ctx.runMutation(
+        internal.features.variables.mutations.reserveBatchCreate,
+        { projectId: args.projectId, count: pendingCreates.length }
+      );
+      await ctx.runMutation(internal.features.variables.mutations.createMany, {
+        projectId: args.projectId,
+        createdBy,
+        variables: pendingCreates,
+      });
+      created += pendingCreates.length;
     }
 
     if (mode === "replace") {
@@ -1022,33 +1050,46 @@ export const importValues = action({
     // interleaved version had.
     for (const entry of entries) existingByKey.delete(entry.key);
 
+    // Creates go out as ONE batch. Calling the per-variable create mutation in
+    // a loop charges variableCreate once per row, and that bucket holds 30, so
+    // a 48-variable import used to fail from the 31st key on while the first
+    // 30 landed. One reserve plus one transaction also means the import cannot
+    // leave the project half-populated.
+    const creates = ops.flatMap((op) =>
+      op.kind === "create"
+        ? [
+            {
+              key: op.key,
+              vaultRef: op.vaultRef,
+              environments: [args.environment],
+              isSensitive: false,
+            },
+          ]
+        : []
+    );
+
+    const createdBy = await ctx.runMutation(
+      internal.features.variables.mutations.reserveBatchCreate,
+      { projectId: args.projectId, count: creates.length }
+    );
+
+    if (creates.length > 0) {
+      await ctx.runMutation(internal.features.variables.mutations.createMany, {
+        projectId: args.projectId,
+        createdBy,
+        variables: creates,
+      });
+      created += creates.length;
+    }
+
     for (const op of ops) {
-      switch (op.kind) {
-        case "update":
-          await ctx.runMutation(api.features.variables.mutations.update, {
-            variableId: op.variableId,
-            vaultRef: op.vaultRef,
-            changeReason: args.changeReason,
-          });
-          updated++;
-          break;
-        case "create":
-          await ctx.runMutation(api.features.variables.mutations.create, {
-            key: op.key,
-            vaultRef: op.vaultRef,
-            environments: [args.environment],
-            projectId: args.projectId,
-            isSensitive: false,
-          });
-          created++;
-          break;
-        case "unchanged":
-          break;
-        default: {
-          const _exhaustive: never = op;
-          return _exhaustive;
-        }
-      }
+      if (op.kind !== "update") continue;
+      await ctx.runMutation(api.features.variables.mutations.update, {
+        variableId: op.variableId,
+        vaultRef: op.vaultRef,
+        changeReason: args.changeReason,
+      });
+      updated++;
     }
 
     if (args.mode === "replace") {

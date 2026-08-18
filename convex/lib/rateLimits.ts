@@ -217,19 +217,28 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // RESOURCE CREATION (per-org)
   // ==========================================
 
-  // Variable create/update: 30 per minute per org
+  // Single variable create, one token per call, per org.
+  //
+  // Every BULK path (import, CLI push, template) reserves against
+  // variableBatchCreate instead and writes through createMany, so this bucket
+  // now only sees a human adding variables one at a time in the dashboard.
+  // It used to see whole imports, which is how a 48-variable file failed from
+  // its 31st key: the bucket held 30. The capacity below is a burst for
+  // someone pasting keys quickly, not a batch allowance.
   variableCreate: {
     kind: "token bucket",
-    rate: 30,
+    rate: 60,
     period: 60_000,
-    capacity: 30,
+    capacity: 120,
   },
 
+  // Not currently charged anywhere. Kept so the budget exists the moment an
+  // update path wants it, and sized to match variableCreate.
   variableUpdate: {
     kind: "token bucket",
-    rate: 30,
+    rate: 60,
     period: 60_000,
-    capacity: 30,
+    capacity: 120,
   },
 
   // Bulk import: 2 per minute per org (expensive operation)
@@ -257,7 +266,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // for one transient vault failure.
   variableBatchCreate: {
     kind: "token bucket",
-    rate: 120,
+    rate: 300,
     period: 60_000,
     capacity: MAX_BATCH_VARIABLES,
   },

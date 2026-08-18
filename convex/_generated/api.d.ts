@@ -13,7 +13,6 @@ import type * as features_accounts_mutations from "../features/accounts/mutation
 import type * as features_accounts_queries from "../features/accounts/queries.js";
 import type * as features_accounts_values from "../features/accounts/values.js";
 import type * as features_admin_auth from "../features/admin/auth.js";
-import type * as features_admin_changelog from "../features/admin/changelog.js";
 import type * as features_admin_crons from "../features/admin/crons.js";
 import type * as features_admin_e2e from "../features/admin/e2e.js";
 import type * as features_admin_featureFlags from "../features/admin/featureFlags.js";
@@ -45,8 +44,6 @@ import type * as features_billing_queries from "../features/billing/queries.js";
 import type * as features_billing_tierLimits from "../features/billing/tierLimits.js";
 import type * as features_billing_webhooks from "../features/billing/webhooks.js";
 import type * as features_cicd_pull from "../features/cicd/pull.js";
-import type * as features_community_changelog_publish from "../features/community/changelog/publish.js";
-import type * as features_community_changelog_queries from "../features/community/changelog/queries.js";
 import type * as features_community_featureRequests_mutations from "../features/community/featureRequests/mutations.js";
 import type * as features_community_featureRequests_queries from "../features/community/featureRequests/queries.js";
 import type * as features_dashboard_dashboard from "../features/dashboard/dashboard.js";
@@ -152,7 +149,6 @@ declare const fullApi: ApiFromModules<{
   "features/accounts/queries": typeof features_accounts_queries;
   "features/accounts/values": typeof features_accounts_values;
   "features/admin/auth": typeof features_admin_auth;
-  "features/admin/changelog": typeof features_admin_changelog;
   "features/admin/crons": typeof features_admin_crons;
   "features/admin/e2e": typeof features_admin_e2e;
   "features/admin/featureFlags": typeof features_admin_featureFlags;
@@ -184,8 +180,6 @@ declare const fullApi: ApiFromModules<{
   "features/billing/tierLimits": typeof features_billing_tierLimits;
   "features/billing/webhooks": typeof features_billing_webhooks;
   "features/cicd/pull": typeof features_cicd_pull;
-  "features/community/changelog/publish": typeof features_community_changelog_publish;
-  "features/community/changelog/queries": typeof features_community_changelog_queries;
   "features/community/featureRequests/mutations": typeof features_community_featureRequests_mutations;
   "features/community/featureRequests/queries": typeof features_community_featureRequests_queries;
   "features/dashboard/dashboard": typeof features_dashboard_dashboard;

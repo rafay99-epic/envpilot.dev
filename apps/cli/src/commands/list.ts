@@ -202,7 +202,6 @@ async function listProjects(
 
   table(
     projects.map((project) => ({
-      icon: project.icon || "📦",
       name: project.name,
       slug: project.slug,
       description: project.description || chalk.dim("-"),
@@ -212,7 +211,6 @@ async function listProjects(
       active: projectConfig?.projectId === project._id ? chalk.green("✓") : "",
     })),
     [
-      { key: "icon", header: "" },
       { key: "name", header: "Name" },
       { key: "slug", header: "Slug" },
       { key: "description", header: "Description", width: 30 },

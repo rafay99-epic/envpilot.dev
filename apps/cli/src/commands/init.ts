@@ -1,7 +1,14 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import inquirer from "inquirer";
-import { success, error, info, warning, withSpinner } from "../lib/ui.js";
+import {
+  success,
+  error,
+  info,
+  warning,
+  withSpinner,
+  projectChoices,
+} from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import {
   isAuthenticated,
@@ -322,10 +329,7 @@ export async function selectOrgProjectEnv(options: {
         type: "list",
         name: "projectId",
         message: "Select a project:",
-        choices: projects.map((project) => ({
-          name: `${project.icon || "📦"} ${project.name}`,
-          value: project._id,
-        })),
+        choices: projectChoices(projects),
       },
     ]);
     selectedProject = projects.find((p) => p._id === projectId)!;

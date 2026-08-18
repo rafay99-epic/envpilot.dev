@@ -10,6 +10,16 @@
  * from error messages so users see clean, human-readable errors.
  */
 export function sanitizeConvexError(error: unknown): string {
+  // Before the generic scrubbing: the rate limiter's payload is an object, so
+  // it would otherwise fall through to `error.message` and leak the raw JSON
+  // plus a node_modules stack into the UI.
+  if (isRateLimitError(error)) {
+    const { retryAfter } = error.data;
+    return `Too many requests in a short time. Try again in ${formatRetryAfter(
+      typeof retryAfter === "number" ? retryAfter : 0
+    )}.`;
+  }
+
   // ConvexError application payloads survive prod redaction (plain Error
   // messages become "Server Error" on production deployments). The payload
   // is already a clean user-facing string — return it directly.
@@ -35,8 +45,10 @@ export function sanitizeConvexError(error: unknown): string {
       .replace(/\[Request ID: [^\]]+\]\s*/g, "")
       // Strip "at handler (...)" stack references
       .replace(/\s*at handler \([^)]*\)/g, "")
-      // Strip "at ... (file:line:col)" patterns anywhere in the message
-      .replace(/\s*at\s+\S+\s+\([^)]*\)/g, "")
+      // Strip "at ... (file:line:col)" patterns anywhere in the message.
+      // `async` is optional: errors thrown inside a Convex action stack as
+      // "at async handler (...)", which the plain pattern walked straight past.
+      .replace(/\s*at\s+(?:async\s+)?\S+\s+\([^)]*\)/g, "")
       // Strip "Server Error Uncaught Error:" prefixes. `+` matters: an action
       // that re-throws a mutation's error double-wraps it ("Uncaught Error:
       // Uncaught Error: ..."), and stripping only one layer leaked the inner
@@ -47,6 +59,8 @@ export function sanitizeConvexError(error: unknown): string {
       .replace(/\.\.\//g, "")
       // Strip "at handler" without parens
       .replace(/\s*at handler\s*/g, "")
+      // Strip the trailing "Called by client" frame Convex appends
+      .replace(/\s*Called by client\.?\s*$/i, "")
       // Clean up extra whitespace
       .replace(/\s{2,}/g, " ")
       .trim()
@@ -78,14 +92,31 @@ export function isTierLimitError(message: string): boolean {
  * @convex-dev/rate-limiter component throws `new ConvexError({ kind:
  * "RateLimited", ... })`, whose structured `.data` survives prod redaction
  * (the `.message` does not). Detect it by the data shape, not a substring.
+ *
+ * The narrowed payload keeps its other fields `unknown` — the guard only
+ * proves `kind`, so callers still have to check what they read.
  */
-export function isRateLimitError(error: unknown): boolean {
+export function isRateLimitError(error: unknown): error is Error & {
+  data: { kind: "RateLimited" } & Record<string, unknown>;
+} {
   return (
     error instanceof Error &&
     "data" in error &&
     typeof (error as Error & { data: unknown }).data === "object" &&
     (error as Error & { data: { kind?: unknown } }).data?.kind === "RateLimited"
   );
+}
+
+/**
+ * Turns the rate limiter's `retryAfter` (MILLISECONDS) into a phrase a person
+ * can act on. Sub-5s waits are vague on purpose: an exact "1 second" reads as
+ * a bug when the retry fails again.
+ */
+export function formatRetryAfter(ms: number): string {
+  const seconds = Math.ceil(ms / 1000);
+  if (seconds <= 5) return "a few seconds";
+  if (seconds < 90) return `${seconds} seconds`;
+  return `${Math.ceil(seconds / 60)} minutes`;
 }
 
 /**

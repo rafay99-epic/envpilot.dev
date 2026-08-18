@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { DrawerPanel } from "@/components/ui";
-import { Upload, Loader2, FileUp } from "lucide-react";
+import { Upload, Loader2, FileUp, AlertTriangle } from "lucide-react";
 import {
   parse,
   detectFormatFromExtension,
@@ -14,7 +14,7 @@ import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { sanitizeConvexError } from "@/lib/error-messages";
+import { sanitizeConvexError, isRateLimitError } from "@/lib/error-messages";
 import { createLogger } from "@/lib/logger";
 import type { Id } from "@convex/_generated/dataModel";
 
@@ -35,6 +35,7 @@ type ImportResult = {
   created: number;
   updated: number;
   deleted: number;
+  skipped: number;
   requested?: number;
 };
 
@@ -64,6 +65,15 @@ export function ImportDialog({
   const [fileName, setFileName] = useState("");
   const [preview, setPreview] = useState<Record<string, string> | null>(null);
   const [parseError, setParseError] = useState("");
+  // Kept apart from parseError: a failed import must not be wiped by the next
+  // keystroke in the textarea, and it carries a different follow-up message.
+  // `partial` marks a throttled import, which reserves its whole budget before
+  // the first write, so the reassurance below is that nothing was written at
+  // all. A permission refusal fails even earlier and needs no such note.
+  const [importError, setImportError] = useState<{
+    message: string;
+    partial: boolean;
+  } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const importValues = useAction(api.features.variables.values.importValues);
@@ -116,6 +126,7 @@ export function ImportDialog({
     if (!content.trim()) return;
     setIsImporting(true);
     setResult(null);
+    setImportError(null);
 
     try {
       // Parse in the browser and send key/value pairs. The file text never
@@ -134,11 +145,18 @@ export function ImportDialog({
 
       setResult(
         data.path === "requests"
-          ? { created: 0, updated: 0, deleted: 0, requested: data.requested }
+          ? {
+              created: 0,
+              updated: 0,
+              deleted: 0,
+              skipped: data.skipped,
+              requested: data.requested,
+            }
           : {
               created: data.created,
               updated: data.updated,
               deleted: data.deleted,
+              skipped: data.skipped,
             }
       );
 
@@ -149,7 +167,12 @@ export function ImportDialog({
         { projectId, organizationId, environment, mode, format },
         err
       );
-      setParseError(sanitizeConvexError(err) || "Import failed");
+      // One sanitized sentence, never the raw payload: the rate limiter's
+      // error is a JSON blob with a node_modules stack attached.
+      setImportError({
+        message: sanitizeConvexError(err) || "Import failed.",
+        partial: isRateLimitError(err),
+      });
     }
     // Runs on both paths: the catch above swallows, and neither branch returns early.
     setIsImporting(false);
@@ -160,6 +183,7 @@ export function ImportDialog({
     setFileName("");
     setPreview(null);
     setParseError("");
+    setImportError(null);
     setResult(null);
     onClose();
   };
@@ -235,6 +259,22 @@ export function ImportDialog({
             {parseError && (
               <div className="rounded-lg border px-4 py-3 text-sm border-danger-line bg-danger-soft text-danger">
                 {parseError}
+              </div>
+            )}
+
+            {importError && (
+              <div className="flex gap-2 rounded-lg border px-4 py-3 text-sm border-danger-line bg-danger-soft text-danger">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p>{importError.message}</p>
+                  {importError.partial && (
+                    <p className="mt-1 text-ink-muted">
+                      Nothing was saved, so no variables were lost. Running the
+                      import again is safe: keys that already exist are updated
+                      rather than duplicated.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -418,7 +458,15 @@ function ImportSummary({
         ) : (
           <p>
             Import complete: {result.created} created, {result.updated} updated
-            {result.deleted > 0 ? `, ${result.deleted} deleted` : ""}.
+            {result.deleted > 0 ? `, ${result.deleted} deleted` : ""}
+            {result.skipped > 0 ? `, ${result.skipped} skipped` : ""}.
+          </p>
+        )}
+        {result.skipped > 0 && (
+          <p className="mt-1 text-ink-muted">
+            Skipped entries had keys the platform cannot store. A key starts
+            with a letter or underscore and holds only letters, digits and
+            underscores.
           </p>
         )}
       </div>

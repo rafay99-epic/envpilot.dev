@@ -8,6 +8,7 @@ import {
   formatProjectRole,
   roleNotice,
   projectRoleNotice,
+  projectChoices,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import {
@@ -228,7 +229,7 @@ export const switchCommand = new Command("switch")
           console.log();
           console.log("Available projects:");
           for (const p of projects) {
-            console.log(`  ${p.icon || "📦"} ${p.name} (${p.slug})`);
+            console.log(`  ${p.name} (${p.slug})`);
           }
           process.exit(1);
         }
@@ -404,10 +405,7 @@ export const switchCommand = new Command("switch")
               type: "list",
               name: "projectId",
               message: "Select a project:",
-              choices: projects.map((project) => ({
-                name: `${project.icon || "📦"} ${project.name}`,
-                value: project._id,
-              })),
+              choices: projectChoices(projects),
               default: projectConfig?.projectId,
             },
           ]);
