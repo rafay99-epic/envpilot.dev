@@ -69,7 +69,6 @@ jobs:
       seed_features: ${{ steps.filter.outputs.seed_features }}
       seed_tiers: ${{ steps.filter.outputs.seed_tiers }}
       seed_roles: ${{ steps.filter.outputs.seed_roles }}
-      seed_changelog: ${{ steps.filter.outputs.seed_changelog }}
       any: ${{ steps.flags.outputs.any }}
       root_version: ${{ steps.versions.outputs.root }}
       web_version: ${{ steps.versions.outputs.web }}
@@ -114,8 +113,6 @@ jobs:
               - 'convex/lib/seedData.ts'
               - 'convex/lib/roleProfiles.ts'
               - 'convex/lib/capabilities.ts'
-            seed_changelog:
-              - 'convex/features/community/changelog/seed.ts'
             shared:
               - 'package.json'
               - 'bun.lock'
@@ -514,7 +511,6 @@ jobs:
       seed_features: ${{ needs.changes.outputs.seed_features == 'true' }}
       seed_tiers: ${{ needs.changes.outputs.seed_tiers == 'true' }}
       seed_roles: ${{ needs.changes.outputs.seed_roles == 'true' }}
-      seed_changelog: ${{ needs.changes.outputs.seed_changelog == 'true' }}
     secrets: inherit
 
   # ── Vercel prod deploys — ACTIVE (2026-07-18) ──────────────────────

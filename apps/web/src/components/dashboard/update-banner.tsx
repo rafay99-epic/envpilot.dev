@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { RefreshCw, X } from "lucide-react";
 
-const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const POLL_INTERVAL = 30 * 60 * 1000; // 30 minutes
 const INITIAL_DELAY = 30 * 1000; // 30s — let the page finish loading first
 const LOADED_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0";
 
@@ -16,6 +16,10 @@ export function UpdateBanner() {
     const controller = new AbortController();
 
     async function checkVersion() {
+      // A backgrounded tab has nobody to show the banner to. Skipping the
+      // fetch here is most of the saving: an idle tab left open all day
+      // used to poll regardless.
+      if (document.visibilityState !== "visible") return;
       try {
         const res = await fetch("/api/version", {
           cache: "no-store",

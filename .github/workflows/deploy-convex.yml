@@ -21,9 +21,6 @@ on:
       seed_roles:
         type: boolean
         default: false
-      seed_changelog:
-        type: boolean
-        default: false
     secrets:
       ENVPILOT_TOKEN:
         required: false
@@ -90,9 +87,3 @@ jobs:
         run: |
           bunx convex run features/admin/migrations:run \
             "$(jq -cn '{name: "seed-role-registry"}')"
-
-      - name: Seed changelog
-        if: inputs.seed_changelog || github.event_name == 'workflow_dispatch'
-        run: |
-          bunx convex run features/admin/migrations:run \
-            "$(jq -cn '{name: "seed-changelog"}')"

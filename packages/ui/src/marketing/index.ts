@@ -5,7 +5,6 @@ export {
   type FooterColumn,
   type FooterLink,
 } from "./MarketingFooter";
-export { StatusIndicator } from "./StatusIndicator";
 export { PageHero } from "./PageHero";
 export { GlowCard } from "./GlowCard";
 export {

@@ -16,3 +16,9 @@ bun.lock
 test-results
 playwright-report
 .convex/
+
+# Multi-entry changelog. Frontmatter fences sit mid-file, where markdown
+# reads `---` as a setext heading underline — Prettier rewrites every entry
+# marker into a heading and destroys the frontmatter. Structure here is
+# parsed by src/lib/changelog.ts, not styled.
+apps/web/content/CHANGELOG.md

@@ -30,7 +30,6 @@ export default authkitMiddleware({
       "/robots.txt",
       "/api/health",
       "/api/config",
-      "/api/status",
       // Release-version manifest polled by signed-out clients (CLI, extension,
       // web boot) for update/enforcement checks — must return JSON, never a
       // WorkOS redirect.
@@ -84,9 +83,18 @@ export const config = {
      * Match all paths except:
      * - _next (Next.js internals)
      * - static files (favicon, images, etc.)
-     * - API routes that don't need auth (health check)
+     * - public marketing pages. These are listed in unauthenticatedPaths
+     *   below, which means the middleware boots the WorkOS SDK and attempts
+     *   a session-cookie decrypt only to then allow the request. Excluding
+     *   them here skips that work entirely, so crawler traffic on the
+     *   marketing site costs no compute.
+     *
+     *   NOT excluded: "/", "/sign-in" and "/sign-up". The two auth pages
+     *   call withAuth() server-side to bounce an already-signed-in user to
+     *   the dashboard, and "/" is the OAuth landing surface. Every route
+     *   excluded above was checked for withAuth and has none.
      */
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/((?!_next|changelog|faq|vs/|wishlist|privacy|terms|logo|support|contact|pricing|sitemap\\.xml|robots\\.txt|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
   ],
 };
