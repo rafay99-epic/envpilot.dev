@@ -47,8 +47,21 @@ export function normalizeApiUrl(raw: string): string {
 }
 
 // Config store using conf package
+/**
+ * Where the CLI keeps its accounts, tokens and run cache.
+ *
+ * Normally `conf` derives this from $HOME. Setting ENVPILOT_CONFIG_DIR moves
+ * it, which is how a sandboxed or CI build gets its own login WITHOUT the
+ * caller having to override $HOME. Overriding $HOME looks equivalent and is
+ * not: every child process inherits it, so `envpilot run -- convex dev` would
+ * send Convex looking for ~/.convex in a directory that has none, and the
+ * same for git, ssh, and anything else that reads a home directory.
+ */
 const config = new Conf<CLIConfig>({
   projectName: "envpilot",
+  ...(process.env.ENVPILOT_CONFIG_DIR
+    ? { cwd: process.env.ENVPILOT_CONFIG_DIR }
+    : {}),
   defaults: {
     apiUrl: DEFAULT_API_URL,
   },

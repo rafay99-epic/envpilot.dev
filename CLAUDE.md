@@ -42,8 +42,12 @@ local CLI or extension. It enforces what used to be a convention:
   the sandbox file.
 - Builds run under `env -i`, so a `WORKOS_*` or `NEXT_PUBLIC_CONVEX_URL`
   already exported in the calling shell cannot leak into the artifact.
-- The run path forces a throwaway `$HOME`, and the script refuses to start if
-  that path is inside the real home directory.
+- The run path isolates the CLI with `ENVPILOT_CONFIG_DIR`, NOT `$HOME`.
+  Overriding `$HOME` looks equivalent and is not: every child inherits it, so
+  `envpilot run -- bun run dev` sent `convex dev` looking for `~/.convex` in
+  an empty directory and it exited 1. Children keep the real home; only
+  envpilot's own accounts and run cache move.
+- The script refuses to start if the sandbox path is inside the real home.
 - Every invocation fingerprints the production CLI config before and after and
   **aborts loudly if it changed**.
 

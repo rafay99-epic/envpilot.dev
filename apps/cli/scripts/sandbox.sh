@@ -139,10 +139,15 @@ build_extension() {
 
 run_cli() {
   [[ -f "$CLI_DIR/dist/index.js" ]] || build
-  note "sandbox HOME=$SB_HOME (production config untouched)"
-  # Run from the CALLER's directory so `doctor` and `run` see the repo you are
-  # actually in, while HOME still points at the sandbox.
-  HOME="$SB_HOME" \
+  note "sandbox config=$SB_HOME/config (production config untouched)"
+  # ENVPILOT_CONFIG_DIR, NOT HOME. Overriding HOME isolates envpilot's config
+  # but every child inherits it, so `run -- bun run dev` sent convex looking
+  # for ~/.convex in an empty directory and it exited 1. The child needs the
+  # real home; only envpilot needs the sandbox.
+  #
+  # Runs from the CALLER's directory so `doctor` and `run` see the repo you
+  # are actually in.
+  ENVPILOT_CONFIG_DIR="$SB_HOME/config" \
   ENVPILOT_SANDBOX=1 \
     node "$CLI_DIR/dist/index.js" "$@"
 }
@@ -155,8 +160,8 @@ case "${1-}" in
     rm -rf "$SB_HOME"
     note "wiped $SB_HOME" ;;
   shell)
-    note "subshell with HOME=$SB_HOME. Type exit to leave."
-    HOME="$SB_HOME" "${SHELL:-/bin/bash}" ;;
+    note "subshell using the sandbox envpilot config. Type exit to leave."
+    ENVPILOT_CONFIG_DIR="$SB_HOME/config" "${SHELL:-/bin/bash}" ;;
   "") die "Nothing to do." "Try: scripts/sandbox.sh doctor" ;;
   *) run_cli "$@" ;;
 esac
