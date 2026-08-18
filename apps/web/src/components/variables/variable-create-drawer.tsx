@@ -90,8 +90,15 @@ export function VariableCreateDrawer({
   async function handleBulkSubmit(entries: VariableFormData[]) {
     const failures: Array<{ key: string; error: string }> = [];
 
+    // Sequential on purpose. Firing these concurrently is what the rule
+    // suggests and is exactly wrong here: each create writes to the vault and
+    // spends from the per-variable rate bucket, so a parallel fan-out of a
+    // pasted 48-key block is the throttle this whole change exists to remove.
+    // The pooled server paths serialize their first write for the same reason
+    // (vault key derivation races on a cold project).
     for (const entry of entries) {
       try {
+        // react-doctor-disable-next-line react-doctor/async-await-in-loop
         await onCreate(entry, { silent: true });
       } catch (err) {
         failures.push({
