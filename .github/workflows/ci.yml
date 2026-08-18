@@ -78,13 +78,13 @@ jobs:
       ext_version: ${{ steps.versions.outputs.extension }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Detect changed paths
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             web:
@@ -219,7 +219,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.ref == 'refs/heads/main' && 'Production' || 'development' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - name: Secret scan (gitleaks)
         # Standing guard: fail the gate if any real credential is committed.
@@ -262,7 +262,7 @@ jobs:
             NEXT_PUBLIC_CONVEX_URL
             WORKOS_CLIENT_ID
       - name: Cache Turborepo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
@@ -345,7 +345,7 @@ jobs:
       NEXT_PUBLIC_APP_URL: http://localhost:3000
       WORKOS_REDIRECT_URI: http://localhost:3000/callback
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/load-env
         with:
           token: ${{ secrets.ENVPILOT_DEV_TOKEN }}
@@ -416,7 +416,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ github.sha }}
           path: apps/web/playwright-report
@@ -436,7 +436,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: Production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/load-env
         with:
           token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
@@ -452,7 +452,7 @@ jobs:
         working-directory: apps/cli
         run: npm pack
       - name: Upload CLI artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: envpilot-cli-${{ github.sha }}
           path: apps/cli/*.tgz
@@ -470,7 +470,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: Production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/load-env
         with:
           token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
@@ -487,7 +487,7 @@ jobs:
         working-directory: apps/vscode-extension
         run: bunx @vscode/vsce package --no-dependencies
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: envpilot-vsix-${{ github.sha }}
           path: apps/vscode-extension/*.vsix
@@ -739,7 +739,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -794,7 +794,7 @@ jobs:
       - name: Download CLI artifact
         if: needs.changes.outputs.run_cli == 'true'
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: envpilot-cli-${{ github.sha }}
           path: release-artifacts
@@ -802,13 +802,13 @@ jobs:
       - name: Download VSIX artifact
         if: needs.changes.outputs.run_extension == 'true'
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: envpilot-vsix-${{ github.sha }}
           path: release-artifacts
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Envpilot ${{ steps.tag.outputs.tag }}

@@ -25,10 +25,10 @@ jobs:
     name: Build and verify (no publish)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.23"
           # No go.sum: the fetcher uses the standard library only, so there is
@@ -66,14 +66,14 @@ jobs:
           PROBE
           echo "  build context reaches the binary"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       # --load, not --push. Single platform because the runner is amd64 and a
       # multi-arch manifest cannot be loaded into the local daemon anyway; the
       # arm64 binary is still compiled above, so a cross-compile break is
       # caught before this step.
       - name: Build the image locally
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: packages/docker-image
           file: packages/docker-image/Dockerfile

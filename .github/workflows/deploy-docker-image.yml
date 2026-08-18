@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: Production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/load-env
         with:
           token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
@@ -69,7 +69,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "major=v${VERSION%%.*}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.23"
           # No go.sum: the fetcher uses the standard library only, so there is
@@ -125,22 +125,22 @@ jobs:
           PROBE
           echo "  build context reaches the binary"
 
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
 
       # GITHUB_TOKEN, not DOCKER_PUBLISH_TOKEN: GHCR rejects fine-grained PATs
       # outright (GitHub Packages supports classic PATs only), and the job's
       # `packages: write` permission is the supported path from inside a
       # workflow. It also means no registry credential outlives this run.
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push the multi-arch image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: packages/docker-image
           file: packages/docker-image/Dockerfile

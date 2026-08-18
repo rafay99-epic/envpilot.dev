@@ -63,7 +63,7 @@ jobs:
           echo "Version $RAW_VERSION is valid semver ✓"
 
       - name: Checkout main repo (for the update script)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - uses: ./.github/actions/load-env
         with:
