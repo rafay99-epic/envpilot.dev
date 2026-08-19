@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
 import { batchGetUsers } from "../../lib/users";
+import { activeProjectsQuery } from "../../lib/projectKind";
 import { resolveFeatureValue } from "../featureRegistry/resolver";
 import {
   normalizeOrgRole,
@@ -25,14 +26,12 @@ export const getStats = query({
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
-    // Get org projects (not deleted)
-    const allProjects = await ctx.db
-      .query("projects")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .collect();
-    const projects = allProjects.filter((p) => p.deletedAt === undefined);
+    // Real projects only — a workspace is a project row, and counting one
+    // here would inflate every number on the dashboard.
+    const projects = await activeProjectsQuery(
+      ctx.db,
+      args.organizationId
+    ).collect();
 
     // Count variables + sensitive variables with a bounded global scan.
     // Collecting every variable of every project re-ran on every variable

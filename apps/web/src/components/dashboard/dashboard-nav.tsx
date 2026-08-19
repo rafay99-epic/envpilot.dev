@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { UserButton, OrganizationSwitcher } from "@/components/auth";
 import { useAuthContext } from "@/components/auth";
 import {
+  Boxes,
   BookText,
   FileKey,
   LayoutDashboard,
@@ -169,6 +170,11 @@ export function DashboardNav() {
       href: "/dashboard/projects",
       label: "Projects",
       icon: <FolderOpen className="h-4 w-4" />,
+    },
+    {
+      href: "/dashboard/workspaces",
+      label: "Workspaces",
+      icon: <Boxes className="h-4 w-4" />,
     },
     // Variable request review is team_lead+ (reviewers: owner / PM / team lead)
     ...(isTeamLeadPlus

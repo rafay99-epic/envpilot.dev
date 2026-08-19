@@ -6,6 +6,7 @@ import { requireAuthedUser } from "../../lib/identity";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { authorizeVariableAccess } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
+import { resolveEffectiveVariables } from "./resolve";
 import {
   getVariableAccess,
   isEnvironmentScopeAllowed,
@@ -59,22 +60,18 @@ export const listByProject = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? LIST_READ_CAP;
-    const variables = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project_deleted", (q) =>
-        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
-      )
-      .take(limit + 1);
+
+    // Own rows plus everything inherited from the workspaces this project
+    // belongs to. Each row carries `source`, so the page can group inherited
+    // ones under the workspace they came from and render them read-only.
+    const variables = await resolveEffectiveVariables(ctx, {
+      projectId: args.projectId,
+      environment: args.environment,
+    });
 
     if (variables.length > limit) {
       throw new ConvexError(
         `Project has more than ${limit} active variables, refusing a partial read. Contact support to raise the limit.`
-      );
-    }
-
-    if (args.environment) {
-      return variables.filter((v) =>
-        v.environments.includes(args.environment!)
       );
     }
 
@@ -557,14 +554,25 @@ async function listWithAccessCore(
   // dropped and reported as `truncatedAt` instead of silently vanishing.
   // Access filtering below makes row counts unreliable as a cap signal.
   const limit = args.limit ?? LIST_READ_CAP;
-  const allVariables = await ctx.db
-    .query("environmentVariables")
-    .withIndex("by_project_deleted", (q) =>
-      q.eq("projectId", args.projectId).eq("deletedAt", undefined)
-    )
-    .take(limit + 1);
-  const truncatedAt = allVariables.length > limit ? limit : undefined;
-  if (truncatedAt !== undefined) allVariables.pop();
+
+  // Own rows PLUS everything inherited from the project's workspaces. This is
+  // the read the CLI and the VS Code extension pull through (values.ts
+  // pullValues -> _listWithAccessCapped), so leaving it on the raw index is
+  // what would make workspaces invisible to both of them.
+  //
+  // mapVariableRow decides access from the row's projectId, and an inherited
+  // row's projectId is the WORKSPACE. Presenting it as this project's row is
+  // correct: access to a shared value comes from membership of a project that
+  // reads it, which is the same rule resolve.ts documents and vault/reveal.ts
+  // enforces.
+  const resolvedRows = (
+    await resolveEffectiveVariables(ctx, { projectId: args.projectId })
+  ).map((row) =>
+    row.source.kind === "own" ? row : { ...row, projectId: args.projectId }
+  );
+
+  const truncatedAt = resolvedRows.length > limit ? limit : undefined;
+  const allVariables = resolvedRows.slice(0, limit);
 
   // Scoped developers never receive out-of-scope variables at all —
   // not even their metadata/keys
@@ -1331,7 +1339,24 @@ export const getEnvironmentConflictsInternal = internalQuery({
     key: v.string(),
     environments: v.array(v.string()),
   },
-  returns: v.array(v.string()),
+  returns: v.array(
+    v.object({
+      source: v.union(
+        v.object({ kind: v.literal("self") }),
+        v.object({
+          kind: v.literal("workspace"),
+          workspaceId: v.id("projects"),
+          name: v.string(),
+        }),
+        v.object({
+          kind: v.literal("member"),
+          projectId: v.id("projects"),
+          name: v.string(),
+        })
+      ),
+      environments: v.array(v.string()),
+    })
+  ),
   handler: async (ctx, args) =>
     findEnvironmentConflicts(ctx, {
       projectId: args.projectId,

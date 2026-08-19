@@ -39,6 +39,7 @@ import {
   TagFilter,
   type VariableFormData,
 } from "@/components/variables";
+import { InheritedVariables } from "@/components/workspaces";
 import { BulkJobStatusLine } from "@/components/variables/BulkJobStatusLine";
 import { useRevealSecret } from "@/hooks/useRevealSecret";
 import { FeatureGate } from "@/components/tier/FeatureGate";
@@ -970,6 +971,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             </>
           )}
         </div>
+
+        <InheritedVariables projectId={project?._id} />
 
         {/* Pinned to the panel's bottom edge, inside its border. Renders null
             when nothing is running, and because it lives here rather than

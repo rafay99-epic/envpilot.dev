@@ -12,6 +12,13 @@ export {
 
 // Project hooks
 export { useOrganizationProjects, useProjectBySlug } from "./useProjects";
+export {
+  useWorkspaces,
+  useWorkspaceBySlug,
+  useProjectWorkspaces,
+  useInheritedVariables,
+  useWorkspaceActions,
+} from "./useWorkspaces";
 export { useAutoPageSize } from "./useAutoPageSize";
 export {
   useCreateProject,

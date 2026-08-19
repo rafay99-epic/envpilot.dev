@@ -1,5 +1,7 @@
 import { v, ConvexError } from "convex/values";
 import { MAX_PROJECT_FILES } from "../../lib/fileLimits";
+import { resolveEffectiveVariables } from "../variables/resolve";
+import { activeProjectsQuery } from "../../lib/projectKind";
 import {
   action,
   internalQuery,
@@ -113,13 +115,12 @@ export const _listScopedProjects = internalQuery({
     })
   ),
   handler: async (ctx, args) => {
-    let projects = await ctx.db
-      .query("projects")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .collect()
-      .then((rows) => rows.filter((p) => p.deletedAt === undefined));
+    // Workspaces are excluded at the index: an API key must never see one
+    // listed as a project, and `assertPullable` refuses if one is targeted.
+    let projects = await activeProjectsQuery(
+      ctx.db,
+      args.organizationId
+    ).collect();
 
     if (args.scopeProjects !== "all") {
       const allowed = new Set(args.scopeProjects.map((id) => id as string));
@@ -170,12 +171,13 @@ export const _readActiveVariables = internalQuery({
     })
   ),
   handler: async (ctx, args) => {
-    const rows = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project_deleted", (q) =>
-        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
-      )
-      .take(MAX_PULL_ROWS + 1);
+    // Resolves the project's own rows PLUS everything it inherits from the
+    // workspaces it belongs to. Server side, so the CLI, extension, REST,
+    // MCP, GitHub Action and Docker image all pick workspaces up without a
+    // client release.
+    const rows = await resolveEffectiveVariables(ctx, {
+      projectId: args.projectId,
+    });
 
     if (rows.length > MAX_PULL_ROWS) {
       throw new ConvexError(

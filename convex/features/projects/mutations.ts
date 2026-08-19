@@ -3,9 +3,12 @@ import { mutation, type MutationCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import {
   checkBooleanFeature,
+  checkCountedLimit,
   checkNumericLimit,
   countActiveProjects,
+  countActiveWorkspaces,
 } from "../featureRegistry/gates";
+import { WORKSPACE_KIND } from "../../lib/projectKind";
 import { requireAuthedUser } from "../../lib/identity";
 import {
   assertOrgAction,
@@ -105,6 +108,14 @@ export async function createProjectCore(
     organizationId: Id<"organizations">;
     icon?: string;
     color?: string;
+    /**
+     * A workspace is a project row that owns variables several projects
+     * share. Same authorization, same slug namespace, same creator
+     * assignment and same audit trail — only the tier limit and the kind
+     * stamp differ, which is why this reuses one code path instead of
+     * growing a second create.
+     */
+    kind?: typeof WORKSPACE_KIND;
   }
 ): Promise<Id<"projects">> {
   {
@@ -125,16 +136,43 @@ export async function createProjectCore(
       throw new ConvexError("Organization not found");
     }
 
-    // Check tier limits for project creation
-    const projectCount = await countActiveProjects(ctx.db, args.organizationId);
-    const projectCheck = await checkNumericLimit(
-      ctx.db,
-      args.organizationId,
-      "max_projects",
-      projectCount
-    );
-    if (!projectCheck.allowed) {
-      throw new ConvexError(projectCheck.reason!);
+    // Tier limits. A workspace never occupies a project slot, and vice
+    // versa — the two are counted through separate index ranges.
+    if (args.kind === WORKSPACE_KIND) {
+      const gate = await checkBooleanFeature(
+        ctx.db,
+        args.organizationId,
+        "workspaces"
+      );
+      if (!gate.allowed) {
+        throw new ConvexError(
+          gate.reason ?? "Workspaces are not available on this plan."
+        );
+      }
+
+      const workspaceCheck = await checkCountedLimit(
+        ctx.db,
+        args.organizationId,
+        "max_workspaces",
+        () => countActiveWorkspaces(ctx.db, args.organizationId)
+      );
+      if (!workspaceCheck.allowed) {
+        throw new ConvexError(workspaceCheck.reason!);
+      }
+    } else {
+      const projectCount = await countActiveProjects(
+        ctx.db,
+        args.organizationId
+      );
+      const projectCheck = await checkNumericLimit(
+        ctx.db,
+        args.organizationId,
+        "max_projects",
+        projectCount
+      );
+      if (!projectCheck.allowed) {
+        throw new ConvexError(projectCheck.reason!);
+      }
     }
 
     const existingProject = await ctx.db
@@ -156,6 +194,7 @@ export async function createProjectCore(
       slug: args.slug,
       description: args.description,
       organizationId: args.organizationId,
+      kind: args.kind,
       icon: args.icon,
       color: args.color,
       createdBy: actor._id,
@@ -179,7 +218,8 @@ export async function createProjectCore(
       organizationId: args.organizationId,
       projectId,
       userId: actor._id,
-      action: "project.created",
+      action:
+        args.kind === WORKSPACE_KIND ? "workspace.created" : "project.created",
       details: JSON.stringify({ name: args.name, slug: args.slug }),
       createdAt: now,
     });

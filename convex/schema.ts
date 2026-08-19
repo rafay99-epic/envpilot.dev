@@ -192,6 +192,11 @@ export default defineSchema({
     description: v.optional(v.string()),
     // Parent organization
     organizationId: v.id("organizations"),
+    // A "workspace" is a project row that owns variables several projects
+    // share. It is never pulled by a client and never listed as a project.
+    // Absent = an ordinary project. See lib/projectKind.ts — the single
+    // definition every listing goes through.
+    kind: v.optional(v.literal("workspace")),
     // Project icon (emoji or URL)
     icon: v.optional(v.string()),
     // Project color (hex code for UI)
@@ -234,6 +239,7 @@ export default defineSchema({
         v.literal("doc_shares"),
         v.literal("docs"),
         v.literal("favorites"),
+        v.literal("workspace_links"),
         v.literal("members"),
         v.literal("access"),
         v.literal("api_keys"),
@@ -251,7 +257,35 @@ export default defineSchema({
     .index("by_organization_and_deleted_at", ["organizationId", "deletedAt"])
     .index("by_org_and_slug", ["organizationId", "slug"])
     .index("by_org_slug_deleted", ["organizationId", "slug", "deletedAt"])
+    // Serves every "real projects only" listing and every workspace listing.
+    // `kind` precedes `deletedAt` so workspaces are pruned in the index
+    // rather than filtered in memory after the read.
+    .index("by_org_kind_deleted", ["organizationId", "kind", "deletedAt"])
     .index("by_created_by", ["createdBy"]),
+
+  // ==========================================
+  // WORKSPACE MEMBERSHIP
+  // ==========================================
+  // Which projects read a workspace's shared variables. A reference, never a
+  // copy: the variable keeps living on the workspace row with one vault
+  // object, so a rotation is one write and drift is impossible.
+  workspaceProjects: defineTable({
+    organizationId: v.id("organizations"),
+    // The project row carrying kind: "workspace".
+    workspaceId: v.id("projects"),
+    // The member project that reads it.
+    projectId: v.id("projects"),
+    // Which environments this membership carries. Absent = all of them.
+    // Lets a workspace share production and staging while dev stays local.
+    environments: v.optional(v.array(v.string())),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    // The resolver: what does this project inherit.
+    .index("by_project", ["projectId"])
+    // The impact list: who is affected if this variable changes.
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_and_project", ["workspaceId", "projectId"]),
 
   // ==========================================
   // FAVORITE PROJECTS
@@ -337,6 +371,11 @@ export default defineSchema({
     lastReminderSentAt: v.optional(v.number()),
     // Variable tags (organization-scoped tag references)
     tagIds: v.optional(v.array(v.id("variableTags"))),
+    // WORKSPACE-OWNED ROWS ONLY. Which member projects this variable reaches.
+    // Absent = every member project, and it keeps following membership as
+    // projects join. Present = exactly this list, so a project joining later
+    // does NOT receive it. Meaningless on an ordinary project's rows.
+    appliesTo: v.optional(v.array(v.id("projects"))),
   })
     .index("by_project", ["projectId"])
     .index("by_project_and_key", ["projectId", "key"])
@@ -1248,6 +1287,13 @@ export default defineSchema({
       v.literal("org.member_suspended"),
       v.literal("org.member_reinstated"),
       v.literal("org.transferred"),
+      // Workspace actions. Membership is logged against the MEMBER project,
+      // because "who gained access to this project's secrets" is the question
+      // an auditor asks, and the workspace name rides in the details blob.
+      v.literal("workspace.created"),
+      v.literal("workspace.project_added"),
+      v.literal("workspace.project_removed"),
+      v.literal("workspace.variable_adopted"),
       // Project actions
       v.literal("project.created"),
       v.literal("project.updated"),

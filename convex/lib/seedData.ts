@@ -460,6 +460,56 @@ export const SEED_FEATURES = [
     resettable: false,
     sortOrder: 5,
   },
+  // ─── Workspaces (shared variables across projects) ───────────────────────
+  //
+  // No dual gate: a workspace triggers no cron, no email and no outbound
+  // call. Its only recurring cost is read fan-out, which the two per-edge
+  // ceilings below bound.
+  {
+    key: "workspaces",
+    displayName: "Workspaces",
+    valueType: "boolean" as const,
+    category: "Collaboration",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 6,
+  },
+  {
+    key: "max_workspaces",
+    displayName: "Max Workspaces per Organization",
+    valueType: "numeric" as const,
+    category: "Collaboration",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 7,
+  },
+  {
+    key: "max_projects_per_workspace",
+    displayName: "Max Projects per Workspace",
+    valueType: "numeric" as const,
+    category: "Collaboration",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 8,
+  },
+  {
+    key: "max_workspaces_per_project",
+    displayName: "Max Workspaces per Project",
+    valueType: "numeric" as const,
+    category: "Collaboration",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 9,
+  },
+  {
+    key: "max_variables_per_workspace",
+    displayName: "Max Variables per Workspace",
+    valueType: "numeric" as const,
+    category: "Collaboration",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 10,
+  },
 ];
 
 // ─── Role registry seeds ──────────────────────────────────────────────────────
