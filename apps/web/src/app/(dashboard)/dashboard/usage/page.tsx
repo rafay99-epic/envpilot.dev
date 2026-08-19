@@ -14,6 +14,7 @@ import { UsageLayout } from "./usage-layout";
 import { usePaymentsEnabled } from "@/hooks/usePaymentsEnabled";
 import { normalizeOrgRole } from "@/lib/roles";
 import { PageHeader } from "@envpilot/ui";
+import UsageLoading from "./loading";
 
 const CHECKOUT_URL = "/api/checkout?tier=pro";
 
@@ -26,7 +27,7 @@ export default function UsagePage() {
 }
 
 function UsagePageContent() {
-  const { organization, user } = useAuthContext();
+  const { organization, user, isLoading: isAuthLoading } = useAuthContext();
   const paymentsEnabled = usePaymentsEnabled();
   // The heavyweight usage scan subscribes ONLY while this page is mounted —
   // the global nav sync deliberately excludes it (see useTierStore.ts).
@@ -53,6 +54,10 @@ function UsagePageContent() {
   // -----------------------------------------------------------------------
   // Early returns
   // -----------------------------------------------------------------------
+
+  if (isAuthLoading) {
+    return <UsageLoading />;
+  }
 
   if (!organization) {
     return (

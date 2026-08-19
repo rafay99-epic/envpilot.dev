@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
 import type { AuthUser, Organization, RoleMeta } from "@/lib/auth";
 import { createLogger } from "@/lib/logger";
@@ -43,73 +43,74 @@ interface UseAuthReturn {
   refreshUser: () => Promise<void>;
 }
 
+async function loadUser(): Promise<FetchState> {
+  try {
+    const response = await fetch("/api/auth/me");
+    if (!response.ok) return { status: "failed" };
+    return { status: "done", data: (await response.json()) as UserData };
+  } catch (error) {
+    log.error("fetch_user_failed", {}, error);
+    return { status: "failed" };
+  }
+}
+
+type FetchState =
+  | { status: "idle" }
+  | { status: "done"; data: UserData }
+  | { status: "failed" };
+
 /**
  * Client-side hook for accessing auth state
  * Note: For server components, use getUser() directly from @workos-inc/authkit-nextjs
  */
-export function useAuth(initialData?: UserData): UseAuthReturn {
-  const [user, setUser] = useState<AuthUser | null>(initialData?.user ?? null);
-  const [organization, setOrganization] = useState<Organization | null>(
-    initialData?.organization ?? null
-  );
-  const [actions, setActions] = useState<string[]>(initialData?.actions ?? []);
-  const [capabilities, setCapabilities] = useState<Record<string, boolean>>(
-    initialData?.capabilities ?? {}
-  );
-  const [roleMeta, setRoleMeta] = useState<RoleMeta | null>(
-    initialData?.roleMeta ?? null
-  );
-  const [isLoading, setIsLoading] = useState(!initialData);
-  const [impersonator, setImpersonator] = useState(initialData?.impersonator);
+export function useAuth(
+  initialData?: UserData,
+  deferFetch = false
+): UseAuthReturn {
+  const [fetchState, setFetchState] = useState<FetchState>({ status: "idle" });
 
-  const fetchUser = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch("/api/auth/me");
-      if (response.ok) {
-        const data: UserData = await response.json();
-        setUser(data.user);
-        setOrganization(data.organization);
-        setActions(data.actions ?? []);
-        setCapabilities(data.capabilities ?? {});
-        setRoleMeta(data.roleMeta ?? null);
-        setImpersonator(data.impersonator);
-      } else {
-        setUser(null);
-        setOrganization(null);
-        setActions([]);
-        setCapabilities({});
-        setRoleMeta(null);
-        setImpersonator(undefined);
-      }
-    } catch (error) {
-      log.error("fetch_user_failed", {}, error);
-      setUser(null);
-      setOrganization(null);
-      setActions([]);
-      setCapabilities({});
-      setRoleMeta(null);
-      setImpersonator(undefined);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  // Derived, not synced into state. `initialData` streams in after mount on the
+  // dashboard, so copying it in an effect meant the seed was dropped whenever
+  // the effect did not re-run. A completed fetch is newer than the seed and
+  // wins; a failed one means signed out.
+  const source =
+    fetchState.status === "done"
+      ? fetchState.data
+      : fetchState.status === "failed"
+        ? null
+        : (initialData ?? null);
+
+  const user = source?.user ?? null;
+  const organization = source?.organization ?? null;
+  const actions = source?.actions ?? [];
+  const capabilities = source?.capabilities ?? {};
+  const roleMeta = source?.roleMeta ?? null;
+  const impersonator = source?.impersonator;
+  const isLoading = !source && fetchState.status !== "failed";
+
+  // Fall back to /api/auth/me when the server could not supply the full
+  // picture: no seed at all, no organization, or no actions.
+  const needsFallbackFetch =
+    !deferFetch &&
+    (!initialData || !initialData.organization || !initialData.actions);
 
   useEffect(() => {
-    // Fetch if no initial data, if initial data has no organization
-    // (e.g. server-side Convex query failed during layout render),
-    // or if initial data has no actions (server layout doesn't compute them).
-    if (!initialData || !initialData.organization || !initialData.actions) {
-      fetchUser();
-    }
-  }, [initialData, fetchUser]);
+    if (!needsFallbackFetch) return;
+    let cancelled = false;
+    loadUser().then((next) => {
+      if (!cancelled) setFetchState(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [needsFallbackFetch]);
 
   // Re-fetch auth state when active organization changes (cookie update)
   useEffect(() => {
-    const handler = () => fetchUser();
+    const handler = () => void loadUser().then(setFetchState);
     window.addEventListener("org-context-changed", handler);
     return () => window.removeEventListener("org-context-changed", handler);
-  }, [fetchUser]);
+  }, []);
 
   // Keep Sentry user attribution in sync with auth state
   useEffect(() => {
@@ -119,10 +120,6 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
       Sentry.setUser(null);
     }
   }, [user]);
-
-  const signOutHandler = useCallback(async () => {
-    window.location.href = "/sign-out";
-  }, []);
 
   return {
     user,
@@ -135,7 +132,9 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
     actions,
     capabilities,
     roleMeta,
-    signOut: signOutHandler,
-    refreshUser: fetchUser,
+    signOut: async () => {
+      window.location.href = "/sign-out";
+    },
+    refreshUser: async () => setFetchState(await loadUser()),
   };
 }

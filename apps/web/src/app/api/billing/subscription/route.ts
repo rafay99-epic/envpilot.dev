@@ -1,4 +1,5 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
+import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
@@ -14,6 +15,8 @@ import { reportApiError } from "@/lib/api-errors";
  * Now returns user-level tier info alongside org-level subscription data.
  */
 export async function GET(request: Request) {
+  await connection();
+
   try {
     // Check if payments are enabled (env var = outer gate)
     if (!isPaymentsEnabled()) {

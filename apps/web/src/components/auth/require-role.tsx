@@ -2,11 +2,8 @@
 
 import type { ReactNode } from "react";
 import { ShieldAlert } from "lucide-react";
-import { useAuthContext } from "./auth-provider";
-import {
-  TerminalButtonLink,
-  TerminalLoading,
-} from "@/components/dashboard/terminal-ui";
+import { useAuthContext } from "./auth-context";
+import { TerminalButtonLink } from "@/components/dashboard/terminal-ui";
 import { ROLE_LEVEL, roleLabel, roleLevel, type OrgRole } from "@/lib/roles";
 
 interface RequireRoleProps {
@@ -45,11 +42,7 @@ export function useRequireRole(minimum: OrgRole): {
 export function RequireRole({ minimum, children }: RequireRoleProps) {
   const { isLoading, allowed } = useRequireRole(minimum);
 
-  if (isLoading) {
-    return <TerminalLoading fullPage />;
-  }
-
-  if (!allowed) {
+  if (!isLoading && !allowed) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
         <div className="rounded-full border border-danger-line bg-danger-soft p-4">

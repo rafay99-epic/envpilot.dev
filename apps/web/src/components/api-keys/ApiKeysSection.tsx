@@ -26,7 +26,7 @@ import {
   TerminalEmptyState,
 } from "@/components/dashboard/terminal-ui";
 import { TerminalDatePicker } from "@/components/dashboard/terminal-date-picker";
-import { useOrganizationProjects } from "@/hooks";
+import { useOrganizationProjects, useNow } from "@/hooks";
 import { ENVIRONMENTS, type Environment } from "@/constants/project";
 
 /**
@@ -325,14 +325,15 @@ function KeyRow({
   const [isRevoking, setIsRevoking] = useState(false);
   const [rowError, setRowError] = useState<string | null>(null);
 
+  const now = useNow(60_000);
+
   const recentlyUsed =
     keyItem.lastUsedAt !== null &&
-    Date.now() - keyItem.lastUsedAt < SEVEN_DAYS_MS;
+    now > 0 &&
+    now - keyItem.lastUsedAt < SEVEN_DAYS_MS;
 
-  // Expiry countdown — computed inline (not a separate component) so the
-  // impure Date.now() read stays inside this already-stateful row component.
   const expiryMsLeft =
-    keyItem.expiresAt !== null ? keyItem.expiresAt - Date.now() : null;
+    keyItem.expiresAt !== null && now > 0 ? keyItem.expiresAt - now : null;
   const expiryExpired = expiryMsLeft !== null && expiryMsLeft <= 0;
   const expiryUrgent =
     expiryMsLeft !== null && (expiryExpired || expiryMsLeft < EXPIRY_URGENT_MS);
@@ -580,14 +581,10 @@ function CreateKeyDrawer({
   );
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [customExpiry, setCustomExpiry] = useState("");
-  // The earliest expiry a key may carry: tomorrow, resolved once when the
-  // drawer mounts. Reading Date.now() from JSX recomputes it on every render,
-  // which reads differently on the server than in the browser and drifts if
-  // the form is left open across midnight. The drawer is keyed per open, so
-  // mounting is the right moment to fix "tomorrow".
-  const [minExpiryDate] = useState(() =>
-    new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  );
+  const nowMs = useNow();
+  const minExpiryDate = nowMs
+    ? new Date(nowMs + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    : "";
 
   const [preset, setPreset] = useState<PresetId>("agent");
   // Problems are computed on every render but only SHOWN once the user has
@@ -688,7 +685,9 @@ function CreateKeyDrawer({
   const surfaceSelectionValid = selectedSurfaces.size > 0;
   const customExpiryValid =
     expiryMode !== "custom" ||
-    (customExpiry.length > 0 && new Date(customExpiry).getTime() > Date.now());
+    (customExpiry.length > 0 &&
+      nowMs > 0 &&
+      new Date(customExpiry).getTime() > nowMs);
 
   const applyPreset = (id: PresetId) => {
     setPreset(id);

@@ -7,6 +7,7 @@ import {
   TerminalBadge,
   TerminalButton,
 } from "@/components/dashboard/terminal-ui";
+import { useNow } from "@/hooks";
 
 interface Session {
   id: string;
@@ -18,6 +19,7 @@ interface Session {
 }
 
 export function SecuritySettings() {
+  const now = useNow(60_000);
   const [sessions, setSessions] = useState<{
     cli: Session[];
     extension: Session[];
@@ -122,8 +124,8 @@ export function SecuritySettings() {
                     </p>
                     <p className="text-[13px] text-ink-subtle">
                       {session.lastUsedAt
-                        ? `Last used ${formatRelativeTime(session.lastUsedAt)}`
-                        : `Created ${formatRelativeTime(session.createdAt)}`}
+                        ? `Last used ${formatRelativeTime(session.lastUsedAt, now)}`
+                        : `Created ${formatRelativeTime(session.createdAt, now)}`}
                     </p>
                   </div>
                 </div>
@@ -162,8 +164,8 @@ export function SecuritySettings() {
   );
 }
 
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now();
+function formatRelativeTime(timestamp: number, now: number): string {
+  if (!now) return "—";
   const diff = now - timestamp;
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);

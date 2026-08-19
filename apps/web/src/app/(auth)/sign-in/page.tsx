@@ -1,6 +1,8 @@
 import { getSignInUrl, withAuth } from "@workos-inc/authkit-nextjs";
 import { redirect } from "next/navigation";
 
+export const instant = false;
+
 export default async function SignInPage({
   searchParams,
 }: {

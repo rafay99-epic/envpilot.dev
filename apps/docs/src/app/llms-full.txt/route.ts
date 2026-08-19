@@ -1,8 +1,6 @@
+import { cacheLife } from "next/cache";
 import { getAllDocsFull } from "@/lib/content";
 import { SITE_URLS } from "@envpilot/ui";
-
-// Disk-based content only changes at deploy time — render at build, serve from CDN.
-export const dynamic = "force-static";
 
 /**
  * /llms-full.txt — complete documentation dump for LLM consumption.
@@ -13,7 +11,10 @@ export const dynamic = "force-static";
  *
  * Follows the llms-full.txt convention from https://llmstxt.org/.
  */
-export async function GET() {
+async function renderLlmsFull() {
+  "use cache";
+  cacheLife("max");
+
   const docs = getAllDocsFull();
 
   const sections = docs
@@ -51,6 +52,12 @@ GitHub: https://github.com/rafay99-epic/envpilot.dev
 
 ${sections}
 `;
+
+  return text;
+}
+
+export async function GET() {
+  const text = await renderLlmsFull();
 
   return new Response(text, {
     headers: {

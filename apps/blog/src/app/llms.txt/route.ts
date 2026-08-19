@@ -1,8 +1,6 @@
+import { cacheLife } from "next/cache";
 import { getAllPosts } from "@/lib/content";
 import { SITE_URLS } from "@envpilot/ui";
-
-// Disk-based content only changes at deploy time — render at build, serve from CDN.
-export const dynamic = "force-static";
 
 /**
  * /llms.txt — compact machine-readable overview of the Envpilot Blog.
@@ -11,7 +9,10 @@ export const dynamic = "force-static";
  * Provides a structured summary and a list of every post that LLMs
  * can use to understand and navigate the blog's content.
  */
-export async function GET() {
+async function renderLlmsTxt() {
+  "use cache";
+  cacheLife("max");
+
   const posts = getAllPosts();
 
   const postLinks = posts
@@ -35,6 +36,12 @@ export async function GET() {
 
 ${postLinks}
 `;
+
+  return text;
+}
+
+export async function GET() {
+  const text = await renderLlmsTxt();
 
   return new Response(text, {
     headers: {

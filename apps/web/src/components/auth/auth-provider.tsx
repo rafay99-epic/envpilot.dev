@@ -1,70 +1,95 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import type { AuthUser, Organization, RoleMeta } from "@/lib/auth";
+import {
+  AuthContext,
+  type AuthContextValue,
+} from "@/components/auth/auth-context";
+import type { DashboardAuthSeed } from "@/lib/dashboard-auth";
+import { AccessNotices } from "@/components/auth/AccessNotices";
+import { AuthErrorPage } from "@/components/auth/auth-error-page";
+import { BannedNotice } from "@/components/auth/banned-notice";
 
-interface AuthContextValue {
-  user: AuthUser | null;
-  organization: Organization | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  isImpersonating: boolean;
-  impersonator?: { email: string; reason: string | null };
-  canDo: (action: string) => boolean;
-  actions: string[];
-  /** Registry capability map for the active org role. */
-  capabilities: Record<string, boolean>;
-  /** Registry display metadata for the active org role. */
-  roleMeta: RoleMeta | null;
-  signOut: () => Promise<void>;
-  refreshUser: () => Promise<void>;
-}
+function useStreamedSeed(promise: Promise<DashboardAuthSeed>) {
+  const [seed, setSeed] = useState<DashboardAuthSeed | null>(null);
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+  useEffect(() => {
+    let active = true;
+    promise.then(
+      (value) => {
+        if (active) setSeed(value);
+      },
+      () => {
+        if (active) {
+          setSeed({
+            status: "error",
+            kind: "auth",
+            message: "We couldn't verify your identity. Please sign in again.",
+          });
+        }
+      }
+    );
+    return () => {
+      active = false;
+    };
+  }, [promise]);
 
-interface AuthProviderProps {
-  children: ReactNode;
-  initialUser?: AuthUser | null;
-  initialOrganization?: Organization | null;
-  /** Backend-authz actions computed by the server layout. When present
-   *  (together with an organization), use-auth skips its mount-time
-   *  /api/auth/me refetch entirely. */
-  initialActions?: string[];
-  /** Registry capability map computed alongside initialActions. */
-  initialCapabilities?: Record<string, boolean>;
-  /** Registry role metadata computed alongside initialActions. */
-  initialRoleMeta?: RoleMeta | null;
+  return seed;
 }
 
 export function AuthProvider({
   children,
-  initialUser,
-  initialOrganization,
-  initialActions,
-  initialCapabilities,
-  initialRoleMeta,
-}: AuthProviderProps) {
+  authPromise,
+}: {
+  children: ReactNode;
+  authPromise: Promise<DashboardAuthSeed>;
+}) {
+  const seed = useStreamedSeed(authPromise);
+  const ready = seed?.status === "ready" ? seed : null;
+
   const auth = useAuth(
-    initialUser
+    ready
       ? {
-          user: initialUser,
-          organization: initialOrganization ?? null,
-          actions: initialActions,
-          capabilities: initialCapabilities,
-          roleMeta: initialRoleMeta,
+          user: ready.user,
+          organization: ready.organization,
+          actions: ready.actions,
+          capabilities: ready.capabilities,
+          roleMeta: ready.roleMeta,
           accessToken: null,
         }
-      : undefined
+      : undefined,
+    seed === null
   );
 
-  return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
-}
+  const value: AuthContextValue = {
+    ...auth,
+    hasOtherOrganizations: ready?.hasOtherOrganizations ?? false,
+  };
 
-export function useAuthContext(): AuthContextValue {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuthContext must be used within an AuthProvider");
-  }
-  return context;
+  return (
+    <AuthContext.Provider value={value}>
+      {seed?.status === "unauthenticated" ? (
+        <AuthErrorPage
+          title="Session Expired"
+          message="Your session is no longer valid. Please sign in again."
+          showTryAgain={false}
+        />
+      ) : seed?.status === "error" ? (
+        <AuthErrorPage
+          title={seed.kind === "sync" ? "Account Sync Error" : undefined}
+          message={seed.message}
+        />
+      ) : seed?.status === "banned" ? (
+        <BannedNotice reason={seed.reason} />
+      ) : (
+        <>
+          <Suspense fallback={null}>
+            <AccessNotices />
+          </Suspense>
+          {children}
+        </>
+      )}
+    </AuthContext.Provider>
+  );
 }

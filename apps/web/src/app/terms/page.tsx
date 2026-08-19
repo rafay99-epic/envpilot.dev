@@ -4,7 +4,7 @@ import { MarketingShell, PageHero, terminal } from "@/components/marketing";
 import { ScrollSpySidebar } from "@/components/ui/ScrollSpySidebar";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | Envpilot",
+  title: "Terms of Service",
   description:
     "Read the Envpilot Terms of Service governing your use of the platform, including billing, data ownership, and acceptable use policies.",
   alternates: { canonical: "/terms" },

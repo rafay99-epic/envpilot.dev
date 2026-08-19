@@ -1,13 +1,21 @@
 "use client";
 
-import { use } from "react";
-import { SharedDocReader } from "./shared-reader";
+import { Suspense, use } from "react";
+import { SharedDocLoading, SharedDocReader } from "./shared-reader";
+
+function Reader({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = use(params);
+  return <SharedDocReader token={token} />;
+}
 
 export default function SharedDocPage({
   params,
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const { token } = use(params);
-  return <SharedDocReader token={token} />;
+  return (
+    <Suspense fallback={<SharedDocLoading />}>
+      <Reader params={params} />
+    </Suspense>
+  );
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, use, useState, useEffect, useRef } from "react";
 import {
   Loader2,
   Copy,
@@ -43,9 +42,42 @@ function formatCountdown(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function ShareViewerPage() {
-  const params = useParams<{ token: string }>();
-  const token = params.token;
+function ShareViewerShell() {
+  return (
+    <div className="w-full max-w-md">
+      <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
+        <div className="flex items-center gap-2 border-b border-line bg-surface/80 px-4 py-3">
+          <div className="flex gap-1.5">
+            <div className="h-3 w-3 rounded-full bg-danger-soft" />
+            <div className="h-3 w-3 rounded-full bg-warning-soft" />
+            <div className="h-3 w-3 rounded-full bg-accent-soft" />
+          </div>
+          <span className="ml-2 font-mono text-xs text-ink-subtle">
+            secret-share
+          </span>
+        </div>
+        <div className="p-6">
+          <div className="h-40" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ShareViewerPage({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
+  return (
+    <Suspense fallback={<ShareViewerShell />}>
+      <ShareViewer params={params} />
+    </Suspense>
+  );
+}
+
+function ShareViewer({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = use(params);
 
   const [step, setStep] = useState<ViewerStep>("email");
   const [email, setEmail] = useState("");

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useSettingsProvenance } from "@/hooks";
+import { useNow, useSettingsProvenance } from "@/hooks";
 
 /** "2 days ago" without pulling in a date library for one line of text. */
-function relativeTime(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+function relativeTime(timestamp: number, now: number): string {
+  if (!now) return "—";
+  const seconds = Math.floor((now - timestamp) / 1000);
   if (seconds < 60) return "just now";
   const units: [number, string][] = [
     [60, "minute"],
@@ -39,6 +40,7 @@ export function SectionProvenance({
   projectId?: string;
 }) {
   const last = useSettingsProvenance({ organizationId, action, projectId });
+  const now = useNow();
   if (!last) return null;
 
   return (
@@ -48,7 +50,7 @@ export function SectionProvenance({
     >
       Changed by {last.userName} ·{" "}
       <span className="whitespace-nowrap">
-        {relativeTime(last.changedAt)} →
+        {relativeTime(last.changedAt, now)} →
       </span>
     </Link>
   );

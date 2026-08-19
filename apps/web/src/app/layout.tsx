@@ -48,10 +48,6 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Envpilot",
-    title: "Envpilot — Stop Pasting .env Files Into Slack",
-    description:
-      "Envpilot keeps your team's environment variables in sync — CLI, VS Code extension, and web dashboard.",
-    url: baseUrl,
     locale: "en_US",
     images: [
       {
@@ -67,8 +63,6 @@ export const metadata: Metadata = {
   // Twitter / X — uses JPEG for faster crawler fetching (123KB vs 852KB PNG)
   twitter: {
     card: "summary_large_image",
-    title: "Envpilot — Stop Pasting .env Files Into Slack",
-    description: "Envpilot keeps your team's environment variables in sync.",
     images: [
       {
         url: ogImageJpg,

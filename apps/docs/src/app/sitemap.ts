@@ -1,8 +1,12 @@
 import type { MetadataRoute } from "next";
+import { cacheLife } from "next/cache";
 import { getAllDocs } from "@/lib/content";
 import { SITE_URLS } from "@envpilot/ui";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  "use cache";
+  cacheLife("days");
+
   const now = new Date();
 
   const docsPages: MetadataRoute.Sitemap = getAllDocs().map((doc) => ({

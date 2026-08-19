@@ -1,7 +1,11 @@
 import type { MetadataRoute } from "next";
+import { cacheLife } from "next/cache";
 import { COMPARISONS } from "@/lib/comparisons";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  "use cache";
+  cacheLife("days");
+
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.envpilot.dev";
   const now = new Date();
 

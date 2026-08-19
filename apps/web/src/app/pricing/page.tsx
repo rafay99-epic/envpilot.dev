@@ -1,8 +1,7 @@
 import { jsonLdScript } from "@envpilot/ui";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { convex } from "@/lib/convex-client";
-import { api } from "@convex/_generated/api";
+import { getPricing } from "@/lib/pricing-data";
 import {
   MarketingShell,
   PageHero,
@@ -17,7 +16,7 @@ import {
 } from "@/components/pricing/PricingContent";
 
 export const metadata: Metadata = {
-  title: "Pricing | Envpilot",
+  title: "Pricing",
   description:
     "Simple, transparent pricing for Envpilot. Start free with AES-256 encryption, RBAC, and real-time sync. Upgrade to Pro for unlimited resources.",
   alternates: { canonical: "/pricing" },
@@ -59,19 +58,7 @@ const faqSchema = {
 };
 
 export default async function PricingPage() {
-  let pricingData: PricingData | null = null;
-  let paymentsEnabled: boolean | null = null;
-
-  try {
-    const [pricing, payments] = await Promise.all([
-      convex.query(api.features.featureRegistry.queries.getPricingData),
-      convex.query(api.features.billing.tierLimits.isPaymentsEnabled),
-    ]);
-    pricingData = pricing as PricingData;
-    paymentsEnabled = payments ?? false;
-  } catch {
-    // Graceful fallback — client component will fetch via useQuery
-  }
+  const { pricingData, paymentsEnabled } = await getPricing();
 
   return (
     <MarketingShell>

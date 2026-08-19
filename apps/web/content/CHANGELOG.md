@@ -15,6 +15,32 @@
 
 <!-- entry -->
 ---
+title: The Dashboard Stops Waiting For The Server
+version: v1.66.0
+date: 2026-08-19
+types: [improvement]
+---
+
+Clicking a link in the dashboard used to do nothing for a moment. The sidebar, the breadcrumbs, the whole frame sat still while the server resolved your session, synced your account, and asked Convex three more questions. Only then did anything paint. Every one of the roughly thirty dashboard routes worked this way, because they all shared one layout that did all of it before rendering a single element.
+
+Now the frame paints on the click, and the session arrives behind it.
+
+### What Changed
+
+The dashboard layout no longer waits for the session. It hands the lookup to the client as a promise and returns immediately, so the sidebar and chrome are part of the prerendered page rather than something the server assembles per request. Your account, organization and permissions stream in and fill it.
+
+Routing was never the layout's job to protect — the proxy already turns signed-out visitors away before this code runs — so nothing about who can reach the dashboard has changed. The suspended-account and sign-in-failure screens now arrive with the session instead of in place of the page.
+
+The public pages moved the same direction. Plan data on the landing and pricing pages, the rendered changelog, and both sitemaps are now built once instead of on every visit.
+
+### Fewer Requests On The Way In
+
+Links used to trigger one prefetch each. A projects grid with twenty cards meant twenty requests for what was, in the end, the same route. Next.js now fetches one reusable shell per route and shares it across every link that points there.
+
+### Under The Hood
+
+Upgraded to Next.js 16.3 with Cache Components and Partial Prefetching enabled across the web app, blog and docs. The dev server also uses substantially less memory, and repeat builds reuse a disk cache.
+---
 title: A Sandbox That Only Sandboxed What It Meant To
 version: v1.22.2
 date: 2026-08-19

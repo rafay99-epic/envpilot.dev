@@ -9,7 +9,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { roleLabel } from "@/lib/roles";
-import { useAuthContext } from "./auth-provider";
+import { useAuthContext } from "./auth-context";
 import { useConvexUser } from "@/hooks/useConvexUser";
 
 interface Organization {

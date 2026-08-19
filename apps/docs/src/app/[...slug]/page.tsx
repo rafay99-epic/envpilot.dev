@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { cacheLife } from "next/cache";
 import type { Metadata } from "next";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
@@ -19,6 +21,7 @@ import { DocsSidebar } from "@/components/DocsSidebar";
 import { DOC_ICONS } from "@/components/doc-icons";
 import { TableOfContents } from "@/components/TableOfContents";
 import { DocsShell } from "@/components/shell";
+import { DocSkeleton } from "@/components/doc-skeleton";
 import { LLMActions } from "@/components/LLMActions";
 import { Callout, Steps, Endpoint } from "@/components/mdx";
 import Link from "next/link";
@@ -52,6 +55,19 @@ const mdxOptions = {
   },
 };
 
+async function DocBody({ source }: { source: string }) {
+  "use cache";
+  cacheLife("max");
+
+  return (
+    <MDXRemote
+      source={source}
+      components={mdxComponents}
+      options={mdxOptions as never}
+    />
+  );
+}
+
 interface PageProps {
   params: Promise<{ slug: string[] }>;
 }
@@ -80,7 +96,17 @@ export async function generateMetadata({
   };
 }
 
-export default async function DocPage({ params }: PageProps) {
+export default function DocPage({ params }: PageProps) {
+  return (
+    <DocsShell>
+      <Suspense fallback={<DocSkeleton />}>
+        <Doc params={params} />
+      </Suspense>
+    </DocsShell>
+  );
+}
+
+async function Doc({ params }: PageProps) {
   const slug = (await params).slug.join("/");
   const doc = getDocBySlug(slug);
   if (!doc) notFound();
@@ -139,12 +165,12 @@ export default async function DocPage({ params }: PageProps) {
   const Icon = DOC_ICONS[doc.icon] ?? DOC_ICONS["file-text"];
 
   return (
-    <DocsShell>
+    <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData) }}
       />
-      <div className="relative overflow-hidden">
+      <div className="relative">
         {/* Deliberately no ambient backdrop here: docs are a reading
             surface — glow/grid/noise layers behind body text hurt
             legibility. Decorative effects stay on non-reading pages. */}
@@ -205,11 +231,7 @@ export default async function DocPage({ params }: PageProps) {
 
               {/* ── MDX content ─────────────────────────────────── */}
               <article className="mt-10">
-                <MDXRemote
-                  source={doc.content}
-                  components={mdxComponents}
-                  options={mdxOptions as never}
-                />
+                <DocBody source={doc.content} />
               </article>
 
               {/* ── Prev / Next ─────────────────────────────────── */}
@@ -265,6 +287,6 @@ export default async function DocPage({ params }: PageProps) {
           </div>
         </div>
       </div>
-    </DocsShell>
+    </>
   );
 }

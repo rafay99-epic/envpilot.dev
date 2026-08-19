@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, use, useId, useReducer, useRef } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import { useConvex, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -595,7 +594,7 @@ function OrganizationMembersPageContent({
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-4xl space-y-8">
+      <div className="space-y-8">
         {/* Header skeleton */}
         <div className="flex items-center justify-between">
           <div>
@@ -637,7 +636,7 @@ function OrganizationMembersPageContent({
 
   if (error && !org) {
     return (
-      <div className="mx-auto max-w-4xl">
+      <div>
         <div className="rounded-xl border p-6 border-danger-line bg-danger-soft">
           <p className="text-danger">{error}</p>
         </div>
@@ -646,67 +645,46 @@ function OrganizationMembersPageContent({
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="space-y-8">
       <div>
-        <Link
-          href={`/organizations/${slug}`}
-          className="inline-flex items-center gap-1 text-sm text-ink-faint hover:text-ink"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Back to {org?.name}
-        </Link>
-        <div className="mt-4">
-          <PageHeader
-            icon={Users}
-            title="Team Members"
-            description={<>Manage who has access to {org?.name}.</>}
-            actions={
-              canInvite ? (
-                <button
-                  onClick={() => setShowInviteModal(true)}
-                  disabled={memberLimitReached}
-                  title={
-                    memberLimitReached
-                      ? `Team member limit reached (${totalMemberSlots}/${memberLimit}). Upgrade to Pro for unlimited members.`
-                      : undefined
-                  }
-                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                    memberLimitReached
-                      ? "cursor-not-allowed bg-ink text-ink-muted"
-                      : "bg-ink text-ink-inverse hover:bg-ink-muted"
-                  }`}
+        <PageHeader
+          icon={Users}
+          title="Team Members"
+          description={<>Manage who has access to {org?.name}.</>}
+          actions={
+            canInvite ? (
+              <button
+                onClick={() => setShowInviteModal(true)}
+                disabled={memberLimitReached}
+                title={
+                  memberLimitReached
+                    ? `Team member limit reached (${totalMemberSlots}/${memberLimit}). Upgrade to Pro for unlimited members.`
+                    : undefined
+                }
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  memberLimitReached
+                    ? "cursor-not-allowed bg-ink text-ink-muted"
+                    : "bg-ink text-ink-inverse hover:bg-ink-muted"
+                }`}
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
                 >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                  Invite Member
-                </button>
-              ) : undefined
-            }
-          />
-        </div>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Invite Member
+              </button>
+            ) : undefined
+          }
+        />
       </div>
 
       {/* Member limit warning */}

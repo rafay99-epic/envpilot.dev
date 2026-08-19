@@ -24,9 +24,13 @@ const nextConfig: NextConfig = {
   // unaffected.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   reactCompiler: true,
+
+  cacheComponents: true,
+  partialPrefetching: true,
   transpilePackages: ["@envpilot/ui"],
   env: {
     NEXT_PUBLIC_APP_VERSION: APP_VERSIONS.web,
+    NEXT_PUBLIC_BUILD_YEAR: String(new Date().getFullYear()),
   },
 
   // ── Blog + docs moved to their own apps/subdomains ─────────────────
@@ -83,16 +87,12 @@ const nextConfig: NextConfig = {
     ],
 
     // ── Client-side router cache ─────────────────────────────────────
-    // Keep navigated pages in memory so back/forward is instant.
-    // Dashboard pages are client components whose data comes from live
-    // Convex subscriptions, so the cached RSC payload is just the shell —
-    // a long TTL cannot serve stale data. 30 s meant almost every nav
-    // re-ran the dynamic (dashboard) layout (auth + 3 Convex round trips)
-    // server-side; 180 s makes repeat navigation instant.
     staleTimes: {
       dynamic: 180,
       static: 300,
     },
+
+    turbopackRustReactCompiler: true,
   },
 
   // ── Image optimization ─────────────────────────────────────────────

@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { AuthErrorBoundary } from "@/components/auth/auth-error-boundary";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
+import { DashboardNavFallback } from "@/components/dashboard/dashboard-nav-fallback";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { CommandPalette } from "@/components/command-palette";
 import { UpdateBanner } from "@/components/dashboard/update-banner";
@@ -35,8 +37,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           }}
         />
 
-        {/* Sidebar Navigation */}
-        <DashboardNav />
+        <Suspense fallback={<DashboardNavFallback />}>
+          <DashboardNav />
+        </Suspense>
 
         {/* Main Content */}
         <main className="relative z-10 flex-1 overflow-auto">
@@ -45,15 +48,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 their own hardcoded arrow to a fixed parent, which is the
                 wrong destination whenever you arrive from search or the
                 command palette. Renders null at the dashboard root. */}
-            <Breadcrumbs className="mb-5" />
+            <Suspense fallback={<div className="mb-5 h-5" />}>
+              <Breadcrumbs className="mb-5" />
+            </Suspense>
             {children}
           </div>
         </main>
 
         {/* Global Keyboard Shortcuts */}
         <KeyboardShortcutsProvider>
-          {/* Global Search Command Palette */}
-          <CommandPalette />
+          <Suspense fallback={null}>
+            <CommandPalette />
+          </Suspense>
         </KeyboardShortcutsProvider>
 
         {/* Update Available Notification */}

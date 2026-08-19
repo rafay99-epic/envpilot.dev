@@ -24,9 +24,15 @@ import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedGrid } from "@/components/dashboard/animated-list";
 import { ChevronRight, Clock, FolderGit2, Plus, Star } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
+import ProjectsLoading from "./loading";
 
 export default function ProjectsPage() {
-  const { canDo, organization, user } = useAuthContext();
+  const {
+    canDo,
+    organization,
+    user,
+    isLoading: isAuthLoading,
+  } = useAuthContext();
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
     | undefined;
@@ -55,6 +61,10 @@ export default function ProjectsPage() {
   // with cards instead of leaving a dead band above the pagination bar.
   const { pageSize, gridRef, footerRef } = useAutoPageSize();
   const pagination = usePagination(sortedProjects, { pageSize });
+
+  if (isAuthLoading) {
+    return <ProjectsLoading />;
+  }
 
   if (!organization) {
     return (

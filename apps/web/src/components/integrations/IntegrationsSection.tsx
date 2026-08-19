@@ -25,6 +25,7 @@ import {
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { useOrganizationProjects } from "@/hooks/useProjects";
+import { useNow } from "@/hooks";
 import { sanitizeConvexError } from "@/lib/error-messages";
 
 type Provider = "slack" | "discord";
@@ -82,8 +83,9 @@ const toggleProject = (
     ? projectsInScope.filter((id) => id !== projectId)
     : [...projectsInScope, projectId];
 
-function relativeTime(timestamp: number): string {
-  const minutes = Math.round((Date.now() - timestamp) / 60_000);
+function relativeTime(timestamp: number, now: number): string {
+  if (!now) return "—";
+  const minutes = Math.round((now - timestamp) / 60_000);
   if (minutes < 1) return "just now";
   if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.round(minutes / 60);
@@ -203,6 +205,7 @@ export function IntegrationsSection({
 }: {
   organizationId: Id<"organizations">;
 }) {
+  const now = useNow(60_000);
   const webhooks = useQuery(
     api.features.integrations.webhooks.listForOrganization,
     { organizationId }
@@ -708,7 +711,7 @@ export function IntegrationsSection({
                         {projectScopeLabel(hook.projectIds, projects)} ·{" "}
                         {hook.eventGroups.join(", ")}
                         {hook.lastSentAt
-                          ? ` · sent ${relativeTime(hook.lastSentAt)}`
+                          ? ` · sent ${relativeTime(hook.lastSentAt, now)}`
                           : ""}
                       </p>
                       {hook.lastStatus !== null &&

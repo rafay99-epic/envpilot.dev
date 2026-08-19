@@ -1,7 +1,12 @@
+import { cacheLife } from "next/cache";
 import { getDocBySlug, getAllDocs } from "@/lib/content";
 
-// Disk-based content only changes at deploy time — render at build, serve from CDN.
-export const dynamic = "force-static";
+async function readDoc(slug: string) {
+  "use cache";
+  cacheLife("max");
+
+  return getDocBySlug(slug)?.content ?? null;
+}
 
 export function generateStaticParams() {
   return getAllDocs().map((doc) => ({ slug: doc.slug.split("/") }));
@@ -18,16 +23,16 @@ interface RouteParams {
  * source of a doc instead of parsing rendered HTML.
  */
 export async function GET(_request: Request, { params }: RouteParams) {
-  const doc = getDocBySlug((await params).slug.join("/"));
+  const content = await readDoc((await params).slug.join("/"));
 
-  if (!doc) {
+  if (content === null) {
     return new Response("Not found", {
       status: 404,
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   }
 
-  return new Response(doc.content, {
+  return new Response(content, {
     headers: {
       "Content-Type": "text/markdown; charset=utf-8",
       "Cache-Control": "public, max-age=86400, s-maxage=86400",

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cacheLife } from "next/cache";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import rehypePrettyCode from "rehype-pretty-code";
@@ -8,7 +9,7 @@ import { ChangelogContent } from "@/components/changelog/ChangelogContent";
 import { getChangelog } from "@/lib/changelog";
 
 export const metadata: Metadata = {
-  title: "Changelog | Envpilot",
+  title: "Changelog",
   description:
     "All the latest updates, improvements, and fixes to Envpilot. Follow along as we build.",
   alternates: { canonical: "/changelog" },
@@ -35,6 +36,19 @@ const mdxOptions = {
   },
 };
 
+async function EntryBody({ source }: { source: string }) {
+  "use cache";
+  cacheLife("max");
+
+  return (
+    <MDXRemote
+      source={source}
+      components={mdxComponents}
+      options={mdxOptions as never}
+    />
+  );
+}
+
 export default function ChangelogPage() {
   // content/CHANGELOG.md is read at build time. No Convex round trip, no
   // revalidate, no ISR writes — the page is fully static.
@@ -44,13 +58,7 @@ export default function ChangelogPage() {
     title: entry.title,
     publishedAt: entry.publishedAt,
     types: entry.types,
-    body: (
-      <MDXRemote
-        source={entry.content}
-        components={mdxComponents}
-        options={mdxOptions as never}
-      />
-    ),
+    body: <EntryBody source={entry.content} />,
   }));
 
   return (

@@ -1,8 +1,12 @@
 import type { MetadataRoute } from "next";
+import { cacheLife } from "next/cache";
 import { SITE_URLS } from "@envpilot/ui";
 import { getAllPosts } from "@/lib/content";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  "use cache";
+  cacheLife("days");
+
   const staticPages: MetadataRoute.Sitemap = [
     {
       url: SITE_URLS.blog,

@@ -28,7 +28,7 @@ export async function generateMetadata({
   if (!comparison) return { title: "Not Found" };
 
   return {
-    title: comparison.metaTitle,
+    title: { absolute: comparison.metaTitle },
     description: comparison.metaDescription,
     alternates: { canonical: `/vs/${slug}` },
     openGraph: {

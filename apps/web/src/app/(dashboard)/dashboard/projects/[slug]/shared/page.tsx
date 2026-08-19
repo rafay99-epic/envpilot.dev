@@ -39,6 +39,7 @@ import {
   useProjectDocShares,
   useRevokeDocShare,
   type ProjectDocShare,
+  useNow,
 } from "@/hooks";
 import { useRevokeShare } from "@/hooks/useShareSecret";
 import { ConfirmDialog } from "@/components/ui";
@@ -143,6 +144,7 @@ const TIMESTAMP_REFRESH_MS = 60_000;
 /* ─── Helpers ──────────────────────────────────────────────────────── */
 
 function formatRelativeTime(timestamp: number, now: number): string {
+  if (!now) return "—";
   const diff = now - timestamp;
   const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -156,6 +158,7 @@ function formatRelativeTime(timestamp: number, now: number): string {
 }
 
 function formatTimeRemaining(expiresAt: number, now: number): string {
+  if (!now) return "—";
   const diff = expiresAt - now;
   if (diff <= 0) return "Expired";
   const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -542,12 +545,7 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
   } = useAuthContext();
   const { convexUserId } = useConvexUser(user?.id);
 
-  // Stable timestamp for relative time formatting — refreshes every 60s
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), TIMESTAMP_REFRESH_MS);
-    return () => clearInterval(id);
-  }, []);
+  const now = useNow(TIMESTAMP_REFRESH_MS);
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { allowed: canShare } = useFeatureGate(orgId, "secret_sharing");

@@ -178,6 +178,26 @@ export function UsageLayout(props: UsageLayoutProps) {
   // ── Plan features data ──────────────────────────────────────────────
   const planVals = isFree ? FREE_VALUES : PRO_VALUES;
 
+  // A capped row is one the plan actually meters. Everything else is uncapped,
+  // and is listed by name rather than drawn as a full bar — a 100%-filled bar
+  // for an unlimited resource reads as "maxed out", which is the opposite of
+  // what it means.
+  const cappedRows = quotaRows.filter((r) => r.limit !== null);
+  const uncappedRows = quotaRows.filter((r) => r.limit === null);
+
+  const offFeatures = enforcementEnabled
+    ? featureCategories.flatMap((cat) =>
+        cat.features
+          .filter(
+            (f) =>
+              !QUOTA_KEYS.has(f.key) &&
+              !formatFeatureValue(planVals[f.key], f.isNumeric, f.numericSuffix)
+                .enabled
+          )
+          .map((f) => f.label)
+      )
+    : [];
+
   return (
     <div className="space-y-6">
       {/* ── 1. Plan strip ─────────────────────────────────────────────── */}
@@ -276,82 +296,113 @@ export function UsageLayout(props: UsageLayoutProps) {
       )}
 
       {/* ── 3. Quotas & limits ────────────────────────────────────────── */}
-      <TerminalWindow title="usage — quotas & limits">
-        <div className="p-6 space-y-4">
+      <TerminalWindow title="usage — limits">
+        <div className="p-6 space-y-6">
           <p className="font-mono text-xs text-ink-subtle">
             $ envpilot status --usage
           </p>
 
-          {FEATURE_GROUPS.map((group) => {
-            const rows = quotaRows.filter((r) => r.group === group);
-            if (rows.length === 0) return null;
-            return (
-              <div key={group}>
-                <h3 className="text-[10px] uppercase tracking-widest text-ink-faint font-bold mb-3">
-                  {group}
-                </h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {rows.map((r) => (
-                    <div key={r.label}>
-                      <QuotaRow
-                        icon={r.icon}
-                        label={r.label}
-                        current={r.current}
-                        limit={r.limit}
-                        isFree={isFree}
-                        enforcementEnabled={enforcementEnabled}
-                        isAllowed={isAllowed}
-                        gateKey={r.gateKey}
-                        onUpgrade={onUpgrade}
-                      />
-                      {r.isVariableRow &&
-                        usage?.variablesPerProject &&
-                        usage.variablesPerProject.length > 1 && (
-                          <VariableByProject
-                            projects={usage.variablesPerProject}
-                            limit={meterLimits.variables}
-                          />
-                        )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Data retention */}
           <div>
-            <h3 className="text-[10px] uppercase tracking-widest text-ink-faint font-bold mb-3">
-              Data retention
-            </h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {retentionRows.map((r) => (
-                <div
-                  key={r.label}
-                  className="rounded-lg border border-line bg-surface-raised/20 p-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {r.icon}
-                      <span className="text-sm font-medium text-ink-muted">
-                        {r.label}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm font-mono text-ink">
-                        {r.days} days
-                      </span>
-                      {enforcementEnabled && isFree && (
-                        <p className="text-[10px] text-ink-faint">
-                          Pro: {r.proDays} days
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span
+                className={`font-mono text-2xl font-bold ${
+                  atLimitRows.length > 0
+                    ? "text-danger"
+                    : nearRows.length > 0
+                      ? "text-warning"
+                      : "text-accent"
+                }`}
+              >
+                {atLimitRows.length > 0
+                  ? `${atLimitRows.length} at limit`
+                  : nearRows.length > 0
+                    ? `${nearRows.length} near limit`
+                    : "All clear"}
+              </span>
+              <span className="font-mono text-xs text-ink-muted">
+                {atLimitRows.length > 0
+                  ? atLimitRows.map((r) => r.label).join(", ")
+                  : nearRows.length > 0
+                    ? nearRows.map((r) => r.label).join(", ")
+                    : "nothing near a limit"}
+              </span>
             </div>
+            <p className="mt-1 font-mono text-[11px] text-ink-faint">
+              {tier} &middot; {uncappedRows.length} of {quotaRows.length}{" "}
+              resources uncapped
+            </p>
           </div>
+
+          {cappedRows.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-ink-faint">
+                Counts toward a limit
+              </h3>
+              <div className="divide-y divide-line border-y border-line">
+                {cappedRows.map((r) => (
+                  <div key={r.label}>
+                    <QuotaRow
+                      icon={r.icon}
+                      label={r.label}
+                      current={r.current}
+                      limit={r.limit}
+                      isFree={isFree}
+                      enforcementEnabled={enforcementEnabled}
+                      isAllowed={isAllowed}
+                      gateKey={r.gateKey}
+                      onUpgrade={onUpgrade}
+                    />
+                    {r.isVariableRow &&
+                      usage?.variablesPerProject &&
+                      usage.variablesPerProject.length > 1 && (
+                        <VariableByProject
+                          projects={usage.variablesPerProject}
+                          limit={meterLimits.variables}
+                        />
+                      )}
+                  </div>
+                ))}
+                {retentionRows.map((r) => (
+                  <div
+                    key={r.label}
+                    className="flex items-center justify-between py-2.5"
+                  >
+                    <span className="text-sm text-ink-muted">{r.label}</span>
+                    <span className="font-mono text-sm text-ink">
+                      {r.days} days
+                      {enforcementEnabled && isFree && (
+                        <span className="ml-2 text-[11px] text-ink-faint">
+                          Pro: {r.proDays}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {uncappedRows.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-ink-faint">
+                No limit on your plan
+              </h3>
+              <p className="font-mono text-[11px] leading-relaxed text-ink-muted">
+                {uncappedRows.map((r) => r.label).join("  ·  ")}
+              </p>
+            </div>
+          )}
+
+          {offFeatures.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-ink-faint">
+                Not in your plan
+              </h3>
+              <p className="font-mono text-[11px] leading-relaxed text-ink-faint">
+                {offFeatures.join("  ·  ")}
+              </p>
+            </div>
+          )}
         </div>
       </TerminalWindow>
 

@@ -17,7 +17,7 @@ import {
 import { PageHeader } from "@envpilot/ui";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useProjectBySlug, useConvexUser } from "@/hooks";
+import { useProjectBySlug, useConvexUser, useNow } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { ConfirmDialog } from "@/components/ui";
 
@@ -26,12 +26,12 @@ import { ConfirmDialog } from "@/components/ui";
 const RETENTION_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function daysAgo(timestamp: number): number {
-  return Math.max(0, Math.floor((Date.now() - timestamp) / DAY_MS));
+function daysAgo(timestamp: number, now: number): number {
+  return Math.max(0, Math.floor((now - timestamp) / DAY_MS));
 }
 
-function daysLeft(deletedAt: number): number {
-  const remaining = deletedAt + RETENTION_DAYS * DAY_MS - Date.now();
+function daysLeft(deletedAt: number, now: number): number {
+  const remaining = deletedAt + RETENTION_DAYS * DAY_MS - now;
   return Math.max(0, Math.ceil(remaining / DAY_MS));
 }
 
@@ -52,6 +52,7 @@ interface TrashPageProps {
  */
 export default function TrashPage({ params }: TrashPageProps) {
   const { slug } = use(params);
+  const now = useNow(60_000);
   const { organization, user, capabilities } = useAuthContext();
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { convexUserId } = useConvexUser(user?.id);
@@ -295,16 +296,17 @@ export default function TrashPage({ params }: TrashPageProps) {
                         {variable.key}
                       </code>
                       <p className="mt-1 text-xs text-ink-subtle">
-                        Deleted {pluralDays(daysAgo(variable.deletedAt))} ago
+                        Deleted {pluralDays(daysAgo(variable.deletedAt, now))}{" "}
+                        ago
                         {" — "}
                         <span
                           className={
-                            daysLeft(variable.deletedAt) <= 1
+                            daysLeft(variable.deletedAt, now) <= 1
                               ? "font-medium text-danger"
                               : ""
                           }
                         >
-                          {pluralDays(daysLeft(variable.deletedAt))} left
+                          {pluralDays(daysLeft(variable.deletedAt, now))} left
                         </span>
                       </p>
                     </div>
@@ -349,16 +351,17 @@ export default function TrashPage({ params }: TrashPageProps) {
                         {account.name}
                       </span>
                       <p className="mt-1 text-xs text-ink-subtle">
-                        Deleted {pluralDays(daysAgo(account.deletedAt))} ago
+                        Deleted {pluralDays(daysAgo(account.deletedAt, now))}{" "}
+                        ago
                         {" — "}
                         <span
                           className={
-                            daysLeft(account.deletedAt) <= 1
+                            daysLeft(account.deletedAt, now) <= 1
                               ? "font-medium text-danger"
                               : ""
                           }
                         >
-                          {pluralDays(daysLeft(account.deletedAt))} left
+                          {pluralDays(daysLeft(account.deletedAt, now))} left
                         </span>
                       </p>
                     </div>
@@ -406,16 +409,16 @@ export default function TrashPage({ params }: TrashPageProps) {
                         {file.path}
                       </p>
                       <p className="mt-1 text-xs text-ink-subtle">
-                        Deleted {pluralDays(daysAgo(file.deletedAt))} ago
+                        Deleted {pluralDays(daysAgo(file.deletedAt, now))} ago
                         {" — "}
                         <span
                           className={
-                            daysLeft(file.deletedAt) <= 1
+                            daysLeft(file.deletedAt, now) <= 1
                               ? "font-medium text-danger"
                               : ""
                           }
                         >
-                          {pluralDays(daysLeft(file.deletedAt))} left
+                          {pluralDays(daysLeft(file.deletedAt, now))} left
                         </span>
                       </p>
                     </div>
@@ -462,16 +465,16 @@ export default function TrashPage({ params }: TrashPageProps) {
                       </p>
                       {doc.deletedAt !== undefined && (
                         <p className="mt-1 text-xs text-ink-subtle">
-                          Deleted {pluralDays(daysAgo(doc.deletedAt))} ago
+                          Deleted {pluralDays(daysAgo(doc.deletedAt, now))} ago
                           {" — "}
                           <span
                             className={
-                              daysLeft(doc.deletedAt) <= 1
+                              daysLeft(doc.deletedAt, now) <= 1
                                 ? "font-medium text-danger"
                                 : ""
                             }
                           >
-                            {pluralDays(daysLeft(doc.deletedAt))} left
+                            {pluralDays(daysLeft(doc.deletedAt, now))} left
                           </span>
                         </p>
                       )}

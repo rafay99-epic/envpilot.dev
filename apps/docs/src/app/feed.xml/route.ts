@@ -1,8 +1,6 @@
+import { cacheLife } from "next/cache";
 import { getAllDocs } from "@/lib/content";
 import { SITE_URLS } from "@envpilot/ui";
-
-// Disk-based content only changes at deploy time — render at build, serve from CDN.
-export const dynamic = "force-static";
 
 /**
  * RSS 2.0 feed for Envpilot documentation pages.
@@ -10,7 +8,10 @@ export const dynamic = "force-static";
  * Serves at /feed.xml — auto-discovered by RSS readers via the
  * <link rel="alternate" type="application/rss+xml"> tag in the layout.
  */
-export async function GET() {
+async function renderFeed() {
+  "use cache";
+  cacheLife("max");
+
   const docs = getAllDocs();
   const now = new Date().toUTCString();
 
@@ -38,6 +39,12 @@ export async function GET() {
 ${items}
   </channel>
 </rss>`;
+
+  return xml;
+}
+
+export async function GET() {
+  const xml = await renderFeed();
 
   return new Response(xml, {
     headers: {

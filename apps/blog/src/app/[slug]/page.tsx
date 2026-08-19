@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { cacheLife } from "next/cache";
 import type { Metadata } from "next";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
@@ -12,12 +14,12 @@ import {
   GridLines,
   jsonLdScript,
   MermaidChart,
-  Noise,
   remarkMermaid,
   Reveal,
   SITE_URLS,
 } from "@envpilot/ui";
 import { BlogShell } from "@/components/shell";
+import { ArticleSkeleton } from "@/components/article-skeleton";
 import Link from "next/link";
 import { ArrowLeft, Clock, Layers } from "lucide-react";
 
@@ -41,6 +43,19 @@ const mdxOptions = {
   },
 };
 
+async function PostBody({ source }: { source: string }) {
+  "use cache";
+  cacheLife("max");
+
+  return (
+    <MDXRemote
+      source={source}
+      components={mdxComponents}
+      options={mdxOptions as never}
+    />
+  );
+}
+
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
@@ -57,7 +72,7 @@ export async function generateMetadata({
   if (!post) return { title: "Not Found" };
 
   return {
-    title: `${post.title} — Envpilot Blog`,
+    title: post.title,
     description: post.description,
     keywords: post.keywords,
     alternates: { canonical: `${SITE_URLS.blog}/${slug}` },
@@ -79,7 +94,17 @@ export async function generateMetadata({
   };
 }
 
-export default async function BlogPostPage({ params }: PageProps) {
+export default function BlogPostPage({ params }: PageProps) {
+  return (
+    <BlogShell>
+      <Suspense fallback={<ArticleSkeleton />}>
+        <Article params={params} />
+      </Suspense>
+    </BlogShell>
+  );
+}
+
+async function Article({ params }: PageProps) {
   const { slug } = await params;
   const post = getPostBySlug(slug);
   if (!post) notFound();
@@ -148,7 +173,7 @@ export default async function BlogPostPage({ params }: PageProps) {
   };
 
   return (
-    <BlogShell>
+    <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdScript(blogPostingSchema) }}
@@ -161,7 +186,6 @@ export default async function BlogPostPage({ params }: PageProps) {
           <AuroraGlow />
           <GridLines />
         </div>
-        <Noise />
 
         <div className="relative z-10 mx-auto max-w-4xl px-4 pt-8 pb-20 sm:px-6 lg:pt-14">
           <main className="min-w-0">
@@ -248,11 +272,7 @@ export default async function BlogPostPage({ params }: PageProps) {
 
             {/* Article body */}
             <article className="mt-8 sm:mt-10">
-              <MDXRemote
-                source={post.content}
-                components={mdxComponents}
-                options={mdxOptions as never}
-              />
+              <PostBody source={post.content} />
             </article>
 
             {/* Bottom back link */}
@@ -268,6 +288,6 @@ export default async function BlogPostPage({ params }: PageProps) {
           </main>
         </div>
       </div>
-    </BlogShell>
+    </>
   );
 }

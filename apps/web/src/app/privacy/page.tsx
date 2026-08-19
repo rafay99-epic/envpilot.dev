@@ -3,7 +3,7 @@ import { MarketingShell, PageHero, terminal } from "@/components/marketing";
 import { ScrollSpySidebar } from "@/components/ui/ScrollSpySidebar";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Envpilot",
+  title: "Privacy Policy",
   description:
     "Learn how Envpilot collects, uses, and protects your personal data. AES-256 encryption, GDPR compliance, and zero-knowledge architecture.",
   alternates: { canonical: "/privacy" },

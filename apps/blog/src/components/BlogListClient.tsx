@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Suspense, useState, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
@@ -14,9 +14,26 @@ interface Props {
 }
 
 export function BlogListClient({ posts, allTags }: Props) {
-  const searchParams = useSearchParams();
+  return (
+    <Suspense
+      fallback={<BlogList posts={posts} allTags={allTags} tag={null} />}
+    >
+      <BlogListForUrlTag posts={posts} allTags={allTags} />
+    </Suspense>
+  );
+}
+
+function BlogListForUrlTag({ posts, allTags }: Props) {
+  const tag = useSearchParams().get("tag");
+  return <BlogList posts={posts} allTags={allTags} tag={tag} />;
+}
+
+function BlogList({
+  posts,
+  allTags,
+  tag: tagFromUrl,
+}: Props & { tag: string | null }) {
   const router = useRouter();
-  const tagFromUrl = searchParams.get("tag");
 
   const [search, setSearch] = useState("");
 

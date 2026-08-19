@@ -1,5 +1,3 @@
-"use client";
-
 import { MarketingShell, PageHero, terminal } from "@/components/marketing";
 import { SupportSidebar } from "@/components/support/SupportSidebar";
 import { SupportTicketPanel } from "@/components/support/SupportTicketPanel";

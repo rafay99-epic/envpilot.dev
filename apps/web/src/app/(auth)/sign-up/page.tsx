@@ -1,6 +1,8 @@
 import { getSignUpUrl, withAuth } from "@workos-inc/authkit-nextjs";
 import { redirect } from "next/navigation";
 
+export const instant = false;
+
 export default async function SignUpPage() {
   // Check if user is already authenticated
   const { user } = await withAuth();
