@@ -83,16 +83,16 @@ export function UsageMeter({
           </span>
         </div>
       )}
-      <div
-        className={`w-full bg-surface-hover rounded-full overflow-hidden ${METER_SIZE_CLASSES[size].container}`}
-      >
+      {!isUnlimited && (
         <div
-          className={`h-full rounded-full transition-all duration-300 ${getBarColor()}`}
-          style={{
-            width: isUnlimited ? "100%" : `${Math.min(percentage, 100)}%`,
-          }}
-        />
-      </div>
+          className={`w-full bg-surface-hover rounded-full overflow-hidden ${METER_SIZE_CLASSES[size].container}`}
+        >
+          <div
+            className={`h-full rounded-full transition-all duration-300 ${getBarColor()}`}
+            style={{ width: `${Math.min(percentage, 100)}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }

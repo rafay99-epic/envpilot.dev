@@ -12,7 +12,7 @@ import { TerminalWindow } from "@/components/dashboard/terminal-ui";
 const chartConfig = {
   actionCount: {
     label: "Actions",
-    color: "var(--color-chart-2)",
+    color: "var(--color-chart-1)",
   },
 } satisfies ChartConfig;
 
@@ -85,7 +85,7 @@ export function TeamActivityChart({ users }: TeamActivityChartProps) {
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar
                 dataKey="actionCount"
-                fill="var(--color-chart-2)"
+                fill="var(--color-chart-1)"
                 radius={[0, 4, 4, 0]}
               />
             </BarChart>
