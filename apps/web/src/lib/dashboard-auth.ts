@@ -3,6 +3,7 @@ import "server-only";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { io } from "next/cache";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { AuthUser, Organization, RoleMeta } from "@/lib/auth";
@@ -42,16 +43,16 @@ export async function loadDashboardAuth(): Promise<DashboardAuthSeed> {
     user = result.user;
     accessToken = result.accessToken;
   } catch (err) {
+    // A failed session lookup is not a renderable state: rendering the
+    // dashboard shell with a half-auth'd client fires Convex queries that
+    // suspend in a loop until React gives up (#482 crash). Redirect to
+    // sign-in so the shell never mounts without a verified session.
     log.error("auth_failure", {}, err);
-    return {
-      status: "error",
-      kind: "auth",
-      message: "We couldn't verify your identity. Please sign in again.",
-    };
+    redirect("/sign-in");
   }
 
   if (!user) {
-    return { status: "unauthenticated" };
+    redirect("/sign-in");
   }
 
   // ─── STEP 2: Critical — Convex user sync ──────────────────────────────
