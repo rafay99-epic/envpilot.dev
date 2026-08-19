@@ -1,7 +1,3 @@
-/**
- * Placeholder for a post body, shared by the route's loading file and the
- * in-page boundary so both show the same thing at the same size.
- */
 export function ArticleSkeleton() {
   return (
     <div className="relative mx-auto max-w-4xl px-4 pt-8 pb-20 sm:px-6 lg:pt-14">

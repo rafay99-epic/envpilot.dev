@@ -55,12 +55,6 @@ const mdxOptions = {
   },
 };
 
-/**
- * Compiling MDX is the expensive half of this page and the source only changes
- * at deploy time, so the rendered doc is cached rather than recompiled per
- * request. It also keeps the route prerenderable: the MDX toolchain reads
- * `Date.now()` internally, which blocks a prerender outside a cache scope.
- */
 async function DocBody({ source }: { source: string }) {
   "use cache";
   cacheLife("max");
@@ -102,9 +96,6 @@ export async function generateMetadata({
   };
 }
 
-// The shell renders without the URL; only the doc waits on `params`. A
-// boundary here rather than relying on loading.tsx alone keeps the nav and
-// footer mounted when moving between docs, instead of suspending the segment.
 export default function DocPage({ params }: PageProps) {
   return (
     <DocsShell>

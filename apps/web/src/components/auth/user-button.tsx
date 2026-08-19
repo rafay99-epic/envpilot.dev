@@ -31,8 +31,6 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // The session streams in after the shell paints, so hold the avatar's space
-  // rather than inviting a signed-in user to sign in again.
   if (isLoading) {
     return (
       <div

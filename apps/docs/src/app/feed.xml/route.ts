@@ -8,8 +8,6 @@ import { SITE_URLS } from "@envpilot/ui";
  * Serves at /feed.xml — auto-discovered by RSS readers via the
  * <link rel="alternate" type="application/rss+xml"> tag in the layout.
  */
-// Disk content plus a build-stamped `lastBuildDate`. Both belong in a cache
-// scope: `use cache` can't sit on the GET export, so the body lives here.
 async function renderFeed() {
   "use cache";
   cacheLife("max");

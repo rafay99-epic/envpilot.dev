@@ -9,7 +9,6 @@ import { extractHeadings } from "@/lib/headings";
  * small enough (tens of KB) that the search dialog can fetch it once on
  * first open and match client-side. No search service, no index server.
  */
-// Disk content only changes at deploy time; build the index once and reuse it.
 async function buildIndex() {
   "use cache";
   cacheLife("max");

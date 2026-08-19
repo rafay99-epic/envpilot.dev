@@ -42,11 +42,6 @@ function formatCountdown(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-/**
- * The card chrome with no step content — the Suspense fallback while the
- * route's token streams in, so the shell paints at the same size the viewer
- * settles into rather than shifting when it arrives.
- */
 function ShareViewerShell() {
   return (
     <div className="w-full max-w-md">
@@ -69,8 +64,6 @@ function ShareViewerShell() {
   );
 }
 
-// The token is per-link data, so it can't be in the prerendered shell. Reading
-// it inside the boundary lets the card paint on click and the viewer stream in.
 export default function ShareViewerPage({
   params,
 }: {

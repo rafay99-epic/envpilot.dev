@@ -1,10 +1,3 @@
-/**
- * Shown in place of the dashboard when the signed-in account is suspended.
- *
- * Lifted out of the dashboard layout when the session moved to a streamed
- * promise: the layout can no longer return a different tree mid-render, so
- * the state travels as data and the provider picks the screen.
- */
 export function BannedNotice({ reason }: { reason: string | null }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas text-ink">

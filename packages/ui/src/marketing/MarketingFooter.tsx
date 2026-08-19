@@ -1,10 +1,6 @@
 import Link from "next/link";
 import { GlowDivider } from "./backgrounds";
 
-// Baked at build time by each app's next.config `env` block. A wall-clock read
-// here is an unstable prerender value under Cache Components, and this shell is
-// reachable from both server and client graphs, so neither `"use cache"` nor a
-// client-only read fits. The year is not request data, so a build constant is.
 const BUILD_YEAR = process.env.NEXT_PUBLIC_BUILD_YEAR ?? "2026";
 
 export interface FooterLink {

@@ -12,14 +12,6 @@ import { AccessNotices } from "@/components/auth/AccessNotices";
 import { AuthErrorPage } from "@/components/auth/auth-error-page";
 import { BannedNotice } from "@/components/auth/banned-notice";
 
-/**
- * Resolves the server's session promise without suspending.
- *
- * `use()` would suspend this component, and since it wraps the whole
- * dashboard that would put every route back behind the session lookup — the
- * exact thing streaming the promise is meant to avoid. Reading it in an
- * effect keeps children painting immediately.
- */
 function useStreamedSeed(promise: Promise<DashboardAuthSeed>) {
   const [seed, setSeed] = useState<DashboardAuthSeed | null>(null);
 
@@ -69,9 +61,6 @@ export function AuthProvider({
           accessToken: null,
         }
       : undefined,
-    // Until the seed lands there is nothing to fetch against — suppressing the
-    // mount-time /api/auth/me keeps the streamed session from racing a
-    // duplicate request for the same data.
     seed === null
   );
 
@@ -95,8 +84,6 @@ export function AuthProvider({
         <BannedNotice reason={seed.reason} />
       ) : (
         <>
-          {/* Renders only overlays, and reads the pathname to exempt the
-              org-switch escape route — nothing to approximate in the shell. */}
           <Suspense fallback={null}>
             <AccessNotices />
           </Suspense>

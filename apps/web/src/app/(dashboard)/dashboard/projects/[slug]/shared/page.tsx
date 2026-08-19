@@ -143,8 +143,6 @@ const TIMESTAMP_REFRESH_MS = 60_000;
 
 /* ─── Helpers ──────────────────────────────────────────────────────── */
 
-// `now` is 0 until the browser supplies a clock (see the `now` state below),
-// which reads as "no value yet" rather than 1970.
 function formatRelativeTime(timestamp: number, now: number): string {
   if (!now) return "—";
   const diff = now - timestamp;

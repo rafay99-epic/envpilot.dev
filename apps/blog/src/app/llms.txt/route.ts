@@ -9,8 +9,6 @@ import { SITE_URLS } from "@envpilot/ui";
  * Provides a structured summary and a list of every post that LLMs
  * can use to understand and navigate the blog's content.
  */
-// Disk-based content only changes at deploy time. `use cache` can't go on the
-// GET export itself, so the body lives here and the handler just serves it.
 async function renderLlmsTxt() {
   "use cache";
   cacheLife("max");

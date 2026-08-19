@@ -2,8 +2,6 @@ import type { MetadataRoute } from "next";
 import { cacheLife } from "next/cache";
 import { COMPARISONS } from "@/lib/comparisons";
 
-// `lastModified` is a wall-clock read, which would make the whole sitemap
-// render per request. The route list only changes at deploy, so cache it daily.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   "use cache";
   cacheLife("days");

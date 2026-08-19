@@ -32,8 +32,6 @@ const log = createLogger("access-notices");
  * name + date only, never who/why (that lives in the admin audit log).
  */
 export function AccessNotices() {
-  // Sourced from the auth context rather than layout props: the dashboard
-  // layout no longer awaits the session, so it has no resolved org to pass.
   const { organization, hasOtherOrganizations } = useAuthContext();
   const activeOrganizationId = organization?.id ?? null;
   const pathname = usePathname();

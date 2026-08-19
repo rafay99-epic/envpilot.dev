@@ -162,5 +162,4 @@ export { useSettingsTab } from "./useSettingsTab";
 export { useUnsavedChanges } from "./useUnsavedChanges";
 export { useSettingsProvenance } from "./useSettingsProvenance";
 
-// Wall-clock reads deferred out of render (Cache Components safe)
 export { useNow } from "./useNow";

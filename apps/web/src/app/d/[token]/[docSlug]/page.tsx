@@ -12,7 +12,6 @@ function Reader({
   return <SharedDocReader token={token} docSlug={docSlug} />;
 }
 
-/** One page inside a shared module. */
 export default function SharedModulePage({
   params,
 }: {

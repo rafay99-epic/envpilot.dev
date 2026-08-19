@@ -581,10 +581,6 @@ function CreateKeyDrawer({
   );
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [customExpiry, setCustomExpiry] = useState("");
-  // The earliest expiry a key may carry: tomorrow, resolved once the browser
-  // supplies a clock. The drawer is keyed per open, so that is also the moment
-  // "tomorrow" gets fixed — it cannot drift if the form is left open across
-  // midnight.
   const nowMs = useNow();
   const minExpiryDate = nowMs
     ? new Date(nowMs + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)

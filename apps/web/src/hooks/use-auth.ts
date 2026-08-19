@@ -44,12 +44,8 @@ interface UseAuthReturn {
 }
 
 /**
- * Client-side hook for accessing auth state.
+ * Client-side hook for accessing auth state
  * Note: For server components, use getUser() directly from @workos-inc/authkit-nextjs
- *
- * @param deferFetch  Set while the server's session payload is still streaming
- *   in. Without it the hook fires /api/auth/me on mount and races the streamed
- *   seed for the same data.
  */
 export function useAuth(
   initialData?: UserData,
@@ -102,15 +98,6 @@ export function useAuth(
     }
   }, []);
 
-  // The useState initializers above only see `initialData` as it was on the
-  // very first render. The dashboard's session now STREAMS in, so on that
-  // route it lands a beat later and those initializers have already run with
-  // nothing — without this the seed is silently dropped and the hook reports a
-  // signed-out, permanently-loading user.
-  //
-  // Depends on the individual fields, not `initialData`: the provider rebuilds
-  // that wrapper every render, while the fields themselves are stable
-  // references off the resolved seed.
   const seedUser = initialData?.user ?? null;
   const seedOrganization = initialData?.organization ?? null;
   const seedActions = initialData?.actions;
@@ -136,15 +123,6 @@ export function useAuth(
     seedImpersonator,
   ]);
 
-  // Fall back to /api/auth/me when the server couldn't supply the full
-  // picture: no initial data at all, no organization (its Convex query failed),
-  // or no actions (nothing computed them).
-  //
-  // Deliberately a boolean rather than `initialData` itself. The provider
-  // rebuilds that object on every render, so keying the effect on its identity
-  // re-ran the fetch for each state update the fetch itself caused — an
-  // unbounded request loop on exactly the degraded path this is meant to
-  // rescue. A primitive only changes when the answer changes.
   const needsFallbackFetch =
     !deferFetch &&
     (!initialData || !initialData.organization || !initialData.actions);
@@ -170,7 +148,6 @@ export function useAuth(
   }, [user]);
 
   const signOutHandler = useCallback(async () => {
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- /sign-out is a route handler that 302s to WorkOS logout; router.push() cannot leave the origin.
     window.location.href = "/sign-out";
   }, []);
 

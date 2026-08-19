@@ -36,13 +36,6 @@ const mdxOptions = {
   },
 };
 
-/**
- * Compiling MDX is the expensive half of this page and CHANGELOG.md only
- * changes at deploy time, so the rendered entry is cached rather than
- * recompiled per request. It also keeps the route prerenderable: the MDX
- * toolchain reads `Date.now()` internally, which blocks a prerender outside
- * a cache scope.
- */
 async function EntryBody({ source }: { source: string }) {
   "use cache";
   cacheLife("max");

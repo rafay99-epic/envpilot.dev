@@ -57,7 +57,6 @@ type Payload =
 
 type Step = "loading" | "locked" | "ready" | "unavailable" | "rate_limited";
 
-/** Doubles as the Suspense fallback while the route's token streams in. */
 export function SharedDocLoading() {
   return (
     <main className="mx-auto flex max-w-3xl items-center justify-center px-6 py-24">

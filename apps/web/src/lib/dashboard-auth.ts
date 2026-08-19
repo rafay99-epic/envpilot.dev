@@ -17,15 +17,6 @@ import { normalizeOrgRole } from "@/lib/roles";
 
 const log = createLogger("lib/dashboard-auth");
 
-/**
- * Everything the dashboard shell needs about the current session, as a value
- * rather than a redirect or a rendered error page.
- *
- * The dashboard layout hands the unresolved promise to AuthProvider instead of
- * awaiting it, so the shell prerenders and paints on click while this streams
- * in. That means the failure modes have to travel as data — a layout that
- * returns `<AuthErrorPage/>` mid-render can't be streamed into a client tree.
- */
 export type DashboardAuthSeed =
   | {
       status: "ready";
@@ -41,12 +32,6 @@ export type DashboardAuthSeed =
   | { status: "error"; kind: "auth" | "sync"; message: string };
 
 export async function loadDashboardAuth(): Promise<DashboardAuthSeed> {
-  // Everything below is request-bound, and `withAuth()` reads the clock
-  // internally to check session expiry. Without this the prerender tries to
-  // bake that in and reports the route as blocking. `io()` suspends during
-  // prerendering so the session stays out of the static shell — and unlike
-  // `connection()` it doesn't block the route's prefetch, which is what keeps
-  // the dashboard shell instant.
   await io();
 
   // ─── STEP 1: Critical — session auth ──────────────────────────────────
@@ -65,8 +50,6 @@ export async function loadDashboardAuth(): Promise<DashboardAuthSeed> {
     };
   }
 
-  // proxy.ts already redirects unauthenticated traffic to WorkOS before this
-  // runs, so reaching here means the session went away mid-flight.
   if (!user) {
     return { status: "unauthenticated" };
   }

@@ -18,9 +18,6 @@ import { reportApiError } from "@/lib/api-errors";
 
 // GET /api/auth/me - Get current authenticated user
 export async function GET(request: Request) {
-  // Declared before the try: this route is request-bound, and without it
-  // Next.js attempts a prerender whose abort lands in the catch below and gets
-  // logged as an application error.
   await connection();
 
   try {

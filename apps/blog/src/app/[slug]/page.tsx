@@ -43,12 +43,6 @@ const mdxOptions = {
   },
 };
 
-/**
- * Compiling MDX is the expensive half of this page and the source only changes
- * at deploy time, so the rendered article is cached rather than recompiled per
- * request. It also keeps the route prerenderable: the MDX toolchain reads
- * `Date.now()` internally, which blocks a prerender outside a cache scope.
- */
 async function PostBody({ source }: { source: string }) {
   "use cache";
   cacheLife("max");
@@ -78,7 +72,6 @@ export async function generateMetadata({
   if (!post) return { title: "Not Found" };
 
   return {
-    // The root layout's template appends " | Envpilot Blog".
     title: post.title,
     description: post.description,
     keywords: post.keywords,
@@ -101,9 +94,6 @@ export async function generateMetadata({
   };
 }
 
-// The shell renders without the URL; only the article waits on `params`. A
-// boundary here rather than relying on loading.tsx alone keeps the nav and
-// footer mounted when moving between posts, instead of suspending the segment.
 export default function BlogPostPage({ params }: PageProps) {
   return (
     <BlogShell>

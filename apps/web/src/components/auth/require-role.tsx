@@ -37,13 +37,6 @@ export function useRequireRole(minimum: OrgRole): {
  * instead of a half-broken page. Backend authz still enforces every action;
  * this is purely the page-level UX layer.
  *
- * Children render while the role is still resolving. The session streams in
- * after the shell paints, so holding them back put a bare spinner in the
- * static shell of every gated route — the page never got to show its own
- * skeleton and the navigation stopped feeling instant. Rendering through is
- * safe precisely because this is a UX layer: the queries underneath are
- * authorized server-side and return nothing to a user who lacks access.
- *
  * Usage: <RequireRole minimum="project_manager">…</RequireRole>
  */
 export function RequireRole({ minimum, children }: RequireRoleProps) {

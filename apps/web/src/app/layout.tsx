@@ -45,11 +45,6 @@ export const metadata: Metadata = {
   // every page that doesn't override it, telling crawlers all subpages are
   // duplicates of the homepage. Each page sets its own canonical instead.
   // Facebook, Instagram, WhatsApp, Telegram, LinkedIn, Discord, Slack, iMessage, Pinterest
-  // Deliberately NO title/description/url here. Metadata is inherited, not
-  // merged per-field, so hardcoding them made every marketing page share the
-  // homepage's social card — /pricing unfurled as "Stop Pasting .env Files
-  // Into Slack". Left unset, each page's own title and description flow into
-  // og:title and og:description, and its canonical carries the URL.
   openGraph: {
     type: "website",
     siteName: "Envpilot",
@@ -68,7 +63,6 @@ export const metadata: Metadata = {
   // Twitter / X — uses JPEG for faster crawler fetching (123KB vs 852KB PNG)
   twitter: {
     card: "summary_large_image",
-    // Title/description omitted for the same reason as openGraph above.
     images: [
       {
         url: ogImageJpg,

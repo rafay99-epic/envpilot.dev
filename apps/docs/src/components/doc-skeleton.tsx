@@ -1,11 +1,6 @@
 import { DocsSidebar } from "@/components/DocsSidebar";
 import { getNavigation } from "@/lib/content";
 
-/**
- * Placeholder for a doc body, shared by the route's loading file and the
- * in-page boundary. The sidebar is disk content rather than URL-derived, so it
- * renders in full here; only the article column is a placeholder.
- */
 export function DocSkeleton() {
   const sections = getNavigation();
 

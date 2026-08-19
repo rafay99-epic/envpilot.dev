@@ -55,9 +55,6 @@ function UsagePageContent() {
   // Early returns
   // -----------------------------------------------------------------------
 
-  // The session streams in after the shell paints. Show the route's own
-  // skeleton meanwhile: a bare spinner here became the whole static shell and
-  // made the navigation stop feeling instant.
   if (isAuthLoading) {
     return <UsageLoading />;
   }
@@ -156,7 +153,6 @@ function UsagePageContent() {
     getLimit,
     onUpgrade: paymentsEnabled
       ? () => {
-          // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- /api/checkout is a route handler that 302s to Polar; router.push() cannot leave the origin.
           window.location.href = CHECKOUT_URL;
         }
       : undefined,

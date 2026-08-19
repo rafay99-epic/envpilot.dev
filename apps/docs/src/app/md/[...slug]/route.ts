@@ -1,8 +1,6 @@
 import { cacheLife } from "next/cache";
 import { getDocBySlug, getAllDocs } from "@/lib/content";
 
-// Disk content only changes at deploy time, so each doc's source is cached by
-// slug. `use cache` can't sit on the GET export, hence the helper.
 async function readDoc(slug: string) {
   "use cache";
   cacheLife("max");

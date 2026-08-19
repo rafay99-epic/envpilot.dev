@@ -9,8 +9,6 @@ import { SITE_URLS } from "@envpilot/ui";
  * Provides a structured summary that LLMs can use to understand
  * what Envpilot is, what it does, and where to find detailed docs.
  */
-// Disk content only changes at deploy time. `use cache` can't sit on the GET
-// export, so the body lives here and the handler just serves it.
 async function renderLlmsTxt() {
   "use cache";
   cacheLife("max");

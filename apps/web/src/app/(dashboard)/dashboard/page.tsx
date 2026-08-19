@@ -66,9 +66,6 @@ export default function DashboardPage() {
   const canCreateProject = canDo("org:create_project");
   const canInviteTeam = canDo("org:invite_member");
 
-  // The session streams in after the shell paints. Show the route's own
-  // skeleton meanwhile: a bare spinner here became the whole static shell and
-  // made the navigation stop feeling instant.
   if (isAuthLoading) {
     return <DashboardHomeLoading />;
   }

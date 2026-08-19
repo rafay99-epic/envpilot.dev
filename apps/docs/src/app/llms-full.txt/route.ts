@@ -11,8 +11,6 @@ import { SITE_URLS } from "@envpilot/ui";
  *
  * Follows the llms-full.txt convention from https://llmstxt.org/.
  */
-// Disk content plus a build stamp — both belong inside the cache scope, and
-// `use cache` can't sit on the GET export.
 async function renderLlmsFull() {
   "use cache";
   cacheLife("max");

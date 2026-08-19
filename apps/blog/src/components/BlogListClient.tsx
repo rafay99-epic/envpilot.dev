@@ -13,13 +13,6 @@ interface Props {
   allTags: string[];
 }
 
-/**
- * Reading `?tag=` is the only thing here that needs the request URL, and it
- * would otherwise keep the entire post list out of the prerendered page. The
- * boundary's fallback is the list itself, unfiltered — so every post ships in
- * the static HTML (crawlable, painted on first frame) and the tag filter
- * applies once the URL is known.
- */
 export function BlogListClient({ posts, allTags }: Props) {
   return (
     <Suspense

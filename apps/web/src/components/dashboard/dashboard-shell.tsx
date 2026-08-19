@@ -37,12 +37,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           }}
         />
 
-        {/* Sidebar Navigation.
-            The boundary is what lets a route with a dynamic segment prerender
-            at all: the nav reads the pathname for its active item and for the
-            project section, which isn't known until the request. Static routes
-            still prerender the real nav — the fallback only shows where the
-            URL genuinely decides the contents. */}
         <Suspense fallback={<DashboardNavFallback />}>
           <DashboardNav />
         </Suspense>
@@ -54,8 +48,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 their own hardcoded arrow to a fixed parent, which is the
                 wrong destination whenever you arrive from search or the
                 command palette. Renders null at the dashboard root. */}
-            {/* Derived entirely from the pathname; the placeholder holds its
-                height so the page body doesn't jump when the trail arrives. */}
             <Suspense fallback={<div className="mb-5 h-5" />}>
               <Breadcrumbs className="mb-5" />
             </Suspense>
@@ -65,8 +57,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
         {/* Global Keyboard Shortcuts */}
         <KeyboardShortcutsProvider>
-          {/* Global Search Command Palette. Renders nothing until opened, so
-              an empty fallback is the whole story. */}
           <Suspense fallback={null}>
             <CommandPalette />
           </Suspense>
