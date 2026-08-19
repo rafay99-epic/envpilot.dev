@@ -1,7 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
   AuthContext,
@@ -46,7 +45,6 @@ export function AuthProvider({
   children: ReactNode;
   authPromise: Promise<DashboardAuthSeed>;
 }) {
-  const router = useRouter();
   const seed = useStreamedSeed(authPromise);
   const ready = seed?.status === "ready" ? seed : null;
 
@@ -64,18 +62,21 @@ export function AuthProvider({
     seed === null
   );
 
-  useEffect(() => {
-    if (seed?.status === "unauthenticated") router.replace("/sign-in");
-  }, [seed?.status, router]);
-
-  const value: AuthContextValue = {
-    ...auth,
-    hasOtherOrganizations: ready?.hasOtherOrganizations ?? false,
-  };
+  const hasOtherOrganizations = ready?.hasOtherOrganizations ?? false;
+  const value: AuthContextValue = useMemo(
+    () => ({ ...auth, hasOtherOrganizations }),
+    [auth, hasOtherOrganizations]
+  );
 
   return (
     <AuthContext.Provider value={value}>
-      {seed?.status === "error" ? (
+      {seed?.status === "unauthenticated" ? (
+        <AuthErrorPage
+          title="Session Expired"
+          message="Your session is no longer valid. Please sign in again."
+          showTryAgain={false}
+        />
+      ) : seed?.status === "error" ? (
         <AuthErrorPage
           title={seed.kind === "sync" ? "Account Sync Error" : undefined}
           message={seed.message}

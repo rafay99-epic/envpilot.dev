@@ -43,6 +43,11 @@ interface UseAuthReturn {
   refreshUser: () => Promise<void>;
 }
 
+type FetchState =
+  | { status: "idle" }
+  | { status: "done"; data: UserData }
+  | { status: "failed" };
+
 /**
  * Client-side hook for accessing auth state
  * Note: For server components, use getUser() directly from @workos-inc/authkit-nextjs
@@ -51,92 +56,65 @@ export function useAuth(
   initialData?: UserData,
   deferFetch = false
 ): UseAuthReturn {
-  const [user, setUser] = useState<AuthUser | null>(initialData?.user ?? null);
-  const [organization, setOrganization] = useState<Organization | null>(
-    initialData?.organization ?? null
-  );
-  const [actions, setActions] = useState<string[]>(initialData?.actions ?? []);
-  const [capabilities, setCapabilities] = useState<Record<string, boolean>>(
-    initialData?.capabilities ?? {}
-  );
-  const [roleMeta, setRoleMeta] = useState<RoleMeta | null>(
-    initialData?.roleMeta ?? null
-  );
-  const [isLoading, setIsLoading] = useState(!initialData);
-  const [impersonator, setImpersonator] = useState(initialData?.impersonator);
+  const [fetchState, setFetchState] = useState<FetchState>({ status: "idle" });
 
-  const fetchUser = useCallback(async () => {
+  // Derived, not synced into state. `initialData` streams in after mount on the
+  // dashboard, so copying it in an effect meant the seed was dropped whenever
+  // the effect did not re-run. A completed fetch is newer than the seed and
+  // wins; a failed one means signed out.
+  const source =
+    fetchState.status === "done"
+      ? fetchState.data
+      : fetchState.status === "failed"
+        ? null
+        : (initialData ?? null);
+
+  const user = source?.user ?? null;
+  const organization = source?.organization ?? null;
+  const actions = source?.actions ?? [];
+  const capabilities = source?.capabilities ?? {};
+  const roleMeta = source?.roleMeta ?? null;
+  const impersonator = source?.impersonator;
+  const isLoading = !source && fetchState.status !== "failed";
+
+  const loadUser = useCallback(async (): Promise<FetchState> => {
     try {
-      setIsLoading(true);
       const response = await fetch("/api/auth/me");
-      if (response.ok) {
-        const data: UserData = await response.json();
-        setUser(data.user);
-        setOrganization(data.organization);
-        setActions(data.actions ?? []);
-        setCapabilities(data.capabilities ?? {});
-        setRoleMeta(data.roleMeta ?? null);
-        setImpersonator(data.impersonator);
-      } else {
-        setUser(null);
-        setOrganization(null);
-        setActions([]);
-        setCapabilities({});
-        setRoleMeta(null);
-        setImpersonator(undefined);
-      }
+      if (!response.ok) return { status: "failed" };
+      return { status: "done", data: (await response.json()) as UserData };
     } catch (error) {
       log.error("fetch_user_failed", {}, error);
-      setUser(null);
-      setOrganization(null);
-      setActions([]);
-      setCapabilities({});
-      setRoleMeta(null);
-      setImpersonator(undefined);
-    } finally {
-      setIsLoading(false);
+      return { status: "failed" };
     }
   }, []);
 
-  const seedUser = initialData?.user ?? null;
-  const seedOrganization = initialData?.organization ?? null;
-  const seedActions = initialData?.actions;
-  const seedCapabilities = initialData?.capabilities;
-  const seedRoleMeta = initialData?.roleMeta ?? null;
-  const seedImpersonator = initialData?.impersonator;
+  const refreshUser = useCallback(async () => {
+    setFetchState(await loadUser());
+  }, [loadUser]);
 
-  useEffect(() => {
-    if (!seedUser) return;
-    setUser(seedUser);
-    setOrganization(seedOrganization);
-    setRoleMeta(seedRoleMeta);
-    setImpersonator(seedImpersonator);
-    if (seedActions) setActions(seedActions);
-    if (seedCapabilities) setCapabilities(seedCapabilities);
-    setIsLoading(false);
-  }, [
-    seedUser,
-    seedOrganization,
-    seedActions,
-    seedCapabilities,
-    seedRoleMeta,
-    seedImpersonator,
-  ]);
-
+  // Fall back to /api/auth/me when the server could not supply the full
+  // picture: no seed at all, no organization, or no actions.
   const needsFallbackFetch =
     !deferFetch &&
     (!initialData || !initialData.organization || !initialData.actions);
 
   useEffect(() => {
-    if (needsFallbackFetch) fetchUser();
-  }, [needsFallbackFetch, fetchUser]);
+    if (!needsFallbackFetch) return;
+    let cancelled = false;
+    loadUser().then((next) => {
+      if (!cancelled) setFetchState(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [needsFallbackFetch, loadUser]);
 
   // Re-fetch auth state when active organization changes (cookie update)
   useEffect(() => {
-    const handler = () => fetchUser();
+    const handler = () => void refreshUser();
     window.addEventListener("org-context-changed", handler);
     return () => window.removeEventListener("org-context-changed", handler);
-  }, [fetchUser]);
+  }, [refreshUser]);
 
   // Keep Sentry user attribution in sync with auth state
   useEffect(() => {
@@ -163,6 +141,6 @@ export function useAuth(
     capabilities,
     roleMeta,
     signOut: signOutHandler,
-    refreshUser: fetchUser,
+    refreshUser,
   };
 }
