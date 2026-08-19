@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import {
   AuthContext,
@@ -45,8 +46,25 @@ export function AuthProvider({
   children: ReactNode;
   authPromise: Promise<DashboardAuthSeed>;
 }) {
+  const router = useRouter();
   const seed = useStreamedSeed(authPromise);
   const ready = seed?.status === "ready" ? seed : null;
+
+  // The dashboard shell must never mount without a verified session: its
+  // Convex queries fire during the auth handshake and suspend in a loop
+  // until React gives up (minified error #482, "This page couldn't load").
+  // The server seed redirects for these states already; this is the client
+  // fallback for the same conditions arriving over the streamed promise.
+  // Sync errors keep the error page (valid session, transient Convex issue).
+  useEffect(() => {
+    if (
+      seed &&
+      (seed.status === "unauthenticated" ||
+        (seed.status === "error" && seed.kind === "auth"))
+    ) {
+      router.replace("/sign-in");
+    }
+  }, [seed, router]);
 
   const auth = useAuth(
     ready
