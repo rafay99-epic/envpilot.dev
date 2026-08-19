@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
 import type { AuthUser, Organization, RoleMeta } from "@/lib/auth";
 import { createLogger } from "@/lib/logger";
@@ -43,6 +43,17 @@ interface UseAuthReturn {
   refreshUser: () => Promise<void>;
 }
 
+async function loadUser(): Promise<FetchState> {
+  try {
+    const response = await fetch("/api/auth/me");
+    if (!response.ok) return { status: "failed" };
+    return { status: "done", data: (await response.json()) as UserData };
+  } catch (error) {
+    log.error("fetch_user_failed", {}, error);
+    return { status: "failed" };
+  }
+}
+
 type FetchState =
   | { status: "idle" }
   | { status: "done"; data: UserData }
@@ -77,21 +88,6 @@ export function useAuth(
   const impersonator = source?.impersonator;
   const isLoading = !source && fetchState.status !== "failed";
 
-  const loadUser = useCallback(async (): Promise<FetchState> => {
-    try {
-      const response = await fetch("/api/auth/me");
-      if (!response.ok) return { status: "failed" };
-      return { status: "done", data: (await response.json()) as UserData };
-    } catch (error) {
-      log.error("fetch_user_failed", {}, error);
-      return { status: "failed" };
-    }
-  }, []);
-
-  const refreshUser = useCallback(async () => {
-    setFetchState(await loadUser());
-  }, [loadUser]);
-
   // Fall back to /api/auth/me when the server could not supply the full
   // picture: no seed at all, no organization, or no actions.
   const needsFallbackFetch =
@@ -107,14 +103,14 @@ export function useAuth(
     return () => {
       cancelled = true;
     };
-  }, [needsFallbackFetch, loadUser]);
+  }, [needsFallbackFetch]);
 
   // Re-fetch auth state when active organization changes (cookie update)
   useEffect(() => {
-    const handler = () => void refreshUser();
+    const handler = () => void loadUser().then(setFetchState);
     window.addEventListener("org-context-changed", handler);
     return () => window.removeEventListener("org-context-changed", handler);
-  }, [refreshUser]);
+  }, []);
 
   // Keep Sentry user attribution in sync with auth state
   useEffect(() => {
@@ -124,10 +120,6 @@ export function useAuth(
       Sentry.setUser(null);
     }
   }, [user]);
-
-  const signOutHandler = useCallback(async () => {
-    window.location.href = "/sign-out";
-  }, []);
 
   return {
     user,
@@ -140,7 +132,9 @@ export function useAuth(
     actions,
     capabilities,
     roleMeta,
-    signOut: signOutHandler,
-    refreshUser,
+    signOut: async () => {
+      window.location.href = "/sign-out";
+    },
+    refreshUser: async () => setFetchState(await loadUser()),
   };
 }

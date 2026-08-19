@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
   AuthContext,
@@ -62,11 +62,10 @@ export function AuthProvider({
     seed === null
   );
 
-  const hasOtherOrganizations = ready?.hasOtherOrganizations ?? false;
-  const value: AuthContextValue = useMemo(
-    () => ({ ...auth, hasOtherOrganizations }),
-    [auth, hasOtherOrganizations]
-  );
+  const value: AuthContextValue = {
+    ...auth,
+    hasOtherOrganizations: ready?.hasOtherOrganizations ?? false,
+  };
 
   return (
     <AuthContext.Provider value={value}>
