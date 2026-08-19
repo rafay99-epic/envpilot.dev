@@ -14,7 +14,6 @@ import {
   GridLines,
   jsonLdScript,
   MermaidChart,
-  Noise,
   remarkMermaid,
   Reveal,
   SITE_URLS,
@@ -196,7 +195,6 @@ async function Article({ params }: PageProps) {
           <AuroraGlow />
           <GridLines />
         </div>
-        <Noise />
 
         <div className="relative z-10 mx-auto max-w-4xl px-4 pt-8 pb-20 sm:px-6 lg:pt-14">
           <main className="min-w-0">

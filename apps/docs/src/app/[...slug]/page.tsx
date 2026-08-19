@@ -179,7 +179,7 @@ async function Doc({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData) }}
       />
-      <div className="relative overflow-hidden">
+      <div className="relative">
         {/* Deliberately no ambient backdrop here: docs are a reading
             surface — glow/grid/noise layers behind body text hurt
             legibility. Decorative effects stay on non-reading pages. */}

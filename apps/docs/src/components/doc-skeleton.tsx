@@ -10,7 +10,7 @@ export function DocSkeleton() {
   const sections = getNavigation();
 
   return (
-    <div className="relative overflow-hidden">
+    <div className="relative">
       <div className="relative z-10 mx-auto max-w-7xl px-4 pt-10 pb-20 sm:px-6 lg:px-8 lg:pt-14">
         <div className="flex flex-col gap-8 lg:flex-row lg:gap-10">
           <DocsSidebar sections={sections} activeSlug="" />
