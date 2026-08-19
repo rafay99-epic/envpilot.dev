@@ -16,7 +16,7 @@ import {
 } from "@/components/pricing/PricingContent";
 
 export const metadata: Metadata = {
-  title: "Pricing | Envpilot",
+  title: "Pricing",
   description:
     "Simple, transparent pricing for Envpilot. Start free with AES-256 encryption, RBAC, and real-time sync. Upgrade to Pro for unlimited resources.",
   alternates: { canonical: "/pricing" },

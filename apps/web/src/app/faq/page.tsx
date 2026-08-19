@@ -6,7 +6,7 @@ import { ScrollSpySidebar } from "@/components/ui/ScrollSpySidebar";
 import { FAQAccordion } from "@/components/faq/FAQAccordion";
 
 export const metadata: Metadata = {
-  title: "FAQ | Envpilot",
+  title: "FAQ",
   description:
     "Frequently asked questions about Envpilot. Learn about plans, billing, security, usage limits, and features.",
   alternates: { canonical: "/faq" },

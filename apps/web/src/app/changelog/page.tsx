@@ -9,7 +9,7 @@ import { ChangelogContent } from "@/components/changelog/ChangelogContent";
 import { getChangelog } from "@/lib/changelog";
 
 export const metadata: Metadata = {
-  title: "Changelog | Envpilot",
+  title: "Changelog",
   description:
     "All the latest updates, improvements, and fixes to Envpilot. Follow along as we build.",
   alternates: { canonical: "/changelog" },

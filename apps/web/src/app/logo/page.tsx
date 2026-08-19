@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { MarketingShell, PageHero, terminal } from "@/components/marketing";
 
 export const metadata: Metadata = {
-  title: "Brand Assets | Envpilot",
+  title: "Brand Assets",
   description:
     "Download official Envpilot icons, marketplace artwork, and social cover images.",
   alternates: { canonical: "/logo" },

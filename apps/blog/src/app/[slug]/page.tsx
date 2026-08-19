@@ -78,7 +78,8 @@ export async function generateMetadata({
   if (!post) return { title: "Not Found" };
 
   return {
-    title: `${post.title} — Envpilot Blog`,
+    // The root layout's template appends " | Envpilot Blog".
+    title: post.title,
     description: post.description,
     keywords: post.keywords,
     alternates: { canonical: `${SITE_URLS.blog}/${slug}` },

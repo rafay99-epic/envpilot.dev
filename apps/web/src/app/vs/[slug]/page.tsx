@@ -28,7 +28,9 @@ export async function generateMetadata({
   if (!comparison) return { title: "Not Found" };
 
   return {
-    title: comparison.metaTitle,
+    // metaTitle is already a complete, brand-leading title; `absolute`
+    // stops the root template appending a second " | Envpilot".
+    title: { absolute: comparison.metaTitle },
     description: comparison.metaDescription,
     alternates: { canonical: `/vs/${slug}` },
     openGraph: {
