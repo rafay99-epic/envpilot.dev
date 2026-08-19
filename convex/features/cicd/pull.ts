@@ -1,4 +1,5 @@
 import { v, ConvexError } from "convex/values";
+import { resolveEffectiveVariables } from "../variables/resolve";
 import {
   action,
   internalMutation,

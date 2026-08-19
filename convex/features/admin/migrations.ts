@@ -174,6 +174,13 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
     doc_sharing: "true",
     doc_public_links: "false",
     max_active_doc_links: "0",
+    // A taste of workspaces: one workspace, three projects in it, ten shared
+    // variables. Enough to solve one real duplication, small enough to convert.
+    workspaces: "true",
+    max_workspaces: "1",
+    max_projects_per_workspace: "3",
+    max_workspaces_per_project: "1",
+    max_variables_per_workspace: "10",
   },
   pro: {
     max_projects: "null",
@@ -220,6 +227,15 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
     doc_sharing: "true",
     doc_public_links: "true",
     max_active_doc_links: "null",
+    workspaces: "true",
+    max_workspaces: "null",
+    // These two are NOT paywalls. 50 member projects bounds the conflict
+    // lookups one variable write performs inside a mutation; 5 workspaces
+    // bounds the indexed reads one pull performs. Raise them in tier config
+    // when someone actually reaches them.
+    max_projects_per_workspace: "50",
+    max_workspaces_per_project: "5",
+    max_variables_per_workspace: "null",
   },
 };
 

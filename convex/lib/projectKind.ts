@@ -1,0 +1,74 @@
+import { ConvexError } from "convex/values";
+import type { DatabaseReader } from "../_generated/server";
+import type { Doc, Id } from "../_generated/dataModel";
+
+/**
+ * A WORKSPACE is a project row that owns variables several projects share.
+ *
+ * THE single definition of that distinction. A workspace must never appear in
+ * a project listing, a project count, or a client pull, and the way to keep
+ * that true as new listings are written is for every one of them to come
+ * through here rather than re-deriving `kind === "workspace"` by hand.
+ *
+ * Adding a second kind later is a change to this file plus the schema union;
+ * nothing else re-derives it. Same shape as lib/surfaces.ts.
+ */
+
+export const WORKSPACE_KIND = "workspace";
+
+/** A project row that holds shared variables rather than a real project. */
+export function isWorkspace(project: Doc<"projects">): boolean {
+  return project.kind === WORKSPACE_KIND;
+}
+
+/**
+ * Indexed range over an organization's real projects: active, and never a
+ * workspace. Returns the query builder so callers keep their own
+ * `.collect()` / `.take()` / `.paginate()` and their own read bounds.
+ *
+ * `kind` sits before `deletedAt` in the index so `eq("kind", undefined)`
+ * prunes workspaces in the index rather than in memory.
+ */
+export function activeProjectsQuery(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">
+) {
+  return db
+    .query("projects")
+    .withIndex("by_org_kind_deleted", (q) =>
+      q
+        .eq("organizationId", organizationId)
+        .eq("kind", undefined)
+        .eq("deletedAt", undefined)
+    );
+}
+
+/** Indexed range over an organization's active workspaces. */
+export function activeWorkspacesQuery(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">
+) {
+  return db
+    .query("projects")
+    .withIndex("by_org_kind_deleted", (q) =>
+      q
+        .eq("organizationId", organizationId)
+        .eq("kind", WORKSPACE_KIND)
+        .eq("deletedAt", undefined)
+    );
+}
+
+/**
+ * Refuse a client pull aimed at a workspace, at every surface that pulls
+ * (CLI, extension, REST, MCP, GitHub Action, Docker image).
+ *
+ * ConvexError, not Error: production redacts plain Error messages to "Server
+ * Error", and this one has to tell the user what to do instead.
+ */
+export function assertPullable(project: Doc<"projects">): void {
+  if (isWorkspace(project)) {
+    throw new ConvexError(
+      `"${project.name}" is a workspace, not a project. Pull from a project that belongs to it.`
+    );
+  }
+}

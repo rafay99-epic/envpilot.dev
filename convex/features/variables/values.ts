@@ -10,7 +10,7 @@ import {
 import { roleLevel, ROLE_LEVEL } from "../../lib/authz";
 import { pool, VAULT_POOL_WIDTH } from "../../lib/pool";
 import { vaultCreate, vaultRead } from "../vault/vault";
-import { isValidVariableKey } from "./helpers";
+import { isValidVariableKey, environmentConflictMessage } from "./helpers";
 
 // Explicit result types. Actions here call ctx.runQuery/runMutation/runAction
 // on `api`/`internal`; annotating each handler's return type breaks the
@@ -369,7 +369,7 @@ export const createWithValue = action({
     // create mutation re-checks (race-safe backstop), but failing only there
     // left an orphaned vault secret behind for every clash. Same key across
     // DISJOINT environments is legal (per-environment uniqueness).
-    const envClashes: string[] = await ctx.runQuery(
+    const envClashes = await ctx.runQuery(
       internal.features.variables.queries.getEnvironmentConflictsInternal,
       {
         projectId: args.projectId,
@@ -378,9 +378,7 @@ export const createWithValue = action({
       }
     );
     if (envClashes.length > 0) {
-      throw new ConvexError(
-        `Variable "${args.key}" already exists in environment(s): ${envClashes.join(", ")}. The same key is allowed only across non-overlapping environments.`
-      );
+      throw new ConvexError(environmentConflictMessage(args.key, envClashes));
     }
 
     const vault = await ctx.runAction(

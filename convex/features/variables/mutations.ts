@@ -35,6 +35,7 @@ import {
   findEnvironmentConflicts,
   findBatchInternalConflicts,
   environmentConflictMessage,
+  describeConflictSource,
 } from "./helpers";
 
 /**
@@ -1044,8 +1045,14 @@ export const restore = mutation({
       environments: variable.environments,
     });
     if (envClashes.length > 0) {
+      const where = envClashes
+        .map(
+          (clash) =>
+            `${describeConflictSource(clash.source)} (${clash.environments.join(", ")})`
+        )
+        .join("; ");
       throw new ConvexError(
-        `Cannot restore: variable "${variable.key}" already exists in environment(s): ${envClashes.join(", ")}. Delete or re-scope the active variable first.`
+        `Cannot restore: variable "${variable.key}" already exists in ${where}. Delete or re-scope the active variable first.`
       );
     }
 

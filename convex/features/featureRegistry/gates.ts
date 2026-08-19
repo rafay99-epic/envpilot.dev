@@ -2,6 +2,10 @@ import type { DatabaseReader } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
 import { resolveFeatureValue, type OrgGateContext } from "./resolver";
 import type { Surface } from "../../lib/surfaces";
+import {
+  activeProjectsQuery,
+  activeWorkspacesQuery,
+} from "../../lib/projectKind";
 
 // ==========================================
 // PAGINATION SHAPE (structural — matches Convex's query builder return type)
@@ -251,11 +255,44 @@ export async function countActiveProjects(
   db: DatabaseReader,
   organizationId: Id<"organizations">
 ): Promise<number> {
-  const projects = await db
-    .query("projects")
-    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+  // Workspaces are project rows and must not occupy a project slot, or a free
+  // org burns one of its three projects on a container. The index prunes them
+  // before the read rather than after it.
+  const projects = await activeProjectsQuery(db, organizationId).collect();
+  return projects.length;
+}
+
+/** Count active workspaces in an organization. */
+export async function countActiveWorkspaces(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">
+): Promise<number> {
+  const workspaces = await activeWorkspacesQuery(db, organizationId).collect();
+  return workspaces.length;
+}
+
+/** Count projects currently in a workspace. */
+export async function countWorkspaceProjects(
+  db: DatabaseReader,
+  workspaceId: Id<"projects">
+): Promise<number> {
+  const memberships = await db
+    .query("workspaceProjects")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
     .collect();
-  return projects.filter((p) => p.deletedAt === undefined).length;
+  return memberships.length;
+}
+
+/** Count workspaces a project already belongs to. */
+export async function countProjectWorkspaces(
+  db: DatabaseReader,
+  projectId: Id<"projects">
+): Promise<number> {
+  const memberships = await db
+    .query("workspaceProjects")
+    .withIndex("by_project", (q) => q.eq("projectId", projectId))
+    .collect();
+  return memberships.length;
 }
 
 /**

@@ -273,6 +273,13 @@ export const CAPABILITIES = {
     description: "Create OTP share links for variables and accounts",
     risk: "critical",
   },
+  "project.workspaces.manage": {
+    label: "Manage workspace membership",
+    category: "Projects",
+    description:
+      "Add or remove a project from a workspace. Adding one grants every reader of that project read access to the workspace's shared values, so this is the escalation point of the feature — creating a workspace is just org.projects.create, and editing its variables is the ordinary project.variables.* check on the workspace row",
+    risk: "high",
+  },
   "project.templates.manage": {
     label: "Manage templates",
     category: "Projects",
@@ -361,6 +368,7 @@ export const PROJECT_ACTION_TO_CAPABILITY = {
   "project:delete_file": "project.files.delete",
   "project:manage_file_permissions": "project.permissions.manage",
   "project:reveal_secrets": "project.secrets.reveal",
+  "project:manage_workspaces": "project.workspaces.manage",
 } as const satisfies Record<string, CapabilityKey>;
 
 export type OrgAction = keyof typeof ORG_ACTION_TO_CAPABILITY;

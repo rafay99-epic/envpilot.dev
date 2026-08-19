@@ -11,10 +11,29 @@ import {
   hasCapability,
   type RoleProfile,
 } from "../../lib/authz";
+import { isWorkspace } from "../../lib/projectKind";
 
 /**
  * Environment Variable shared helpers
  */
+
+/**
+ * Where a clashing key already lives.
+ *
+ * A discriminated union rather than a nullable project id: "self" and
+ * "a workspace two hops away" are genuinely different situations for the
+ * person reading the error, and the compiler should refuse to let a new
+ * source be added without every formatter handling it.
+ */
+export type ConflictSource =
+  | { kind: "self" }
+  | { kind: "workspace"; workspaceId: Id<"projects">; name: string }
+  | { kind: "member"; projectId: Id<"projects">; name: string };
+
+export interface EnvironmentConflict {
+  source: ConflictSource;
+  environments: string[];
+}
 
 /**
  * Throw when a scoped developer touches environments outside their assignment
@@ -254,8 +273,13 @@ export async function findEnvironmentConflicts(
     key: string;
     environments: string[];
     excludeVariableId?: Id<"environmentVariables">;
+    /**
+     * Workspace writes only: the member projects the row would reach, as the
+     * caller intends to set `appliesTo`. Omit for "every member project".
+     */
+    appliesTo?: Id<"projects">[];
   }
-): Promise<string[]> {
+): Promise<EnvironmentConflict[]> {
   // Defense-in-depth at the shared write-path choke point: an empty
   // environments array would make the variable invisible to every
   // environment-filtered read (CLI run/pull, extension sync, public API)
@@ -265,32 +289,169 @@ export async function findEnvironmentConflicts(
     throw new ConvexError("At least one environment is required");
   }
 
-  const sameKey = await ctx.db
+  const conflicts: EnvironmentConflict[] = [];
+  const wanted = args.environments;
+
+  // 1. The owning row itself — the original per-project rule, unchanged.
+  const own = await activeRowsWithKey(ctx, args.projectId, args.key, args);
+  const ownClash = overlappingEnvironments(own, wanted);
+  if (ownClash.length > 0) {
+    conflicts.push({ source: { kind: "self" }, environments: ownClash });
+  }
+
+  const target = await ctx.db.get(args.projectId);
+  if (!target) return conflicts;
+
+  // 2. The other side of the membership edge. Both directions matter: a key
+  // written in a workspace can collide with one a member project already
+  // owns, and vice versa. Checking only one direction leaves the collision
+  // reachable from the other.
+  if (isWorkspace(target)) {
+    const members = await ctx.db
+      .query("workspaceProjects")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.projectId))
+      .collect();
+
+    for (const member of members) {
+      // A row scoped away from this project never reaches it, so it cannot
+      // clash with anything the project owns.
+      if (args.appliesTo && !args.appliesTo.includes(member.projectId)) {
+        continue;
+      }
+      const carried = carriedEnvironments(wanted, member.environments);
+      if (carried.length === 0) continue;
+
+      const rows = await activeRowsWithKey(
+        ctx,
+        member.projectId,
+        args.key,
+        args
+      );
+      const clash = overlappingEnvironments(rows, carried);
+      if (clash.length === 0) continue;
+
+      const project = await ctx.db.get(member.projectId);
+      conflicts.push({
+        source: {
+          kind: "member",
+          projectId: member.projectId,
+          name: project?.name ?? "a member project",
+        },
+        environments: clash,
+      });
+    }
+    return conflicts;
+  }
+
+  const memberships = await ctx.db
+    .query("workspaceProjects")
+    .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+    .collect();
+
+  for (const membership of memberships) {
+    const carried = carriedEnvironments(wanted, membership.environments);
+    if (carried.length === 0) continue;
+
+    const rows = (
+      await activeRowsWithKey(ctx, membership.workspaceId, args.key, args)
+    ).filter(
+      // Absent appliesTo = every member. Present = only the listed projects,
+      // so a row scoped elsewhere is not in this project's namespace.
+      (row) => !row.appliesTo || row.appliesTo.includes(args.projectId)
+    );
+    const clash = overlappingEnvironments(rows, carried);
+    if (clash.length === 0) continue;
+
+    const workspace = await ctx.db.get(membership.workspaceId);
+    conflicts.push({
+      source: {
+        kind: "workspace",
+        workspaceId: membership.workspaceId,
+        name: workspace?.name ?? "a workspace",
+      },
+      environments: clash,
+    });
+  }
+
+  return conflicts;
+}
+
+/** Active rows carrying `key` in one project, minus the row being edited. */
+async function activeRowsWithKey(
+  ctx: QueryCtx,
+  projectId: Id<"projects">,
+  key: string,
+  args: { excludeVariableId?: Id<"environmentVariables"> }
+): Promise<Doc<"environmentVariables">[]> {
+  const rows = await ctx.db
     .query("environmentVariables")
     .withIndex("by_project_and_key", (q) =>
-      q.eq("projectId", args.projectId).eq("key", args.key)
+      q.eq("projectId", projectId).eq("key", key)
     )
     .collect();
 
+  return rows.filter(
+    (row) => row.deletedAt === undefined && row._id !== args.excludeVariableId
+  );
+}
+
+/** Environments claimed by both the proposed write and an existing row. */
+function overlappingEnvironments(
+  rows: Doc<"environmentVariables">[],
+  wanted: string[]
+): string[] {
   const clashes = new Set<string>();
-  for (const existing of sameKey) {
-    if (existing.deletedAt) continue;
-    if (args.excludeVariableId && existing._id === args.excludeVariableId) {
-      continue;
-    }
-    for (const env of existing.environments) {
-      if (args.environments.includes(env)) clashes.add(env);
+  for (const row of rows) {
+    for (const environment of row.environments) {
+      if (wanted.includes(environment)) clashes.add(environment);
     }
   }
   return [...clashes];
 }
 
+/** Environments a membership actually carries. Absent filter = all of them. */
+function carriedEnvironments(
+  wanted: string[],
+  membershipEnvironments: string[] | undefined
+): string[] {
+  if (!membershipEnvironments) return wanted;
+  return wanted.filter((environment) =>
+    membershipEnvironments.includes(environment)
+  );
+}
+
 /** Standard user-facing message for a per-environment key clash. */
 export function environmentConflictMessage(
   key: string,
-  clashes: string[]
+  conflicts: EnvironmentConflict[]
 ): string {
-  return `Variable "${key}" already exists in environment(s): ${clashes.join(", ")}. The same key is allowed only across non-overlapping environments.`;
+  const where = conflicts
+    .map(
+      (conflict) =>
+        `${describeConflictSource(conflict.source)} (${conflict.environments.join(", ")})`
+    )
+    .join("; ");
+  return `Variable "${key}" already exists in ${where}. The same key is allowed only across non-overlapping environments.`;
+}
+
+/**
+ * Naming the side is the whole point of the richer shape: "already exists in
+ * production" is unactionable when the row lives in a workspace the user is
+ * not currently looking at.
+ */
+export function describeConflictSource(source: ConflictSource): string {
+  switch (source.kind) {
+    case "self":
+      return "this project";
+    case "workspace":
+      return `workspace "${source.name}"`;
+    case "member":
+      return `project "${source.name}"`;
+    default: {
+      const exhaustive: never = source;
+      return exhaustive;
+    }
+  }
 }
 
 /**

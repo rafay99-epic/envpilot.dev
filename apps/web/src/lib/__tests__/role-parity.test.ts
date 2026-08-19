@@ -87,6 +87,7 @@ const EXPECTED_PROJECT_ACTIONS: Record<string, string[]> = {
     "project:delete_file",
     "project:manage_file_permissions",
     "project:reveal_secrets",
+    "project:manage_workspaces",
   ],
   project_manager: [
     "project:read",
@@ -106,6 +107,7 @@ const EXPECTED_PROJECT_ACTIONS: Record<string, string[]> = {
     "project:delete_file",
     "project:manage_file_permissions",
     "project:reveal_secrets",
+    "project:manage_workspaces",
   ],
   team_lead: [
     "project:read",
