@@ -1,4 +1,5 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
+import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { convex, createAuthedConvexClient } from "@/lib/convex-client";
@@ -17,6 +18,11 @@ import { reportApiError } from "@/lib/api-errors";
 
 // GET /api/auth/me - Get current authenticated user
 export async function GET(request: Request) {
+  // Declared before the try: this route is request-bound, and without it
+  // Next.js attempts a prerender whose abort lands in the catch below and gets
+  // logged as an application error.
+  await connection();
+
   try {
     const { user, impersonator, accessToken } = await withAuth();
 

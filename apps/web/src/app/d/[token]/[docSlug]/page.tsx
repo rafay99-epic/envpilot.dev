@@ -1,7 +1,16 @@
 "use client";
 
-import { use } from "react";
-import { SharedDocReader } from "../shared-reader";
+import { Suspense, use } from "react";
+import { SharedDocLoading, SharedDocReader } from "../shared-reader";
+
+function Reader({
+  params,
+}: {
+  params: Promise<{ token: string; docSlug: string }>;
+}) {
+  const { token, docSlug } = use(params);
+  return <SharedDocReader token={token} docSlug={docSlug} />;
+}
 
 /** One page inside a shared module. */
 export default function SharedModulePage({
@@ -9,6 +18,9 @@ export default function SharedModulePage({
 }: {
   params: Promise<{ token: string; docSlug: string }>;
 }) {
-  const { token, docSlug } = use(params);
-  return <SharedDocReader token={token} docSlug={docSlug} />;
+  return (
+    <Suspense fallback={<SharedDocLoading />}>
+      <Reader params={params} />
+    </Suspense>
+  );
 }

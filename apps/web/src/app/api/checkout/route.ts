@@ -7,8 +7,6 @@ import { api } from "@convex/_generated/api";
 import { isPaymentsEnabled } from "@/lib/polar";
 import { sanitizeConvexError } from "@/lib/error-messages";
 
-export const dynamic = "force-dynamic";
-
 /**
  * Every exit from this route is tied to one authenticated user and one
  * single-use checkout session, so no cache (browser, CDN or Next's router)

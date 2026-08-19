@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
 import { jsonLdScript, SITE_URLS } from "@envpilot/ui";
 import { BlogShell } from "@/components/shell";
@@ -74,9 +73,7 @@ export default function BlogPage() {
       {/* ── Blog listing ─────────────────────────────────────────── */}
       <section className="relative py-12 sm:py-16">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <Suspense fallback={null}>
-            <BlogListClient posts={posts} allTags={allTags} />
-          </Suspense>
+          <BlogListClient posts={posts} allTags={allTags} />
         </div>
       </section>
     </BlogShell>

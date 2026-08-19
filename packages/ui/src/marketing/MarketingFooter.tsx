@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { GlowDivider } from "./backgrounds";
 
+// Baked at build time by each app's next.config `env` block. A wall-clock read
+// here is an unstable prerender value under Cache Components, and this shell is
+// reachable from both server and client graphs, so neither `"use cache"` nor a
+// client-only read fits. The year is not request data, so a build constant is.
+const BUILD_YEAR = process.env.NEXT_PUBLIC_BUILD_YEAR ?? "2026";
+
 export interface FooterLink {
   label: string;
   href: string;
@@ -76,7 +82,7 @@ export function MarketingFooter({ columns }: { columns: FooterColumn[] }) {
 
         <div className="flex flex-col items-center justify-between gap-4 pt-6 sm:flex-row">
           <p className="font-mono text-xs text-ink-faint">
-            &copy; {new Date().getFullYear()} Envpilot &middot; Built at{" "}
+            &copy; {BUILD_YEAR} Envpilot &middot; Built at{" "}
             <a
               href="https://syntaxlabtechnology.com"
               target="_blank"

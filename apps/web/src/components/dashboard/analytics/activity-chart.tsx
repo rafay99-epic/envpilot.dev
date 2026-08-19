@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/chart";
 import { TerminalWindow } from "@/components/dashboard/terminal-ui";
 import { formatDateWith } from "@/lib/format";
+import { useNow } from "@/hooks";
 
 // Buckets are keyed by UTC day, so ticks are parsed and rendered in UTC and
 // never land a day off for the reader's zone.
@@ -28,9 +29,10 @@ interface ActivityChartProps {
 }
 
 export function ActivityChart({ dailyCounts, daysBack }: ActivityChartProps) {
+  const nowMs = useNow();
   // Fill in missing days with zero
   const data: { date: string; count: number }[] = [];
-  const now = new Date();
+  const now = new Date(nowMs);
   for (let i = daysBack - 1; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);

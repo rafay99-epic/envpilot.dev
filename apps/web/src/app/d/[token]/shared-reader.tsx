@@ -57,6 +57,15 @@ type Payload =
 
 type Step = "loading" | "locked" | "ready" | "unavailable" | "rate_limited";
 
+/** Doubles as the Suspense fallback while the route's token streams in. */
+export function SharedDocLoading() {
+  return (
+    <main className="mx-auto flex max-w-3xl items-center justify-center px-6 py-24">
+      <Loader2 className="h-5 w-5 animate-spin text-ink-faint" />
+    </main>
+  );
+}
+
 function expiryLine(expiresAt: number): string {
   return new Date(expiresAt).toLocaleDateString(undefined, {
     year: "numeric",
@@ -168,11 +177,7 @@ export function SharedDocReader({
   };
 
   if (step === "loading") {
-    return (
-      <main className="mx-auto flex max-w-3xl items-center justify-center px-6 py-24">
-        <Loader2 className="h-5 w-5 animate-spin text-ink-faint" />
-      </main>
-    );
+    return <SharedDocLoading />;
   }
 
   if (step === "unavailable") {

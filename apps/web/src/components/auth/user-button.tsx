@@ -3,13 +3,19 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useAuthContext } from "./auth-provider";
+import { useAuthContext } from "./auth-context";
 import { roleLabel } from "@/lib/roles";
 import { LogOut, LayoutDashboard, Settings } from "lucide-react";
 
 export function UserButton({ collapsed }: { collapsed?: boolean }) {
-  const { user, organization, isImpersonating, impersonator, signOut } =
-    useAuthContext();
+  const {
+    user,
+    organization,
+    isLoading,
+    isImpersonating,
+    impersonator,
+    signOut,
+  } = useAuthContext();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -24,6 +30,18 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // The session streams in after the shell paints, so hold the avatar's space
+  // rather than inviting a signed-in user to sign in again.
+  if (isLoading) {
+    return (
+      <div
+        className={`flex w-full items-center gap-3 p-1.5 ${collapsed ? "justify-center" : ""}`}
+      >
+        <div className="h-8 w-8 shrink-0 rounded-full bg-surface-hover ring-2 ring-line" />
+      </div>
+    );
+  }
 
   if (!user) {
     return (

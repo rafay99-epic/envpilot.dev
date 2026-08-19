@@ -59,6 +59,7 @@ export function UpgradePrompt({
     if (onUpgradeClick) {
       onUpgradeClick();
     } else {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- /api/checkout is a route handler that 302s to Polar; router.push() cannot leave the origin.
       window.location.href = "/api/checkout?tier=pro";
     }
   };

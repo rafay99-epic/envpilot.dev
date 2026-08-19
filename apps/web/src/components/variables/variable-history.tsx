@@ -4,6 +4,7 @@ import { useState } from "react";
 import { DrawerPanel } from "@/components/ui";
 import type { Id } from "@convex/_generated/dataModel";
 import { useTimeZone } from "@/hooks/useTimeZone";
+import { useNow } from "@/hooks";
 import { formatDateTime } from "@/lib/format";
 
 interface VersionRecord {
@@ -59,9 +60,10 @@ export function VariableHistory({
   const [picked, setPicked] = useState<number[] | null>(null);
 
   const timeZone = useTimeZone();
+  const now = useNow(60_000);
 
   const formatRelativeTime = (timestamp: number) => {
-    const now = Date.now();
+    if (!now) return "—";
     const diff = now - timestamp;
     const seconds = Math.floor(diff / 1000);
     const minutes = Math.floor(seconds / 60);

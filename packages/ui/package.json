@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/ui",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Shared marketing, docs, and app-chrome UI components for Envpilot",
   "private": true,
   "license": "UNLICENSED",
@@ -38,7 +38,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.3.1",
     "typescript": "^5"
   }
 }

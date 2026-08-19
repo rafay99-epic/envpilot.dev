@@ -24,9 +24,22 @@ const nextConfig: NextConfig = {
   // unaffected.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   reactCompiler: true,
+
+  // ── Cache Components + Partial Prefetching ─────────────────────────
+  // Dynamic by default with explicit `use cache` boundaries. Every route
+  // prerenders a static shell and streams the rest, so a link click paints
+  // immediately instead of waiting on the server. Partial Prefetching then
+  // fetches ONE reusable shell per route rather than one payload per link —
+  // the projects grid and the sidebar both link at /dashboard/projects/[slug]
+  // many times over and now cost a single prefetch between them.
+  cacheComponents: true,
+  partialPrefetching: true,
   transpilePackages: ["@envpilot/ui"],
   env: {
     NEXT_PUBLIC_APP_VERSION: APP_VERSIONS.web,
+    // Baked in so the footer's copyright year needs no wall-clock read at
+    // render time (an unstable value under Cache Components).
+    NEXT_PUBLIC_BUILD_YEAR: String(new Date().getFullYear()),
   },
 
   // ── Blog + docs moved to their own apps/subdomains ─────────────────
@@ -83,16 +96,18 @@ const nextConfig: NextConfig = {
     ],
 
     // ── Client-side router cache ─────────────────────────────────────
-    // Keep navigated pages in memory so back/forward is instant.
-    // Dashboard pages are client components whose data comes from live
-    // Convex subscriptions, so the cached RSC payload is just the shell —
-    // a long TTL cannot serve stale data. 30 s meant almost every nav
-    // re-ran the dynamic (dashboard) layout (auth + 3 Convex round trips)
-    // server-side; 180 s makes repeat navigation instant.
+    // Keep navigated pages in memory so back/forward is instant. The
+    // dashboard shell is now prerendered rather than re-run per navigation,
+    // so this no longer has to paper over the layout's auth round trips —
+    // it just keeps already-fetched RSC payloads around.
     staleTimes: {
       dynamic: 180,
       static: 300,
     },
+
+    // Runs the React Compiler natively inside Turbopack instead of shelling
+    // out to Babel. Same output, no JS round trip per module.
+    turbopackRustReactCompiler: true,
   },
 
   // ── Image optimization ─────────────────────────────────────────────

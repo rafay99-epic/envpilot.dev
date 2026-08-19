@@ -10,6 +10,7 @@ import {
   TerminalButton,
   TerminalButtonLink,
 } from "@/components/dashboard/terminal-ui";
+import { useAuthContext } from "@/components/auth/auth-context";
 import { createLogger } from "@/lib/logger";
 import { useTimeZone } from "@/hooks/useTimeZone";
 import { formatDate } from "@/lib/format";
@@ -30,13 +31,11 @@ const log = createLogger("access-notices");
  * Both are deliberately information-poor toward the affected user: org
  * name + date only, never who/why (that lives in the admin audit log).
  */
-export function AccessNotices({
-  activeOrganizationId,
-  hasOtherOrganizations,
-}: {
-  activeOrganizationId: string | null;
-  hasOtherOrganizations: boolean;
-}) {
+export function AccessNotices() {
+  // Sourced from the auth context rather than layout props: the dashboard
+  // layout no longer awaits the session, so it has no resolved org to pass.
+  const { organization, hasOtherOrganizations } = useAuthContext();
+  const activeOrganizationId = organization?.id ?? null;
   const pathname = usePathname();
   const tombstones = useQuery(
     api.features.organizations.tombstones.myTombstones

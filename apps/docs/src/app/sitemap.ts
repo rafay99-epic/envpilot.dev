@@ -1,8 +1,14 @@
 import type { MetadataRoute } from "next";
+import { cacheLife } from "next/cache";
 import { getAllDocs } from "@/lib/content";
 import { SITE_URLS } from "@envpilot/ui";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+// `lastModified` is a wall-clock read, which would make the whole sitemap
+// render per request. Docs only change at deploy, so cache it daily.
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  "use cache";
+  cacheLife("days");
+
   const now = new Date();
 
   const docsPages: MetadataRoute.Sitemap = getAllDocs().map((doc) => ({

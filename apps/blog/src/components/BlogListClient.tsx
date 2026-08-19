@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Suspense, useState, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
@@ -13,10 +13,34 @@ interface Props {
   allTags: string[];
 }
 
+/**
+ * Reading `?tag=` is the only thing here that needs the request URL, and it
+ * would otherwise keep the entire post list out of the prerendered page. The
+ * boundary's fallback is the list itself, unfiltered — so every post ships in
+ * the static HTML (crawlable, painted on first frame) and the tag filter
+ * applies once the URL is known.
+ */
 export function BlogListClient({ posts, allTags }: Props) {
-  const searchParams = useSearchParams();
+  return (
+    <Suspense
+      fallback={<BlogList posts={posts} allTags={allTags} tag={null} />}
+    >
+      <BlogListForUrlTag posts={posts} allTags={allTags} />
+    </Suspense>
+  );
+}
+
+function BlogListForUrlTag({ posts, allTags }: Props) {
+  const tag = useSearchParams().get("tag");
+  return <BlogList posts={posts} allTags={allTags} tag={tag} />;
+}
+
+function BlogList({
+  posts,
+  allTags,
+  tag: tagFromUrl,
+}: Props & { tag: string | null }) {
   const router = useRouter();
-  const tagFromUrl = searchParams.get("tag");
 
   const [search, setSearch] = useState("");
 

@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { cacheLife } from "next/cache";
 import type { Metadata } from "next";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
@@ -19,6 +21,7 @@ import { DocsSidebar } from "@/components/DocsSidebar";
 import { DOC_ICONS } from "@/components/doc-icons";
 import { TableOfContents } from "@/components/TableOfContents";
 import { DocsShell } from "@/components/shell";
+import { DocSkeleton } from "@/components/doc-skeleton";
 import { LLMActions } from "@/components/LLMActions";
 import { Callout, Steps, Endpoint } from "@/components/mdx";
 import Link from "next/link";
@@ -52,6 +55,25 @@ const mdxOptions = {
   },
 };
 
+/**
+ * Compiling MDX is the expensive half of this page and the source only changes
+ * at deploy time, so the rendered doc is cached rather than recompiled per
+ * request. It also keeps the route prerenderable: the MDX toolchain reads
+ * `Date.now()` internally, which blocks a prerender outside a cache scope.
+ */
+async function DocBody({ source }: { source: string }) {
+  "use cache";
+  cacheLife("max");
+
+  return (
+    <MDXRemote
+      source={source}
+      components={mdxComponents}
+      options={mdxOptions as never}
+    />
+  );
+}
+
 interface PageProps {
   params: Promise<{ slug: string[] }>;
 }
@@ -80,7 +102,20 @@ export async function generateMetadata({
   };
 }
 
-export default async function DocPage({ params }: PageProps) {
+// The shell renders without the URL; only the doc waits on `params`. A
+// boundary here rather than relying on loading.tsx alone keeps the nav and
+// footer mounted when moving between docs, instead of suspending the segment.
+export default function DocPage({ params }: PageProps) {
+  return (
+    <DocsShell>
+      <Suspense fallback={<DocSkeleton />}>
+        <Doc params={params} />
+      </Suspense>
+    </DocsShell>
+  );
+}
+
+async function Doc({ params }: PageProps) {
   const slug = (await params).slug.join("/");
   const doc = getDocBySlug(slug);
   if (!doc) notFound();
@@ -139,7 +174,7 @@ export default async function DocPage({ params }: PageProps) {
   const Icon = DOC_ICONS[doc.icon] ?? DOC_ICONS["file-text"];
 
   return (
-    <DocsShell>
+    <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData) }}
@@ -205,11 +240,7 @@ export default async function DocPage({ params }: PageProps) {
 
               {/* ── MDX content ─────────────────────────────────── */}
               <article className="mt-10">
-                <MDXRemote
-                  source={doc.content}
-                  components={mdxComponents}
-                  options={mdxOptions as never}
-                />
+                <DocBody source={doc.content} />
               </article>
 
               {/* ── Prev / Next ─────────────────────────────────── */}
@@ -265,6 +296,6 @@ export default async function DocPage({ params }: PageProps) {
           </div>
         </div>
       </div>
-    </DocsShell>
+    </>
   );
 }

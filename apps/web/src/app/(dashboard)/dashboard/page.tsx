@@ -11,6 +11,7 @@ import {
   useExpiringVariables,
   useFeatureGate,
   useConvexUser,
+  useNow,
 } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import type { Id } from "@convex/_generated/dataModel";
@@ -28,9 +29,10 @@ import { normalizeOrgRole, roleLabel } from "@/lib/roles";
 import { useTimeZone } from "@/hooks/useTimeZone";
 import { formatDateWith } from "@/lib/format";
 import { Plus, ChevronRight, Check, RotateCcw } from "lucide-react";
+import DashboardHomeLoading from "./loading";
 
 export default function DashboardPage() {
-  const { user, organization } = useAuthContext();
+  const { user, organization, isLoading: isAuthLoading } = useAuthContext();
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
     | undefined;
@@ -63,6 +65,13 @@ export default function DashboardPage() {
 
   const canCreateProject = canDo("org:create_project");
   const canInviteTeam = canDo("org:invite_member");
+
+  // The session streams in after the shell paints. Show the route's own
+  // skeleton meanwhile: a bare spinner here became the whole static shell and
+  // made the navigation stop feeling instant.
+  if (isAuthLoading) {
+    return <DashboardHomeLoading />;
+  }
 
   if (!organization) {
     return (
@@ -463,8 +472,9 @@ const actionLabels: Record<string, string> = {
 
 function ActivityRow({ activity }: { activity: ActivityItem }) {
   const timeZone = useTimeZone();
+  const now = useNow(60_000);
   const actionLabel = actionLabels[activity.action] || activity.action;
-  const time = formatTimestamp(activity.createdAt, timeZone);
+  const time = formatTimestamp(activity.createdAt, timeZone, now);
 
   return (
     <div className="flex items-start gap-3 px-5 py-3 font-mono text-xs">
@@ -563,8 +573,12 @@ function ExpiringSecretRow({
   );
 }
 
-function formatTimestamp(timestamp: number, timeZone: string): string {
-  const hours = Math.floor((Date.now() - timestamp) / (1000 * 60 * 60));
+function formatTimestamp(
+  timestamp: number,
+  timeZone: string,
+  now: number
+): string {
+  const hours = Math.floor((now - timestamp) / (1000 * 60 * 60));
 
   if (hours < 24) {
     return formatDateWith(

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { useNow } from "@/hooks";
 import {
   addDays,
   addMonths,
@@ -62,9 +63,10 @@ export function TerminalDatePicker({
   const selectedDate = value ? parseISO(value) : null;
   const minDate = min ? startOfDay(parseISO(min)) : null;
 
-  const [viewMonth, setViewMonth] = useState<Date>(() =>
-    startOfMonth(selectedDate ?? new Date())
-  );
+  const nowMs = useNow();
+  const [viewMonth, setViewMonth] = useState<Date | null>(null);
+  const activeMonth =
+    viewMonth ?? startOfMonth(selectedDate ?? new Date(nowMs));
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -138,14 +140,14 @@ export function TerminalDatePicker({
     setOpen(false);
   };
 
-  const gridStart = startOfWeek(startOfMonth(viewMonth));
-  const gridEnd = endOfWeek(endOfMonth(viewMonth));
+  const gridStart = startOfWeek(startOfMonth(activeMonth));
+  const gridEnd = endOfWeek(endOfMonth(activeMonth));
   const days: Date[] = [];
   for (let d = gridStart; !isBefore(gridEnd, d); d = addDays(d, 1)) {
     days.push(d);
   }
 
-  const today = new Date();
+  const today = new Date(nowMs);
 
   return (
     <div className={className}>
@@ -182,13 +184,15 @@ export function TerminalDatePicker({
           >
             <div className="mb-2 flex items-center justify-between">
               <span className="text-sm font-medium text-ink">
-                {format(viewMonth, "MMMM yyyy")}
+                {format(activeMonth, "MMMM yyyy")}
               </span>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   aria-label="Previous month"
-                  onClick={() => setViewMonth((m) => addMonths(m, -1))}
+                  onClick={() =>
+                    setViewMonth((m) => addMonths(m ?? activeMonth, -1))
+                  }
                   className="rounded p-1 text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -196,7 +200,9 @@ export function TerminalDatePicker({
                 <button
                   type="button"
                   aria-label="Next month"
-                  onClick={() => setViewMonth((m) => addMonths(m, 1))}
+                  onClick={() =>
+                    setViewMonth((m) => addMonths(m ?? activeMonth, 1))
+                  }
                   className="rounded p-1 text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -220,7 +226,7 @@ export function TerminalDatePicker({
                 const disabled = isDisabled(day);
                 const selected =
                   selectedDate !== null && isSameDay(day, selectedDate);
-                const inMonth = isSameMonth(day, viewMonth);
+                const inMonth = isSameMonth(day, activeMonth);
                 const isToday = isSameDay(day, today);
                 return (
                   <button

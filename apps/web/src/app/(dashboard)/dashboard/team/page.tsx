@@ -5,16 +5,24 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
+import TeamLoading from "./loading";
 
 export default function TeamPage() {
   const router = useRouter();
-  const { organization } = useAuthContext();
+  const { organization, isLoading: isAuthLoading } = useAuthContext();
 
   useEffect(() => {
     if (organization?.slug) {
       router.replace(`/organizations/${organization.slug}/members`);
     }
   }, [organization?.slug, router]);
+
+  // The session streams in after the shell paints. Show the route's own
+  // skeleton meanwhile: a bare spinner here became the whole static shell and
+  // made the navigation stop feeling instant.
+  if (isAuthLoading) {
+    return <TeamLoading />;
+  }
 
   if (!organization) {
     return (

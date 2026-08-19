@@ -1,12 +1,8 @@
 import { jsonLdScript } from "@envpilot/ui";
 import type { Metadata } from "next";
 import LandingPage from "@/components/landing/LandingPage";
-import { convex } from "@/lib/convex-client";
-import { api } from "@convex/_generated/api";
-import type { PricingData } from "@/components/pricing/PricingContent";
+import { getPricing } from "@/lib/pricing-data";
 import { FAQ_ITEMS } from "@/components/landing/faq-data";
-
-export const revalidate = 3600; // pricing changes on the order of months
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -47,19 +43,7 @@ const faqSchema = {
 };
 
 export default async function HomePage() {
-  let pricingData: PricingData | null = null;
-  let paymentsEnabled: boolean | null = null;
-
-  try {
-    const [pricing, payments] = await Promise.all([
-      convex.query(api.features.featureRegistry.queries.getPricingData),
-      convex.query(api.features.billing.tierLimits.isPaymentsEnabled),
-    ]);
-    pricingData = pricing as PricingData;
-    paymentsEnabled = payments ?? false;
-  } catch {
-    // Graceful fallback — the client island fetches via useQuery instead
-  }
+  const { pricingData, paymentsEnabled } = await getPricing();
 
   return (
     <>

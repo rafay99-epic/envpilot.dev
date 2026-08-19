@@ -29,6 +29,7 @@ import { createLogger } from "@/lib/logger";
 import { PageHeader } from "@envpilot/ui";
 import { useTimeZone } from "@/hooks/useTimeZone";
 import { formatDate } from "@/lib/format";
+import RequestsLoading from "./loading";
 
 const log = createLogger("app/dashboard/requests");
 
@@ -96,7 +97,12 @@ function envBadgeColor(env: string): "green" | "amber" | "red" | "zinc" {
 }
 
 export default function RequestsPage() {
-  const { organization, roleMeta, user } = useAuthContext();
+  const {
+    organization,
+    roleMeta,
+    user,
+    isLoading: isAuthLoading,
+  } = useAuthContext();
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
     | undefined;
@@ -241,6 +247,13 @@ export default function RequestsPage() {
       throw err;
     }
   };
+
+  // The session streams in after the shell paints. Show the route's own
+  // skeleton meanwhile: a bare spinner here became the whole static shell and
+  // made the navigation stop feeling instant.
+  if (isAuthLoading) {
+    return <RequestsLoading />;
+  }
 
   if (!organization) {
     return (

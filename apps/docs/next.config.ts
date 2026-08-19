@@ -32,6 +32,18 @@ const LEGACY_SLUG_REDIRECTS: Record<string, string> = {
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@envpilot/ui"],
+
+  // Baked into the bundle so the footer's copyright year needs no wall-clock
+  // read at render time (an unstable value under Cache Components).
+  env: {
+    NEXT_PUBLIC_BUILD_YEAR: String(new Date().getFullYear()),
+  },
+
+  // Docs are disk content behind `use cache`, so every page prerenders and the
+  // sidebar links (60+ pointing at /[...slug]) collapse to one reusable shell
+  // prefetch instead of one payload per link.
+  cacheComponents: true,
+  partialPrefetching: true,
   compiler: {
     // Strip stray console.* from production bundles; keep error for
     // diagnosing client-side failures (e.g. mermaid render errors).

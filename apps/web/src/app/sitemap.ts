@@ -1,7 +1,13 @@
 import type { MetadataRoute } from "next";
+import { cacheLife } from "next/cache";
 import { COMPARISONS } from "@/lib/comparisons";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+// `lastModified` is a wall-clock read, which would make the whole sitemap
+// render per request. The route list only changes at deploy, so cache it daily.
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  "use cache";
+  cacheLife("days");
+
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.envpilot.dev";
   const now = new Date();
 

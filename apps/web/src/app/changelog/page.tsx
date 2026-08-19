@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cacheLife } from "next/cache";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import rehypePrettyCode from "rehype-pretty-code";
@@ -35,6 +36,26 @@ const mdxOptions = {
   },
 };
 
+/**
+ * Compiling MDX is the expensive half of this page and CHANGELOG.md only
+ * changes at deploy time, so the rendered entry is cached rather than
+ * recompiled per request. It also keeps the route prerenderable: the MDX
+ * toolchain reads `Date.now()` internally, which blocks a prerender outside
+ * a cache scope.
+ */
+async function EntryBody({ source }: { source: string }) {
+  "use cache";
+  cacheLife("max");
+
+  return (
+    <MDXRemote
+      source={source}
+      components={mdxComponents}
+      options={mdxOptions as never}
+    />
+  );
+}
+
 export default function ChangelogPage() {
   // content/CHANGELOG.md is read at build time. No Convex round trip, no
   // revalidate, no ISR writes — the page is fully static.
@@ -44,13 +65,7 @@ export default function ChangelogPage() {
     title: entry.title,
     publishedAt: entry.publishedAt,
     types: entry.types,
-    body: (
-      <MDXRemote
-        source={entry.content}
-        components={mdxComponents}
-        options={mdxOptions as never}
-      />
-    ),
+    body: <EntryBody source={entry.content} />,
   }));
 
   return (

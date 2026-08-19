@@ -48,6 +48,7 @@ import { createLogger } from "@/lib/logger";
 import { PageHeader } from "@envpilot/ui";
 import { formatDateWith } from "@/lib/format";
 import { useTimeZone } from "@/hooks/useTimeZone";
+import VariablesLoading from "./loading";
 
 const log = createLogger("app/dashboard/variables");
 
@@ -77,7 +78,12 @@ interface Variable {
 }
 
 export default function VariablesPage() {
-  const { canDo, organization, user } = useAuthContext();
+  const {
+    canDo,
+    organization,
+    user,
+    isLoading: isAuthLoading,
+  } = useAuthContext();
   const updateVariable = useUpdateVariable();
   const deleteVariable = useDeleteVariable();
   const revealSecret = useRevealSecret();
@@ -276,6 +282,13 @@ export default function VariablesPage() {
       toast.error(message);
     }
   };
+
+  // The session streams in after the shell paints. Show the route's own
+  // skeleton meanwhile: a bare spinner here became the whole static shell and
+  // made the navigation stop feeling instant.
+  if (isAuthLoading) {
+    return <VariablesLoading />;
+  }
 
   if (!organization) {
     return (

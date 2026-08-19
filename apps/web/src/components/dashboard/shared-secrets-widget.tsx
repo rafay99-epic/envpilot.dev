@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -13,6 +12,7 @@ import {
 } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { Eye, Clock, Flame } from "lucide-react";
+import { useNow } from "@/hooks";
 
 interface SharedSecretsWidgetProps {
   organizationId: Id<"organizations">;
@@ -76,9 +76,9 @@ interface ShareData {
 }
 
 function SharedSecretRow({ share }: { share: ShareData }) {
-  const [now] = useState(() => Date.now());
+  const now = useNow();
   const timeRemaining = formatTimeRemaining(share.expiresAt, now);
-  const isExpiringSoon = share.expiresAt - now < 3_600_000; // < 1 hour
+  const isExpiringSoon = now > 0 && share.expiresAt - now < 3_600_000;
 
   return (
     <div className="flex items-center justify-between px-5 py-3 font-mono text-xs">
@@ -120,6 +120,7 @@ function SharedSecretRow({ share }: { share: ShareData }) {
 }
 
 function formatTimeRemaining(expiresAt: number, now: number): string {
+  if (!now) return "—";
   const diff = expiresAt - now;
   if (diff <= 0) return "expired";
 

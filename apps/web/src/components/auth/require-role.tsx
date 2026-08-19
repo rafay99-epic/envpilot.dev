@@ -2,11 +2,8 @@
 
 import type { ReactNode } from "react";
 import { ShieldAlert } from "lucide-react";
-import { useAuthContext } from "./auth-provider";
-import {
-  TerminalButtonLink,
-  TerminalLoading,
-} from "@/components/dashboard/terminal-ui";
+import { useAuthContext } from "./auth-context";
+import { TerminalButtonLink } from "@/components/dashboard/terminal-ui";
 import { ROLE_LEVEL, roleLabel, roleLevel, type OrgRole } from "@/lib/roles";
 
 interface RequireRoleProps {
@@ -40,16 +37,19 @@ export function useRequireRole(minimum: OrgRole): {
  * instead of a half-broken page. Backend authz still enforces every action;
  * this is purely the page-level UX layer.
  *
+ * Children render while the role is still resolving. The session streams in
+ * after the shell paints, so holding them back put a bare spinner in the
+ * static shell of every gated route — the page never got to show its own
+ * skeleton and the navigation stopped feeling instant. Rendering through is
+ * safe precisely because this is a UX layer: the queries underneath are
+ * authorized server-side and return nothing to a user who lacks access.
+ *
  * Usage: <RequireRole minimum="project_manager">…</RequireRole>
  */
 export function RequireRole({ minimum, children }: RequireRoleProps) {
   const { isLoading, allowed } = useRequireRole(minimum);
 
-  if (isLoading) {
-    return <TerminalLoading fullPage />;
-  }
-
-  if (!allowed) {
+  if (!isLoading && !allowed) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
         <div className="rounded-full border border-danger-line bg-danger-soft p-4">

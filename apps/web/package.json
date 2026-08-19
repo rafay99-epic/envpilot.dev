@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/web",
-  "version": "1.65.1",
+  "version": "1.66.0",
   "private": true,
   "description": "Envpilot web dashboard — manage secrets, teams, and projects",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
@@ -36,7 +36,7 @@
     "gray-matter": "^4.0.3",
     "lucide-react": "^0.577.0",
     "mcp-handler": "1.1.0",
-    "next": "^16.2.10",
+    "next": "^16.3.1",
     "next-mdx-remote": "^6.0.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -52,7 +52,8 @@
   "devDependencies": {
     "@envpilot/eslint-config": "workspace:*",
     "@envpilot/tsconfig": "workspace:*",
-    "@next/bundle-analyzer": "^16.2.3",
+    "@next/bundle-analyzer": "^16.3.1",
+    "@next/playwright": "^16.3.1",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@tanstack/react-query-devtools": "^5.91.3",
@@ -62,7 +63,7 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "^16.2.10",
+    "eslint-config-next": "^16.3.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.0.4"
