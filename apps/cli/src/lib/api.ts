@@ -15,6 +15,8 @@
 // expired or within 60s of expiring, persisting the result to the active
 // account.
 
+import { mkdirSync, rmSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { ConvexHttpClient } from "convex/browser";
 import {
   makeFunctionReference,
@@ -23,7 +25,12 @@ import {
   type OptionalRestArgs,
 } from "convex/server";
 import { CONVEX_URL } from "./env.js";
-import { getActiveAccount, updateActiveAccount, clearAuth } from "./config.js";
+import {
+  getActiveAccount,
+  updateActiveAccount,
+  clearAuth,
+  getConfigPath,
+} from "./config.js";
 import { isTokenExpiring } from "./jwt.js";
 import { refreshAccessToken, WorkosAuthError } from "./workos.js";
 import { computeFingerprint } from "./variables-cache.js";
@@ -68,6 +75,42 @@ export class APIError extends Error {
 // instead of each hitting WorkOS (and racing to persist rotated tokens).
 let refreshInFlight: Promise<string> | null = null;
 
+const REFRESH_LOCK_STALE_MS = 15_000;
+const REFRESH_LOCK_WAIT_MS = 5_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function acquireRefreshLock(): Promise<string | null> {
+  const lockPath = join(dirname(getConfigPath()), ".refresh-lock");
+  const deadline = Date.now() + REFRESH_LOCK_WAIT_MS;
+  for (;;) {
+    try {
+      mkdirSync(lockPath);
+      return lockPath;
+    } catch {
+      try {
+        if (Date.now() - statSync(lockPath).mtimeMs > REFRESH_LOCK_STALE_MS) {
+          rmSync(lockPath, { recursive: true, force: true });
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      if (Date.now() >= deadline) return null;
+      await sleep(100);
+    }
+  }
+}
+
+function releaseRefreshLock(lockPath: string | null): void {
+  if (!lockPath) return;
+  try {
+    rmSync(lockPath, { recursive: true, force: true });
+  } catch {}
+}
+
 /**
  * Return a valid WorkOS access token for the active account, refreshing it
  * first when it is expired or about to expire (<60s left). Persists the new
@@ -92,35 +135,52 @@ export async function ensureFreshAccessToken(): Promise<string> {
 
   if (refreshInFlight) return refreshInFlight;
 
-  const refreshToken = account.refreshToken;
-  if (!refreshToken) {
-    throw new APIError(
-      "Your session has expired. Run `envpilot login`.",
-      401,
-      "SESSION_EXPIRED"
-    );
-  }
-
   refreshInFlight = (async () => {
+    const lockPath = await acquireRefreshLock();
     try {
-      const result = await refreshAccessToken(refreshToken);
-      updateActiveAccount({
-        accessToken: result.access_token,
-        refreshToken: result.refresh_token,
-      });
-      return result.access_token;
-    } catch (err) {
-      if (err instanceof WorkosAuthError && err.code === "access_denied") {
-        // Refresh token revoked/expired — the session is genuinely dead.
-        clearAuth();
-        throw new APIError(
-          "Your session has expired. Run `envpilot login`.",
-          401,
-          "SESSION_EXPIRED"
-        );
+      let attemptedRefreshToken: string | null = null;
+      for (;;) {
+        const current = getActiveAccount();
+        if (current?.accessToken && !isTokenExpiring(current.accessToken)) {
+          return current.accessToken;
+        }
+
+        const refreshToken = current?.refreshToken;
+        if (!refreshToken) {
+          throw new APIError(
+            "Your session has expired. Run `envpilot login`.",
+            401,
+            "SESSION_EXPIRED"
+          );
+        }
+
+        if (refreshToken === attemptedRefreshToken) {
+          clearAuth();
+          throw new APIError(
+            "Your session has expired. Run `envpilot login`.",
+            401,
+            "SESSION_EXPIRED"
+          );
+        }
+
+        try {
+          const result = await refreshAccessToken(refreshToken);
+          updateActiveAccount({
+            accessToken: result.access_token,
+            refreshToken: result.refresh_token,
+          });
+          return result.access_token;
+        } catch (err) {
+          if (
+            !(err instanceof WorkosAuthError && err.code === "access_denied")
+          ) {
+            throw err;
+          }
+          attemptedRefreshToken = refreshToken;
+        }
       }
-      throw err;
     } finally {
+      releaseRefreshLock(lockPath);
       refreshInFlight = null;
     }
   })();
