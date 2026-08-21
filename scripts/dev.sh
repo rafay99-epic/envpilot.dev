@@ -41,7 +41,7 @@ filter_for() {
 }
 
 names=(convex)
-commands=("convex dev")
+commands=("bun --bun convex dev")
 colors=(green)
 palette=(blue magenta cyan yellow)
 
@@ -62,7 +62,7 @@ for surface in "${surfaces[@]}"; do
   fi
 
   names+=("$surface")
-  commands+=("turbo dev --filter=$filter")
+  commands+=("bun --bun turbo dev --filter=$filter")
   colors+=("${palette[$(((${#names[@]} - 2) % ${#palette[@]}))]}")
 done
 
@@ -80,7 +80,7 @@ printf '→ starting: %s\n' "$(
   echo "${names[*]}"
 )"
 
-exec bunx concurrently \
+exec bunx --bun concurrently \
   --names "$(
     IFS=,
     echo "${names[*]}"

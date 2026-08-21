@@ -1,15 +1,15 @@
 {
   "name": "@envpilot/blog",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "private": true,
   "description": "Envpilot Blog — engineering, security, and building in public",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "UNLICENSED",
   "homepage": "https://blog.envpilot.dev",
   "scripts": {
-    "dev": "next dev -p 3001",
-    "build": "next build",
-    "start": "next start -p 3001",
+    "dev": "bun --bun next dev -p 3001",
+    "build": "bun --bun next build",
+    "start": "bun --bun next start -p 3001",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
