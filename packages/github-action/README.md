@@ -39,6 +39,10 @@ Store the service token itself as a repository or environment secret (`ENVPILOT_
 | `export-env`  | No       | `"true"`                   | When `true`, exports every pulled variable to `$GITHUB_ENV` so later steps can read it directly. |
 | `env-file`    | No       | —                          | Path to write the pulled variables as a dotenv file (`KEY='value'` per line). Skipped if unset.  |
 
+## Workspaces
+
+If the scoped project belongs to an Envpilot [workspace](https://docs.envpilot.dev/dashboard/overview), the pull returns the project's own variables **plus** everything inherited from that workspace — one rotation on the workspace side reaches every workflow with no action change. Workspaces themselves are never pullable; point `token` at a project.
+
 ## Outputs
 
 | Output  | Description                              |

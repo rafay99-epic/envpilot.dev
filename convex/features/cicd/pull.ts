@@ -232,12 +232,12 @@ export const _readScopedVariables = internalQuery({
     // let a CI run "succeed" while deploying with missing secrets. If a
     // project legitimately outgrows this, raise the bound deliberately.
     const MAX_PULL_VARIABLES = 1000;
-    const variables = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project_deleted", (q) =>
-        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
-      )
-      .take(MAX_PULL_VARIABLES + 1);
+    // Own rows PLUS everything inherited from the project's workspaces —
+    // same resolution the dashboard and api/reads use, so the Action, REST
+    // and Docker image surfaces see shared values without a client release.
+    const variables = await resolveEffectiveVariables(ctx, {
+      projectId: args.projectId,
+    });
 
     if (variables.length > MAX_PULL_VARIABLES) {
       throw new ConvexError(

@@ -10,6 +10,8 @@ import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import { assertProjectAction } from "../../lib/authz";
 import { isWorkspace } from "../../lib/projectKind";
+import { resolveOrgGateContext } from "../featureRegistry/resolver";
+import { assertWorkspaceVariableCap } from "../variables/mutations";
 
 /**
  * Adoption: pulling variables a workspace's projects ALREADY duplicate up into
@@ -69,12 +71,9 @@ type AdoptResult = {
 };
 
 /**
- * Every duplicated key across the workspace's member projects, with the
- * caller's authorization already enforced.
- *
- * Adoption deletes rows in the member projects and creates one in the
- * workspace, so it demands exactly those rights: delete on each project it
- * touches, create on the workspace.
+ * Every duplicated key across the workspace's member projects the actor can
+ * manage, with authorization enforced per project: members the actor cannot
+ * delete from are left out of the scan rather than blocking everyone.
  */
 export const _collectCandidates = internalQuery({
   args: { workspaceId: v.id("projects") },
@@ -105,12 +104,21 @@ export const _collectCandidates = internalQuery({
       const project = await ctx.db.get(membership.projectId);
       if (!project || project.deletedAt) continue;
 
-      await assertProjectAction(
-        ctx,
-        actor._id,
-        membership.projectId,
-        "project:delete_variable"
-      );
+      // Per-project filter, not a blanket requirement: an actor who manages
+      // five of six members can still adopt the duplicates among those five.
+      // Projects they cannot delete from are simply left out of the scan.
+      let deletable = true;
+      try {
+        await assertProjectAction(
+          ctx,
+          actor._id,
+          membership.projectId,
+          "project:delete_variable"
+        );
+      } catch {
+        deletable = false;
+      }
+      if (!deletable) continue;
 
       const rows = await ctx.db
         .query("environmentVariables")
@@ -258,8 +266,11 @@ export const _applyAdoption = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
+    // Auth propagates from the calling action — same pattern _collectCandidates
+    // uses — so the audit row names the actor who ran the adoption.
+    const actor = await requireAuthedUser(ctx);
     const workspace = await ctx.db.get(args.workspaceId);
-    if (!workspace || !isWorkspace(workspace)) {
+    if (!workspace || workspace.deletedAt || !isWorkspace(workspace)) {
       throw new ConvexError("Workspace not found");
     }
 
@@ -267,6 +278,40 @@ export const _applyAdoption = internalMutation({
     if (!survivor || survivor.deletedAt) {
       throw new ConvexError(`"${args.key}" is no longer available to adopt.`);
     }
+
+    // The scan may have skipped member projects the actor cannot manage. If
+    // any of them still owns this key, adopting would leave the resolver
+    // serving (or refusing) two values for one (key, environment) pair —
+    // refuse here instead of bricking that project's pulls.
+    const memberships = await ctx.db
+      .query("workspaceProjects")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
+      .collect();
+    for (const membership of memberships) {
+      if (membership.projectId === survivor.projectId) continue;
+      const others = await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project_and_key", (q) =>
+          q.eq("projectId", membership.projectId).eq("key", args.key)
+        )
+        .collect();
+      const stillOwns = others.some(
+        (row) =>
+          row.deletedAt === undefined &&
+          row._id !== args.survivorId &&
+          !args.duplicateIds.includes(row._id)
+      );
+      if (stillOwns) {
+        const holder = await ctx.db.get(membership.projectId);
+        throw new ConvexError(
+          `"${holder?.name ?? "A member project"}" still defines "${args.key}" but you cannot manage it. Adopt after it is removed from the workspace or its copy is deleted.`
+        );
+      }
+    }
+
+    // Re-parenting adds a row to the workspace: the registry cap applies.
+    const gate = await resolveOrgGateContext(ctx.db, workspace.organizationId);
+    await assertWorkspaceVariableCap(ctx, workspace, gate);
 
     const now = Date.now();
 
@@ -287,7 +332,7 @@ export const _applyAdoption = internalMutation({
     await ctx.db.insert("auditLogs", {
       organizationId: workspace.organizationId,
       projectId: args.workspaceId,
-      userId: survivor.lastModifiedBy,
+      userId: actor._id,
       action: "workspace.variable_adopted",
       details: JSON.stringify({
         key: args.key,

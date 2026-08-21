@@ -29,6 +29,7 @@ import {
   hasCapability,
 } from "../../lib/authz";
 import { revokeSharesForResource } from "../sharing/helpers";
+import { isWorkspace } from "../../lib/projectKind";
 import {
   assertWithinEnvironmentScope,
   assertValidVariableFields,
@@ -60,6 +61,30 @@ type BatchCreateContext = {
   auth: Awaited<ReturnType<typeof authorizeVariableAccess>>;
   gate: Awaited<ReturnType<typeof resolveOrgGateContext>>;
 };
+
+/**
+ * Workspace-owned rows are capped by their own registry key, on top of the
+ * per-project limit every variable write already pays. No-op for ordinary
+ * projects. Every path that adds a row to a workspace routes through here:
+ * single create, batch create, and adoption (via its own call).
+ */
+export async function assertWorkspaceVariableCap(
+  ctx: MutationCtx,
+  project: Doc<"projects">,
+  gate: Awaited<ReturnType<typeof resolveOrgGateContext>>,
+  delta = 1
+): Promise<void> {
+  if (!isWorkspace(project)) return;
+  const cap = await checkCountedLimit(
+    ctx.db,
+    project.organizationId,
+    "max_variables_per_workspace",
+    (limit) => countActiveVariables(ctx.db, project._id, limit),
+    gate,
+    delta
+  );
+  if (!cap.allowed) throw new ConvexError(cap.reason!);
+}
 
 async function createCore(
   ctx: MutationCtx,
@@ -134,6 +159,8 @@ async function createCore(
     if (!varCheck.allowed) {
       throw new Error(varCheck.reason!);
     }
+
+    await assertWorkspaceVariableCap(ctx, project, gate);
   }
 
   // Validate rotation frequency bounds
@@ -412,6 +439,7 @@ export const createMany = internalMutation({
     if (!varCheck.allowed) {
       throw new ConvexError(varCheck.reason!);
     }
+    await assertWorkspaceVariableCap(ctx, project, gate, args.variables.length);
 
     // In-batch clashes first, for a message that names the offending key.
     // createCore re-checks each row against the database as it goes, which

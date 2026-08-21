@@ -59,6 +59,10 @@ With `format=env` the same response is dotenv text, ready to redirect into a fil
 
 The original single-project endpoint used by the [GitHub Action](/action/overview). It still works and is not going anywhere, but new integrations should use `/v1/projects/{slug}/variables`.
 
+## Workspaces
+
+A [workspace](/dashboard/organization) holds one copy of a variable that several projects share. Pulling a **project** returns its own rows plus everything inherited from the workspaces it belongs to — no parameter, no client change. There is deliberately no workspace endpoint: a workspace is not addressable by API keys, so pull from any project that reads it.
+
 ## Limits
 
 - Requires the `variables` resource, and the project **and** environment must be in the key's scope.

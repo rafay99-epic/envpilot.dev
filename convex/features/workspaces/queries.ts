@@ -52,7 +52,19 @@ async function visibleWorkspaces(
     .collect();
   const assigned = new Set(assignments.map((row) => row.projectId as string));
 
-  return all.filter((workspace) => assigned.has(workspace._id as string));
+  // Assignment-scoped roles also see any workspace one of their projects
+  // reads from — hiding the page while the values already show up on the
+  // project's variables list made the feature contradict itself.
+  const readable = new Set(assigned);
+  for (const row of assignments) {
+    const edges = await ctx.db
+      .query("workspaceProjects")
+      .withIndex("by_project", (q) => q.eq("projectId", row.projectId))
+      .collect();
+    for (const edge of edges) readable.add(edge.workspaceId as string);
+  }
+
+  return all.filter((workspace) => readable.has(workspace._id as string));
 }
 
 export const listByOrganization = query({

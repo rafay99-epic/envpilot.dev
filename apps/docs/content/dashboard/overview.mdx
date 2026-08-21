@@ -21,6 +21,12 @@ Two widgets appear when your plan enables them:
 
 `/dashboard/projects` lists every project you can reach. **Create Project** offers a framework template (Next.js, T3 Stack, Django, Rails, and around twenty more) that pre-fills a starter variable set with placeholders.
 
+## Workspaces
+
+`/dashboard/workspaces` holds variables several projects share. One row, one rotation, no duplicates: link projects to a workspace and they read its variables on their own variables page (grouped as "From \<workspace\>", read-only) and in every pull — CLI, extension, API, GitHub Action.
+
+Editing happens on the workspace page. Adoption pulls keys member projects already duplicate up into the workspace when their values are identical; differing values are reported and skipped.
+
 ## Audit log
 
 `/dashboard/audit` is a searchable log of every recorded action — variable reads and writes, secret-file downloads, permission changes, authentication, team changes, billing and CI/CD events, across 14 categories.
