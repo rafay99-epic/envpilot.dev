@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
-import { Analytics } from "@vercel/analytics/next";
+import { WebAnalytics } from "@/components/web-analytics";
 import Script from "next/script";
 
 const geistSans = Geist({
@@ -153,7 +153,7 @@ export default function RootLayout({
           }}
         />
         <ConvexClientProvider>{children}</ConvexClientProvider>
-        <Analytics />
+        <WebAnalytics />
         {process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID && (
           <Script
             defer
