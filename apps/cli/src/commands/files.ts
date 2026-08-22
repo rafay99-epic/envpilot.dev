@@ -170,15 +170,20 @@ const statusCommand = new Command("status")
       }
 
       blank();
+      const root = process.cwd();
+      const fileStatuses = await Promise.all(
+        files.map(async (file) => ({
+          file,
+          status: await statusOf(file, root),
+        }))
+      );
       let drifted = 0;
-      for (const file of files) {
+      for (const { file, status } of fileStatuses) {
         // Hash the LOCAL copy and compare — no network, no decrypt, no audit.
-        const status = await statusOf(file, process.cwd());
         // Content and permissions drift independently: a byte-identical file
         // left world-readable is still wrong for a keystore.
         const wrongMode =
-          status === "in-sync" &&
-          !modeMatches(process.cwd(), file.path, file.mode);
+          status === "in-sync" && !modeMatches(root, file.path, file.mode);
         if (status !== "in-sync" || wrongMode) drifted += 1;
         printFileRow(file, wrongMode ? "wrong-mode" : status);
       }
@@ -222,8 +227,15 @@ const pullCommand = new Command("pull")
       // Read each local file ONCE. statusOf hashes the file on disk, so
       // calling it in both the conflict filter and the write loop hashed
       // every keystore twice per pull.
-      const statuses = new Map<string, FileStatus>();
-      for (const f of files) statuses.set(f._id, await statusOf(f, root));
+      const statusEntries = await Promise.all(
+        files.map(
+          async (file): Promise<[string, FileStatus]> => [
+            file._id,
+            await statusOf(file, root),
+          ]
+        )
+      );
+      const statuses = new Map(statusEntries);
 
       // Refuse silently-destructive overwrites. A local keystore that differs
       // may be someone's debug copy; losing it without a word is worse than
@@ -251,45 +263,61 @@ const pullCommand = new Command("pull")
       }
 
       blank();
-      let written = 0;
-      let repaired = 0;
+      const repairedIds = new Set<string>();
+      const filesToWrite: SecretFileRow[] = [];
       for (const file of files) {
         if (statuses.get(file._id) === "in-sync") {
-          // Content matches, so no fetch and no decrypt — but repair the
-          // permissions if something loosened them since the last pull.
           if (!modeMatches(root, file.path, file.mode)) {
             applyMode(root, file.path, file.mode);
-            repaired += 1;
-            console.log(
-              `  ${chalk.yellow("~")} ${file.path} ${chalk.dim(
-                `(permissions restored to ${file.mode})`
-              )}`
-            );
-          } else {
-            console.log(
-              `  ${chalk.dim("=")} ${file.path} ${chalk.dim("(unchanged)")}`
-            );
+            repairedIds.add(file._id);
           }
-          continue;
+        } else {
+          filesToWrite.push(file);
         }
-        // One decrypt per file, each audited server-side.
-        const content = await withSpinner(`Fetching ${file.path}...`, () =>
-          client.getSecretFileContent(file._id)
-        );
-        await writeSecretFile(
-          root,
-          content.path,
-          Buffer.from(content.content, "base64"),
-          content.mode
-        );
-        written += 1;
-        console.log(
-          `  ${chalk.green("✓")} ${file.path}  ${formatBytes(file.size)}  ${file.mode}`
-        );
+      }
+
+      const writtenIds = new Set(
+        filesToWrite.length === 0
+          ? []
+          : await withSpinner(
+              `Fetching ${filesToWrite.length} secret file${filesToWrite.length === 1 ? "" : "s"}...`,
+              () =>
+                Promise.all(
+                  filesToWrite.map(async (file) => {
+                    const content = await client.getSecretFileContent(file._id);
+                    await writeSecretFile(
+                      root,
+                      content.path,
+                      Buffer.from(content.content, "base64"),
+                      content.mode
+                    );
+                    return file._id;
+                  })
+                )
+            )
+      );
+
+      for (const file of files) {
+        if (writtenIds.has(file._id)) {
+          console.log(
+            `  ${chalk.green("✓")} ${file.path}  ${formatBytes(file.size)}  ${file.mode}`
+          );
+        } else if (repairedIds.has(file._id)) {
+          console.log(
+            `  ${chalk.yellow("~")} ${file.path} ${chalk.dim(
+              `(permissions restored to ${file.mode})`
+            )}`
+          );
+        } else {
+          console.log(
+            `  ${chalk.dim("=")} ${file.path} ${chalk.dim("(unchanged)")}`
+          );
+        }
       }
 
       blank();
-      const repairedCount = repaired;
+      const written = writtenIds.size;
+      const repairedCount = repairedIds.size;
       success(
         `${written} file${written === 1 ? "" : "s"} written` +
           (repairedCount > 0

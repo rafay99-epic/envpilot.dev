@@ -49,7 +49,7 @@ export const organizationSlugSchema = projectSlugSchema;
 /**
  * URL validation
  */
-export const urlSchema = z.string().url("Must be a valid URL");
+export const urlSchema = z.url({ message: "Must be a valid URL" });
 
 /**
  * Token validation

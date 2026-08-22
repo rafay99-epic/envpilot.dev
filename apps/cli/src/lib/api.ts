@@ -133,6 +133,12 @@ export async function ensureFreshAccessToken(): Promise<string> {
     );
   }
 
+  return ensureFreshAccessTokenForAccount(account);
+}
+
+async function ensureFreshAccessTokenForAccount(
+  account: Account
+): Promise<string> {
   if (!isTokenExpiring(account.accessToken)) {
     return account.accessToken;
   }
@@ -169,6 +175,22 @@ export async function getConvexClient(): Promise<ConvexHttpClient> {
     );
   }
   const token = await ensureFreshAccessToken();
+  const client = new ConvexHttpClient(CONVEX_URL);
+  client.setAuth(token);
+  return client;
+}
+
+async function getConvexClientForAccount(
+  account: Account
+): Promise<ConvexHttpClient> {
+  if (!CONVEX_URL) {
+    throw new APIError(
+      "This CLI build has no Convex URL embedded. Rebuild with NEXT_PUBLIC_CONVEX_URL set.",
+      0,
+      "NOT_CONFIGURED"
+    );
+  }
+  const token = await ensureFreshAccessTokenForAccount(account);
   const client = new ConvexHttpClient(CONVEX_URL);
   client.setAuth(token);
   return client;
@@ -531,6 +553,18 @@ export async function revokeDeviceSession(sessionId: string): Promise<void> {
   }
 }
 
+export async function revokeDeviceSessionForAccount(
+  account: Account,
+  sessionId: string
+): Promise<void> {
+  try {
+    const client = await getConvexClientForAccount(account);
+    await client.mutation(refs.deviceSessionRevoke, { sessionId });
+  } catch {
+    // Non-fatal — local credentials are cleared regardless.
+  }
+}
+
 // ============================================================================
 // Feature helpers
 // ============================================================================
@@ -690,12 +724,15 @@ export class APIClient {
   ): Promise<FingerprintCheck> {
     const rows = await convexQuery(refs.listVariablesWithAccess, { projectId });
     const accessible = rows.filter((row) => row.hasAccess);
-    const matching = accessible.filter(
-      (row) => !environment || row.environments.includes(environment)
-    );
-    const otherEnvKeys = accessible
-      .filter((row) => environment && !row.environments.includes(environment))
-      .map((row) => ({ key: row.key, environments: row.environments }));
+    const matching: typeof accessible = [];
+    const otherEnvKeys: FingerprintCheck["otherEnvKeys"] = [];
+    for (const row of accessible) {
+      if (!environment || row.environments.includes(environment)) {
+        matching.push(row);
+      } else {
+        otherEnvKeys.push({ key: row.key, environments: row.environments });
+      }
+    }
 
     const asVariables = matching.map(
       (row) =>
@@ -797,13 +834,14 @@ export class APIClient {
       ...(environment ? { environment } : {}),
     });
 
-    const variables: Variable[] = result.variables
+    const variables: Variable[] = [];
+    for (const row of result.variables) {
       // Variables whose value failed to decrypt are surfaced via
       // meta.decryptionFailures and NOT injected — matching the old
       // GET /api/cli/variables route, which omitted them from `data`
       // entirely (never wrote a "[DECRYPTION_FAILED]" placeholder to .env).
-      .filter((row) => row.value !== "[DECRYPTION_FAILED]")
-      .map((row) => ({
+      if (row.value === "[DECRYPTION_FAILED]") continue;
+      variables.push({
         _id: row._id,
         key: row.key,
         value: row.value,
@@ -819,7 +857,8 @@ export class APIClient {
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
         access: row.access,
-      }));
+      });
+    }
 
     // Preserve the legacy meta block old CLI builds derive .env protection
     // from (role / projectRole are passthrough keys of CliVariablesMeta).

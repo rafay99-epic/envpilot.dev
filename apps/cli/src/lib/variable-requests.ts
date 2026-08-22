@@ -199,13 +199,19 @@ export function buildEligibleRequestTargets(
   projects: RequestProjectCandidate[],
   orgNameById: Record<string, string>
 ): RequestTarget[] {
-  return projects.filter(isRequestEligibleProject).map((p) => ({
-    projectId: p._id,
-    projectName: p.name,
-    organizationId: p.organizationId,
-    organizationName: orgNameById[p.organizationId] ?? p.organizationId,
-    environmentScope: p.environmentScope ?? null,
-  }));
+  const targets: RequestTarget[] = [];
+  for (const project of projects) {
+    if (!isRequestEligibleProject(project)) continue;
+    targets.push({
+      projectId: project._id,
+      projectName: project.name,
+      organizationId: project.organizationId,
+      organizationName:
+        orgNameById[project.organizationId] ?? project.organizationId,
+      environmentScope: project.environmentScope ?? null,
+    });
+  }
+  return targets;
 }
 
 /** Label a target for a picker / summary as "<project> — <org>". */

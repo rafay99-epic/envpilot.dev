@@ -15,7 +15,7 @@ export interface ApiResponse<T> {
 // User types
 export const userSchema = z.object({
   id: z.string(),
-  email: z.string().email(),
+  email: z.email(),
   name: z.string().optional(),
 });
 
@@ -146,7 +146,7 @@ export type Environment = z.infer<typeof environmentSchema>;
 // CLI Config schema
 export const cliConfigSchema = z.object({
   // Global CLI setting — shared across all accounts.
-  apiUrl: z.string().url(),
+  apiUrl: z.url(),
   // Multi-account store. Keyed by account id (== user id).
   accounts: z.record(z.string(), accountSchema).optional(),
   // The currently active account id.
