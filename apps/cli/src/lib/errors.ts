@@ -43,6 +43,52 @@ export const ErrorCodes = {
 const ACCESS_SUSPENDED_TOKEN = "ACCESS_SUSPENDED";
 const ACCESS_REVOKED_MESSAGE =
   "Your access to this organization has been revoked. Please contact your organization administrator.";
+const EXPECTED_ERROR_CODES = new Set([
+  ErrorCodes.NOT_AUTHENTICATED,
+  ErrorCodes.INVALID_INPUT,
+  ErrorCodes.NOT_INITIALIZED,
+  "SESSION_EXPIRED",
+]);
+const SAFE_TELEMETRY_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
+
+function errorCode(error: unknown): string | undefined {
+  if (!(error instanceof Error) || !("code" in error)) return undefined;
+  return typeof error.code === "string" && SAFE_TELEMETRY_CODE.test(error.code)
+    ? error.code
+    : undefined;
+}
+
+function telemetryTags(error: unknown): Record<string, string> {
+  const tags: Record<string, string> = {};
+  if (error instanceof Error) tags.errorType = error.name;
+
+  const code = errorCode(error);
+  if (code) tags.errorCode = code;
+
+  if (error instanceof Error && "statusCode" in error) {
+    const statusCode = error.statusCode;
+    if (typeof statusCode === "number" && Number.isFinite(statusCode)) {
+      tags.statusCode = String(statusCode);
+    }
+  }
+  return tags;
+}
+
+function exitCode(error: unknown): number {
+  switch (errorCode(error)) {
+    case ErrorCodes.NOT_AUTHENTICATED:
+    case "SESSION_EXPIRED":
+      return 2;
+    case ErrorCodes.PERMISSION_DENIED:
+      return 3;
+    case ErrorCodes.TIER_LIMIT_EXCEEDED:
+      return 4;
+    case ErrorCodes.INCOMPLETE_SECRETS:
+      return 5;
+    default:
+      return 1;
+  }
+}
 
 /**
  * Reduce a Convex error to the single user-facing sentence it carries.
@@ -121,44 +167,13 @@ export function formatError(error: unknown): string {
 export async function handleError(error: unknown): Promise<never> {
   console.error(formatError(error));
 
-  // Report unexpected errors to Sentry (skip user-caused errors)
-  const skipCodes: Set<string> = new Set([
-    ErrorCodes.NOT_AUTHENTICATED,
-    ErrorCodes.INVALID_INPUT,
-    ErrorCodes.NOT_INITIALIZED,
-  ]);
-
-  if (error instanceof CLIError) {
-    if (!skipCodes.has(error.code)) {
-      captureError(error, { errorCode: error.code });
-    }
-  } else {
-    captureError(error);
+  const code = errorCode(error);
+  if (!code || !EXPECTED_ERROR_CODES.has(code)) {
+    captureError(error, telemetryTags(error));
   }
 
   await flushSentry();
-
-  // Exit with error code based on error type
-  if (error instanceof CLIError) {
-    switch (error.code) {
-      case ErrorCodes.NOT_AUTHENTICATED:
-        process.exit(2);
-        break;
-      case ErrorCodes.PERMISSION_DENIED:
-        process.exit(3);
-        break;
-      case ErrorCodes.TIER_LIMIT_EXCEEDED:
-        process.exit(4);
-        break;
-      case ErrorCodes.INCOMPLETE_SECRETS:
-        process.exit(5);
-        break;
-      default:
-        process.exit(1);
-    }
-  }
-
-  process.exit(1);
+  process.exit(exitCode(error));
 }
 
 /**

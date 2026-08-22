@@ -14,6 +14,8 @@ export function initSentry(): void {
     dsn,
     environment: "cli",
     release: typeof __CLI_VERSION__ !== "undefined" ? __CLI_VERSION__ : "0.0.0",
+    serverName: "envpilot-cli",
+    sendDefaultPii: false,
 
     // All EnvPilot surfaces report to one Sentry project; the surface tag
     // is how dashboards tell web / cli / extension events apart.
@@ -21,6 +23,10 @@ export function initSentry(): void {
 
     // Free tier: disable performance monitoring
     tracesSampleRate: 0,
+
+    beforeBreadcrumb(breadcrumb) {
+      return breadcrumb.category === "console" ? null : breadcrumb;
+    },
 
     beforeSend(event) {
       // Strip home directory paths from stack frames for privacy
@@ -50,6 +56,11 @@ export function initSentry(): void {
     },
   });
   initialized = true;
+}
+
+export function setCommandContext(command: string): void {
+  if (!initialized) return;
+  Sentry.setTag("command", command);
 }
 
 export function captureError(

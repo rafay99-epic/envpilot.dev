@@ -25,6 +25,8 @@ Envpilot access tokens expire after five minutes. A refresh started for one acco
 
 Refreshes now stay bound to the account and token that started them. WorkOS retries caused by timeouts, rate limits or temporary service errors keep the session intact. A terminally rejected token expires only its own account, and the CLI never selects another identity for the running command. Concurrent terminals use WorkOS's replay-safe token rotation, then conditionally persist the result so an older response cannot overwrite newer credentials.
 
+Unexpected CLI failures now include safe command, error-code and status tags in Sentry. Authentication mistakes stay out of error tracking, console breadcrumbs are dropped, and machine names, personal paths, arguments, tokens and secret values are never added as diagnostic tags.
+
 <!-- entry -->
 ---
 title: The Dashboard Stops Waiting For The Server

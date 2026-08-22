@@ -124,13 +124,18 @@ async function postForm(
     body: new URLSearchParams(form).toString(),
     signal,
   });
-  let body: unknown = null;
-  try {
-    body = await res.json();
-  } catch {
-    body = null;
+  if (!res.ok) {
+    try {
+      return { status: res.status, body: await res.json() };
+    } catch {
+      return { status: res.status, body: null };
+    }
   }
-  return { status: res.status, body };
+  try {
+    return { status: res.status, body: await res.json() };
+  } catch {
+    return { status: res.status, body: null };
+  }
 }
 
 // ── Device flow ────────────────────────────────────────────────────────────

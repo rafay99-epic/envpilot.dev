@@ -101,9 +101,8 @@ async function refreshAccount(account: Account): Promise<string> {
       });
       if (write.kind === "updated") return write.account.accessToken;
       if (write.kind === "missing") throw expiredSessionError();
-      if (!isTokenExpiring(write.account.accessToken)) {
-        return write.account.accessToken;
-      }
+      const accessToken = write.account.accessToken;
+      if (!isTokenExpiring(accessToken)) return accessToken;
       attempt = nextRefreshAttempt(write.account);
       continue;
     }
@@ -112,9 +111,8 @@ async function refreshAccount(account: Account): Promise<string> {
     if (expiry.kind === "expired" || expiry.kind === "missing") {
       throw expiredSessionError();
     }
-    if (!isTokenExpiring(expiry.account.accessToken)) {
-      return expiry.account.accessToken;
-    }
+    const accessToken = expiry.account.accessToken;
+    if (!isTokenExpiring(accessToken)) return accessToken;
     attempt = nextRefreshAttempt(expiry.account);
   }
 
