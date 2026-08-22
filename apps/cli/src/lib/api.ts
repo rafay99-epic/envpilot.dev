@@ -88,7 +88,7 @@ function nextRefreshAttempt(account: Account): AccountRefreshAttempt {
 async function refreshAccount(account: Account): Promise<string> {
   let attempt = nextRefreshAttempt(account);
 
-  for (let localRetry = 0; localRetry < 2; localRetry++) {
+  for (let supersedeAttempt = 0; supersedeAttempt < 2; supersedeAttempt++) {
     const outcome = await refreshAccessToken(attempt.refreshToken);
     if (outcome.kind === "transient") {
       throw new APIError(outcome.message, 0, "SESSION_REFRESH_RETRY");

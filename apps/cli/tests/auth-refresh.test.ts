@@ -66,6 +66,41 @@ describe("ensureFreshAccessToken", () => {
     expect(mocks.getActiveAccount).toHaveBeenCalledTimes(1);
   });
 
+  it("shares one refresh between overlapping calls for the same account", async () => {
+    const current = account("account-a");
+    mocks.getActiveAccount.mockReturnValue(current);
+    let finishRefresh:
+      | ((value: {
+          kind: "success";
+          accessToken: string;
+          refreshToken: string;
+        }) => void)
+      | null = null;
+    mocks.refreshAccessToken.mockReturnValue(
+      new Promise((resolve) => {
+        finishRefresh = resolve;
+      })
+    );
+    mocks.commitRefreshedTokens.mockResolvedValue({
+      kind: "updated",
+      account: { ...current, accessToken: "access-new" },
+    });
+
+    const first = ensureFreshAccessToken();
+    const second = ensureFreshAccessToken();
+    finishRefresh?.({
+      kind: "success",
+      accessToken: "access-new",
+      refreshToken: "refresh-new",
+    });
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      "access-new",
+      "access-new",
+    ]);
+    expect(mocks.refreshAccessToken).toHaveBeenCalledOnce();
+  });
+
   it("keeps credentials on a transient refresh failure", async () => {
     mocks.getActiveAccount.mockReturnValue(account("account-a"));
     mocks.refreshAccessToken.mockResolvedValue({
