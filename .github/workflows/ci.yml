@@ -683,12 +683,13 @@ jobs:
     name: Deploy Homebrew formula
     needs: [changes, deploy-cli]
     if: |
+      !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.outputs.run_cli == 'true' &&
-      needs.deploy-cli.outputs.published == 'true'
+      needs.deploy-cli.result == 'success'
     uses: ./.github/workflows/deploy-homebrew.yml
     with:
-      version: ${{ needs.deploy-cli.outputs.version }}
+      version: ${{ needs.changes.outputs.cli_version }}
     secrets: inherit
 
   # ------------------------------------------------------------------

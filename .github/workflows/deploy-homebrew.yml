@@ -62,6 +62,17 @@ jobs:
           echo "VERSION=$RAW_VERSION" >> "$GITHUB_ENV"
           echo "Version $RAW_VERSION is valid semver ✓"
 
+      - name: Verify npm published the requested version
+        run: |
+          for DELAY in 0 3 6 9 12; do
+            sleep "$DELAY"
+            PUBLISHED_VERSION=$(npm view @envpilot/cli version 2>/dev/null || true)
+            [ "$PUBLISHED_VERSION" = "$VERSION" ] && exit 0
+          done
+
+          echo "::error::npm latest is ${PUBLISHED_VERSION:-unavailable}, but Homebrew requested $VERSION"
+          exit 1
+
       - name: Checkout main repo (for the update script)
         uses: actions/checkout@v7
 
