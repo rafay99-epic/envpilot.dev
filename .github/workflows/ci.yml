@@ -61,6 +61,10 @@ jobs:
       run_blog: ${{ steps.flags.outputs.run_blog }}
       run_docs: ${{ steps.flags.outputs.run_docs }}
       run_admin: ${{ steps.flags.outputs.run_admin }}
+      deploy_web: ${{ steps.flags.outputs.deploy_web }}
+      deploy_blog: ${{ steps.flags.outputs.deploy_blog }}
+      deploy_docs: ${{ steps.flags.outputs.deploy_docs }}
+      deploy_admin: ${{ steps.flags.outputs.deploy_admin }}
       run_cli: ${{ steps.flags.outputs.run_cli }}
       run_extension: ${{ steps.flags.outputs.run_extension }}
       run_action: ${{ steps.flags.outputs.run_action }}
@@ -126,6 +130,10 @@ jobs:
               - '.github/workflows/**'
               - '.github/actions/**'
               - '.prettierignore'
+            # Shared runtime code used by every Vercel app. Tooling and CI
+            # changes still run checks through `shared`, but do not deploy.
+            vercel_shared:
+              - 'packages/ui/**'
 
       - name: Compute run flags
         id: flags
@@ -140,15 +148,20 @@ jobs:
           DOCKER_IMAGE: ${{ steps.filter.outputs.docker_image }}
           CONVEX: ${{ steps.filter.outputs.convex }}
           SHARED: ${{ steps.filter.outputs.shared }}
+          VERCEL_SHARED: ${{ steps.filter.outputs.vercel_shared }}
         run: |
           bool() { if [ "$1" = "true" ] || [ "$2" = "true" ]; then echo true; else echo false; fi; }
 
           run_web=$(bool "$WEB" "$SHARED")
-          # blog + docs deploy independently; shared changes (packages/ui,
-          # lockfile, configs) rebuild all four Vercel apps.
+          # Broad shared changes rerun checks. Deploy flags below stay scoped
+          # to direct app changes and shared runtime UI.
           run_blog=$(bool "$BLOG" "$SHARED")
           run_docs=$(bool "$DOCS" "$SHARED")
           run_admin=$(bool "$ADMIN" "$SHARED")
+          deploy_web=$(bool "$WEB" "$VERCEL_SHARED")
+          deploy_blog=$(bool "$BLOG" "$VERCEL_SHARED")
+          deploy_docs=$(bool "$DOCS" "$VERCEL_SHARED")
+          deploy_admin=$(bool "$ADMIN" "$VERCEL_SHARED")
           run_cli=$(bool "$CLI" "$SHARED")
           run_extension=$(bool "$EXTENSION" "$SHARED")
           run_action=$(bool "$ACTION" "$SHARED")
@@ -169,6 +182,10 @@ jobs:
             echo "run_blog=$run_blog"
             echo "run_docs=$run_docs"
             echo "run_admin=$run_admin"
+            echo "deploy_web=$deploy_web"
+            echo "deploy_blog=$deploy_blog"
+            echo "deploy_docs=$deploy_docs"
+            echo "deploy_admin=$deploy_admin"
             echo "run_cli=$run_cli"
             echo "run_extension=$run_extension"
             echo "run_action=$run_action"
@@ -182,10 +199,10 @@ jobs:
             echo "### Change detection"
             echo "| Surface | Check | Deploy |"
             echo "|---------|-------|--------|"
-            echo "| Web | $run_web | Vercel |"
-            echo "| Admin | $run_admin | Vercel |"
-            echo "| Blog | $run_blog | Vercel |"
-            echo "| Docs | $run_docs | Vercel |"
+            echo "| Web | $run_web | $deploy_web |"
+            echo "| Admin | $run_admin | $deploy_admin |"
+            echo "| Blog | $run_blog | $deploy_blog |"
+            echo "| Docs | $run_docs | $deploy_docs |"
             echo "| CLI | $run_cli | $run_cli |"
             echo "| Extension | $run_extension | $run_extension |"
             echo "| Convex | $run_convex | $deploy_convex |"
@@ -532,8 +549,8 @@ jobs:
   # ── Vercel prod deploys — ACTIVE (2026-07-18) ──────────────────────
   # One job per Vercel project, all through the same reusable workflow.
   # Each is path-gated by the `changes` job, so a docs-only merge deploys
-  # docs and nothing else — that IS the "only deploy blog/docs when they
-  # change" behaviour, done in CI instead of by turbo-ignore.
+  # docs and nothing else. Shared UI changes deploy every consumer, while
+  # CI and tooling changes run checks without deploying applications.
   #
   # Vercel's own git auto-deploy is fully OFF in every app's vercel.json
   # (`git.deploymentEnabled: false`) — otherwise each merge would ship
@@ -549,7 +566,7 @@ jobs:
       !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
-      needs.changes.outputs.run_web == 'true'
+      needs.changes.outputs.deploy_web == 'true'
     uses: ./.github/workflows/deploy-vercel.yml
     with:
       app: web
@@ -562,7 +579,7 @@ jobs:
       !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
-      needs.changes.outputs.run_admin == 'true'
+      needs.changes.outputs.deploy_admin == 'true'
     uses: ./.github/workflows/deploy-vercel.yml
     with:
       app: admin
@@ -576,7 +593,7 @@ jobs:
       !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
-      needs.changes.outputs.run_blog == 'true'
+      needs.changes.outputs.deploy_blog == 'true'
     uses: ./.github/workflows/deploy-vercel.yml
     with:
       app: blog
@@ -590,7 +607,7 @@ jobs:
       !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
-      needs.changes.outputs.run_docs == 'true'
+      needs.changes.outputs.deploy_docs == 'true'
     uses: ./.github/workflows/deploy-vercel.yml
     with:
       app: docs
