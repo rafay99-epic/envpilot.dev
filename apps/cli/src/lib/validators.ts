@@ -42,14 +42,9 @@ export const projectSlugSchema = z
   );
 
 /**
- * Organization slug validation
- */
-export const organizationSlugSchema = projectSlugSchema;
-
-/**
  * URL validation
  */
-export const urlSchema = z.string().url("Must be a valid URL");
+export const urlSchema = z.url({ message: "Must be a valid URL" });
 
 /**
  * Token validation
@@ -58,11 +53,6 @@ export const tokenSchema = z
   .string()
   .min(1, "Token cannot be empty")
   .regex(/^env_[A-Za-z0-9]{48}$/, "Invalid token format");
-
-/**
- * File path validation
- */
-export const filePathSchema = z.string().min(1, "File path cannot be empty");
 
 /**
  * Validate and parse environment variables from an object

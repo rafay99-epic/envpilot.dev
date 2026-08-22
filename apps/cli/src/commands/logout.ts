@@ -1,13 +1,15 @@
 import { Command } from "commander";
 import { success, info } from "../lib/ui.js";
-import { revokeDeviceSession } from "../lib/api.js";
+import {
+  revokeDeviceSession,
+  revokeDeviceSessionForAccount,
+} from "../lib/api.js";
 import {
   clearAuth,
   isAuthenticated,
   getActiveAccount,
   listAccounts,
   removeAccount,
-  setActiveAccount,
 } from "../lib/config.js";
 import { handleError } from "../lib/errors.js";
 
@@ -23,14 +25,19 @@ export const logoutCommand = new Command("logout")
 
       if (options.all) {
         const accounts = listAccounts();
+        const revocations: Promise<void>[] = [];
 
         for (const account of accounts) {
-          // Best-effort remote revoke. Each account is a distinct WorkOS
-          // identity, so authenticate as it (setActive) before revoking.
           if (account.sessionId) {
-            setActiveAccount(account.id);
-            await revokeDeviceSession(account.sessionId);
+            revocations.push(
+              revokeDeviceSessionForAccount(account, account.sessionId)
+            );
           }
+        }
+
+        await Promise.all(revocations);
+
+        for (const account of accounts) {
           removeAccount(account.id);
         }
 

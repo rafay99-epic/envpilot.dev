@@ -1,7 +1,8 @@
 import { Command } from "commander";
 import { CLI_VERSION } from "./cli-version.js";
-import { getTopLevelCommandCatalog } from "./command-catalog.js";
+import { getCommandCatalog } from "./command-catalog.js";
 import { enforceVersion } from "./version-check.js";
+import { setCommandContext } from "./sentry.js";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -14,7 +15,8 @@ export function createProgram(): Command {
     // to forward args/flags to a spawned child process after `--`.
     .enablePositionalOptions();
 
-  for (const command of getTopLevelCommandCatalog()) {
+  for (const command of getCommandCatalog()) {
+    if (!command.topLevel) continue;
     if (command.createCommand) {
       program.addCommand(command.createCommand());
     }
@@ -26,7 +28,8 @@ export function createProgram(): Command {
   // exist. Merely-outdated just prints a soft update notice and proceeds.
   // `--version`/`--help` short-circuit Commander before actions, so they are
   // naturally exempt (users can always check their version / read help).
-  program.hook("preAction", async () => {
+  program.hook("preAction", async (_command, actionCommand) => {
+    setCommandContext(actionCommand.name());
     const blocked = await enforceVersion();
     if (blocked) process.exit(1);
   });

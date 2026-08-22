@@ -15,6 +15,7 @@ import {
   ignoreSecretFilePaths,
   modeMatches,
   statusOf,
+  type FileStatus,
   writeSecretFile,
 } from "../lib/secret-files.js";
 import { isAuthenticated } from "../lib/config.js";
@@ -201,10 +202,19 @@ async function pullAllProjects(options: {
 
   checkTrackedFiles();
 
-  let totalPulled = 0;
-  let totalFailed = 0;
+  const outputPaths = configV2.projects.map((project) =>
+    getEnvPathForEnvironment(project.environment)
+  );
+  const hasUniqueOutputPaths = new Set(outputPaths).size === outputPaths.length;
+  const canPullConcurrently =
+    !process.stdout.isTTY &&
+    !options.files &&
+    Boolean(options.force || options.dryRun) &&
+    hasUniqueOutputPaths;
 
-  for (const project of configV2.projects) {
+  const pullConfiguredProject = async (
+    project: ProjectEntry
+  ): Promise<boolean> => {
     const outputPath = getEnvPathForEnvironment(project.environment);
     const displayName = project.projectName || project.projectId;
 
@@ -226,14 +236,33 @@ async function pullAllProjects(options: {
         outputPath,
         options
       );
-      totalPulled++;
+      return true;
     } catch (err) {
-      totalFailed++;
       if (err instanceof Error) {
         error(`  Failed: ${err.message}`);
       }
+      return false;
     }
+  };
+
+  const results = canPullConcurrently
+    ? await Promise.all(configV2.projects.map(pullConfiguredProject))
+    : await configV2.projects.reduce<Promise<boolean[]>>(
+        (resultsPromise, project) =>
+          resultsPromise.then((orderedResults) =>
+            pullConfiguredProject(project).then((pulled) => {
+              orderedResults.push(pulled);
+              return orderedResults;
+            })
+          ),
+        Promise.resolve([])
+      );
+
+  let totalPulled = 0;
+  for (const pulled of results) {
+    if (pulled) totalPulled += 1;
   }
+  const totalFailed = results.length - totalPulled;
 
   console.log();
   if (totalFailed === 0) {
@@ -298,6 +327,15 @@ async function pullSecretFiles(
   if (files.length === 0) return true;
 
   const root = process.cwd();
+  const statusEntries = await Promise.all(
+    files.map(
+      async (file): Promise<[string, FileStatus]> => [
+        file._id,
+        await statusOf(file, root),
+      ]
+    )
+  );
+  const statuses = new Map(statusEntries);
 
   // --dry-run still previews WHICH files would be written and their current
   // drift, it just never downloads content or touches the disk.
@@ -305,7 +343,7 @@ async function pullSecretFiles(
     console.log();
     info(`${files.length} secret file(s) for ${environment}:`);
     for (const file of files) {
-      const status = await statusOf(file, root);
+      const status = statuses.get(file._id) ?? "modified";
       // Permission drift is drift: a real pull chmods a byte-identical file
       // whose mode was loosened, so a preview that calls it "in-sync" is
       // lying about what the pull will do.
@@ -320,7 +358,7 @@ async function pullSecretFiles(
 
   const conflicts: typeof files = [];
   for (const file of files) {
-    if ((await statusOf(file, root)) === "modified") conflicts.push(file);
+    if (statuses.get(file._id) === "modified") conflicts.push(file);
   }
   if (conflicts.length > 0 && !force) {
     console.log();
@@ -342,25 +380,34 @@ async function pullSecretFiles(
   );
 
   console.log();
-  let written = 0;
+  const filesToWrite: typeof files = [];
   for (const file of files) {
-    if ((await statusOf(file, root)) === "in-sync") {
+    if (statuses.get(file._id) === "in-sync") {
       // Repair loosened permissions without re-downloading anything.
       if (!modeMatches(root, file.path, file.mode)) {
         applyMode(root, file.path, file.mode);
       }
-      continue;
+    } else {
+      filesToWrite.push(file);
     }
-    const content = await client.getSecretFileContent(file._id);
-    await writeSecretFile(
-      root,
-      content.path,
-      Buffer.from(content.content, "base64"),
-      content.mode
-    );
-    written += 1;
+  }
+
+  await Promise.all(
+    filesToWrite.map(async (file) => {
+      const content = await client.getSecretFileContent(file._id);
+      await writeSecretFile(
+        root,
+        content.path,
+        Buffer.from(content.content, "base64"),
+        content.mode
+      );
+    })
+  );
+
+  for (const file of filesToWrite) {
     console.log(`  ${chalk.green("✓")} ${file.path}  ${file.mode}`);
   }
+  const written = filesToWrite.length;
   success(
     `${written} secret file${written === 1 ? "" : "s"} written, ${files.length - written} unchanged`
   );

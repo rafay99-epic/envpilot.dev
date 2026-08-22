@@ -12,13 +12,6 @@ on:
         type: boolean
         required: false
         default: false
-    outputs:
-      published:
-        description: Whether a new version was published
-        value: ${{ jobs.publish.outputs.published }}
-      version:
-        description: The local CLI version
-        value: ${{ jobs.publish.outputs.version }}
     secrets:
       ENVPILOT_TOKEN:
         required: false
@@ -44,9 +37,6 @@ jobs:
     name: Publish to npm
     runs-on: ubuntu-latest
     environment: Production
-    outputs:
-      published: ${{ steps.guard.outputs.should_publish }}
-      version: ${{ steps.guard.outputs.local_version }}
     steps:
       - uses: actions/checkout@v7
         with:

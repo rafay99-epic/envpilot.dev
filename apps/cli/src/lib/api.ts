@@ -23,9 +23,14 @@ import {
   type OptionalRestArgs,
 } from "convex/server";
 import { CONVEX_URL } from "./env.js";
-import { getActiveAccount, updateActiveAccount, clearAuth } from "./config.js";
+import {
+  commitRefreshedTokens,
+  expireAccountSession,
+  getActiveAccount,
+  type AccountRefreshAttempt,
+} from "./config.js";
 import { isTokenExpiring } from "./jwt.js";
-import { refreshAccessToken, WorkosAuthError } from "./workos.js";
+import { refreshAccessToken } from "./workos.js";
 import { computeFingerprint } from "./variables-cache.js";
 import { normalizeOrgRole } from "./roles.js";
 import type {
@@ -37,6 +42,7 @@ import type {
   UsageInfo,
   VariableRequest,
   VariableRequestStatus,
+  Account,
 } from "../types/index.js";
 import type { CreateVariableRequestBody } from "./variable-requests.js";
 
@@ -64,18 +70,59 @@ export class APIError extends Error {
 // Auth: fresh WorkOS access token
 // ============================================================================
 
-// Re-entrancy guard so concurrent calls share a single in-flight refresh
-// instead of each hitting WorkOS (and racing to persist rotated tokens).
-let refreshInFlight: Promise<string> | null = null;
+const refreshesInFlight = new Map<string, Promise<string>>();
 
-/**
- * Return a valid WorkOS access token for the active account, refreshing it
- * first when it is expired or about to expire (<60s left). Persists the new
- * access token AND any rotated refresh token onto the active account.
- *
- * Throws APIError(401) when there is no session, or when the refresh token is
- * rejected (in which case local credentials are cleared so the user re-logs in).
- */
+function expiredSessionError(): APIError {
+  return new APIError(
+    "Your session has expired. Run `envpilot login`.",
+    401,
+    "SESSION_EXPIRED"
+  );
+}
+
+function nextRefreshAttempt(account: Account): AccountRefreshAttempt {
+  if (!account.refreshToken) throw expiredSessionError();
+  return { accountId: account.id, refreshToken: account.refreshToken };
+}
+
+async function refreshAccount(account: Account): Promise<string> {
+  let attempt = nextRefreshAttempt(account);
+
+  for (let supersedeAttempt = 0; supersedeAttempt < 2; supersedeAttempt++) {
+    const outcome = await refreshAccessToken(attempt.refreshToken);
+    if (outcome.kind === "transient") {
+      throw new APIError(outcome.message, 0, "SESSION_REFRESH_RETRY");
+    }
+
+    if (outcome.kind === "success") {
+      const write = await commitRefreshedTokens(attempt, {
+        accessToken: outcome.accessToken,
+        refreshToken: outcome.refreshToken,
+      });
+      if (write.kind === "updated") return write.account.accessToken;
+      if (write.kind === "missing") throw expiredSessionError();
+      const accessToken = write.account.accessToken;
+      if (!isTokenExpiring(accessToken)) return accessToken;
+      attempt = nextRefreshAttempt(write.account);
+      continue;
+    }
+
+    const expiry = await expireAccountSession(attempt);
+    if (expiry.kind === "expired" || expiry.kind === "missing") {
+      throw expiredSessionError();
+    }
+    const accessToken = expiry.account.accessToken;
+    if (!isTokenExpiring(accessToken)) return accessToken;
+    attempt = nextRefreshAttempt(expiry.account);
+  }
+
+  throw new APIError(
+    "Your session changed while it was refreshing. Run the command again.",
+    0,
+    "SESSION_REFRESH_RETRY"
+  );
+}
+
 export async function ensureFreshAccessToken(): Promise<string> {
   const account = getActiveAccount();
   if (!account?.accessToken) {
@@ -86,46 +133,26 @@ export async function ensureFreshAccessToken(): Promise<string> {
     );
   }
 
+  return ensureFreshAccessTokenForAccount(account);
+}
+
+async function ensureFreshAccessTokenForAccount(
+  account: Account
+): Promise<string> {
   if (!isTokenExpiring(account.accessToken)) {
     return account.accessToken;
   }
 
-  if (refreshInFlight) return refreshInFlight;
+  const existing = refreshesInFlight.get(account.id);
+  if (existing) return existing;
 
-  const refreshToken = account.refreshToken;
-  if (!refreshToken) {
-    throw new APIError(
-      "Your session has expired. Run `envpilot login`.",
-      401,
-      "SESSION_EXPIRED"
-    );
-  }
-
-  refreshInFlight = (async () => {
-    try {
-      const result = await refreshAccessToken(refreshToken);
-      updateActiveAccount({
-        accessToken: result.access_token,
-        refreshToken: result.refresh_token,
-      });
-      return result.access_token;
-    } catch (err) {
-      if (err instanceof WorkosAuthError && err.code === "access_denied") {
-        // Refresh token revoked/expired — the session is genuinely dead.
-        clearAuth();
-        throw new APIError(
-          "Your session has expired. Run `envpilot login`.",
-          401,
-          "SESSION_EXPIRED"
-        );
-      }
-      throw err;
-    } finally {
-      refreshInFlight = null;
+  const refresh = refreshAccount(account).finally(() => {
+    if (refreshesInFlight.get(account.id) === refresh) {
+      refreshesInFlight.delete(account.id);
     }
-  })();
-
-  return refreshInFlight;
+  });
+  refreshesInFlight.set(account.id, refresh);
+  return refresh;
 }
 
 // ============================================================================
@@ -148,6 +175,22 @@ export async function getConvexClient(): Promise<ConvexHttpClient> {
     );
   }
   const token = await ensureFreshAccessToken();
+  const client = new ConvexHttpClient(CONVEX_URL);
+  client.setAuth(token);
+  return client;
+}
+
+async function getConvexClientForAccount(
+  account: Account
+): Promise<ConvexHttpClient> {
+  if (!CONVEX_URL) {
+    throw new APIError(
+      "This CLI build has no Convex URL embedded. Rebuild with NEXT_PUBLIC_CONVEX_URL set.",
+      0,
+      "NOT_CONFIGURED"
+    );
+  }
+  const token = await ensureFreshAccessTokenForAccount(account);
   const client = new ConvexHttpClient(CONVEX_URL);
   client.setAuth(token);
   return client;
@@ -510,6 +553,18 @@ export async function revokeDeviceSession(sessionId: string): Promise<void> {
   }
 }
 
+export async function revokeDeviceSessionForAccount(
+  account: Account,
+  sessionId: string
+): Promise<void> {
+  try {
+    const client = await getConvexClientForAccount(account);
+    await client.mutation(refs.deviceSessionRevoke, { sessionId });
+  } catch {
+    // Non-fatal — local credentials are cleared regardless.
+  }
+}
+
 // ============================================================================
 // Feature helpers
 // ============================================================================
@@ -669,12 +724,15 @@ export class APIClient {
   ): Promise<FingerprintCheck> {
     const rows = await convexQuery(refs.listVariablesWithAccess, { projectId });
     const accessible = rows.filter((row) => row.hasAccess);
-    const matching = accessible.filter(
-      (row) => !environment || row.environments.includes(environment)
-    );
-    const otherEnvKeys = accessible
-      .filter((row) => environment && !row.environments.includes(environment))
-      .map((row) => ({ key: row.key, environments: row.environments }));
+    const matching: typeof accessible = [];
+    const otherEnvKeys: FingerprintCheck["otherEnvKeys"] = [];
+    for (const row of accessible) {
+      if (!environment || row.environments.includes(environment)) {
+        matching.push(row);
+      } else {
+        otherEnvKeys.push({ key: row.key, environments: row.environments });
+      }
+    }
 
     const asVariables = matching.map(
       (row) =>
@@ -776,13 +834,14 @@ export class APIClient {
       ...(environment ? { environment } : {}),
     });
 
-    const variables: Variable[] = result.variables
+    const variables: Variable[] = [];
+    for (const row of result.variables) {
       // Variables whose value failed to decrypt are surfaced via
       // meta.decryptionFailures and NOT injected — matching the old
       // GET /api/cli/variables route, which omitted them from `data`
       // entirely (never wrote a "[DECRYPTION_FAILED]" placeholder to .env).
-      .filter((row) => row.value !== "[DECRYPTION_FAILED]")
-      .map((row) => ({
+      if (row.value === "[DECRYPTION_FAILED]") continue;
+      variables.push({
         _id: row._id,
         key: row.key,
         value: row.value,
@@ -798,7 +857,8 @@ export class APIClient {
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
         access: row.access,
-      }));
+      });
+    }
 
     // Preserve the legacy meta block old CLI builds derive .env protection
     // from (role / projectRole are passthrough keys of CliVariablesMeta).
