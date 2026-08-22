@@ -17,6 +17,14 @@ const DEVICE_AUTHORIZE_URL = `${WORKOS_BASE}/user_management/authorize/device`;
 const AUTHENTICATE_URL = `${WORKOS_BASE}/user_management/authenticate`;
 
 const DEVICE_CODE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
+const REFRESH_ATTEMPTS = 3;
+const REFRESH_TIMEOUT_MS = 3_000;
+const REFRESH_RETRY_BASE_MS = 150;
+
+function refreshRetryDelay(attempt: number): number {
+  const ceiling = REFRESH_RETRY_BASE_MS * 2 ** attempt;
+  return ceiling / 2 + Math.random() * (ceiling / 2);
+}
 
 // ── Response schemas ─────────────────────────────────────────────────────────
 
@@ -53,6 +61,31 @@ const refreshSchema = z.object({
 });
 export type RefreshResponse = z.infer<typeof refreshSchema>;
 
+export type RefreshTransientCause =
+  | "timeout"
+  | "network"
+  | "rate_limited"
+  | "upstream"
+  | "invalid_response"
+  | "unexpected";
+
+export type RefreshOutcome =
+  | {
+      kind: "success";
+      accessToken: string;
+      refreshToken: string;
+    }
+  | {
+      kind: "transient";
+      cause: RefreshTransientCause;
+      message: string;
+    }
+  | {
+      kind: "terminal";
+      cause: "invalid_grant";
+      message: string;
+    };
+
 // ── Errors ───────────────────────────────────────────────────────────────────
 
 /** Thrown for unrecoverable device-flow failures (denied/expired/network). */
@@ -82,12 +115,14 @@ function assertConfigured(): void {
 
 async function postForm(
   url: string,
-  form: Record<string, string>
+  form: Record<string, string>,
+  signal?: AbortSignal
 ): Promise<{ status: number; body: unknown }> {
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(form).toString(),
+    signal,
   });
   let body: unknown = null;
   try {
@@ -195,50 +230,113 @@ export async function pollForToken(deviceCode: string): Promise<PollResult> {
   }
 }
 
-/** Step 3: exchange a refresh token for a fresh access token (may rotate rt). */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function refreshErrorMessage(body: unknown): string {
+  const message = extractErrorMessage(body);
+  return message
+    ? `Session refresh failed: ${message.replace(/\.$/, "")}.`
+    : "Session refresh failed.";
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "AbortError" || error.name === "TimeoutError")
+  );
+}
+
+function transientCause(status: number): RefreshTransientCause | null {
+  if (status === 408) return "timeout";
+  if (status === 429) return "rate_limited";
+  if ([500, 502, 503, 504].includes(status)) return "upstream";
+  return null;
+}
+
 export async function refreshAccessToken(
   refreshToken: string
-): Promise<RefreshResponse> {
+): Promise<RefreshOutcome> {
   assertConfigured();
-  let result: { status: number; body: unknown };
-  try {
-    result = await postForm(AUTHENTICATE_URL, {
-      client_id: WORKOS_CLIENT_ID,
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    });
-  } catch (err) {
-    throw new WorkosAuthError(
-      `Could not reach WorkOS to refresh the session: ${(err as Error).message}`,
-      "network"
-    );
+  for (let attempt = 0; attempt < REFRESH_ATTEMPTS; attempt++) {
+    let result: { status: number; body: unknown };
+    try {
+      result = await postForm(
+        AUTHENTICATE_URL,
+        {
+          client_id: WORKOS_CLIENT_ID,
+          grant_type: "refresh_token",
+          refresh_token: refreshToken,
+        },
+        AbortSignal.timeout(REFRESH_TIMEOUT_MS)
+      );
+    } catch (error) {
+      if (attempt < REFRESH_ATTEMPTS - 1) {
+        await sleep(refreshRetryDelay(attempt));
+        continue;
+      }
+      return {
+        kind: "transient",
+        cause: isTimeoutError(error) ? "timeout" : "network",
+        message: isTimeoutError(error)
+          ? "Session refresh timed out. Try again."
+          : "Could not reach WorkOS to refresh the session. Try again.",
+      };
+    }
+
+    if (result.status === 200) {
+      const parsed = refreshSchema.safeParse(result.body);
+      if (!parsed.success) {
+        return {
+          kind: "transient",
+          cause: "invalid_response",
+          message: "WorkOS returned an unexpected refresh response. Try again.",
+        };
+      }
+      return {
+        kind: "success",
+        accessToken: parsed.data.access_token,
+        refreshToken: parsed.data.refresh_token,
+      };
+    }
+
+    if (
+      result.status === 400 &&
+      extractOauthError(result.body) === "invalid_grant"
+    ) {
+      return {
+        kind: "terminal",
+        cause: "invalid_grant",
+        message: refreshErrorMessage(result.body),
+      };
+    }
+
+    const cause = transientCause(result.status);
+    if (cause && attempt < REFRESH_ATTEMPTS - 1) {
+      await sleep(refreshRetryDelay(attempt));
+      continue;
+    }
+    if (cause) {
+      return {
+        kind: "transient",
+        cause,
+        message: `${refreshErrorMessage(result.body)} Try again.`,
+      };
+    }
+
+    return {
+      kind: "transient",
+      cause: "unexpected",
+      message: `${refreshErrorMessage(result.body)} Try again.`,
+    };
   }
 
-  if (result.status >= 400) {
-    const message =
-      extractOauthError(result.body) ?? extractErrorMessage(result.body);
-    // Distinguish a genuinely dead session from a transient hiccup:
-    //   - 5xx / 429           → server unavailable or rate-limited; the refresh
-    //                           token is probably still valid. Surface as
-    //                           `network` so the caller KEEPS the creds and the
-    //                           user can retry (no wrongful forced re-login).
-    //   - other 4xx (400/401) → the refresh grant was rejected (revoked/expired
-    //                           token) → access_denied so the caller clears creds.
-    const transient = result.status >= 500 || result.status === 429;
-    throw new WorkosAuthError(
-      `Session refresh failed${message ? `: ${message}` : ""}.`,
-      transient ? "network" : "access_denied"
-    );
-  }
-
-  const parsed = refreshSchema.safeParse(result.body);
-  if (!parsed.success) {
-    throw new WorkosAuthError(
-      "WorkOS returned an unexpected refresh response.",
-      "invalid_response"
-    );
-  }
-  return parsed.data;
+  return {
+    kind: "transient",
+    cause: "unexpected",
+    message: "Session refresh failed. Try again.",
+  };
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

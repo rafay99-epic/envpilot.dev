@@ -15,8 +15,6 @@
 // expired or within 60s of expiring, persisting the result to the active
 // account.
 
-import { mkdirSync, rmSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { ConvexHttpClient } from "convex/browser";
 import {
   makeFunctionReference,
@@ -26,13 +24,13 @@ import {
 } from "convex/server";
 import { CONVEX_URL } from "./env.js";
 import {
+  commitRefreshedTokens,
+  expireAccountSession,
   getActiveAccount,
-  updateActiveAccount,
-  clearAuth,
-  getConfigPath,
+  type AccountRefreshAttempt,
 } from "./config.js";
 import { isTokenExpiring } from "./jwt.js";
-import { refreshAccessToken, WorkosAuthError } from "./workos.js";
+import { refreshAccessToken } from "./workos.js";
 import { computeFingerprint } from "./variables-cache.js";
 import { normalizeOrgRole } from "./roles.js";
 import type {
@@ -44,6 +42,7 @@ import type {
   UsageInfo,
   VariableRequest,
   VariableRequestStatus,
+  Account,
 } from "../types/index.js";
 import type { CreateVariableRequestBody } from "./variable-requests.js";
 
@@ -71,54 +70,61 @@ export class APIError extends Error {
 // Auth: fresh WorkOS access token
 // ============================================================================
 
-// Re-entrancy guard so concurrent calls share a single in-flight refresh
-// instead of each hitting WorkOS (and racing to persist rotated tokens).
-let refreshInFlight: Promise<string> | null = null;
+const refreshesInFlight = new Map<string, Promise<string>>();
 
-const REFRESH_LOCK_STALE_MS = 15_000;
-const REFRESH_LOCK_WAIT_MS = 5_000;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function expiredSessionError(): APIError {
+  return new APIError(
+    "Your session has expired. Run `envpilot login`.",
+    401,
+    "SESSION_EXPIRED"
+  );
 }
 
-async function acquireRefreshLock(): Promise<string | null> {
-  const lockPath = join(dirname(getConfigPath()), ".refresh-lock");
-  const deadline = Date.now() + REFRESH_LOCK_WAIT_MS;
-  for (;;) {
-    try {
-      mkdirSync(lockPath);
-      return lockPath;
-    } catch {
-      try {
-        if (Date.now() - statSync(lockPath).mtimeMs > REFRESH_LOCK_STALE_MS) {
-          rmSync(lockPath, { recursive: true, force: true });
-          continue;
-        }
-      } catch {
-        continue;
-      }
-      if (Date.now() >= deadline) return null;
-      await sleep(100);
+function nextRefreshAttempt(account: Account): AccountRefreshAttempt {
+  if (!account.refreshToken) throw expiredSessionError();
+  return { accountId: account.id, refreshToken: account.refreshToken };
+}
+
+async function refreshAccount(account: Account): Promise<string> {
+  let attempt = nextRefreshAttempt(account);
+
+  for (let localRetry = 0; localRetry < 2; localRetry++) {
+    const outcome = await refreshAccessToken(attempt.refreshToken);
+    if (outcome.kind === "transient") {
+      throw new APIError(outcome.message, 0, "SESSION_REFRESH_RETRY");
     }
+
+    if (outcome.kind === "success") {
+      const write = await commitRefreshedTokens(attempt, {
+        accessToken: outcome.accessToken,
+        refreshToken: outcome.refreshToken,
+      });
+      if (write.kind === "updated") return write.account.accessToken;
+      if (write.kind === "missing") throw expiredSessionError();
+      if (!isTokenExpiring(write.account.accessToken)) {
+        return write.account.accessToken;
+      }
+      attempt = nextRefreshAttempt(write.account);
+      continue;
+    }
+
+    const expiry = await expireAccountSession(attempt);
+    if (expiry.kind === "expired" || expiry.kind === "missing") {
+      throw expiredSessionError();
+    }
+    if (!isTokenExpiring(expiry.account.accessToken)) {
+      return expiry.account.accessToken;
+    }
+    attempt = nextRefreshAttempt(expiry.account);
   }
+
+  throw new APIError(
+    "Your session changed while it was refreshing. Run the command again.",
+    0,
+    "SESSION_REFRESH_RETRY"
+  );
 }
 
-function releaseRefreshLock(lockPath: string | null): void {
-  if (!lockPath) return;
-  try {
-    rmSync(lockPath, { recursive: true, force: true });
-  } catch {}
-}
-
-/**
- * Return a valid WorkOS access token for the active account, refreshing it
- * first when it is expired or about to expire (<60s left). Persists the new
- * access token AND any rotated refresh token onto the active account.
- *
- * Throws APIError(401) when there is no session, or when the refresh token is
- * rejected (in which case local credentials are cleared so the user re-logs in).
- */
 export async function ensureFreshAccessToken(): Promise<string> {
   const account = getActiveAccount();
   if (!account?.accessToken) {
@@ -133,59 +139,16 @@ export async function ensureFreshAccessToken(): Promise<string> {
     return account.accessToken;
   }
 
-  if (refreshInFlight) return refreshInFlight;
+  const existing = refreshesInFlight.get(account.id);
+  if (existing) return existing;
 
-  refreshInFlight = (async () => {
-    const lockPath = await acquireRefreshLock();
-    try {
-      let attemptedRefreshToken: string | null = null;
-      for (;;) {
-        const current = getActiveAccount();
-        if (current?.accessToken && !isTokenExpiring(current.accessToken)) {
-          return current.accessToken;
-        }
-
-        const refreshToken = current?.refreshToken;
-        if (!refreshToken) {
-          throw new APIError(
-            "Your session has expired. Run `envpilot login`.",
-            401,
-            "SESSION_EXPIRED"
-          );
-        }
-
-        if (refreshToken === attemptedRefreshToken) {
-          clearAuth();
-          throw new APIError(
-            "Your session has expired. Run `envpilot login`.",
-            401,
-            "SESSION_EXPIRED"
-          );
-        }
-
-        try {
-          const result = await refreshAccessToken(refreshToken);
-          updateActiveAccount({
-            accessToken: result.access_token,
-            refreshToken: result.refresh_token,
-          });
-          return result.access_token;
-        } catch (err) {
-          if (
-            !(err instanceof WorkosAuthError && err.code === "access_denied")
-          ) {
-            throw err;
-          }
-          attemptedRefreshToken = refreshToken;
-        }
-      }
-    } finally {
-      releaseRefreshLock(lockPath);
-      refreshInFlight = null;
+  const refresh = refreshAccount(account).finally(() => {
+    if (refreshesInFlight.get(account.id) === refresh) {
+      refreshesInFlight.delete(account.id);
     }
-  })();
-
-  return refreshInFlight;
+  });
+  refreshesInFlight.set(account.id, refresh);
+  return refresh;
 }
 
 // ============================================================================

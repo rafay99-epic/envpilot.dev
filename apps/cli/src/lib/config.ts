@@ -1,5 +1,6 @@
 import Conf from "conf";
 import type { Account, CLIConfig, User } from "../types/index.js";
+import { withConfigLock, withConfigLockSync } from "./config-lock.js";
 import { normalizeOrgRole, type OrgRole } from "./roles.js";
 import { clearRunCache } from "./variables-cache.js";
 
@@ -133,7 +134,7 @@ export function migrateLegacyConfigData(data: CLIConfig): CLIConfig {
  * Lazy + idempotent: called at the start of every account read. Only writes
  * when legacy fields are actually present, so it's a no-op once migrated.
  */
-export function migrateLegacyConfig(): void {
+function migrateLegacyConfigUnlocked(): void {
   const data = config.store as CLIConfig;
   const hadLegacy =
     data.accessToken !== undefined ||
@@ -144,6 +145,10 @@ export function migrateLegacyConfig(): void {
     data.activeProjectId !== undefined;
   if (!hadLegacy) return;
   config.store = migrateLegacyConfigData(data);
+}
+
+export function migrateLegacyConfig(): void {
+  withConfigLockSync(config.path, migrateLegacyConfigUnlocked);
 }
 
 /** Read the accounts record from the store (never undefined). */
@@ -188,10 +193,14 @@ export function getActiveAccountId(): string | undefined {
  * with the given id exists.
  */
 export function setActiveAccount(id: string): boolean {
-  const accounts = readAccounts();
-  if (!accounts[id]) return false;
-  const previous = config.get("activeAccountId");
-  config.set("activeAccountId", id);
+  const previous = withConfigLockSync(config.path, () => {
+    const accounts = readAccounts();
+    if (!accounts[id]) return undefined;
+    const activeAccountId = config.get("activeAccountId");
+    config.set("activeAccountId", id);
+    return activeAccountId ?? null;
+  });
+  if (previous === undefined) return false;
   // Switching identity must purge the decrypted-secret cache, exactly as
   // clearAuth does on logout. Without this the incoming account can be served
   // the outgoing account's secrets straight from disk.
@@ -210,13 +219,13 @@ export function setActiveAccount(id: string): boolean {
  * it also becomes the active account.
  */
 export function upsertAccount(account: Account): void {
-  const accounts = readAccounts();
-  const isFirst = Object.keys(accounts).length === 0;
-  accounts[account.id] = account;
-  writeAccounts(accounts);
-  if (isFirst) {
-    config.set("activeAccountId", account.id);
-  }
+  withConfigLockSync(config.path, () => {
+    const accounts = readAccounts();
+    const isFirst = Object.keys(accounts).length === 0;
+    accounts[account.id] = account;
+    writeAccounts(accounts);
+    if (isFirst) config.set("activeAccountId", account.id);
+  });
 }
 
 /**
@@ -227,26 +236,25 @@ export function removeAccount(id: string): {
   removedActive: boolean;
   newActiveId?: string;
 } {
-  const accounts = readAccounts();
-  if (!accounts[id]) {
-    return { removedActive: false };
-  }
+  return withConfigLockSync(config.path, () => {
+    const accounts = readAccounts();
+    if (!accounts[id]) return { removedActive: false };
 
-  const wasActive = config.get("activeAccountId") === id;
-  delete accounts[id];
-  writeAccounts(accounts);
+    const wasActive = config.get("activeAccountId") === id;
+    delete accounts[id];
+    writeAccounts(accounts);
 
-  let newActiveId: string | undefined;
-  if (wasActive) {
-    newActiveId = Object.keys(accounts)[0];
-    if (newActiveId) {
-      config.set("activeAccountId", newActiveId);
-    } else {
-      config.delete("activeAccountId");
+    let newActiveId: string | undefined;
+    if (wasActive) {
+      newActiveId = Object.keys(accounts)[0];
+      if (newActiveId) {
+        config.set("activeAccountId", newActiveId);
+      } else {
+        config.delete("activeAccountId");
+      }
     }
-  }
-
-  return { removedActive: wasActive, newActiveId };
+    return { removedActive: wasActive, newActiveId };
+  });
 }
 
 /**
@@ -254,7 +262,13 @@ export function removeAccount(id: string): {
  * account. The account id is never changed by a patch.
  */
 export function updateActiveAccount(patch: Partial<Account>): void {
-  migrateLegacyConfig();
+  withConfigLockSync(config.path, () => {
+    migrateLegacyConfigUnlocked();
+    updateActiveAccountUnlocked(patch);
+  });
+}
+
+function updateActiveAccountUnlocked(patch: Partial<Account>): void {
   const id = config.get("activeAccountId");
   if (!id) return;
   const accounts = readAccounts();
@@ -262,6 +276,72 @@ export function updateActiveAccount(patch: Partial<Account>): void {
   if (!existing) return;
   accounts[id] = { ...existing, ...patch, id: existing.id };
   writeAccounts(accounts);
+}
+
+export type AccountRefreshAttempt = {
+  accountId: string;
+  refreshToken: string;
+};
+
+export type AccountTokenWriteResult =
+  | { kind: "updated"; account: Account }
+  | { kind: "superseded"; account: Account }
+  | { kind: "missing" };
+
+export async function commitRefreshedTokens(
+  attempt: AccountRefreshAttempt,
+  tokens: { accessToken: string; refreshToken: string }
+): Promise<AccountTokenWriteResult> {
+  return withConfigLock(config.path, () => {
+    migrateLegacyConfigUnlocked();
+    const accounts = readAccounts();
+    const current = accounts[attempt.accountId];
+    if (!current) return { kind: "missing" };
+    if (current.refreshToken !== attempt.refreshToken) {
+      return { kind: "superseded", account: current };
+    }
+
+    const updated: Account = {
+      ...current,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+    accounts[attempt.accountId] = updated;
+    writeAccounts(accounts);
+    return { kind: "updated", account: updated };
+  });
+}
+
+export type AccountExpiryResult =
+  | { kind: "expired" }
+  | { kind: "superseded"; account: Account }
+  | { kind: "missing" };
+
+export async function expireAccountSession(
+  attempt: AccountRefreshAttempt
+): Promise<AccountExpiryResult> {
+  const result = await withConfigLock(config.path, () => {
+    migrateLegacyConfigUnlocked();
+    const accounts = readAccounts();
+    const current = accounts[attempt.accountId];
+    if (!current) return { kind: "missing" } as const;
+    if (current.refreshToken !== attempt.refreshToken) {
+      return { kind: "superseded", account: current } as const;
+    }
+
+    delete accounts[attempt.accountId];
+    writeAccounts(accounts);
+    const wasActive = config.get("activeAccountId") === attempt.accountId;
+    if (wasActive) config.delete("activeAccountId");
+    return { kind: "expired", wasActive } as const;
+  });
+
+  if (result.kind === "expired" && result.wasActive) {
+    try {
+      clearRunCache();
+    } catch {}
+  }
+  return result.kind === "expired" ? { kind: "expired" } : result;
 }
 
 /**
@@ -290,38 +370,37 @@ export function getConfig(): CLIConfig {
  * flat shape.
  */
 export function setConfig(updates: Partial<CLIConfig>): void {
-  const accountPatch: Partial<Account> = {};
-  let hasAccountPatch = false;
+  withConfigLockSync(config.path, () => {
+    const accountPatch: Partial<Account> = {};
+    let hasAccountPatch = false;
 
-  for (const [key, value] of Object.entries(updates)) {
-    switch (key) {
-      case "apiUrl":
-      case "accounts":
-      case "activeAccountId":
-        if (value === undefined) {
-          config.delete(key as keyof CLIConfig);
-        } else {
-          config.set(key as keyof CLIConfig, value);
-        }
-        break;
-      // Legacy auth fields → route onto the active account.
-      case "accessToken":
-      case "refreshToken":
-      case "role":
-      case "activeOrganizationId":
-      case "activeProjectId":
-      case "user":
-        (accountPatch as Record<string, unknown>)[key] = value;
-        hasAccountPatch = true;
-        break;
-      default:
-        break;
+    for (const [key, value] of Object.entries(updates)) {
+      switch (key) {
+        case "apiUrl":
+        case "accounts":
+        case "activeAccountId":
+          if (value === undefined) {
+            config.delete(key as keyof CLIConfig);
+          } else {
+            config.set(key as keyof CLIConfig, value);
+          }
+          break;
+        case "accessToken":
+        case "refreshToken":
+        case "role":
+        case "activeOrganizationId":
+        case "activeProjectId":
+        case "user":
+          (accountPatch as Record<string, unknown>)[key] = value;
+          hasAccountPatch = true;
+          break;
+        default:
+          break;
+      }
     }
-  }
 
-  if (hasAccountPatch) {
-    updateActiveAccount(accountPatch);
-  }
+    if (hasAccountPatch) updateActiveAccountUnlocked(accountPatch);
+  });
 }
 
 /**
@@ -339,7 +418,7 @@ export function getApiUrl(): string {
  * Set the API URL
  */
 export function setApiUrl(url: string): void {
-  config.set("apiUrl", normalizeApiUrl(url));
+  setConfig({ apiUrl: normalizeApiUrl(url) });
 }
 
 /**
@@ -454,7 +533,7 @@ export function clearAuth(): { newActiveId?: string } {
  * Clear all configuration
  */
 export function clearConfig(): void {
-  config.clear();
+  withConfigLockSync(config.path, () => config.clear());
 }
 
 /**

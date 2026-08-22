@@ -15,6 +15,18 @@
 
 <!-- entry -->
 ---
+title: CLI Sessions Stay Put Across Terminals
+version: v1.22.3
+date: 2026-08-22
+types: [fix]
+---
+
+Envpilot access tokens expire after five minutes. A refresh started for one account could finish after another terminal changed the globally active account. The result was then saved to, or cleared from, whichever account happened to be active at that moment. That is how a command could report an expired session and leave `whoami` showing a different account.
+
+Refreshes now stay bound to the account and token that started them. WorkOS retries caused by timeouts, rate limits or temporary service errors keep the session intact. A terminally rejected token expires only its own account, and the CLI never selects another identity for the running command. Concurrent terminals use WorkOS's replay-safe token rotation, then conditionally persist the result so an older response cannot overwrite newer credentials.
+
+<!-- entry -->
+---
 title: The Dashboard Stops Waiting For The Server
 version: v1.66.0
 date: 2026-08-19
