@@ -33,24 +33,19 @@ port_for() {
   esac
 }
 
-filter_for() {
-  case "$1" in
-  web | admin | blog | docs) echo "@envpilot/$1" ;;
-  *) echo "" ;;
-  esac
-}
-
 names=(convex)
 commands=("bun --bun convex dev")
 colors=(green)
 palette=(blue magenta cyan yellow)
 
 for surface in "${surfaces[@]}"; do
-  filter="$(filter_for "$surface")"
-  if [ -z "$filter" ]; then
+  case "$surface" in
+  web | admin | blog | docs) ;;
+  *)
     echo "✗ Unknown surface '$surface'. Pick from: web, admin, blog, docs." >&2
     exit 1
-  fi
+    ;;
+  esac
 
   # A second server on an occupied port is the failure that starts as a
   # confusing 500 and ends with two full Next builds fighting for the machine.
@@ -62,7 +57,7 @@ for surface in "${surfaces[@]}"; do
   fi
 
   names+=("$surface")
-  commands+=("bun --bun turbo dev --filter=$filter")
+  commands+=("bun run --cwd apps/$surface dev")
   colors+=("${palette[$(((${#names[@]} - 2) % ${#palette[@]}))]}")
 done
 
