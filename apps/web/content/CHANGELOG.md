@@ -15,6 +15,18 @@
 
 <!-- entry -->
 ---
+title: Dynamic Routes Build Cleanly Again
+version: v1.66.3
+date: 2026-08-23
+types: [fix]
+---
+
+Vercel Analytics read route parameters while Next.js prerendered every dynamic page. One shared component made project, organization, invitation, comparison and public-share routes each report the same build error.
+
+Analytics now loads in the browser, where route parameters are available. The affected pages keep their partial prerendered shells and the production build completes without opting them out of instant navigation.
+
+<!-- entry -->
+---
 title: CLI Sessions Stay Put Across Terminals
 version: v1.22.3
 date: 2026-08-22
