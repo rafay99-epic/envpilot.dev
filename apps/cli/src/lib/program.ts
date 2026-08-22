@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { CLI_VERSION } from "./cli-version.js";
-import { getTopLevelCommandCatalog } from "./command-catalog.js";
+import { getCommandCatalog } from "./command-catalog.js";
 import { enforceVersion } from "./version-check.js";
 import { setCommandContext } from "./sentry.js";
 
@@ -15,7 +15,8 @@ export function createProgram(): Command {
     // to forward args/flags to a spawned child process after `--`.
     .enablePositionalOptions();
 
-  for (const command of getTopLevelCommandCatalog()) {
+  for (const command of getCommandCatalog()) {
+    if (!command.topLevel) continue;
     if (command.createCommand) {
       program.addCommand(command.createCommand());
     }

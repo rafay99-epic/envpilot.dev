@@ -15,7 +15,6 @@ import {
   type ProjectConfig,
   type ProjectConfigV2,
   type ProjectEntry,
-  type Environment,
 } from "../types/index.js";
 
 // Project config file name
@@ -324,26 +323,6 @@ export function updateProjectConfig(
   }
   const updated = updateProjectInConfig(v2, active.projectId, updates);
   writeProjectConfigV2(updated, directory);
-}
-
-/**
- * Get the current environment from project config
- */
-export function getCurrentEnvironment(
-  directory: string = process.cwd()
-): Environment {
-  const config = readProjectConfig(directory);
-  return config?.environment ?? "development";
-}
-
-/**
- * Set the current environment in project config
- */
-export function setCurrentEnvironment(
-  environment: Environment,
-  directory: string = process.cwd()
-): void {
-  updateProjectConfig({ environment }, directory);
 }
 
 /**

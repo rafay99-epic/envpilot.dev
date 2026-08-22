@@ -202,10 +202,19 @@ async function pullAllProjects(options: {
 
   checkTrackedFiles();
 
-  let totalPulled = 0;
-  let totalFailed = 0;
+  const outputPaths = configV2.projects.map((project) =>
+    getEnvPathForEnvironment(project.environment)
+  );
+  const hasUniqueOutputPaths = new Set(outputPaths).size === outputPaths.length;
+  const canPullConcurrently =
+    !process.stdout.isTTY &&
+    !options.files &&
+    Boolean(options.force || options.dryRun) &&
+    hasUniqueOutputPaths;
 
-  for (const project of configV2.projects) {
+  const pullConfiguredProject = async (
+    project: ProjectEntry
+  ): Promise<boolean> => {
     const outputPath = getEnvPathForEnvironment(project.environment);
     const displayName = project.projectName || project.projectId;
 
@@ -227,14 +236,33 @@ async function pullAllProjects(options: {
         outputPath,
         options
       );
-      totalPulled++;
+      return true;
     } catch (err) {
-      totalFailed++;
       if (err instanceof Error) {
         error(`  Failed: ${err.message}`);
       }
+      return false;
     }
+  };
+
+  const results = canPullConcurrently
+    ? await Promise.all(configV2.projects.map(pullConfiguredProject))
+    : await configV2.projects.reduce<Promise<boolean[]>>(
+        (resultsPromise, project) =>
+          resultsPromise.then((orderedResults) =>
+            pullConfiguredProject(project).then((pulled) => {
+              orderedResults.push(pulled);
+              return orderedResults;
+            })
+          ),
+        Promise.resolve([])
+      );
+
+  let totalPulled = 0;
+  for (const pulled of results) {
+    if (pulled) totalPulled += 1;
   }
+  const totalFailed = results.length - totalPulled;
 
   console.log();
   if (totalFailed === 0) {

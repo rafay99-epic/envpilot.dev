@@ -15,9 +15,7 @@ export async function openTUI(): Promise<void> {
     import("./press-any-key.js"),
   ]);
 
-  // The TUI runs in a loop: render → pick command → execute → repeat.
-  // The loop exits only when the user presses Escape.
-  while (true) {
+  const runCycle = async (): Promise<boolean> => {
     let selectedArgv: string[] | null = null;
 
     const app = render(
@@ -30,9 +28,8 @@ export async function openTUI(): Promise<void> {
 
     await app.waitUntilExit();
 
-    // User pressed Escape (no command selected) — exit the TUI.
     if (!selectedArgv) {
-      break;
+      return false;
     }
 
     // Run the selected command with a clean terminal.
@@ -56,8 +53,20 @@ export async function openTUI(): Promise<void> {
 
     await prompt.waitUntilExit();
 
-    if (quit) {
-      break;
-    }
-  }
+    return !quit;
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    const runNext = (): void => {
+      void runCycle().then((continueRunning) => {
+        if (continueRunning) {
+          runNext();
+        } else {
+          resolve();
+        }
+      }, reject);
+    };
+
+    runNext();
+  });
 }

@@ -48,7 +48,7 @@ export const accountSchema = z.object({
 export type Account = z.infer<typeof accountSchema>;
 
 // Organization types
-export const organizationSchema = z.object({
+const organizationSchema = z.object({
   _id: z.string(),
   name: z.string(),
   slug: z.string(),
@@ -64,7 +64,7 @@ export type Organization = z.infer<typeof organizationSchema>;
 export type ProjectRole = "viewer" | "developer" | "manager";
 
 // Project types
-export const projectSchema = z.object({
+const projectSchema = z.object({
   _id: z.string(),
   name: z.string(),
   slug: z.string(),
@@ -93,7 +93,7 @@ export const variableTagSchema = z.object({
 
 export type VariableTag = z.infer<typeof variableTagSchema>;
 
-export const variableSchema = z.object({
+const variableSchema = z.object({
   _id: z.string(),
   key: z.string(),
   value: z.string(),
@@ -144,7 +144,7 @@ export const environmentSchema = z.enum([
 export type Environment = z.infer<typeof environmentSchema>;
 
 // CLI Config schema
-export const cliConfigSchema = z.object({
+const cliConfigSchema = z.object({
   // Global CLI setting — shared across all accounts.
   apiUrl: z.url(),
   // Multi-account store. Keyed by account id (== user id).
@@ -219,7 +219,7 @@ const variableRequestUserSchema = z
   .nullable()
   .optional();
 
-export const variableRequestSchema = z.object({
+const variableRequestSchema = z.object({
   _id: z.string(),
   key: z.string(),
   description: z.string().optional(),

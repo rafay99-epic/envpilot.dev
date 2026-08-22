@@ -198,16 +198,6 @@ function formatValue(value: string): string {
 }
 
 /**
- * Merge two sets of environment variables
- */
-export function mergeEnvVars(
-  base: Record<string, string>,
-  updates: Record<string, string>
-): Record<string, string> {
-  return { ...base, ...updates };
-}
-
-/**
  * Compute the diff between two sets of environment variables
  */
 export function diffEnvVars(
@@ -300,13 +290,6 @@ export function writeEnvFile(
 ): void {
   const content = stringifyEnv(vars, options);
   atomicWriteFileSync(filePath, content, 0o600);
-}
-
-/**
- * Get the default .env file path
- */
-export function getDefaultEnvPath(directory: string = process.cwd()): string {
-  return join(directory, ".env.local");
 }
 
 /**

@@ -195,30 +195,6 @@ export function notInitialized(): CLIError {
   );
 }
 
-export function projectNotFound(projectId: string): CLIError {
-  return new CLIError(
-    `Project not found: ${projectId}`,
-    ErrorCodes.PROJECT_NOT_FOUND,
-    "Run `envpilot list projects` to see available projects."
-  );
-}
-
-export function organizationNotFound(organizationId: string): CLIError {
-  return new CLIError(
-    `Organization not found: ${organizationId}`,
-    ErrorCodes.ORGANIZATION_NOT_FOUND,
-    "Run `envpilot list organizations` to see available organizations."
-  );
-}
-
-export function tierLimitExceeded(feature: string): CLIError {
-  return new CLIError(
-    `Tier limit reached: ${feature}`,
-    ErrorCodes.TIER_LIMIT_EXCEEDED,
-    "Run `envpilot usage` to see your current plan limits, or upgrade to Pro."
-  );
-}
-
 export function fileNotFound(path: string): CLIError {
   return new CLIError(`File not found: ${path}`, ErrorCodes.FILE_NOT_FOUND);
 }
@@ -272,13 +248,5 @@ export function incompleteSecrets(reasons: readonly string[]): CLIError {
     `Refusing to run with an incomplete environment:\n  ${reasons.join("\n  ")}`,
     ErrorCodes.INCOMPLETE_SECRETS,
     "Fix the variables above, or pass --allow-partial to run anyway."
-  );
-}
-
-export function networkError(message: string): CLIError {
-  return new CLIError(
-    `Network error: ${message}`,
-    ErrorCodes.NETWORK_ERROR,
-    "Check your internet connection and try again."
   );
 }

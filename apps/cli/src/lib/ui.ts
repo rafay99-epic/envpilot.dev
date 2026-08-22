@@ -167,14 +167,6 @@ export function maskValue(value: string, showChars: number = 4): string {
 }
 
 /**
- * Confirm action with y/n
- */
-export function printConfirmPrompt(message: string): void {
-  console.log();
-  console.log(chalk.yellow(`${message} (y/N)`));
-}
-
-/**
  * Print a horizontal line
  */
 export function line(): void {
