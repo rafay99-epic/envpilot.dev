@@ -235,46 +235,56 @@ class LinkDirectoryDialog(
     private val selected: ApiProject,
 ) : DialogWrapper(project) {
 
-    private val envCombo = JComboBox(VALID_ENVIRONMENTS.toTypedArray())
-    private var chosenDir: String? = null
+    private var environment = VALID_ENVIRONMENTS.first()
+    private val dirField = com.intellij.openapi.ui.TextFieldWithBrowseButton()
 
     init {
-        title = "Link ${selected.name}"
+        title = "Link ${selected.name} to a Directory"
+        setOKButtonText("Link Directory")
+        dirField.text = project.basePath ?: ""
+        dirField.addBrowseFolderListener(
+            "Choose Directory",
+            "The Envpilot env file will be written into this directory.",
+            project,
+            com.intellij.openapi.fileChooser.FileChooserDescriptorFactory.createSingleFolderDescriptor()
+        )
         init()
     }
 
-    override fun createCenterPanel(): JComponent {
-        val panel = JPanel(java.awt.GridLayout(0, 1))
-        panel.add(javax.swing.JLabel("Environment:"))
-        panel.add(envCombo)
-        val dirLabel = javax.swing.JLabel("Directory: (project root)")
-        val chooseButton = javax.swing.JButton("Choose…")
-        chooseButton.addActionListener {
-            val chooser = com.intellij.openapi.fileChooser.FileChooserFactory.getInstance()
-                .createFileChooser(
-                    com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
-                        .createSingleFolderDescriptor(),
-                    project,
-                    null
-                )
-            val files = chooser.choose(project)
-            files.firstOrNull()?.let {
-                chosenDir = java.io.File(it.path).canonicalPath
-                dirLabel.text = "Directory: $chosenDir"
-            }
+    override fun createCenterPanel(): JComponent = com.intellij.ui.dsl.builder.panel {
+        group("Project") {
+            row("Name:") { label(selected.name) }
+            row("Variables:") { label("${selected.variableCount} (all environments)") }
         }
-        panel.add(dirLabel)
-        panel.add(chooseButton)
-        return panel
+        group("Link settings") {
+            row("Environment:") {
+                cell(javax.swing.JComboBox(VALID_ENVIRONMENTS.toTypedArray()))
+                    .onChanged { environment = it.selectedItem as String }
+            }.comment("Which environment's values to pull into this directory.")
+            row("Directory:") {
+                cell(dirField).align(com.intellij.ui.dsl.builder.AlignX.FILL)
+            }.comment("The env file (Settings ▸ Tools ▸ Envpilot to change the name) is written here.")
+        }
+    }
+
+    override fun doValidate(): com.intellij.openapi.ui.ValidationInfo? {
+        if (dirField.text.isBlank()) {
+            return com.intellij.openapi.ui.ValidationInfo("Directory is required", dirField)
+        }
+        val dir = java.io.File(dirField.text)
+        if (!dir.exists() || !dir.isDirectory) {
+            return com.intellij.openapi.ui.ValidationInfo("Directory does not exist", dirField)
+        }
+        return null
     }
 
     override fun doOKAction() {
-        val dir = chosenDir ?: Paths.get(project.basePath ?: "").toAbsolutePath().toString()
+        val dir = java.io.File(dirField.text).canonicalPath
         val added = LinkedProjectsService.getInstance(project).add(
             LinkedProject(
                 projectId = selected.id,
                 projectName = selected.name,
-                environment = envCombo.selectedItem as String,
+                environment = environment,
                 directoryPath = dir,
             )
         )
