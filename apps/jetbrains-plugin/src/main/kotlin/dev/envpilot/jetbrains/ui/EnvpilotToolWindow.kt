@@ -230,6 +230,13 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         list.selectedIndex.takeIf { it >= 0 && it < items.size }?.let { items[it] }
 }
 
+private fun notifyBalloon(project: Project, message: String, type: com.intellij.notification.NotificationType) {
+    com.intellij.notification.NotificationGroupManager.getInstance()
+        .getNotificationGroup("dev.envpilot.notifications")
+        .createNotification(message, type)
+        .notify(project)
+}
+
 class LinkDirectoryDialog(
     private val project: Project,
     private val selected: ApiProject,
@@ -238,6 +245,9 @@ class LinkDirectoryDialog(
     private var environment = VALID_ENVIRONMENTS.first()
     private val dirField = com.intellij.openapi.ui.TextFieldWithBrowseButton()
     private val pathPreview = javax.swing.JLabel()
+    private val pullScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+    )
 
     init {
         title = "Link ${selected.name} to a Directory"
@@ -317,6 +327,18 @@ class LinkDirectoryDialog(
                 .notify(project)
             super.doOKAction()
             return
+        }
+        // Pull immediately so the user sees the env file land — no hidden
+        // "now go click Pull Now" step.
+        pullScope.launch {
+            val ok = SyncScheduler.getInstance().runCycle(project)
+            notifyBalloon(
+                project,
+                if (ok) "Linked ${selected.name} — env file pulled into $dir"
+                else "Linked ${selected.name}, but the pull failed — see the status bar.",
+                if (ok) com.intellij.notification.NotificationType.INFORMATION
+                else com.intellij.notification.NotificationType.ERROR
+            )
         }
         val settings = EnvpilotSettings.getInstance().state
         if (settings.commitGuardAutoInstall) {

@@ -1,8 +1,6 @@
 package dev.envpilot.jetbrains
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.editor.EditorFactory
-import com.intellij.openapi.editor.actionSystem.EditorActionManager
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
@@ -80,16 +78,19 @@ class StartupActivity : ProjectActivity {
     private fun installGlobalGuards() {
         if (!guardsInstalled.compareAndSet(false, true)) return
         ApplicationManager.getApplication().invokeLater {
-            val manager = EditorActionManager.getInstance()
-            manager.setActionHandler(
-                IdeActions.ACTION_COPY,
-                CopyGuardHandler(manager.getActionHandler(IdeActions.ACTION_COPY), isCut = false)
-            )
-            manager.setActionHandler(
-                IdeActions.ACTION_CUT,
-                CopyGuardHandler(manager.getActionHandler(IdeActions.ACTION_CUT), isCut = true)
-            )
-            EditorFactory.getInstance() // warm up editor subsystem
+            try {
+                val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
+                val copyAction = actionManager.getAction(IdeActions.ACTION_COPY)
+                        as com.intellij.openapi.editor.actionSystem.EditorAction
+                copyAction.setupHandler(CopyGuardHandler(copyAction.handler, isCut = false))
+                val cutAction = actionManager.getAction(IdeActions.ACTION_CUT)
+                        as com.intellij.openapi.editor.actionSystem.EditorAction
+                cutAction.setupHandler(CopyGuardHandler(cutAction.handler, isCut = true))
+            } catch (e: Exception) {
+                dev.envpilot.jetbrains.telemetry.EnvSentry.capture(e, mapOf("surface" to "copy-guard"))
+                com.intellij.openapi.diagnostic.logger<StartupActivity>()
+                    .warn("Copy guard registration failed: ${e.message}")
+            }
         }
     }
 }
