@@ -2,82 +2,82 @@ package dev.envpilot.jetbrains.ui
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
+import com.intellij.ui.dsl.builder.AlignX
+import com.intellij.ui.dsl.builder.panel
 import dev.envpilot.jetbrains.api.EnvpilotApi
 import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.config.EnvpilotSettings
 import dev.envpilot.jetbrains.model.VALID_ENVIRONMENTS
-import dev.envpilot.jetbrains.sync.LinkedProjectsService
 import dev.envpilot.jetbrains.telemetry.EnvSentry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.swing.JComponent
-import javax.swing.JPanel
-import javax.swing.JCheckBox
-import javax.swing.JTextField
-import javax.swing.JTextArea
-import javax.swing.JLabel
-import java.awt.GridLayout
 
 /**
- * Submit a variable request (goes through the same approval flow as the web).
- * The value is encrypted server-side by the createWithValue action — it never
- * travels anywhere unencrypted.
+ * Submit a variable request (same approval flow as the web). The value is
+ * encrypted server-side by the createWithValue action.
  */
 class RequestVariableDialog(
     private val project: Project,
     private val projects: List<Pair<String, String>>, // id to name
 ) : DialogWrapper(project) {
 
-    private val keyField = JTextField()
-    private val valueField = JTextField()
-    private val descriptionField = JTextField()
-    private val envChecks = VALID_ENVIRONMENTS.map { it to JCheckBox(it) }
-    private val sensitiveCheck = JCheckBox("Sensitive value", true)
-    private val projectCombo = javax.swing.JComboBox(projects.map { it.second }.toTypedArray())
+    private val keyField = javax.swing.JTextField()
+    private val valueField = javax.swing.JTextField()
+    private val descriptionField = javax.swing.JTextField()
+    private val envChecks = VALID_ENVIRONMENTS.map { it to javax.swing.JCheckBox(it.capitalize()) }
+    private val sensitiveCheck = javax.swing.JCheckBox("Sensitive value", true)
+    private val projectCombo =
+        javax.swing.JComboBox(projects.map { it.second }.toTypedArray())
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
         title = "Request Variable"
+        setOKButtonText("Submit Request")
+        envChecks.first().second.isSelected = true
         init()
     }
 
-    override fun createCenterPanel(): JComponent {
-        val panel = JPanel(java.awt.BorderLayout(0, 8))
-        val grid = JPanel(GridLayout(0, 1))
-        grid.add(JLabel("Project:"))
-        grid.add(projectCombo)
-        grid.add(JLabel("Key (UPPER_SNAKE_CASE):"))
-        grid.add(keyField)
-        grid.add(JLabel("Proposed value:"))
-        grid.add(valueField)
-        grid.add(JLabel("Description:"))
-        grid.add(descriptionField)
-        val envRow = JPanel()
-        envChecks.forEach { envRow.add(it.second) }
-        grid.add(JLabel("Environments:"))
-        grid.add(envRow)
-        grid.add(sensitiveCheck)
-        panel.add(grid, java.awt.BorderLayout.NORTH)
-        return panel
+    override fun createCenterPanel(): JComponent = panel {
+        group("Variable") {
+            row("Project:") {
+                cell(projectCombo).align(AlignX.FILL)
+            }
+            row("Key:") {
+                cell(keyField).align(AlignX.FILL)
+            }.comment("UPPER_SNAKE_CASE — letters, digits and underscores, starting with a letter.")
+            row("Proposed value:") {
+                cell(valueField).align(AlignX.FILL)
+            }.comment("Encrypted server-side before storage; never leaves the machine in plaintext.")
+            row("Description:") {
+                cell(descriptionField).align(AlignX.FILL)
+            }.comment("Optional context for whoever approves this request.")
+        }
+        group("Environments") {
+            row {
+                envChecks.forEach { (_, check) -> cell(check) }
+            }
+        }
+        group("Options") {
+            row { cell(sensitiveCheck) }
+        }
     }
 
-    override fun doValidate(): com.intellij.openapi.ui.ValidationInfo? {
+    override fun doValidate(): ValidationInfo? {
         if (!Regex("^[A-Z][A-Z0-9_]*$").matches(keyField.text.trim())) {
-            return com.intellij.openapi.ui.ValidationInfo(
-                "Key must be UPPER_SNAKE_CASE (A-Z, 0-9, _)",
-                keyField
-            )
+            return ValidationInfo("Key must be UPPER_SNAKE_CASE (A-Z, 0-9, _)", keyField)
         }
         if (valueField.text.isBlank()) {
-            return com.intellij.openapi.ui.ValidationInfo("Value is required", valueField)
+            return ValidationInfo("Value is required", valueField)
         }
         if (envChecks.none { it.second.isSelected }) {
-            return com.intellij.openapi.ui.ValidationInfo("Pick at least one environment", envChecks[0].second)
+            return ValidationInfo("Pick at least one environment", envChecks[0].second)
         }
         return null
     }
@@ -115,3 +115,6 @@ class RequestVariableDialog(
         }
     }
 }
+
+private fun String.capitalize(): String =
+    replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }

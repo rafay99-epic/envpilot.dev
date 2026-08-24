@@ -237,6 +237,7 @@ class LinkDirectoryDialog(
 
     private var environment = VALID_ENVIRONMENTS.first()
     private val dirField = com.intellij.openapi.ui.TextFieldWithBrowseButton()
+    private val pathPreview = javax.swing.JLabel()
 
     init {
         title = "Link ${selected.name} to a Directory"
@@ -248,8 +249,25 @@ class LinkDirectoryDialog(
             project,
             com.intellij.openapi.fileChooser.FileChooserDescriptorFactory.createSingleFolderDescriptor()
         )
+        dirField.childComponent.document.addDocumentListener(object : javax.swing.event.DocumentListener {
+            override fun insertUpdate(e: javax.swing.event.DocumentEvent) = updatePathPreview()
+            override fun removeUpdate(e: javax.swing.event.DocumentEvent) = updatePathPreview()
+            override fun changedUpdate(e: javax.swing.event.DocumentEvent) = updatePathPreview()
+        })
+        updatePathPreview()
         init()
     }
+
+    private fun updatePathPreview() {
+        val base = dirField.text.trim().ifBlank { "?" }
+        val target = EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" }
+        pathPreview.text =
+            "<html><body style=\"margin:0\">Will write <code>${escapeHtml("$base/$target")}</code>" +
+                " &nbsp;(${environment})</body></html>"
+    }
+
+    private fun escapeHtml(s: String): String =
+        s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     override fun createCenterPanel(): JComponent = com.intellij.ui.dsl.builder.panel {
         group("Project") {
@@ -263,7 +281,8 @@ class LinkDirectoryDialog(
             }.comment("Which environment's values to pull into this directory.")
             row("Directory:") {
                 cell(dirField).align(com.intellij.ui.dsl.builder.AlignX.FILL)
-            }.comment("The env file (Settings ▸ Tools ▸ Envpilot to change the name) is written here.")
+            }.comment("Change the env file name in Settings ▸ Tools ▸ Envpilot.")
+            row("Result:") { cell(pathPreview) }
         }
     }
 
