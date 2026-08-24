@@ -66,6 +66,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
             DefaultActionGroup().apply {
                 add(refreshAction())
                 add(linkAction())
+                add(unlinkAction())
                 add(pullAction())
             },
             true
@@ -86,6 +87,19 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
 
         override fun actionPerformed(e: AnActionEvent) {
             (selected() as? ApiProject)?.let { LinkDirectoryDialog(project, it).show() }
+        }
+    }
+
+    private fun unlinkAction() = object : AnAction("Unlink", "Remove this directory link", null) {
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = selected() is LinkedProject
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            (selected() as? LinkedProject)?.let { link ->
+                LinkedProjectsService.getInstance(project).remove(link)
+                reload()
+            }
         }
     }
 
@@ -128,10 +142,10 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         for (org in api.orgs()) {
             rows.add("Org: ${org.name} (${org.slug})" to org)
             for (proj in api.projects(org.id)) {
-                val linkInfo = linksByProject[proj.id]
-                    ?.joinToString(", ") { "${it.environment} → ${it.directoryPath}" }
-                    ?.let { "  [$it]" } ?: ""
-                rows.add("  Project: ${proj.name}$linkInfo" to proj)
+                rows.add("  Project: ${proj.name} (${proj.variableCount} vars)" to proj)
+                for (link in linksByProject[proj.id].orEmpty()) {
+                    rows.add("      ${link.environment} → ${link.directoryPath}" to link)
+                }
             }
         }
         return rows
