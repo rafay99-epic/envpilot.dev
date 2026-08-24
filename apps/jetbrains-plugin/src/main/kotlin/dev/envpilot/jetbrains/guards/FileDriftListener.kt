@@ -38,6 +38,16 @@ class FileDriftListener : BulkFileListener {
                         SyncState.notifyChanged()
                     }
                 }
+                // Secret files are drift-watched against their synced hashes.
+                val managed = service.managedPaths().firstNotNullOfOrNull { service.managed(it) }
+                val secretHash = managed?.secretHashes?.get(event.file.path) ?: continue
+                val currentHash = runCatching {
+                    EnvCloak.hashOf(Path.of(event.file.path))
+                }.getOrNull() ?: continue
+                if (currentHash != secretHash) {
+                    SyncState.markFailure("Drift detected: ${event.file.name} changed outside Envpilot — next sync overwrites.")
+                    SyncState.notifyChanged()
+                }
             }
         }
     }

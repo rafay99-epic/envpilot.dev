@@ -55,6 +55,7 @@ object PullService {
         EnvFiles.atomicWrite(targetFile, merged)
 
         val writtenSecrets = mutableListOf<String>()
+        val secretHashes = mutableMapOf<String, String>()
         val previous = project?.let { EnvEditorService.getInstance(it) }
         for ((meta, bytes) in downloaded) {
             val dest = resolveWithin(dir, meta.path)
@@ -68,12 +69,13 @@ object PullService {
                 Files.setPosixFilePermissions(dest, posixPerms(meta.mode))
             }
             writtenSecrets.add(dest.toString())
+            secretHashes[dest.toString()] = EnvCloak.hashOf(dest)
         }
         if (project != null) {
             try {
                 EnvEditorService.getInstance(project).recordSync(
                     targetFile.toString(), values.keys, values,
-                    EnvCloak.hashOf(targetFile), writtenSecrets,
+                    EnvCloak.hashOf(targetFile), writtenSecrets, secretHashes,
                 )
             } catch (e: Exception) {
                 log.warn("Editor state update failed: ${e.message}")

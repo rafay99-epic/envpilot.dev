@@ -217,6 +217,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         val api = EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
             auth.getFreshToken(force)
         }
+        val editorService = EnvEditorService.getInstance(project)
         val linksByProject = LinkedProjectsService.getInstance(project).all().groupBy { it.projectId }
         val rows = mutableListOf<Pair<String, Any>>()
         for (org in api.orgs()) {
@@ -237,6 +238,23 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                         EnvEditorService.LinkStatus.NOT_PULLED -> "NOT PULLED"
                     }
                     rows.add("      ${link.environment} → ${link.directoryPath}  [$status]" to link)
+                    // Secret files for this link: name, size, on-disk state.
+                    val fileKey = "${link.projectId}:${link.environment}"
+                    val metas = editorService.cachedFiles(fileKey) ?: run {
+                        try {
+                            api.listFiles(link.projectId, link.environment.takeIf { it.isNotBlank() })
+                                .also { editorService.cacheFiles(fileKey, it) }
+                        } catch (_: Exception) { null }
+                    }
+                    for (f in metas.orEmpty()) {
+                        val onDisk = java.nio.file.Files.exists(
+                            java.nio.file.Paths.get(link.directoryPath, f.path)
+                        )
+                        val kb = if (f.size >= 1024) "${f.size / 1024} KB" else "${f.size} B"
+                        rows.add(
+                            "          file: ${f.name} ($kb)  ${if (onDisk) "→ on disk" else "[NOT PULLED]"}" to link
+                        )
+                    }
                 }
             }
         }

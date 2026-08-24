@@ -20,6 +20,7 @@ class EnvEditorService {
         val syncedHash: String,
         val syncedAtMs: Long,
         val secretFilePaths: List<String> = emptyList(),
+        val secretHashes: Map<String, String> = emptyMap(),
     )
 
     enum class LinkStatus { SYNCED, DRIFTED, NOT_PULLED }
@@ -28,6 +29,7 @@ class EnvEditorService {
 
     // Cached metadata-only key lists per project, for completion.
     private val metadataCache = ConcurrentHashMap<String, Pair<Long, Set<String>>>()
+    private val filesCache = ConcurrentHashMap<String, Pair<Long, List<dev.envpilot.jetbrains.model.SecretFileMeta>>>()
     private val metadataTtlMs = 30_000L
 
     @Volatile var revealUntilMs: Long = 0
@@ -38,9 +40,14 @@ class EnvEditorService {
         values: Map<String, String>,
         hash: String,
         secretFilePaths: List<String> = emptyList(),
+        secretHashes: Map<String, String> = emptyMap(),
     ) {
-        managed[path] = ManagedFile(keys, values, hash, System.currentTimeMillis(), secretFilePaths)
+        managed[path] = ManagedFile(keys, values, hash, System.currentTimeMillis(), secretFilePaths, secretHashes)
     }
+
+    /** Every secret file path Envpilot wrote, across all managed entries. */
+    fun allTrackedSecretFiles(): List<String> =
+        managed.values.flatMap { it.secretFilePaths }
 
     /** Status of a linked directory's env file, for tree icons/labels. */
     fun statusFor(targetFile: String): LinkStatus {
@@ -61,6 +68,16 @@ class EnvEditorService {
     }
 
     fun isDrifted(path: String): Boolean = managed[path]?.syncedHash?.isEmpty() == true
+
+    /** Metadata cache for secret files, keyed "projectId:environment". */
+    fun cachedFiles(key: String): List<dev.envpilot.jetbrains.model.SecretFileMeta>? {
+        val (at, metas) = filesCache[key] ?: return null
+        return if (System.currentTimeMillis() - at < metadataTtlMs) metas else null
+    }
+
+    fun cacheFiles(key: String, metas: List<dev.envpilot.jetbrains.model.SecretFileMeta>) {
+        filesCache[key] = System.currentTimeMillis() to metas
+    }
 
     fun cachedKeys(projectId: String): Set<String>? {
         val (at, keys) = metadataCache[projectId] ?: return null
