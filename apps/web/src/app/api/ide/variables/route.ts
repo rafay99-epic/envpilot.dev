@@ -1,14 +1,9 @@
-import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex, createAuthedConvexClient } from "@/lib/convex-client";
+import { createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import {
-  handleApiError,
-  reportApiError,
-  sanitizeConvexError,
-} from "@/lib/api-errors";
-import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import { handleApiError, reportApiError } from "@/lib/api-errors";
+import { ideAuth, isConvexAuthError } from "@/lib/ide-auth";
 
 const VALID_ENVIRONMENTS = ["development", "staging", "production"];
 
@@ -21,8 +16,8 @@ const VALID_ENVIRONMENTS = ["development", "staging", "production"];
  */
 export async function GET(request: Request) {
   try {
-    const { user, accessToken } = await withAuth();
-    if (!user) {
+    const session = await ideAuth(request);
+    if (!session) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
@@ -43,8 +38,7 @@ export async function GET(request: Request) {
     }
     const metadataOnly = searchParams.get("metadataOnly") !== "false";
 
-    await getOrCreateConvexUser(convex, user);
-    const result = await createAuthedConvexClient(accessToken!).action(
+    const result = await createAuthedConvexClient(session.token).action(
       api.features.variables.values.pullValues,
       {
         projectId: projectId as Id<"projects">,
@@ -57,8 +51,15 @@ export async function GET(request: Request) {
     reportApiError(error, "GET /api/ide/variables");
     // ConvexError payloads carry user-facing messages (e.g. permission
     // denials); pass them through with a sane status.
-    const message = sanitizeConvexError(error);
-    if (message !== "Server Error") {
+    if (isConvexAuthError(error)) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch variables";
+    if (/unauthenticated/i.test(message)) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    if (!/server error/i.test(message)) {
       return NextResponse.json({ error: message }, { status: 403 });
     }
     return handleApiError(error, "Failed to fetch variables");

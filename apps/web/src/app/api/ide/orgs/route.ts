@@ -1,28 +1,29 @@
-import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex, createAuthedConvexClient } from "@/lib/convex-client";
+import { createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { handleApiError, reportApiError } from "@/lib/api-errors";
-import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import { ideAuth, isConvexAuthError } from "@/lib/ide-auth";
 
 /**
  * GET /api/ide/orgs - Organizations the signed-in user belongs to.
  * Used by the JetBrains plugin (and future IDE clients).
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { user, accessToken } = await withAuth();
-    if (!user) {
+    const session = await ideAuth(request);
+    if (!session) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    await getOrCreateConvexUser(convex, user);
-    const organizations = await createAuthedConvexClient(accessToken!).query(
+    const organizations = await createAuthedConvexClient(session.token).query(
       api.features.organizations.queries.listForUser,
       {}
     );
     return NextResponse.json({ organizations });
   } catch (error) {
     reportApiError(error, "GET /api/ide/orgs");
+    if (isConvexAuthError(error)) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
     return handleApiError(error, "Failed to fetch organizations");
   }
 }

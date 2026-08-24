@@ -114,15 +114,18 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     }
 
     private suspend fun fetchRows(): List<Pair<String, Any>> {
-        val token = AuthService.getInstance().getFreshToken() ?: return listOf(
+        val auth = AuthService.getInstance()
+        if (auth.getSession() == null) return listOf(
             "Not signed in — use Tools ▸ Envpilot ▸ Sign In" to Any()
         )
-        val api = EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl())
+        val api = EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
+            auth.getFreshToken(force)
+        }
         val linksByProject = LinkedProjectsService.getInstance(project).all().groupBy { it.projectId }
         val rows = mutableListOf<Pair<String, Any>>()
-        for (org in api.orgs(token)) {
+        for (org in api.orgs()) {
             rows.add("Org: ${org.name} (${org.slug})" to org)
-            for (proj in api.projects(token, org.id)) {
+            for (proj in api.projects(org.id)) {
                 val linkInfo = linksByProject[proj.id]
                     ?.joinToString(", ") { "${it.environment} → ${it.directoryPath}" }
                     ?.let { "  [$it]" } ?: ""

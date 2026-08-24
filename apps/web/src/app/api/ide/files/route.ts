@@ -1,10 +1,9 @@
-import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex, createAuthedConvexClient } from "@/lib/convex-client";
+import { createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { handleApiError, reportApiError } from "@/lib/api-errors";
-import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import { ideAuth, isConvexAuthError } from "@/lib/ide-auth";
 
 const VALID_ENVIRONMENTS = ["development", "staging", "production"];
 
@@ -14,8 +13,8 @@ const VALID_ENVIRONMENTS = ["development", "staging", "production"];
  */
 export async function GET(request: Request) {
   try {
-    const { user, accessToken } = await withAuth();
-    if (!user) {
+    const session = await ideAuth(request);
+    if (!session) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
@@ -35,8 +34,7 @@ export async function GET(request: Request) {
       );
     }
 
-    await getOrCreateConvexUser(convex, user);
-    const files = await createAuthedConvexClient(accessToken!).query(
+    const files = await createAuthedConvexClient(session.token).query(
       api.features.files.queries.list,
       {
         projectId: projectId as Id<"projects">,
@@ -46,6 +44,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ files });
   } catch (error) {
     reportApiError(error, "GET /api/ide/files");
+    if (isConvexAuthError(error)) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
     return handleApiError(error, "Failed to fetch files");
   }
 }

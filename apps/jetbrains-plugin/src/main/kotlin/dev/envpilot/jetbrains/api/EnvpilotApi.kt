@@ -15,8 +15,12 @@ class ApiError(val status: Int, message: String) : Exception(message)
 /**
  * Typed HTTPS client over the /api/ide/ Next.js routes. The routes wrap Convex
  * server-side and enforce the same authz chain as every other client surface.
+ * On a 401 the token is force-refreshed once and the request retried.
  */
-class EnvpilotApi(private val serverUrl: String) {
+class EnvpilotApi(
+    private val serverUrl: String,
+    private val tokenProvider: suspend (force: Boolean) -> String?,
+) {
 
     companion object {
         private val gson = Gson()
@@ -27,16 +31,16 @@ class EnvpilotApi(private val serverUrl: String) {
 
     class Unauthorized : Exception("Session expired")
 
-    fun orgs(token: String): List<Org> {
-        val body = get(token, "/api/ide/orgs") ?: return emptyList()
+    suspend fun orgs(): List<Org> {
+        val body = call { get(it, "/api/ide/orgs") } ?: return emptyList()
         return body.getAsJsonArray("organizations")?.map { el ->
             val o = el.asJsonObject
             Org(o.str("_id") ?: "", o.str("name") ?: "", o.str("slug") ?: "", o.str("role"))
         } ?: emptyList()
     }
 
-    fun projects(token: String, organizationId: String): List<Project> {
-        val body = get(token, "/api/ide/projects?organizationId=${enc(organizationId)}") ?: return emptyList()
+    suspend fun projects(organizationId: String): List<Project> {
+        val body = call { get(it, "/api/ide/projects?organizationId=${enc(organizationId)}") } ?: return emptyList()
         return body.getAsJsonArray("projects")?.map { el ->
             val p = el.asJsonObject
             Project(
@@ -49,12 +53,11 @@ class EnvpilotApi(private val serverUrl: String) {
         }.orEmpty()
     }
 
-    fun pullValues(token: String, projectId: String, environment: String?, metadataOnly: Boolean): PullResult {
+    suspend fun pullValues(projectId: String, environment: String?, metadataOnly: Boolean): PullResult {
         val envQ = environment?.let { "&environment=${enc(it)}" } ?: ""
-        val body = get(
-            token,
-            "/api/ide/variables?projectId=${enc(projectId)}$envQ&metadataOnly=$metadataOnly"
-        ) ?: throw ApiError(500, "Empty response from server")
+        val body = call {
+            get(it, "/api/ide/variables?projectId=${enc(projectId)}$envQ&metadataOnly=$metadataOnly")
+        } ?: throw ApiError(500, "Empty response from server")
 
         val variables = body.getAsJsonArray("variables")?.map { el ->
             val v = el.asJsonObject
@@ -76,9 +79,9 @@ class EnvpilotApi(private val serverUrl: String) {
         )
     }
 
-    fun listFiles(token: String, projectId: String, environment: String?): List<SecretFileMeta> {
+    suspend fun listFiles(projectId: String, environment: String?): List<SecretFileMeta> {
         val envQ = environment?.let { "&environment=${enc(it)}" } ?: ""
-        val body = get(token, "/api/ide/files?projectId=${enc(projectId)}$envQ") ?: return emptyList()
+        val body = call { get(it, "/api/ide/files?projectId=${enc(projectId)}$envQ") } ?: return emptyList()
         return body.getAsJsonArray("files")?.map { el ->
             val f = el.asJsonObject
             SecretFileMeta(
@@ -93,9 +96,10 @@ class EnvpilotApi(private val serverUrl: String) {
         }.orEmpty()
     }
 
-    fun fileContent(token: String, fileId: String): Pair<SecretFileMeta, ByteArray> {
-        val body = get(token, "/api/ide/files/content?fileId=${enc(fileId)}", allow404Body = false)
-            ?: throw ApiError(500, "Empty response from server")
+    suspend fun fileContent(fileId: String): Pair<SecretFileMeta, ByteArray> {
+        val body = call {
+            get(it, "/api/ide/files/content?fileId=${enc(fileId)}", allow404Body = false)
+        } ?: throw ApiError(500, "Empty response from server")
         val meta = SecretFileMeta(
             id = fileId,
             name = body.str("name") ?: "",
@@ -108,6 +112,14 @@ class EnvpilotApi(private val serverUrl: String) {
         val bytes = java.util.Base64.getDecoder().decode(body.str("content") ?: "")
         return meta to bytes
     }
+
+    private suspend fun <T> call(block: (String) -> T): T =
+        try {
+            block(tokenProvider(false) ?: throw ApiError(401, "Not signed in"))
+        } catch (e: Unauthorized) {
+            val fresh = tokenProvider(true) ?: throw ApiError(401, "Not signed in")
+            block(fresh)
+        }
 
     private fun get(token: String, pathAndQuery: String, allow404Body: Boolean = true): JsonObject? {
         val request = HttpRequest.newBuilder()

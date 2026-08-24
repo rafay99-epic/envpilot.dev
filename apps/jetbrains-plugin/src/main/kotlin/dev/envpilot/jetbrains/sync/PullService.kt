@@ -22,12 +22,14 @@ object PullService {
     class PullAborted(message: String) : Exception(message)
 
     suspend fun pull(link: LinkedProject): Int {
-        val token = AuthService.getInstance().getFreshToken()
-            ?: throw PullAborted("Not signed in")
-        val api = EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl())
+        val auth = AuthService.getInstance()
+        if (auth.getSession() == null) throw PullAborted("Not signed in")
+        val api = EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
+            auth.getFreshToken(force)
+        }
         val environment = link.environment.takeIf { it.isNotBlank() }
 
-        val result = api.pullValues(token, link.projectId, environment, metadataOnly = false)
+        val result = api.pullValues(link.projectId, environment, metadataOnly = false)
         val failed = result.meta.decryptionFailures.orEmpty() +
             result.variables.filter { it.value == "[DECRYPTION_FAILED]" }.map { it.key }
         if (failed.isNotEmpty()) {
@@ -35,9 +37,9 @@ object PullService {
         }
 
         // Fetch everything first so a failure mid-pull writes nothing.
-        val fileMetas = api.listFiles(token, link.projectId, environment)
+        val fileMetas = api.listFiles(link.projectId, environment)
         val downloaded = fileMetas.map { meta ->
-            val (m, bytes) = api.fileContent(token, meta.id)
+            val (m, bytes) = api.fileContent(meta.id)
             m to bytes
         }
 
