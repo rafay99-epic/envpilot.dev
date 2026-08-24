@@ -101,8 +101,10 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
             val rows: List<Pair<String, Any>> = try {
                 fetchRows()
             } catch (e: Exception) {
-                log.warn("Reload failed: ${e.message}")
-                listOf("Error: ${e.message}" to Any())
+                log.warn("Reload failed", e)
+                val msg = e.message?.takeIf { it.isNotBlank() }
+                    ?: e::class.simpleName ?: "unknown error"
+                listOf("Error: $msg" to Any())
             }
             ApplicationManager.getApplication().invokeLater {
                 items.clear()
