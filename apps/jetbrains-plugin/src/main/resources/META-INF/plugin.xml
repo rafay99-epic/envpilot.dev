@@ -1,0 +1,57 @@
+<idea-plugin>
+    <id>dev.envpilot</id>
+    <name>Envpilot</name>
+    <vendor url="https://www.envpilot.dev">Envpilot</vendor>
+    <description><![CDATA[
+        Envpilot for JetBrains IDEs and Android Studio: sign in with WorkOS,
+        browse your organizations and projects, and pull environment variables
+        and secret files straight into your workspace.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService
+            serviceImplementation="dev.envpilot.jetbrains.auth.AuthService"/>
+        <applicationService
+            serviceImplementation="dev.envpilot.jetbrains.config.EnvpilotSettings"/>
+
+        <statusBarWidgetFactory
+            id="dev.envpilot.widget"
+            implementation="dev.envpilot.jetbrains.ui.EnvpilotWidgetFactory"/>
+
+        <applicationConfigurable
+            parentId="tools"
+            id="dev.envpilot.settings"
+            displayName="Envpilot"
+            instance="dev.envpilot.jetbrains.ui.EnvpilotSettingsConfigurable"/>
+
+        <postStartupActivity
+            implementation="dev.envpilot.jetbrains.StartupActivity"/>
+
+        <toolWindow id="Envpilot"
+                    anchor="right"
+                    factoryClass="dev.envpilot.jetbrains.ui.EnvpilotToolWindowFactory"/>
+
+        <notificationGroup
+            id="dev.envpilot.notifications"
+            displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <group id="dev.envpilot.ToolsGroup"
+               text="Envpilot"
+               description="Envpilot"
+               popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="dev.envpilot.SignIn"
+                    class="dev.envpilot.jetbrains.actions.SignInAction"
+                    text="Sign In to Envpilot"
+                    description="Start the WorkOS device-flow login"/>
+            <action id="dev.envpilot.SignOut"
+                    class="dev.envpilot.jetbrains.actions.SignOutAction"
+                    text="Sign Out"
+                    description="Clear the stored Envpilot session"/>
+        </group>
+    </actions>
+</idea-plugin>
