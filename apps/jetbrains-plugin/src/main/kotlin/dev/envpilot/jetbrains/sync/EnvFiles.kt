@@ -12,7 +12,6 @@ import java.nio.file.StandardCopyOption
  * KEY=VALUE subset both clients share).
  */
 object EnvFiles {
-
     data class Entry(val key: String, val value: String)
 
     fun parse(content: String): List<Entry> =
@@ -26,7 +25,10 @@ object EnvFiles {
             Entry(key, line.substring(eq + 1).trim())
         }.toList()
 
-    fun merge(existingContent: String?, pulled: Map<String, String>): String {
+    fun merge(
+        existingContent: String?,
+        pulled: Map<String, String>,
+    ): String {
         if (existingContent == null) {
             return pulled.entries.joinToString("\n") { "${it.key}=${it.value}" } + "\n"
         }
@@ -34,7 +36,11 @@ object EnvFiles {
         val seen = mutableSetOf<String>()
         var i = 0
         while (i < lines.size) {
-            val entry = parse(lines[i]).firstOrNull() ?: run { i++; continue }
+            val entry =
+                parse(lines[i]).firstOrNull() ?: run {
+                    i++
+                    continue
+                }
             if (entry.key in pulled && entry.key !in seen) {
                 lines[i] = "${entry.key}=${pulled[entry.key]}"
                 seen.add(entry.key)
@@ -49,8 +55,42 @@ object EnvFiles {
         return lines.joinToString("\n")
     }
 
+    enum class ConflictMode(val id: String) {
+        MERGE("merge"),
+        OVERWRITE("overwrite"),
+        BACKUP("backup"),
+        ;
+
+        companion object {
+            fun from(id: String?): ConflictMode = entries.firstOrNull { it.id == id } ?: MERGE
+        }
+    }
+
+    /**
+     * Resolve existing file content against pulled values per mode:
+     *  - merge: preserve comments/unknown keys, update managed keys (default)
+     *  - overwrite: file becomes exactly the pulled set
+     *  - backup: like merge, but the previous content is kept as <file>.envpilot-bak
+     */
+    fun resolve(
+        existingContent: String?,
+        pulled: Map<String, String>,
+        mode: ConflictMode,
+    ): String {
+        if (existingContent == null) return merge(null, pulled)
+        return when (mode) {
+            ConflictMode.OVERWRITE -> merge(null, pulled)
+            else -> merge(existingContent, pulled)
+        }
+    }
+
+    fun backupPath(target: Path): Path = target.resolveSibling(target.fileName.toString() + ".envpilot-bak")
+
     /** Atomic temp+rename write; skips the write when content is unchanged. */
-    fun atomicWrite(target: Path, content: String) {
+    fun atomicWrite(
+        target: Path,
+        content: String,
+    ) {
         if (readIfExists(target) == content) return
         target.parent?.let { Files.createDirectories(it) }
         val tmp = Files.createTempFile(target.parent, ".envpilot-", ".tmp")
@@ -66,6 +106,5 @@ object EnvFiles {
         }
     }
 
-    fun readIfExists(path: Path): String? =
-        if (Files.exists(path)) Files.readAllLines(path).joinToString("\n") else null
+    fun readIfExists(path: Path): String? = if (Files.exists(path)) Files.readAllLines(path).joinToString("\n") else null
 }

@@ -1,9 +1,9 @@
-import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
-
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.2.20"
     id("org.jetbrains.intellij.platform") version "2.18.1"
+    id("io.gitlab.arturbosch.detekt") version "1.23.7"
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.2"
 }
 
 group = "dev.envpilot"
@@ -35,7 +35,7 @@ val generateBuildConfig by tasks.registering {
                 val DEFAULT_SERVER_URL = "${defaultServerUrl.replace("\"", "\\\"")}"
                 val SENTRY_DSN = "${sentryDsn.replace("\"", "\\\"")}"
             }
-            """.trimIndent() + "\n"
+            """.trimIndent() + "\n",
         )
     }
 }
@@ -85,8 +85,20 @@ tasks {
     compileKotlin {
         dependsOn(generateBuildConfig)
     }
+
     // Not needed until publishing; saves minutes on every local build.
     buildSearchableOptions {
         enabled = false
     }
+}
+
+// ktlint scans the generated source dir too — declare the ordering.
+tasks.named("runKtlintCheckOverMainSourceSet") { dependsOn(generateBuildConfig) }
+tasks.named("runKtlintCheckOverKotlinScripts") { dependsOn(generateBuildConfig) }
+
+// Quality gate: detekt (lint) + ktlint (format checks) run as part of
+// `build`/`check`, so CI's existing Gradle job enforces them.
+detekt {
+    config.setFrom(files("detekt.yml"))
+    buildUponDefaultConfig = true
 }

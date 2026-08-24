@@ -1,10 +1,10 @@
 package dev.envpilot.jetbrains.ui
 
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
-import com.intellij.notification.NotificationGroupManager
-import com.intellij.notification.NotificationType
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import dev.envpilot.jetbrains.api.EnvpilotApi
@@ -24,9 +24,9 @@ import javax.swing.JComponent
  */
 class RequestVariableDialog(
     private val project: Project,
-    private val projects: List<Pair<String, String>>, // id to name
+    // pairs of (projectId, projectName)
+    private val projects: List<Pair<String, String>>,
 ) : DialogWrapper(project) {
-
     private val keyField = javax.swing.JTextField()
     private val valueField = javax.swing.JTextField()
     private val descriptionField = javax.swing.JTextField()
@@ -44,30 +44,31 @@ class RequestVariableDialog(
         init()
     }
 
-    override fun createCenterPanel(): JComponent = panel {
-        group("Variable") {
-            row("Project:") {
-                cell(projectCombo).align(AlignX.FILL)
+    override fun createCenterPanel(): JComponent =
+        panel {
+            group("Variable") {
+                row("Project:") {
+                    cell(projectCombo).align(AlignX.FILL)
+                }
+                row("Key:") {
+                    cell(keyField).align(AlignX.FILL)
+                }.comment("UPPER_SNAKE_CASE — letters, digits and underscores, starting with a letter.")
+                row("Proposed value:") {
+                    cell(valueField).align(AlignX.FILL)
+                }.comment("Encrypted server-side before storage; never leaves the machine in plaintext.")
+                row("Description:") {
+                    cell(descriptionField).align(AlignX.FILL)
+                }.comment("Optional context for whoever approves this request.")
             }
-            row("Key:") {
-                cell(keyField).align(AlignX.FILL)
-            }.comment("UPPER_SNAKE_CASE — letters, digits and underscores, starting with a letter.")
-            row("Proposed value:") {
-                cell(valueField).align(AlignX.FILL)
-            }.comment("Encrypted server-side before storage; never leaves the machine in plaintext.")
-            row("Description:") {
-                cell(descriptionField).align(AlignX.FILL)
-            }.comment("Optional context for whoever approves this request.")
-        }
-        group("Environments") {
-            row {
-                envChecks.forEach { (_, check) -> cell(check) }
+            group("Environments") {
+                row {
+                    envChecks.forEach { (_, check) -> cell(check) }
+                }
+            }
+            group("Options") {
+                row { cell(sensitiveCheck) }
             }
         }
-        group("Options") {
-            row { cell(sensitiveCheck) }
-        }
-    }
 
     override fun doValidate(): ValidationInfo? {
         if (!Regex("^[A-Z][A-Z0-9_]*$").matches(keyField.text.trim())) {
@@ -93,9 +94,10 @@ class RequestVariableDialog(
         scope.launch {
             try {
                 val auth = AuthService.getInstance()
-                val api = EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
-                    auth.getFreshToken(force)
-                }
+                val api =
+                    EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
+                        auth.getFreshToken(force)
+                    }
                 api.createVariableRequest(projectId, key, value, environments, sensitive, description)
                 notify("Variable request for $key submitted — awaiting approval.", NotificationType.INFORMATION)
             } catch (e: Exception) {
@@ -106,7 +108,10 @@ class RequestVariableDialog(
         super.doOKAction()
     }
 
-    private fun notify(message: String, type: NotificationType) {
+    private fun notify(
+        message: String,
+        type: NotificationType,
+    ) {
         javax.swing.SwingUtilities.invokeLater {
             NotificationGroupManager.getInstance()
                 .getNotificationGroup("dev.envpilot.notifications")
@@ -116,5 +121,4 @@ class RequestVariableDialog(
     }
 }
 
-private fun String.capitalize(): String =
-    replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+private fun String.capitalize(): String = replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }

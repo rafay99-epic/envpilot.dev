@@ -9,7 +9,6 @@ import org.junit.Test
 import java.util.Base64
 
 class JwtTest {
-
     private val gson = com.google.gson.Gson()
 
     private fun token(payload: Map<String, Any?>): String {

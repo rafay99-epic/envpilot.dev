@@ -11,7 +11,6 @@ import com.intellij.util.messages.Topic
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -42,12 +41,10 @@ data class Session(
  */
 @Service(Service.Level.APP)
 class AuthService {
-
     companion object {
         val AUTH_TOPIC = Topic.create("EnvpilotAuthChanged", AuthStateListener::class.java)
 
-        fun getInstance(): AuthService =
-            ApplicationManager.getApplication().getService(AuthService::class.java)
+        fun getInstance(): AuthService = ApplicationManager.getApplication().getService(AuthService::class.java)
 
         private const val PROP_USER_ID = "dev.envpilot.userId"
         private const val PROP_EMAIL = "dev.envpilot.email"
@@ -104,11 +101,12 @@ class AuthService {
                 // CAS: only persist when the stored refresh token is still the one we used.
                 val stored = loadSession()
                 if (stored?.refreshToken != freshTokenForRefresh.refreshToken) return@withLock null
-                val updated = freshTokenForRefresh.copy(
-                    accessToken = result.accessToken,
-                    refreshToken = result.refreshToken,
-                    sessionId = Jwt.sessionId(result.accessToken) ?: freshTokenForRefresh.sessionId,
-                )
+                val updated =
+                    freshTokenForRefresh.copy(
+                        accessToken = result.accessToken,
+                        refreshToken = result.refreshToken,
+                        sessionId = Jwt.sessionId(result.accessToken) ?: freshTokenForRefresh.sessionId,
+                    )
                 saveSession(updated)
                 result.accessToken
             } catch (e: WorkosClient.WorkosAuthError) {
@@ -141,42 +139,45 @@ class AuthService {
                 while (System.currentTimeMillis() < deadline) {
                     when (val poll = WorkosClient.pollForToken(deviceCode.deviceCode)) {
                         is WorkosClient.PollResult.Complete -> {
-                            val user = poll.token.user
-                                ?: throw WorkosClient.WorkosAuthError(
-                                    "WorkOS returned a token without user info.",
-                                    WorkosClient.WorkosAuthError.INVALID_RESPONSE
+                            val user =
+                                poll.token.user
+                                    ?: throw WorkosClient.WorkosAuthError(
+                                        "WorkOS returned a token without user info.",
+                                        WorkosClient.WorkosAuthError.INVALID_RESPONSE,
+                                    )
+                            val session =
+                                Session(
+                                    userId = user.id,
+                                    email = user.email,
+                                    accessToken = poll.token.accessToken,
+                                    refreshToken = poll.token.refreshToken,
+                                    sessionId = Jwt.sessionId(poll.token.accessToken),
                                 )
-                            val session = Session(
-                                userId = user.id,
-                                email = user.email,
-                                accessToken = poll.token.accessToken,
-                                refreshToken = poll.token.refreshToken,
-                                sessionId = Jwt.sessionId(poll.token.accessToken),
-                            )
                             saveSession(session)
                             notifyChanged()
                             onDone(session.email, null)
                             return@launch
                         }
                         WorkosClient.PollResult.Pending,
-                        WorkosClient.PollResult.NetworkError -> Unit
+                        WorkosClient.PollResult.NetworkError,
+                        -> Unit
                         WorkosClient.PollResult.SlowDown -> intervalMs += 5000
                         WorkosClient.PollResult.Denied ->
                             throw WorkosClient.WorkosAuthError(
                                 "Sign-in was denied in the browser.",
-                                WorkosClient.WorkosAuthError.ACCESS_DENIED
+                                WorkosClient.WorkosAuthError.ACCESS_DENIED,
                             )
                         WorkosClient.PollResult.Expired ->
                             throw WorkosClient.WorkosAuthError(
                                 "The sign-in code expired. Try again.",
-                                WorkosClient.WorkosAuthError.EXPIRED_TOKEN
+                                WorkosClient.WorkosAuthError.EXPIRED_TOKEN,
                             )
                     }
                     kotlinx.coroutines.delay(intervalMs)
                 }
                 throw WorkosClient.WorkosAuthError(
                     "Sign-in timed out before approval.",
-                    WorkosClient.WorkosAuthError.EXPIRED_TOKEN
+                    WorkosClient.WorkosAuthError.EXPIRED_TOKEN,
                 )
             } catch (e: Exception) {
                 onDone(null, e)
@@ -237,7 +238,7 @@ class AuthService {
                 null,
                 "To sign in to Envpilot, enter this code in your browser:\n\n$userCode",
                 "Envpilot Sign In",
-                javax.swing.JOptionPane.INFORMATION_MESSAGE
+                javax.swing.JOptionPane.INFORMATION_MESSAGE,
             )
         }
     }

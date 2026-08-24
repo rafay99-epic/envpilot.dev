@@ -18,7 +18,6 @@ import javax.swing.Icon
  * sync cycle; the tooltip explains the file is Envpilot-managed.
  */
 class EnvLineMarkerProvider : LineMarkerProvider {
-
     override fun getLineMarkerInfo(element: PsiElement): LineMarkerInfo<*>? {
         val file = element.containingFile as? PsiPlainTextFile ?: return null
         if (!file.name.startsWith(".env")) return null
@@ -36,7 +35,7 @@ class EnvLineMarkerProvider : LineMarkerProvider {
                     }
                 }
             },
-            GutterIconRenderer.Alignment.LEFT
+            GutterIconRenderer.Alignment.LEFT,
         )
     }
 

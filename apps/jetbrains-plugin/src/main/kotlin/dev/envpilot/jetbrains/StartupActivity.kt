@@ -1,15 +1,16 @@
 package dev.envpilot.jetbrains
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.util.Disposer
-import dev.envpilot.jetbrains.editor.EnvCloak
 import dev.envpilot.jetbrains.auth.AuthService
+import dev.envpilot.jetbrains.editor.EnvCloak
 import dev.envpilot.jetbrains.guards.CopyGuardHandler
 import dev.envpilot.jetbrains.sync.SyncScheduler
 import dev.envpilot.jetbrains.telemetry.EnvSentry
@@ -26,9 +27,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  * is cancelled/disposed when the project closes.
  */
 class StartupActivity : ProjectActivity {
-
     companion object {
         private val guardsInstalled = AtomicBoolean(false)
+        private val purgeInstalled = AtomicBoolean(false)
     }
 
     override suspend fun execute(project: Project) {
@@ -43,20 +44,38 @@ class StartupActivity : ProjectActivity {
 
         SyncScheduler.getInstance().startFor(project)
 
+        // Perceived real-time: pull the moment the user returns to the IDE.
+        project.messageBus.connect().subscribe(
+            com.intellij.openapi.application.ApplicationActivationListener.TOPIC,
+            object : com.intellij.openapi.application.ApplicationActivationListener {
+                override fun applicationActivated(ideFrame: com.intellij.openapi.wm.IdeFrame) {
+                    if (project.isDisposed) return
+                    CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                        SyncScheduler.getInstance().runCycle(project)
+                    }
+                }
+            },
+        )
+
         installGlobalGuards()
+        installUninstallPurge()
+        installKeyHover(project)
 
         // Cloak managed values when a file opens or becomes active.
         project.messageBus.connect().subscribe(
             FileEditorManagerListener.FILE_EDITOR_MANAGER,
             object : FileEditorManagerListener {
-                override fun fileOpened(manager: FileEditorManager, file: com.intellij.openapi.vfs.VirtualFile) {
+                override fun fileOpened(
+                    manager: FileEditorManager,
+                    file: com.intellij.openapi.vfs.VirtualFile,
+                ) {
                     cloakIfManaged(project, file)
                 }
 
                 override fun selectionChanged(event: FileEditorManagerEvent) {
                     event.newFile?.let { cloakIfManaged(project, it) }
                 }
-            }
+            },
         )
 
         Disposer.register(project) {
@@ -87,7 +106,10 @@ class StartupActivity : ProjectActivity {
         }
     }
 
-    private fun cloakIfManaged(project: Project, file: com.intellij.openapi.vfs.VirtualFile) {
+    private fun cloakIfManaged(
+        project: Project,
+        file: com.intellij.openapi.vfs.VirtualFile,
+    ) {
         ApplicationManager.getApplication().invokeLater {
             val editor = FileEditorManager.getInstance(project).selectedTextEditor ?: return@invokeLater
             if (editor.virtualFile?.path == file.path) {
@@ -96,16 +118,74 @@ class StartupActivity : ProjectActivity {
         }
     }
 
+    /**
+     * App-wide, once: when the plugin is disabled/uninstalled, delete every
+     * pulled env file and secret file — same protection as close-time unsync.
+     */
+    private fun installUninstallPurge() {
+        if (!purgeInstalled.compareAndSet(false, true)) return
+        ApplicationManager.getApplication().messageBus.connect().subscribe(
+            com.intellij.ide.plugins.DynamicPluginListener.TOPIC,
+            object : com.intellij.ide.plugins.DynamicPluginListener {
+                override fun beforePluginUnload(
+                    pluginDescriptor: com.intellij.ide.plugins.IdeaPluginDescriptor,
+                    isUpdate: Boolean,
+                ) {
+                    if (pluginDescriptor.pluginId.idString != dev.envpilot.jetbrains.version.VersionCheck.PLUGIN_ID) return
+                    for (project in com.intellij.openapi.project.ProjectManager.getInstance().openProjects) {
+                        unsyncOnClose(project)
+                    }
+                }
+            },
+        )
+    }
+
+    private var lastHoverAtMs = 0L
+
+    /** Hover a managed key in a .env file → tooltip telling you it is Envpilot-hidden. */
+    private fun installKeyHover(project: Project) {
+        EditorFactory.getInstance().eventMulticaster.addEditorMouseMotionListener(
+            object : com.intellij.openapi.editor.event.EditorMouseMotionListener {
+                override fun mouseMoved(e: com.intellij.openapi.editor.event.EditorMouseEvent) {
+                    val editor = e.editor ?: return
+                    if (editor.project != project) return
+                    if (!editor.virtualFile?.name?.startsWith(".env")!!) return
+                    val service = dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project)
+                    val managed = service.managed(editor.virtualFile!!.path) ?: return
+                    if (service.isRevealed()) return
+                    if (System.currentTimeMillis() - lastHoverAtMs < 1500) return
+                    val offset = editor.xyToLogicalPosition(e.mouseEvent.point).let { editor.logicalPositionToOffset(it) }
+                    val line = editor.document.getLineNumber(offset)
+                    val lineStart = editor.document.getLineStartOffset(line)
+                    val key =
+                        editor.document.charsSequence
+                            .subSequence(lineStart, offset).toString()
+                            .trimStart().substringBefore('=').trim()
+                    if (key in managed.keys && key.isNotBlank()) {
+                        lastHoverAtMs = System.currentTimeMillis()
+                        com.intellij.codeInsight.hint.HintManager.getInstance().showInformationHint(
+                            editor,
+                            "$key — Envpilot-managed, value hidden",
+                        )
+                    }
+                }
+            },
+            project,
+        )
+    }
+
     /** App-wide, once: wrap copy/cut with the cloak-aware guard. */
     private fun installGlobalGuards() {
         if (!guardsInstalled.compareAndSet(false, true)) return
         ApplicationManager.getApplication().invokeLater {
             try {
                 val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
-                val copyAction = actionManager.getAction(IdeActions.ACTION_COPY)
+                val copyAction =
+                    actionManager.getAction(IdeActions.ACTION_COPY)
                         as com.intellij.openapi.editor.actionSystem.EditorAction
                 copyAction.setupHandler(CopyGuardHandler(copyAction.handler, isCut = false))
-                val cutAction = actionManager.getAction(IdeActions.ACTION_CUT)
+                val cutAction =
+                    actionManager.getAction(IdeActions.ACTION_CUT)
                         as com.intellij.openapi.editor.actionSystem.EditorAction
                 cutAction.setupHandler(CopyGuardHandler(cutAction.handler, isCut = true))
             } catch (e: Exception) {

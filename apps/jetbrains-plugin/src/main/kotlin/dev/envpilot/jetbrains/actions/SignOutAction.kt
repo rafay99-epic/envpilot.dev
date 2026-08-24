@@ -5,7 +5,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import dev.envpilot.jetbrains.auth.AuthService
 
 class SignOutAction : AnAction() {
-
     override fun actionPerformed(e: AnActionEvent) {
         AuthService.getInstance().signOut()
     }

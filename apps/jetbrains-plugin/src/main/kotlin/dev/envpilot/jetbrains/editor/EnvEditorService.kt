@@ -6,7 +6,6 @@ import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.project.Project
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Project-level state for editor integrations: which files Envpilot manages,
@@ -20,7 +19,6 @@ import java.util.concurrent.atomic.AtomicLong
 @Service(Service.Level.PROJECT)
 @State(name = "EnvpilotEditorState", storages = [Storage("EnvpilotPlugin.xml")])
 class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
-
     class ManagedFileState {
         var keys: List<String> = emptyList()
         var syncedHash: String = ""
@@ -55,7 +53,10 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
     @Volatile var revealUntilMs: Long = 0
 
     override fun getState(): State = state
-    override fun loadState(s: State) { state = s }
+
+    override fun loadState(s: State) {
+        state = s
+    }
 
     fun recordSync(
         path: String,
@@ -64,13 +65,14 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
         secretFilePaths: List<String> = emptyList(),
         secretHashes: Map<String, String> = emptyMap(),
     ) {
-        val entry = ManagedFileState().apply {
-            this.keys = keys.toList()
-            this.syncedHash = hash
-            this.syncedAtMs = System.currentTimeMillis()
-            this.secretFilePaths = secretFilePaths
-            this.secretHashes = secretHashes
-        }
+        val entry =
+            ManagedFileState().apply {
+                this.keys = keys.toList()
+                this.syncedHash = hash
+                this.syncedAtMs = System.currentTimeMillis()
+                this.secretFilePaths = secretFilePaths
+                this.secretHashes = secretHashes
+            }
         state.managed[path] = entry
     }
 
@@ -104,15 +106,17 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
     }
 
     /** Every secret file path Envpilot wrote, across all managed entries. */
-    fun allTrackedSecretFiles(): List<String> =
-        state.managed.values.flatMap { it.secretFilePaths }
+    fun allTrackedSecretFiles(): List<String> = state.managed.values.flatMap { it.secretFilePaths }
 
     fun cachedFiles(key: String): List<dev.envpilot.jetbrains.model.SecretFileMeta>? {
         val (at, metas) = filesCache[key] ?: return null
         return if (System.currentTimeMillis() - at < metadataTtlMs) metas else null
     }
 
-    fun cacheFiles(key: String, metas: List<dev.envpilot.jetbrains.model.SecretFileMeta>) {
+    fun cacheFiles(
+        key: String,
+        metas: List<dev.envpilot.jetbrains.model.SecretFileMeta>,
+    ) {
         filesCache[key] = System.currentTimeMillis() to metas
     }
 
@@ -121,7 +125,10 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
         return if (System.currentTimeMillis() - at < metadataTtlMs) keys else null
     }
 
-    fun cacheKeys(projectId: String, keys: Set<String>) {
+    fun cacheKeys(
+        projectId: String,
+        keys: Set<String>,
+    ) {
         metadataCache[projectId] = System.currentTimeMillis() to keys
     }
 
@@ -132,7 +139,6 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
     fun isRevealed(): Boolean = System.currentTimeMillis() < revealUntilMs
 
     companion object {
-        fun getInstance(project: Project): EnvEditorService =
-            project.getService(EnvEditorService::class.java)
+        fun getInstance(project: Project): EnvEditorService = project.getService(EnvEditorService::class.java)
     }
 }

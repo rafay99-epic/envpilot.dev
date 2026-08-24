@@ -6,11 +6,9 @@ import com.intellij.codeInsight.completion.CompletionProvider
 import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.lookup.LookupElementBuilder
-import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.patterns.PlatformPatterns
 import com.intellij.patterns.StandardPatterns
-import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiPlainTextFile
 import com.intellij.util.ProcessingContext
 import dev.envpilot.jetbrains.api.EnvpilotApi
@@ -18,8 +16,6 @@ import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.config.EnvpilotSettings
 import dev.envpilot.jetbrains.sync.LinkedProjectsService
 import dev.envpilot.jetbrains.telemetry.EnvSentry
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -28,16 +24,15 @@ import kotlinx.coroutines.runBlocking
  * provider, scoped to plain-text env files.
  */
 class EnvCompletionContributor : CompletionContributor() {
-
     init {
         extend(
             CompletionType.BASIC,
             PlatformPatterns.psiElement().inFile(
                 PlatformPatterns.psiFile(PsiPlainTextFile::class.java).withName(
-                    StandardPatterns.string().startsWith(".env")
-                )
+                    StandardPatterns.string().startsWith(".env"),
+                ),
             ),
-            Provider
+            Provider,
         )
     }
 
@@ -53,7 +48,7 @@ class EnvCompletionContributor : CompletionContributor() {
                 result.addElement(
                     LookupElementBuilder.create(key)
                         .withTypeText("Envpilot")
-                        .withTailText("  (Envpilot-managed)", true)
+                        .withTailText("  (Envpilot-managed)", true),
                 )
             }
         }
@@ -76,9 +71,10 @@ class EnvCompletionContributor : CompletionContributor() {
                 runBlocking {
                     val auth = AuthService.getInstance()
                     if (auth.getSession() == null) return@runBlocking cached.ifEmpty { null }
-                    val api = EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
-                        auth.getFreshToken(force)
-                    }
+                    val api =
+                        EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
+                            auth.getFreshToken(force)
+                        }
                     for (link in links) {
                         if (service.cachedKeys(link.projectId) != null) continue
                         val meta = api.pullValues(link.projectId, link.environment.takeIf { it.isNotBlank() }, metadataOnly = true)

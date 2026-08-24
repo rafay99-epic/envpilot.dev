@@ -4,12 +4,10 @@ import dev.envpilot.jetbrains.sync.PullService
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import java.nio.file.Files
-import kotlin.io.path.absolutePathString
 import org.junit.Test
+import java.nio.file.Files
 
 class PathSafetyTest {
-
     private fun tempDir(): java.nio.file.Path = Files.createTempDirectory("envpilot-path")
 
     @Test

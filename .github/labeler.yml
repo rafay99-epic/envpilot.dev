@@ -14,6 +14,10 @@ scope:extension:
   - changed-files:
       - any-glob-to-any-file: apps/vscode-extension/**
 
+scope:jetbrains:
+  - changed-files:
+      - any-glob-to-any-file: apps/jetbrains-plugin/**
+
 scope:github-action:
   - changed-files:
       - any-glob-to-any-file: packages/github-action/**

@@ -10,7 +10,6 @@ import io.sentry.SentryLevel
  * (local dev builds), so telemetry never becomes a failure source.
  */
 object EnvSentry {
-
     @Volatile private var initialized = false
 
     fun init() {
@@ -27,7 +26,10 @@ object EnvSentry {
         }
     }
 
-    fun capture(e: Throwable, context: Map<String, String> = emptyMap()) {
+    fun capture(
+        e: Throwable,
+        context: Map<String, String> = emptyMap(),
+    ) {
         if (!initialized) return
         try {
             Sentry.withScope { scope ->

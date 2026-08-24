@@ -5,9 +5,9 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.FoldRegion
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
-import com.intellij.openapi.util.Key
-import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.Key
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -25,14 +25,16 @@ import java.security.MessageDigest
  * copy guard blocks clipboard access to managed files while hidden.
  */
 object EnvCloak {
-
     private val FOLDS = Key.create<Array<FoldRegion>>("envpilot.cloakFolds")
     private val FOLD_LISTENER = Key.create<DocumentListener>("envpilot.cloakListener")
 
     private const val ENV_PLACEHOLDER = "••••••••"
     private const val FILE_PLACEHOLDER = "🔒 Envpilot secret file — hidden (Reveal Values to show)"
 
-    fun refresh(editor: Editor, project: Project) {
+    fun refresh(
+        editor: Editor,
+        project: Project,
+    ) {
         val path = editor.virtualFile?.path ?: return
         val service = EnvEditorService.getInstance(project)
         val managed = service.managed(path)
@@ -71,7 +73,10 @@ object EnvCloak {
     }
 
     /** Managed and currently hidden? The copy guard blocks clipboard access then. */
-    fun isProtected(editor: Editor, project: Project): Boolean {
+    fun isProtected(
+        editor: Editor,
+        project: Project,
+    ): Boolean {
         val path = editor.virtualFile?.path ?: return false
         val service = EnvEditorService.getInstance(project)
         return service.managed(path) != null && !service.isRevealed()
@@ -89,15 +94,19 @@ object EnvCloak {
         editor.putUserData(FOLDS, null)
     }
 
-    private fun attachListener(editor: Editor, project: Project) {
+    private fun attachListener(
+        editor: Editor,
+        project: Project,
+    ) {
         if (editor.getUserData(FOLD_LISTENER) != null) return
-        val listener = object : DocumentListener {
-            override fun documentChanged(event: DocumentEvent) {
-                ApplicationManager.getApplication().invokeLater {
-                    if (!editor.isDisposed) refresh(editor, project)
+        val listener =
+            object : DocumentListener {
+                override fun documentChanged(event: DocumentEvent) {
+                    ApplicationManager.getApplication().invokeLater {
+                        if (!editor.isDisposed) refresh(editor, project)
+                    }
                 }
             }
-        }
         editor.document.addDocumentListener(listener)
         editor.putUserData(FOLD_LISTENER, listener)
         Disposer.register(project) {

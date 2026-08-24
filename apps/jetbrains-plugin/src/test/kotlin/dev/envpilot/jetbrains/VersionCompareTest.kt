@@ -5,7 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class VersionCompareTest {
-
     @Test
     fun `equal versions`() {
         assertEquals(0, VersionCheck.compareVersions("1.2.3", "1.2.3"))

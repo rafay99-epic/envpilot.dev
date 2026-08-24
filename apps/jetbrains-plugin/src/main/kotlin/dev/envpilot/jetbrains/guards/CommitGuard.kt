@@ -4,7 +4,6 @@ import com.intellij.openapi.diagnostic.logger
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.attribute.PosixFilePermissions
 
 /**
  * Installs a git pre-commit hook that blocks commits touching the managed
@@ -12,13 +11,15 @@ import java.nio.file.attribute.PosixFilePermissions
  * VS Code extension — plain sh, zero platform coupling.
  */
 object CommitGuard {
-
     private val log = logger<CommitGuard>()
     const val START = "# >>> ENVPILOT COMMIT GUARD >>>"
     const val END = "# <<< ENVPILOT COMMIT GUARD <<<"
 
     /** @return true when the hook is (or already was) installed. */
-    fun install(projectRoot: String, targetFile: String): Boolean {
+    fun install(
+        projectRoot: String,
+        targetFile: String,
+    ): Boolean {
         val gitDir = findGitDir(Path.of(projectRoot)) ?: return false
         val hook = gitDir.resolve("hooks/pre-commit")
         Files.createDirectories(hook.parent)

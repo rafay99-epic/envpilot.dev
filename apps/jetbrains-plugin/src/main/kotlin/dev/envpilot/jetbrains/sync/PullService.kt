@@ -19,47 +19,59 @@ import java.nio.file.attribute.PosixFilePermission
  * the whole pull loudly — we never write partially resolved state.
  */
 object PullService {
-
     private val log = logger<PullService>()
 
     class PullAborted(message: String) : Exception(message)
 
-    suspend fun pull(link: LinkedProject, project: Project? = null): Int {
+    suspend fun pull(
+        link: LinkedProject,
+        project: Project? = null,
+    ): Int {
         val auth = AuthService.getInstance()
         if (auth.getSession() == null) throw PullAborted("Not signed in")
-        val api = EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
-            auth.getFreshToken(force)
-        }
+        val api =
+            EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
+                auth.getFreshToken(force)
+            }
         val environment = link.environment.takeIf { it.isNotBlank() }
 
         val result = api.pullValues(link.projectId, environment, metadataOnly = false)
-        val failed = result.meta.decryptionFailures.orEmpty() +
-            result.variables.filter { it.value == "[DECRYPTION_FAILED]" }.map { it.key }
+        val failed =
+            result.meta.decryptionFailures.orEmpty() +
+                result.variables.filter { it.value == "[DECRYPTION_FAILED]" }.map { it.key }
         if (failed.isNotEmpty()) {
             throw PullAborted("Decryption failed for ${failed.size} variable(s): ${failed.joinToString(", ")}")
         }
 
         // Fetch everything first so a failure mid-pull writes nothing.
         val fileMetas = api.listFiles(link.projectId, environment)
-        val downloaded = fileMetas.map { meta ->
-            val (m, bytes) = api.fileContent(meta.id)
-            m to bytes
-        }
+        val downloaded =
+            fileMetas.map { meta ->
+                val (m, bytes) = api.fileContent(meta.id)
+                m to bytes
+            }
 
         val dir = Path.of(link.directoryPath)
-        val targetFile = dir.resolve(
-            EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" }
-        )
+        val targetFile =
+            dir.resolve(
+                EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" },
+            )
         val values = result.variables.associate { it.key to it.value }
-        val merged = EnvFiles.merge(EnvFiles.readIfExists(targetFile), values)
+        val mode = EnvFiles.ConflictMode.from(EnvpilotSettings.getInstance().state.conflictResolution)
+        val existing = EnvFiles.readIfExists(targetFile)
+        val merged = EnvFiles.resolve(existing, values, mode)
+        if (mode == EnvFiles.ConflictMode.BACKUP && existing != null && existing != merged) {
+            EnvFiles.atomicWrite(EnvFiles.backupPath(targetFile), existing)
+        }
         EnvFiles.atomicWrite(targetFile, merged)
 
         val writtenSecrets = mutableListOf<String>()
         val secretHashes = mutableMapOf<String, String>()
         val previous = project?.let { EnvEditorService.getInstance(it) }
         for ((meta, bytes) in downloaded) {
-            val dest = resolveWithin(dir, meta.path)
-                ?: throw PullAborted("Refusing unsafe file path from server: ${meta.path}")
+            val dest =
+                resolveWithin(dir, meta.path)
+                    ?: throw PullAborted("Refusing unsafe file path from server: ${meta.path}")
             Files.createDirectories(dest.parent)
             if (Files.exists(dest)) {
                 guardExistingFile(dest, bytes, previous?.managed(dest.toString())?.secretFilePaths)
@@ -74,8 +86,11 @@ object PullService {
         if (project != null) {
             try {
                 EnvEditorService.getInstance(project).recordSync(
-                    targetFile.toString(), values.keys,
-                    EnvCloak.hashOf(targetFile), writtenSecrets, secretHashes,
+                    targetFile.toString(),
+                    values.keys,
+                    EnvCloak.hashOf(targetFile),
+                    writtenSecrets,
+                    secretHashes,
                 )
             } catch (e: Exception) {
                 log.warn("Editor state update failed: ${e.message}")
@@ -90,7 +105,11 @@ object PullService {
      * wrote and differs from the vault copy, back it up first: overwriting a
      * foreign file silently is a data-loss bug.
      */
-    private fun guardExistingFile(dest: Path, incoming: ByteArray, previouslyOurs: List<String>?) {
+    private fun guardExistingFile(
+        dest: Path,
+        incoming: ByteArray,
+        previouslyOurs: List<String>?,
+    ) {
         if (isPosix(dest)) {
             val perms = Files.getPosixFilePermissions(dest).toMutableSet()
             if (perms.add(PosixFilePermission.OWNER_WRITE)) {
@@ -107,7 +126,10 @@ object PullService {
     }
 
     /** Resolve a server-provided relative path inside [dir], refusing escapes and symlinks out. */
-    internal fun resolveWithin(dir: Path, relativePath: String): Path? {
+    internal fun resolveWithin(
+        dir: Path,
+        relativePath: String,
+    ): Path? {
         val cleaned = relativePath.replace('\\', '/').trimStart('/')
         if (cleaned.isBlank() || cleaned.split('/').any { it == ".." }) return null
         val root = dir.toAbsolutePath().normalize()
@@ -124,12 +146,15 @@ object PullService {
         return if (realProbe.startsWith(realRoot)) resolved else null
     }
 
-    private fun isPosix(p: Path): Boolean =
-        p.fileSystem.supportedFileAttributeViews().contains("posix")
+    private fun isPosix(p: Path): Boolean = p.fileSystem.supportedFileAttributeViews().contains("posix")
 
     private fun posixPerms(mode: Int): Set<PosixFilePermission> {
         val perms = mutableSetOf<PosixFilePermission>()
-        fun bit(mask: Int, perm: PosixFilePermission) {
+
+        fun bit(
+            mask: Int,
+            perm: PosixFilePermission,
+        ) {
             if (mode and mask != 0) perms.add(perm)
         }
         bit(0b100_000_000, PosixFilePermission.OWNER_READ)
