@@ -10,9 +10,8 @@ import com.intellij.notification.NotificationType
 import dev.envpilot.jetbrains.editor.EnvCloak
 
 /**
- * Blocks clipboard copies whose selection intersects a cloaked value range.
- * Registered programmatically over the original handler (see StartupActivity)
- * to avoid editorActionHandler EP recursion.
+ * Blocks clipboard copies/cuts from any Envpilot-managed file while it is
+ * hidden. Reveal Values (time-boxed) lifts the block.
  */
 class CopyGuardHandler(
     private val delegate: EditorActionHandler,
@@ -25,12 +24,12 @@ class CopyGuardHandler(
         dataContext: DataContext?,
     ) {
         val project: Project? = editor.project
-        if (project != null && EnvCloak.selectionIntersectsCloak(editor, project)) {
+        if (project != null && EnvCloak.isProtected(editor, project)) {
             NotificationGroupManager.getInstance()
                 .getNotificationGroup("dev.envpilot.notifications")
                 .createNotification(
-                    if (isCut) "Cut blocked: selection contains an Envpilot-managed secret value."
-                    else "Copy blocked: selection contains an Envpilot-managed secret value.",
+                    if (isCut) "Cut blocked: this file is Envpilot-managed and hidden."
+                    else "Copy blocked: this file is Envpilot-managed and hidden. Use Reveal Values first.",
                     NotificationType.WARNING
                 )
                 .notify(project)

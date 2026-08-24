@@ -88,7 +88,6 @@ class StartupActivity : ProjectActivity {
     }
 
     private fun cloakIfManaged(project: Project, file: com.intellij.openapi.vfs.VirtualFile) {
-        if (!file.name.startsWith(".env")) return
         ApplicationManager.getApplication().invokeLater {
             val editor = FileEditorManager.getInstance(project).selectedTextEditor ?: return@invokeLater
             if (editor.virtualFile?.path == file.path) {

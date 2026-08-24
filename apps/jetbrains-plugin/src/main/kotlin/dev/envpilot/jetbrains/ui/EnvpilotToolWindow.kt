@@ -290,13 +290,16 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
 
 internal fun refreshOpenEnvEditors(project: Project) {
     ApplicationManager.getApplication().invokeLater {
-        val editor = com.intellij.openapi.fileEditor.FileEditorManager
-            .getInstance(project).selectedTextEditor ?: return@invokeLater
-        if (editor.virtualFile?.name?.startsWith(".env") == true) {
-            dev.envpilot.jetbrains.editor.EnvCloak.refresh(editor, project)
+        for (editor in com.intellij.openapi.fileEditor.FileEditorManager
+                .getInstance(project).selectedEditors) {
+            val file = editor.file ?: continue
+            val textEditor = editor.asSafely<com.intellij.openapi.fileEditor.TextEditor>()?.editor ?: continue
+            dev.envpilot.jetbrains.editor.EnvCloak.refresh(textEditor, project)
         }
     }
 }
+
+private inline fun <reified T> Any?.asSafely(): T? = this as? T
 
 private fun notifyBalloon(project: Project, message: String, type: com.intellij.notification.NotificationType) {
     com.intellij.notification.NotificationGroupManager.getInstance()

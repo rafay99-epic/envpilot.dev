@@ -2,81 +2,79 @@ package dev.envpilot.jetbrains.editor
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.FoldRegion
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
-import com.intellij.openapi.editor.markup.EffectType
-import com.intellij.openapi.editor.markup.HighlighterLayer
-import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.editor.colors.EditorColorsManager
-import java.awt.Font
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 
 /**
- * Cloaks managed variable values inside open editors by painting their text
- * with the editor background color (text stays selectable for legitimate
- * copies — the copy guard decides that separately). Ranges recompute on every
- * document change; reveal is time-boxed.
+ * Hides managed secret content at the RENDER level (fold regions), the way
+ * the VS Code extension cloaks values — the text is not drawn at all, not
+ * merely recolored.
+ *
+ * - .env files: each managed value folds to "••••••••"
+ * - other managed files (uploaded secrets): the whole document folds to a
+ *   single "hidden" placeholder
+ *
+ * Reveal (time-boxed, from the tool window) temporarily removes folds. The
+ * copy guard blocks clipboard access to managed files while hidden.
  */
 object EnvCloak {
 
-    private val CLOAK_RANGES = Key.create<List<IntRange>>("envpilot.cloakRanges")
-    private val CLOAK_LISTENER = Key.create<DocumentListener>("envpilot.cloakListener")
+    private val FOLDS = Key.create<Array<FoldRegion>>("envpilot.cloakFolds")
+    private val FOLD_LISTENER = Key.create<DocumentListener>("envpilot.cloakListener")
+
+    private const val ENV_PLACEHOLDER = "••••••••"
+    private const val FILE_PLACEHOLDER = "🔒 Envpilot secret file — hidden (Reveal Values to show)"
 
     fun refresh(editor: Editor, project: Project) {
         val path = editor.virtualFile?.path ?: return
         val service = EnvEditorService.getInstance(project)
         val managed = service.managed(path)
 
-        editor.markupModel.allHighlighters
-            .filter { it.getUserData(OUR_MARKER) == true }
-            .forEach { editor.markupModel.removeHighlighter(it) }
-
-        editor.putUserData(CLOAK_RANGES, emptyList())
+        clearFolds(editor)
         if (managed == null || service.isRevealed()) return
 
-        val bg = EditorColorsManager.getInstance().globalScheme.defaultBackground
-        val attrs = TextAttributes().apply {
-            foregroundColor = bg
-            effectColor = bg
-            effectType = EffectType.BOXED
-            fontType = Font.PLAIN
-        }
+        val isEnvFile = editor.virtualFile.name.startsWith(".env")
+        val text = editor.document
 
-        val ranges = mutableListOf<IntRange>()
-        val text = editor.document.text
-        val keyRegex = Regex("(?m)^([A-Za-z_][A-Za-z0-9_.]*)(\\s*=)(.*)$")
-        for (match in keyRegex.findAll(text)) {
-            val key = match.groupValues[1]
-            if (key !in managed.keys) continue
-            val valueRange = match.groups[3]!!.range
-            if (valueRange.isEmpty()) continue
-            ranges.add(valueRange)
-            editor.markupModel.addRangeHighlighter(
-                valueRange.first, valueRange.last + 1,
-                HighlighterLayer.CARET_ROW + 1,
-                attrs,
-                com.intellij.openapi.editor.markup.HighlighterTargetArea.EXACT_RANGE
-            ).putUserData(OUR_MARKER, true)
+        editor.foldingModel.runBatchFoldingOperation {
+            if (isEnvFile) {
+                val keyRegex = Regex("(?m)^([A-Za-z_][A-Za-z0-9_.]*)(\\s*=)(.*)$")
+                val folds = mutableListOf<FoldRegion>()
+                for (match in keyRegex.findAll(text.charsSequence)) {
+                    val key = match.groupValues[1]
+                    if (key !in managed.keys) continue
+                    val range = match.groups[3]!!.range
+                    if (range.isEmpty()) continue
+                    val region = editor.foldingModel.addFoldRegion(range.first, range.last + 1, ENV_PLACEHOLDER)
+                    region?.isExpanded = false
+                    region?.let { folds.add(it) }
+                }
+                editor.putUserData(FOLDS, folds.toTypedArray())
+            } else if (text.textLength > 2) {
+                // Whole-document fold for uploaded secret files (json, pem, keystore…).
+                val region = editor.foldingModel.addFoldRegion(1, text.textLength, FILE_PLACEHOLDER)
+                region?.isExpanded = false
+                editor.putUserData(FOLDS, if (region != null) arrayOf(region) else emptyArray())
+            } else {
+                editor.putUserData(FOLDS, emptyArray())
+            }
         }
-        editor.putUserData(CLOAK_RANGES, ranges)
 
         attachListener(editor, project)
     }
 
-    /** Selection intersects a cloaked value range? Used by the copy guard. */
-    fun selectionIntersectsCloak(editor: Editor, project: Project): Boolean {
-        val ranges = editor.getUserData(CLOAK_RANGES) ?: return false
-        if (ranges.isEmpty()) return false
-        val sel = editor.selectionModel
-        if (!sel.hasSelection()) return false
-        val start = sel.selectionStart
-        val end = sel.selectionEnd
-        return ranges.any { it.first < end && it.last + 1 > start }
+    /** Managed and currently hidden? The copy guard blocks clipboard access then. */
+    fun isProtected(editor: Editor, project: Project): Boolean {
+        val path = editor.virtualFile?.path ?: return false
+        val service = EnvEditorService.getInstance(project)
+        return service.managed(path) != null && !service.isRevealed()
     }
 
     fun hashOf(path: Path): String =
@@ -84,8 +82,15 @@ object EnvCloak {
             .digest(Files.readAllBytes(path))
             .joinToString("") { "%02x".format(it) }
 
+    private fun clearFolds(editor: Editor) {
+        editor.getUserData(FOLDS)?.forEach {
+            if (it.isValid) editor.foldingModel.removeFoldRegion(it)
+        }
+        editor.putUserData(FOLDS, null)
+    }
+
     private fun attachListener(editor: Editor, project: Project) {
-        if (editor.getUserData(CLOAK_LISTENER) != null) return
+        if (editor.getUserData(FOLD_LISTENER) != null) return
         val listener = object : DocumentListener {
             override fun documentChanged(event: DocumentEvent) {
                 ApplicationManager.getApplication().invokeLater {
@@ -94,11 +99,9 @@ object EnvCloak {
             }
         }
         editor.document.addDocumentListener(listener)
-        editor.putUserData(CLOAK_LISTENER, listener)
+        editor.putUserData(FOLD_LISTENER, listener)
         Disposer.register(project) {
             editor.document.removeDocumentListener(listener)
         }
     }
-
-    private val OUR_MARKER = Key.create<Boolean>("envpilot.cloakMarker")
 }
