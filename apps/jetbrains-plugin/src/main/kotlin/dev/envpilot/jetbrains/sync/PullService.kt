@@ -54,19 +54,7 @@ object PullService {
         val merged = EnvFiles.merge(EnvFiles.readIfExists(targetFile), values)
         EnvFiles.atomicWrite(targetFile, merged)
 
-        if (project != null) {
-            try {
-                EnvEditorService.getInstance(project).recordSync(
-                    targetFile.toString(),
-                    values.keys,
-                    values,
-                    EnvCloak.hashOf(targetFile),
-                )
-            } catch (e: Exception) {
-                log.warn("Editor state update failed: ${e.message}")
-            }
-        }
-
+        val writtenSecrets = mutableListOf<String>()
         for ((meta, bytes) in downloaded) {
             val dest = resolveWithin(dir, meta.path)
                 ?: throw PullAborted("Refusing unsafe file path from server: ${meta.path}")
@@ -74,6 +62,17 @@ object PullService {
             Files.write(dest, bytes)
             if (meta.mode != null && isPosix(dest)) {
                 Files.setPosixFilePermissions(dest, posixPerms(meta.mode))
+            }
+            writtenSecrets.add(dest.toString())
+        }
+        if (project != null) {
+            try {
+                EnvEditorService.getInstance(project).recordSync(
+                    targetFile.toString(), values.keys, values,
+                    EnvCloak.hashOf(targetFile), writtenSecrets,
+                )
+            } catch (e: Exception) {
+                log.warn("Editor state update failed: ${e.message}")
             }
         }
         return result.variables.size + downloaded.size

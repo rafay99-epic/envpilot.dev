@@ -61,6 +61,29 @@ class StartupActivity : ProjectActivity {
 
         Disposer.register(project) {
             SyncScheduler.getInstance().stopFor(project)
+            unsyncOnClose(project)
+        }
+    }
+
+    /**
+     * Decrypted secrets on disk defeat the vault — when the IDE closes,
+     * delete the env files and secret files we materialized. Only files we
+     * wrote (tracked in EnvEditorService) are ever touched.
+     */
+    private fun unsyncOnClose(project: Project) {
+        if (!dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.autoUnsyncOnClose) return
+        val service = dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project)
+        var removed = 0
+        for (path in service.managedPaths()) {
+            val managed = service.managed(path) ?: continue
+            for (secretPath in managed.secretFilePaths) {
+                if (java.nio.file.Files.deleteIfExists(java.nio.file.Path.of(secretPath))) removed++
+            }
+            if (java.nio.file.Files.deleteIfExists(java.nio.file.Path.of(path))) removed++
+        }
+        if (removed > 0) {
+            com.intellij.openapi.diagnostic.logger<StartupActivity>()
+                .info("Auto-unsync on close: removed $removed managed file(s)")
         }
     }
 

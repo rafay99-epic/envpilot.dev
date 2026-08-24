@@ -17,6 +17,7 @@ class EnvpilotSettings : PersistentStateComponent<EnvpilotSettings.State> {
         var autocompleteEnabled: Boolean = true
         var commitGuardEnabled: Boolean = false
         var commitGuardAutoInstall: Boolean = false
+        var autoUnsyncOnClose: Boolean = true
     }
 
     private var state = State()

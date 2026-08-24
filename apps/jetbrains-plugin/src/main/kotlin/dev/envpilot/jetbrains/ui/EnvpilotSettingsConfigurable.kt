@@ -62,6 +62,10 @@ class EnvpilotSettingsConfigurable : BoundConfigurable("Envpilot") {
                 checkBox("Auto-install commit-guard git hook when linking")
                     .bindSelected(state::commitGuardAutoInstall)
             }
+            row {
+                checkBox("Remove pulled env files when the IDE closes")
+                    .bindSelected(state::autoUnsyncOnClose)
+            }.comment("Decrypted secrets on disk defeat the point of the vault — delete them on close.")
         }
         group("Version") {
             row {

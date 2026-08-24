@@ -60,10 +60,10 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         list = JBList(listModel)
         list.cellRenderer = com.intellij.ui.SimpleListCellRenderer.create { label, value, index ->
             label.text = value
-            label.icon = when (items.getOrNull(index)) {
+            label.icon = when (val item = items.getOrNull(index)) {
                 is dev.envpilot.jetbrains.model.Org -> AllIcons.Nodes.Module
-                is ApiProject -> AllIcons.Nodes.Project
-                is LinkedProject -> AllIcons.Nodes.Symlink
+                is ApiProject -> projectIcon(item.id)
+                is LinkedProject -> linkIcon(item)
                 else -> null
             }
         }
@@ -219,7 +219,12 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
             for (proj in api.projects(org.id)) {
                 rows.add("  Project: ${proj.name} (${proj.variableCount} vars)" to proj)
                 for (link in linksByProject[proj.id].orEmpty()) {
-                    rows.add("      ${link.environment} → ${link.directoryPath}" to link)
+                    val status = when (linkStatus(link)) {
+                        EnvEditorService.LinkStatus.SYNCED -> "synced"
+                        EnvEditorService.LinkStatus.DRIFTED -> "modified — next sync overwrites"
+                        EnvEditorService.LinkStatus.NOT_PULLED -> "NOT PULLED"
+                    }
+                    rows.add("      ${link.environment} → ${link.directoryPath}  [$status]" to link)
                 }
             }
         }
@@ -228,6 +233,29 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
 
     private fun selected(): Any? =
         list.selectedIndex.takeIf { it >= 0 && it < items.size }?.let { items[it] }
+
+    private fun targetPathFor(link: LinkedProject): String {
+        val target = EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" }
+        return java.nio.file.Paths.get(link.directoryPath, target).toString()
+    }
+
+    private fun linkStatus(link: LinkedProject): EnvEditorService.LinkStatus =
+        EnvEditorService.getInstance(project).statusFor(targetPathFor(link))
+
+    private fun linkIcon(link: LinkedProject): javax.swing.Icon = when (linkStatus(link)) {
+        EnvEditorService.LinkStatus.SYNCED -> AllIcons.General.InspectionsOK
+        EnvEditorService.LinkStatus.DRIFTED -> AllIcons.General.BalloonWarning
+        EnvEditorService.LinkStatus.NOT_PULLED -> AllIcons.General.BalloonWarning
+    }
+
+    private fun projectIcon(projectId: String): javax.swing.Icon {
+        val links = LinkedProjectsService.getInstance(project).all().filter { it.projectId == projectId }
+        if (links.isEmpty()) return AllIcons.Nodes.Project
+        return when (links.all { linkStatus(it) == EnvEditorService.LinkStatus.SYNCED }) {
+            true -> AllIcons.General.InspectionsOK
+            false -> AllIcons.General.BalloonWarning
+        }
+    }
 }
 
 private fun notifyBalloon(project: Project, message: String, type: com.intellij.notification.NotificationType) {
@@ -248,6 +276,7 @@ class LinkDirectoryDialog(
     private val pullScope = kotlinx.coroutines.CoroutineScope(
         kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
     )
+    private var workspaceRoots: List<String> = emptyList()
 
     init {
         title = "Link ${selected.name} to a Directory"
@@ -264,9 +293,18 @@ class LinkDirectoryDialog(
             override fun removeUpdate(e: javax.swing.event.DocumentEvent) = updatePathPreview()
             override fun changedUpdate(e: javax.swing.event.DocumentEvent) = updatePathPreview()
         })
+        workspaceRoots = detectWorkspaceRoots()
         updatePathPreview()
         init()
     }
+
+    /** All content roots across modules — covers worktrees and multi-root setups. */
+    private fun detectWorkspaceRoots(): List<String> =
+        com.intellij.openapi.module.ModuleManager.getInstance(project).modules
+            .flatMap { com.intellij.openapi.roots.ModuleRootManager.getInstance(it).contentRoots.toList() }
+            .map { it.path }
+            .distinct()
+            .filter { it != null } as List<String>
 
     private fun updatePathPreview() {
         val base = dirField.text.trim().ifBlank { "?" }
@@ -285,6 +323,15 @@ class LinkDirectoryDialog(
             row("Variables:") { label("${selected.variableCount} (all environments)") }
         }
         group("Link settings") {
+            if (workspaceRoots.size > 1) {
+                row("Workspace folders:") {
+                    cell(javax.swing.JComboBox(workspaceRoots.toTypedArray())).onChanged {
+                        (it as? javax.swing.JComboBox<*>)?.selectedItem?.let { root ->
+                            dirField.text = root.toString()
+                        }
+                    }
+                }.comment("Detected content roots (worktrees/modules) — picking one fills the field below.")
+            }
             row("Environment:") {
                 cell(javax.swing.JComboBox(VALID_ENVIRONMENTS.toTypedArray()))
                     .onChanged { environment = it.selectedItem as String }
