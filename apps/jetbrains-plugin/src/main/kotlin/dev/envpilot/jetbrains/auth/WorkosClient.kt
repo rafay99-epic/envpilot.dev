@@ -24,6 +24,7 @@ object WorkosClient {
 
     private val gson = Gson()
     private val http: HttpClient = HttpClient.newBuilder()
+        .version(java.net.http.HttpClient.Version.HTTP_1_1)
         .connectTimeout(Duration.ofSeconds(10))
         .build()
 
