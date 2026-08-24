@@ -115,6 +115,12 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         override fun actionPerformed(e: AnActionEvent) {
             (selected() as? LinkedProject)?.let { link ->
                 LinkedProjectsService.getInstance(project).remove(link)
+                notifyBalloon(
+                    project,
+                    "Unlinked ${link.projectName} (${link.environment}) from ${link.directoryPath}. " +
+                        "The env file stays on disk until the IDE closes.",
+                    com.intellij.notification.NotificationType.INFORMATION
+                )
                 reload()
             }
         }
@@ -128,8 +134,15 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
 
         override fun actionPerformed(e: AnActionEvent) {
             scope.launch {
-                SyncScheduler.getInstance().runCycle(project)
-                refreshOpenEnvEditors()
+                val ok = SyncScheduler.getInstance().runCycle(project)
+                notifyBalloon(
+                    project,
+                    if (ok) "Pull complete — all linked directories synced."
+                    else "Pull failed — see the status bar for the reason.",
+                    if (ok) com.intellij.notification.NotificationType.INFORMATION
+                    else com.intellij.notification.NotificationType.ERROR
+                )
+                refreshOpenEnvEditors(project)
             }
         }
     }
@@ -144,7 +157,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
 
         override fun actionPerformed(e: AnActionEvent) {
             EnvEditorService.getInstance(project).revealFor(30)
-            refreshOpenEnvEditors()
+            refreshOpenEnvEditors(project)
         }
     }
 
@@ -174,15 +187,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         }
     }
 
-    private fun refreshOpenEnvEditors() {
-        ApplicationManager.getApplication().invokeLater {
-            val editor = com.intellij.openapi.fileEditor.FileEditorManager
-                .getInstance(project).selectedTextEditor ?: return@invokeLater
-            if (editor.virtualFile?.name?.startsWith(".env") == true) {
-                dev.envpilot.jetbrains.editor.EnvCloak.refresh(editor, project)
-            }
-        }
-    }
+
 
     /** Fetch on IO, mutate the Swing model on the EDT. */
     private fun reload() {
@@ -216,7 +221,14 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         val rows = mutableListOf<Pair<String, Any>>()
         for (org in api.orgs()) {
             rows.add("Org: ${org.name} (${org.slug})" to org)
-            for (proj in api.projects(org.id)) {
+            // One flaky org must not blank out the whole tree.
+            val projects = try {
+                api.projects(org.id)
+            } catch (e: Exception) {
+                rows.add("      Load failed: ${e.message ?: e::class.simpleName} — hit Refresh" to org)
+                continue
+            }
+            for (proj in projects) {
                 rows.add("  Project: ${proj.name} (${proj.variableCount} vars)" to proj)
                 for (link in linksByProject[proj.id].orEmpty()) {
                     val status = when (linkStatus(link)) {
@@ -254,6 +266,16 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         return when (links.all { linkStatus(it) == EnvEditorService.LinkStatus.SYNCED }) {
             true -> AllIcons.General.InspectionsOK
             false -> AllIcons.General.BalloonWarning
+        }
+    }
+}
+
+internal fun refreshOpenEnvEditors(project: Project) {
+    ApplicationManager.getApplication().invokeLater {
+        val editor = com.intellij.openapi.fileEditor.FileEditorManager
+            .getInstance(project).selectedTextEditor ?: return@invokeLater
+        if (editor.virtualFile?.name?.startsWith(".env") == true) {
+            dev.envpilot.jetbrains.editor.EnvCloak.refresh(editor, project)
         }
     }
 }
@@ -379,6 +401,7 @@ class LinkDirectoryDialog(
         // "now go click Pull Now" step.
         pullScope.launch {
             val ok = SyncScheduler.getInstance().runCycle(project)
+            refreshOpenEnvEditors(project)
             notifyBalloon(
                 project,
                 if (ok) "Linked ${selected.name} — env file pulled into $dir"

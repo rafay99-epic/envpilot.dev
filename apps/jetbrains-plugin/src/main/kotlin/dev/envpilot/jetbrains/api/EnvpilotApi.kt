@@ -134,13 +134,25 @@ class EnvpilotApi(
         }
     }
 
-    private suspend fun <T> call(block: (String) -> T): T =
-        try {
-            block(tokenProvider(false) ?: throw ApiError(401, "Not signed in"))
-        } catch (e: Unauthorized) {
-            val fresh = tokenProvider(true) ?: throw ApiError(401, "Not signed in")
-            block(fresh)
+    private suspend fun <T> call(block: (String) -> T): T {
+        var lastError: Exception? = null
+        repeat(3) { attempt ->
+            try {
+                return try {
+                    block(tokenProvider(false) ?: throw ApiError(401, "Not signed in"))
+                } catch (e: Unauthorized) {
+                    val fresh = tokenProvider(true) ?: throw ApiError(401, "Not signed in")
+                    block(fresh)
+                }
+            } catch (e: ApiError) {
+                // Convex cold starts / transient 5xx — retry with backoff.
+                if (e.status < 500 || attempt == 2) throw e
+                lastError = e
+                kotlinx.coroutines.delay(500L * (attempt + 1))
+            }
         }
+        throw lastError ?: ApiError(500, "Request failed")
+    }
 
     private fun postJson(token: String, path: String, body: Map<String, Any?>): JsonObject? {
         val request = HttpRequest.newBuilder()
