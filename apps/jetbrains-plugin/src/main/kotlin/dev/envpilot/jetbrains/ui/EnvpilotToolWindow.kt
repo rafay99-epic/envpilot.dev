@@ -4,6 +4,7 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
@@ -57,6 +58,15 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     init {
         layout = java.awt.BorderLayout()
         list = JBList(listModel)
+        list.cellRenderer = com.intellij.ui.SimpleListCellRenderer.create { label, value, index ->
+            label.text = value
+            label.icon = when (items.getOrNull(index)) {
+                is dev.envpilot.jetbrains.model.Org -> AllIcons.Nodes.Module
+                is ApiProject -> AllIcons.Nodes.Project
+                is LinkedProject -> AllIcons.Nodes.Symlink
+                else -> null
+            }
+        }
         add(JBScrollPane(list), java.awt.BorderLayout.CENTER)
 
         Disposer.register(project) { scope.cancel() }
@@ -78,11 +88,15 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         add(toolbar.component, java.awt.BorderLayout.NORTH)
     }
 
-    private fun refreshAction() = object : AnAction("Refresh", "Reload orgs and projects", null) {
+    private fun refreshAction() = object : AnAction("Refresh", "Reload orgs and projects", AllIcons.Actions.Refresh) {
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = AuthService.getInstance().email != null
+        }
+
         override fun actionPerformed(e: AnActionEvent) = reload()
     }
 
-    private fun linkAction() = object : AnAction("Link Directory…", "Link a directory to a project environment", null) {
+    private fun linkAction() = object : AnAction("Link Directory…", "Link a directory to a project environment", AllIcons.General.Add) {
         override fun update(e: AnActionEvent) {
             e.presentation.isEnabled =
                 AuthService.getInstance().email != null && selected() is ApiProject
@@ -93,7 +107,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         }
     }
 
-    private fun unlinkAction() = object : AnAction("Unlink", "Remove this directory link", null) {
+    private fun unlinkAction() = object : AnAction("Unlink", "Remove this directory link", AllIcons.General.Remove) {
         override fun update(e: AnActionEvent) {
             e.presentation.isEnabled = selected() is LinkedProject
         }
@@ -106,7 +120,12 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         }
     }
 
-    private fun pullAction() = object : AnAction("Pull Now", "Sync all linked directories in this project", null) {
+    private fun pullAction() = object : AnAction("Pull Now", "Sync all linked directories in this project", AllIcons.Actions.Download) {
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = AuthService.getInstance().email != null &&
+                LinkedProjectsService.getInstance(project).all().isNotEmpty()
+        }
+
         override fun actionPerformed(e: AnActionEvent) {
             scope.launch {
                 SyncScheduler.getInstance().runCycle(project)
@@ -116,8 +135,13 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     }
 
     private fun revealAction() = object : AnAction(
-        "Reveal Values", "Show managed secret values in editors for 30 seconds", null
+        "Reveal Values", "Show managed secret values in editors for 30 seconds", AllIcons.Actions.Preview
     ) {
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = AuthService.getInstance().email != null &&
+                EnvEditorService.getInstance(project).managedPaths().isNotEmpty()
+        }
+
         override fun actionPerformed(e: AnActionEvent) {
             EnvEditorService.getInstance(project).revealFor(30)
             refreshOpenEnvEditors()
@@ -125,10 +149,11 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     }
 
     private fun requestVariableAction() = object : AnAction(
-        "Request Variable…", "Submit a variable request for approval", null
+        "Request Variable…", "Submit a variable request for approval", AllIcons.Actions.AddFile
     ) {
         override fun update(e: AnActionEvent) {
-            e.presentation.isEnabled = AuthService.getInstance().email != null
+            e.presentation.isEnabled = AuthService.getInstance().email != null &&
+                LinkedProjectsService.getInstance(project).all().isNotEmpty()
         }
 
         override fun actionPerformed(e: AnActionEvent) {

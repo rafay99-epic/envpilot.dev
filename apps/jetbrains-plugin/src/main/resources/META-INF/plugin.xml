@@ -63,6 +63,7 @@
             implementation="dev.envpilot.jetbrains.guards.FileDriftListener"/>
 
         <toolWindow id="Envpilot"
+                    icon="/icons/envpilot-13.svg"
                     anchor="right"
                     factoryClass="dev.envpilot.jetbrains.ui.EnvpilotToolWindowFactory"/>
 
