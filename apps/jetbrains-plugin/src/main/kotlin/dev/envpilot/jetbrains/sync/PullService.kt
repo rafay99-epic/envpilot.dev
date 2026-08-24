@@ -74,7 +74,7 @@ object PullService {
         if (project != null) {
             try {
                 EnvEditorService.getInstance(project).recordSync(
-                    targetFile.toString(), values.keys, values,
+                    targetFile.toString(), values.keys,
                     EnvCloak.hashOf(targetFile), writtenSecrets, secretHashes,
                 )
             } catch (e: Exception) {
