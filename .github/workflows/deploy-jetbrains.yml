@@ -1,0 +1,112 @@
+name: Deploy JetBrains Plugin
+
+# Builds the IntelliJ/Android Studio plugin with production values pulled
+# from Envpilot (never hardcoded), verifies they are baked into the artifact,
+# and publishes to JetBrains Marketplace when publishing credentials exist.
+# Called by ci.yml after the full verification gate; also dispatchable
+# standalone. Marketplace rejects duplicate versions — bump
+# apps/jetbrains-plugin/gradle.properties pluginVersion to ship.
+
+on:
+  workflow_call:
+    inputs:
+      force:
+        description: Skip the version guard (reserved; Marketplace rejects duplicate versions itself)
+        type: boolean
+        required: false
+        default: false
+    secrets:
+      ENVPILOT_TOKEN:
+        required: false
+      ENVPILOT_PROD_TOKEN:
+        required: false
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Skip the version guard
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-jetbrains-main
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish plugin
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Prod client id + server URL come from Envpilot — same bootstrap as the
+      # CLI/extension. Marketplace credentials are read from the same pulled
+      # environment when present; publishing is skipped loudly when absent.
+      - uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
+          required: |
+            ENVPILOT_SERVER_URL
+            WORKOS_CLIENT_ID
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # Backend-first ordering is enforced by ci.yml (needs deploy-convex).
+      - name: Build and verify plugin
+        working-directory: apps/jetbrains-plugin
+        run: ./gradlew build verifyPlugin
+
+      # Verify the PACKAGED jar (the exact bytes we publish): an empty client
+      # id breaks sign-in, so a build missing it must never reach the
+      # Marketplace.
+      - name: Verify build-time values are embedded in the jar
+        working-directory: apps/jetbrains-plugin
+        run: |
+          if [ -z "$WORKOS_CLIENT_ID" ]; then
+            echo "::error::WORKOS_CLIENT_ID is empty — refusing to publish."
+            exit 1
+          fi
+          VERSION=$(grep pluginVersion gradle.properties | cut -d= -f2)
+          ZIP="build/distributions/envpilot-${VERSION}.zip"
+          unzip -o -q "$ZIP" "envpilot-${VERSION}.jar" -d /tmp/verify
+          if ! unzip -p "/tmp/verify/envpilot-${VERSION}.jar" dev/envpilot/jetbrains/BuildConfig.class | grep -qF "$WORKOS_CLIENT_ID"; then
+            echo "::error::Packaged $ZIP does not contain the WorkOS client id — refusing to publish a broken build."
+            exit 1
+          fi
+          echo "WorkOS client id embedded in $ZIP ✓"
+
+      - name: Publish to JetBrains Marketplace
+        id: publish
+        working-directory: apps/jetbrains-plugin
+        env:
+          PUBLISH_TOKEN: ${{ env.JETBRAINS_PUBLISH_TOKEN }}
+          CERTIFICATE_CHAIN: ${{ env.CERTIFICATE_CHAIN }}
+          PRIVATE_KEY: ${{ env.PRIVATE_KEY }}
+          PRIVATE_KEY_PASSWORD: ${{ env.PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -z "$PUBLISH_TOKEN" ]; then
+            echo "::notice::JETBRAINS_PUBLISH_TOKEN not set in the Envpilot production environment — skipping Marketplace publish. Add it (plus CERTIFICATE_CHAIN, PRIVATE_KEY, PRIVATE_KEY_PASSWORD) to publish."
+            exit 0
+          fi
+          ./gradlew publishPlugin
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: envpilot-jetbrains-${{ github.sha }}
+          path: apps/jetbrains-plugin/build/distributions/*.zip
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true

@@ -11,11 +11,12 @@ if [[ ! -f "$ROOT_ENV" ]]; then
   exit 1
 fi
 
-WORKOS_CLIENT_ID="$(grep -E '^WORKOS_CLIENT_ID=' "$ROOT_ENV" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+WORKOS_CLIENT_ID="${WORKOS_CLIENT_ID:-$(grep -E '^WORKOS_CLIENT_ID=' "$ROOT_ENV" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")}"
 if [[ -z "$WORKOS_CLIENT_ID" ]]; then
-  echo "error: WORKOS_CLIENT_ID missing from root .env.local" >&2
+  echo "error: WORKOS_CLIENT_ID missing (env or root .env.local)" >&2
   exit 1
 fi
+export WORKOS_CLIENT_ID
 
 export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}"
 export ENVPILOT_SERVER_URL="${ENVPILOT_SERVER_URL:-http://localhost:3000}"
