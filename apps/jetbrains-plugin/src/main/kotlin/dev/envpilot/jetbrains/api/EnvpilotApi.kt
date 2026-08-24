@@ -114,6 +114,26 @@ class EnvpilotApi(
         return meta to bytes
     }
 
+    suspend fun createVariableRequest(
+        projectId: String,
+        key: String,
+        value: String,
+        environments: List<String>,
+        isSensitive: Boolean,
+        description: String?,
+    ) {
+        call { token ->
+            postJson(token, "/api/ide/request-variables", mapOf(
+                "projectId" to projectId,
+                "key" to key,
+                "value" to value,
+                "environments" to environments,
+                "isSensitive" to isSensitive,
+                "description" to description,
+            ))
+        }
+    }
+
     private suspend fun <T> call(block: (String) -> T): T =
         try {
             block(tokenProvider(false) ?: throw ApiError(401, "Not signed in"))
@@ -121,6 +141,27 @@ class EnvpilotApi(
             val fresh = tokenProvider(true) ?: throw ApiError(401, "Not signed in")
             block(fresh)
         }
+
+    private fun postJson(token: String, path: String, body: Map<String, Any?>): JsonObject? {
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create("$serverUrl$path"))
+            .timeout(Duration.ofSeconds(60))
+            .header("Authorization", "Bearer $token")
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body)))
+            .build()
+        val response = http.send(request, HttpResponse.BodyHandlers.ofString())
+        when (response.statusCode()) {
+            200, 201 -> return gson.fromJson(response.body(), JsonObject::class.java)
+            401 -> throw Unauthorized()
+            else -> {
+                val msg = try {
+                    gson.fromJson(response.body(), JsonObject::class.java)?.str("error")
+                } catch (_: Exception) { null }
+                throw ApiError(response.statusCode(), msg ?: "Request failed (${response.statusCode()})")
+            }
+        }
+    }
 
     private fun get(token: String, pathAndQuery: String, allow404Body: Boolean = true): JsonObject? {
         val request = HttpRequest.newBuilder()

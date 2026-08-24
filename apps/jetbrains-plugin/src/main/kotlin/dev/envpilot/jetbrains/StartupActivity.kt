@@ -1,23 +1,40 @@
 package dev.envpilot.jetbrains
 
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.actionSystem.EditorActionManager
+import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent
+import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.util.Disposer
+import dev.envpilot.jetbrains.editor.EnvCloak
 import dev.envpilot.jetbrains.auth.AuthService
+import dev.envpilot.jetbrains.guards.CopyGuardHandler
 import dev.envpilot.jetbrains.sync.SyncScheduler
+import dev.envpilot.jetbrains.telemetry.EnvSentry
 import dev.envpilot.jetbrains.version.VersionCheck
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Per project open: initialize auth, run the version check, start auto-sync.
- * The scheduler loop is cancelled when the project closes.
+ * Per project open: initialize auth + telemetry, run the version check, start
+ * auto-sync, register the copy guard and cloak-on-open listeners. Everything
+ * is cancelled/disposed when the project closes.
  */
 class StartupActivity : ProjectActivity {
 
+    companion object {
+        private val guardsInstalled = AtomicBoolean(false)
+    }
+
     override suspend fun execute(project: Project) {
+        EnvSentry.init()
         AuthService.getInstance().initialize()
 
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
@@ -27,8 +44,52 @@ class StartupActivity : ProjectActivity {
         }
 
         SyncScheduler.getInstance().startFor(project)
+
+        installGlobalGuards()
+
+        // Cloak managed values when a file opens or becomes active.
+        project.messageBus.connect().subscribe(
+            FileEditorManagerListener.FILE_EDITOR_MANAGER,
+            object : FileEditorManagerListener {
+                override fun fileOpened(manager: FileEditorManager, file: com.intellij.openapi.vfs.VirtualFile) {
+                    cloakIfManaged(project, file)
+                }
+
+                override fun selectionChanged(event: FileEditorManagerEvent) {
+                    event.newFile?.let { cloakIfManaged(project, it) }
+                }
+            }
+        )
+
         Disposer.register(project) {
             SyncScheduler.getInstance().stopFor(project)
+        }
+    }
+
+    private fun cloakIfManaged(project: Project, file: com.intellij.openapi.vfs.VirtualFile) {
+        if (!file.name.startsWith(".env")) return
+        ApplicationManager.getApplication().invokeLater {
+            val editor = FileEditorManager.getInstance(project).selectedTextEditor ?: return@invokeLater
+            if (editor.virtualFile?.path == file.path) {
+                EnvCloak.refresh(editor, project)
+            }
+        }
+    }
+
+    /** App-wide, once: wrap copy/cut with the cloak-aware guard. */
+    private fun installGlobalGuards() {
+        if (!guardsInstalled.compareAndSet(false, true)) return
+        ApplicationManager.getApplication().invokeLater {
+            val manager = EditorActionManager.getInstance()
+            manager.setActionHandler(
+                IdeActions.ACTION_COPY,
+                CopyGuardHandler(manager.getActionHandler(IdeActions.ACTION_COPY), isCut = false)
+            )
+            manager.setActionHandler(
+                IdeActions.ACTION_CUT,
+                CopyGuardHandler(manager.getActionHandler(IdeActions.ACTION_CUT), isCut = true)
+            )
+            EditorFactory.getInstance() // warm up editor subsystem
         }
     }
 }

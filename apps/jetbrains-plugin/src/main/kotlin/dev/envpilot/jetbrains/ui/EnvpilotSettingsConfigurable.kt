@@ -45,6 +45,24 @@ class EnvpilotSettingsConfigurable : BoundConfigurable("Envpilot") {
                     .comment("File variables are written to inside linked directories")
             }
         }
+        group("Editor & security") {
+            row {
+                checkBox("Cloak managed values in editors")
+                    .bindSelected(state::cloakValues)
+            }
+            row {
+                checkBox("Autocomplete env keys in .env files")
+                    .bindSelected(state::autocompleteEnabled)
+            }
+            row {
+                checkBox("Commit guard (block commits of managed env files)")
+                    .bindSelected(state::commitGuardEnabled)
+            }
+            row {
+                checkBox("Auto-install commit-guard git hook when linking")
+                    .bindSelected(state::commitGuardAutoInstall)
+            }
+        }
         group("Version") {
             row {
                 label(

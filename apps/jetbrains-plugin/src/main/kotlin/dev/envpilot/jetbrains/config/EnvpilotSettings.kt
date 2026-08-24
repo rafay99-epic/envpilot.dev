@@ -13,6 +13,10 @@ class EnvpilotSettings : PersistentStateComponent<EnvpilotSettings.State> {
         var autoSync: Boolean = true
         var syncIntervalSeconds: Int = 300
         var targetFile: String = ".env.local"
+        var cloakValues: Boolean = true
+        var autocompleteEnabled: Boolean = true
+        var commitGuardEnabled: Boolean = false
+        var commitGuardAutoInstall: Boolean = false
     }
 
     private var state = State()

@@ -121,6 +121,7 @@ class AuthService {
                 } else {
                     // Transient — keep creds, caller retries later.
                     log.warn("Transient session refresh failure: ${e.message}")
+                    dev.envpilot.jetbrains.telemetry.EnvSentry.capture(e, mapOf("surface" to "token-refresh"))
                     null
                 }
             }

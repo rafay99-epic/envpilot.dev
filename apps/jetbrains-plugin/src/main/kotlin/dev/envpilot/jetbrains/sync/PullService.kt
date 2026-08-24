@@ -1,9 +1,12 @@
 package dev.envpilot.jetbrains.sync
 
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.project.Project
 import dev.envpilot.jetbrains.api.EnvpilotApi
 import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.config.EnvpilotSettings
+import dev.envpilot.jetbrains.editor.EnvCloak
+import dev.envpilot.jetbrains.editor.EnvEditorService
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermission
@@ -21,7 +24,7 @@ object PullService {
 
     class PullAborted(message: String) : Exception(message)
 
-    suspend fun pull(link: LinkedProject): Int {
+    suspend fun pull(link: LinkedProject, project: Project? = null): Int {
         val auth = AuthService.getInstance()
         if (auth.getSession() == null) throw PullAborted("Not signed in")
         val api = EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
@@ -47,11 +50,22 @@ object PullService {
         val targetFile = dir.resolve(
             EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" }
         )
-        val merged = EnvFiles.merge(
-            EnvFiles.readIfExists(targetFile),
-            result.variables.associate { it.key to it.value }
-        )
+        val values = result.variables.associate { it.key to it.value }
+        val merged = EnvFiles.merge(EnvFiles.readIfExists(targetFile), values)
         EnvFiles.atomicWrite(targetFile, merged)
+
+        if (project != null) {
+            try {
+                EnvEditorService.getInstance(project).recordSync(
+                    targetFile.toString(),
+                    values.keys,
+                    values,
+                    EnvCloak.hashOf(targetFile),
+                )
+            } catch (e: Exception) {
+                log.warn("Editor state update failed: ${e.message}")
+            }
+        }
 
         for ((meta, bytes) in downloaded) {
             val dest = resolveWithin(dir, meta.path)

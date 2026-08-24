@@ -14,6 +14,7 @@ version = providers.gradleProperty("pluginVersion").get()
 val workosClientId: String = System.getenv("WORKOS_CLIENT_ID") ?: ""
 val defaultServerUrl: String =
     System.getenv("ENVPILOT_SERVER_URL") ?: "https://www.envpilot.dev"
+val sentryDsn: String = System.getenv("SENTRY_JETBRAINS_DSN") ?: ""
 
 val generatedSrcDir = layout.buildDirectory.dir("generated/src/kotlin")
 
@@ -21,6 +22,7 @@ val generateBuildConfig by tasks.registering {
     val outFile = generatedSrcDir.get().file("dev/envpilot/jetbrains/BuildConfig.kt").asFile
     inputs.property("workosClientId", workosClientId)
     inputs.property("defaultServerUrl", defaultServerUrl)
+    inputs.property("sentryDsn", sentryDsn)
     outputs.file(outFile)
     doLast {
         outFile.parentFile.mkdirs()
@@ -31,6 +33,7 @@ val generateBuildConfig by tasks.registering {
             object BuildConfig {
                 val WORKOS_CLIENT_ID = "${workosClientId.replace("\"", "\\\"")}"
                 val DEFAULT_SERVER_URL = "${defaultServerUrl.replace("\"", "\\\"")}"
+                val SENTRY_DSN = "${sentryDsn.replace("\"", "\\\"")}"
             }
             """.trimIndent() + "\n"
         )
@@ -61,6 +64,7 @@ dependencies {
         intellijIdeaCommunity("2025.1")
     }
     implementation("com.google.code.gson:gson:2.11.0")
+    implementation("io.sentry:sentry:7.14.0")
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
 }

@@ -51,6 +51,17 @@
         <postStartupActivity
             implementation="dev.envpilot.jetbrains.StartupActivity"/>
 
+        <completion.contributor
+            language="TEXT"
+            implementationClass="dev.envpilot.jetbrains.editor.EnvCompletionContributor"/>
+
+        <codeInsight.lineMarkerProvider
+            language="TEXT"
+            implementationClass="dev.envpilot.jetbrains.editor.EnvLineMarkerProvider"/>
+
+        <bulkFileListener
+            implementation="dev.envpilot.jetbrains.guards.FileDriftListener"/>
+
         <toolWindow id="Envpilot"
                     anchor="right"
                     factoryClass="dev.envpilot.jetbrains.ui.EnvpilotToolWindowFactory"/>

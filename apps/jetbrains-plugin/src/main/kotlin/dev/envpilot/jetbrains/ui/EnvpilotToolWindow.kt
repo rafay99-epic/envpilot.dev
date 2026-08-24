@@ -18,6 +18,7 @@ import dev.envpilot.jetbrains.api.EnvpilotApi
 import dev.envpilot.jetbrains.config.EnvpilotSettings
 import dev.envpilot.jetbrains.model.Project as ApiProject
 import dev.envpilot.jetbrains.model.VALID_ENVIRONMENTS
+import dev.envpilot.jetbrains.editor.EnvEditorService
 import dev.envpilot.jetbrains.sync.LinkedProject
 import dev.envpilot.jetbrains.sync.LinkedProjectsService
 import dev.envpilot.jetbrains.sync.SyncScheduler
@@ -68,6 +69,8 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                 add(linkAction())
                 add(unlinkAction())
                 add(pullAction())
+                add(revealAction())
+                add(requestVariableAction())
             },
             true
         )
@@ -105,7 +108,54 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
 
     private fun pullAction() = object : AnAction("Pull Now", "Sync all linked directories in this project", null) {
         override fun actionPerformed(e: AnActionEvent) {
-            scope.launch { SyncScheduler.getInstance().runCycle(project) }
+            scope.launch {
+                SyncScheduler.getInstance().runCycle(project)
+                refreshOpenEnvEditors()
+            }
+        }
+    }
+
+    private fun revealAction() = object : AnAction(
+        "Reveal Values", "Show managed secret values in editors for 30 seconds", null
+    ) {
+        override fun actionPerformed(e: AnActionEvent) {
+            EnvEditorService.getInstance(project).revealFor(30)
+            refreshOpenEnvEditors()
+        }
+    }
+
+    private fun requestVariableAction() = object : AnAction(
+        "Request Variable…", "Submit a variable request for approval", null
+    ) {
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = AuthService.getInstance().email != null
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            val links = LinkedProjectsService.getInstance(project).all()
+            val projects = links.distinctBy { it.projectId }
+                .map { it.projectId to it.projectName }
+            if (projects.isEmpty()) {
+                com.intellij.notification.NotificationGroupManager.getInstance()
+                    .getNotificationGroup("dev.envpilot.notifications")
+                    .createNotification(
+                        "Link a project directory first, then request variables for it.",
+                        com.intellij.notification.NotificationType.WARNING
+                    )
+                    .notify(project)
+                return
+            }
+            RequestVariableDialog(project, projects).show()
+        }
+    }
+
+    private fun refreshOpenEnvEditors() {
+        ApplicationManager.getApplication().invokeLater {
+            val editor = com.intellij.openapi.fileEditor.FileEditorManager
+                .getInstance(project).selectedTextEditor ?: return@invokeLater
+            if (editor.virtualFile?.name?.startsWith(".env") == true) {
+                dev.envpilot.jetbrains.editor.EnvCloak.refresh(editor, project)
+            }
         }
     }
 
@@ -211,6 +261,24 @@ class LinkDirectoryDialog(
                     com.intellij.notification.NotificationType.WARNING
                 )
                 .notify(project)
+            super.doOKAction()
+            return
+        }
+        val settings = EnvpilotSettings.getInstance().state
+        if (settings.commitGuardAutoInstall) {
+            val installed = dev.envpilot.jetbrains.guards.CommitGuard.install(
+                dir,
+                settings.targetFile.ifBlank { ".env.local" }
+            )
+            if (!installed) {
+                com.intellij.notification.NotificationGroupManager.getInstance()
+                    .getNotificationGroup("dev.envpilot.notifications")
+                    .createNotification(
+                        "Linked, but no git repository found — commit guard not installed.",
+                        com.intellij.notification.NotificationType.WARNING
+                    )
+                    .notify(project)
+            }
         }
         super.doOKAction()
     }
