@@ -72,7 +72,7 @@ class EnvpilotWidget : StatusBarWidget, StatusBarWidget.TextPresentation {
                 },
             )
         ApplicationManager.getApplication().executeOnPooledThread {
-            AuthService.getInstance() // triggers service init + state load
+            AuthService.getInstance()
             ApplicationManager.getApplication().invokeLater {
                 statusBar.updateWidget(ID)
             }

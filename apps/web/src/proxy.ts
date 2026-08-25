@@ -52,12 +52,6 @@ export default authkitMiddleware({
       // wrapper, never a WorkOS session cookie. No sub-path variants: the
       // route only lives at this exact path (SSE is disabled).
       "/api/mcp",
-      // IDE clients (JetBrains plugin) authenticate with a Bearer WorkOS
-      // device-flow token, not a browser session cookie. Each /api/ide/*
-      // route resolves that token via ideAuth() and Convex verifies its
-      // signature — a WorkOS redirect here would hand the IDE an HTML page
-      // instead of JSON.
-      "/api/ide/(.*)",
       // The CLI now calls Convex directly for everything, including secret
       // VALUES (Stage 3): the last /api/cli/* vault routes were deleted, so no
       // CLI path needs an unauthenticated bypass anymore.

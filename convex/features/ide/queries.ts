@@ -8,7 +8,7 @@ import type { Id } from "../../_generated/dataModel";
  * Lightweight change signal for IDE real-time sync: the max updatedAt across
  * a project's active variables and files. Authenticated + membership-checked;
  * contains no secrets. Clients subscribe over the Convex WebSocket and pull
- * via the audited REST surface when this changes.
+ * via their normal data plane when this changes.
  */
 export const projectVersion = query({
   args: { projectId: v.id("projects") },
@@ -28,16 +28,18 @@ export const projectVersion = query({
     let latest = 0;
     for (const row of await ctx.db
       .query("environmentVariables")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+      )
       .collect()) {
-      if (row.deletedAt !== undefined) continue;
       latest = Math.max(latest, row.updatedAt);
     }
     for (const row of await ctx.db
       .query("projectFiles")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+      )
       .collect()) {
-      if (row.deletedAt !== undefined) continue;
       latest = Math.max(latest, row.updatedAt);
     }
     return latest;

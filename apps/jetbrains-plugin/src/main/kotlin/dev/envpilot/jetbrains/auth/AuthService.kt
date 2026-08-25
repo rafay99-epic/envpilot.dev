@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.util.messages.Topic
+import dev.envpilot.jetbrains.telemetry.EnvSentry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,9 +27,10 @@ data class Session(
 )
 
 /**
- * Application-level auth orchestration: sign-in flow, fresh-token access
- * with single-flight refresh and a CAS guard against sign-out/sign-in
- * races. Storage mechanics live in [TokenStore].
+ * Application-level auth orchestration: AuthKit browser login, fresh-token
+ * access with single-flight refresh and a CAS guard against sign-out/sign-in
+ * races. Storage mechanics live in [TokenStore]; the WorkOS flow itself in
+ * [AuthKitLogin].
  */
 @Service(Service.Level.APP)
 class AuthService {
@@ -84,7 +86,7 @@ class AuthService {
         return refreshMutex.withLock {
             val sessionForRefresh = getSession() ?: return@withLock null
             try {
-                val result = WorkosClient.refreshAccessToken(sessionForRefresh.refreshToken)
+                val result = AuthKitLogin.refresh(sessionForRefresh.refreshToken)
                 // CAS: only persist when the stored refresh token is still the one we used.
                 val stored = store.load()
                 if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
@@ -97,28 +99,36 @@ class AuthService {
                 store.save(updated)
                 cached.set(updated)
                 result.accessToken
-            } catch (e: WorkosClient.WorkosAuthError) {
-                if (e.code == WorkosClient.WorkosAuthError.ACCESS_DENIED) {
-                    val stored = store.load()
-                    if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
-                    log.warn("Session refresh rejected — signing out.")
-                    clearSession()
+            } catch (e: AuthKitLogin.LoginCancelled) {
+                val stored = store.load()
+                if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
+                if (e.transient) {
+                    log.warn("Transient session refresh failure: ${e.message}")
+                    EnvSentry.capture(e, mapOf("surface" to "token-refresh"))
                     null
                 } else {
-                    // Transient — keep creds, caller retries later.
-                    log.warn("Transient session refresh failure: ${e.message}")
-                    dev.envpilot.jetbrains.telemetry.EnvSentry.capture(e, mapOf("surface" to "token-refresh"))
+                    log.warn("Session refresh rejected — signing out.")
+                    clearSession()
+                    notifyChanged()
                     null
                 }
             }
         }
     }
 
-    /** Full device-flow login; runs on IO, notifies listeners when done. */
+    /** Full AuthKit browser login; runs on IO, notifies listeners when done. */
     fun startSignIn(onDone: (String?, Exception?) -> Unit) {
         scope.launch {
             try {
-                val session = runDeviceFlow()
+                val token = AuthKitLogin.signIn()
+                val session =
+                    Session(
+                        userId = token.user?.id ?: token.accessToken,
+                        email = token.user?.email ?: "unknown",
+                        accessToken = token.accessToken,
+                        refreshToken = token.refreshToken,
+                        sessionId = Jwt.sessionId(token.accessToken),
+                    )
                 store.save(session)
                 cached.set(session)
                 notifyChanged()
@@ -136,55 +146,6 @@ class AuthService {
         }
     }
 
-    // ── Device flow ──────────────────────────────────────────────────────────
-
-    private suspend fun runDeviceFlow(): Session {
-        val deviceCode = WorkosClient.requestDeviceCode()
-        com.intellij.ide.BrowserUtil.browse(deviceCode.verificationUriComplete)
-        showUserCodeDialog(deviceCode.userCode)
-
-        val deadline = System.currentTimeMillis() + deviceCode.expiresIn * 1000
-        var intervalMs = deviceCode.interval * 1000
-        while (System.currentTimeMillis() < deadline) {
-            when (val poll = WorkosClient.pollForToken(deviceCode.deviceCode)) {
-                is WorkosClient.PollResult.Complete -> {
-                    val user =
-                        poll.token.user
-                            ?: throw WorkosClient.WorkosAuthError(
-                                "WorkOS returned a token without user info.",
-                                WorkosClient.WorkosAuthError.INVALID_RESPONSE,
-                            )
-                    return Session(
-                        userId = user.id,
-                        email = user.email,
-                        accessToken = poll.token.accessToken,
-                        refreshToken = poll.token.refreshToken,
-                        sessionId = Jwt.sessionId(poll.token.accessToken),
-                    )
-                }
-                WorkosClient.PollResult.Pending,
-                WorkosClient.PollResult.NetworkError,
-                -> Unit
-                WorkosClient.PollResult.SlowDown -> intervalMs += 5000
-                WorkosClient.PollResult.Denied ->
-                    throw WorkosClient.WorkosAuthError(
-                        "Sign-in was denied in the browser.",
-                        WorkosClient.WorkosAuthError.ACCESS_DENIED,
-                    )
-                WorkosClient.PollResult.Expired ->
-                    throw WorkosClient.WorkosAuthError(
-                        "The sign-in code expired. Try again.",
-                        WorkosClient.WorkosAuthError.EXPIRED_TOKEN,
-                    )
-            }
-            kotlinx.coroutines.delay(intervalMs)
-        }
-        throw WorkosClient.WorkosAuthError(
-            "Sign-in timed out before approval.",
-            WorkosClient.WorkosAuthError.EXPIRED_TOKEN,
-        )
-    }
-
     private suspend fun clearSession() {
         cached.set(null)
         store.clear()
@@ -192,16 +153,5 @@ class AuthService {
 
     private fun notifyChanged() {
         ApplicationManager.getApplication().messageBus.syncPublisher(AUTH_TOPIC).authChanged()
-    }
-
-    private fun showUserCodeDialog(userCode: String) {
-        ApplicationManager.getApplication().invokeLater {
-            javax.swing.JOptionPane.showMessageDialog(
-                null,
-                "To sign in to Envpilot, enter this code in your browser:\n\n$userCode",
-                "Envpilot Sign In",
-                javax.swing.JOptionPane.INFORMATION_MESSAGE,
-            )
-        }
     }
 }

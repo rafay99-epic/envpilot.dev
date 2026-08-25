@@ -16,8 +16,7 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * Real-time sync: one Convex WebSocket for the IDE lifetime. Subscribes to a
  * lightweight version query per linked project; any server-side change fires
- * a sync cycle. Falls back to interval polling automatically — the socket is
- * a doorbell, decrypted pulls stay on the audited REST path.
+ * a sync cycle. Falls back to interval polling when the socket is down.
  */
 @Service(Service.Level.APP)
 class ConvexSyncService {
@@ -31,30 +30,43 @@ class ConvexSyncService {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val socket = AtomicReference<ConvexSocket?>(null)
 
-    // queryId → IDE project directory hash is resolved via args; we keep the
-    // projectId per query so transitions map back to the right project.
+    // queryId → projectId, so transitions map back to the right project.
     private val projectByQueryId = AtomicReference<Map<Int, String>>(emptyMap())
 
+    // projectId → queryId; makes watch idempotent across reconnects.
+    private val queryIdByProject = AtomicReference<Map<String, Int>>(emptyMap())
+
+    // Projects requested before the socket connected — flushed on connect.
+    private val pendingProjects = AtomicReference<Set<String>>(emptySet())
+
+    @Synchronized
     fun ensureStarted() {
         if (!EnvpilotSettings.getInstance().state.realTimeSync) return
         if (socket.get() != null) return
         scope.launch { start() }
     }
 
+    fun socketOrNull(): ConvexSocket? = socket.get()
+
     fun stop() {
         socket.getAndSet(null)?.stop()
         SyncState.realtimeConnected = false
     }
 
-    /** (Re)subscribe a project to change notifications. */
+    /** Idempotent: one version query per Envpilot project, buffered until connected. */
     fun watchProject(projectId: String) {
-        val s = socket.get() ?: return
+        if (queryIdByProject.get().containsKey(projectId)) return
+        val s =
+            socket.get() ?: run {
+                pendingProjects.updateAndGet { it + projectId }
+                return
+            }
         val queryId = s.subscribe(VERSION_QUERY, mapOf("projectId" to projectId))
         projectByQueryId.updateAndGet { it + (queryId to projectId) }
+        queryIdByProject.updateAndGet { it + (projectId to queryId) }
     }
 
     private suspend fun start() {
-        val auth = AuthService.getInstance()
         val deploymentUrl =
             EnvpilotSettings.getInstance().state.convexUrl.ifBlank {
                 dev.envpilot.jetbrains.BuildConfig.CONVEX_URL
@@ -63,7 +75,7 @@ class ConvexSyncService {
             log.warn("Real-time sync disabled: no Convex URL configured")
             return
         }
-        val socket = ConvexSocket(deploymentUrl, { auth.getFreshToken(false) }, listener())
+        val socket = ConvexSocket(deploymentUrl, { AuthService.getInstance().getFreshToken(false) }, listener())
         this.socket.set(socket)
         socket.start()
     }
@@ -73,9 +85,7 @@ class ConvexSyncService {
             override fun onQueryUpdated(queryId: Int) {
                 val projectId = projectByQueryId.get()[queryId] ?: return
                 scope.launch {
-                    for (project in ApplicationManager.getApplication().let {
-                        com.intellij.openapi.project.ProjectManager.getInstance().openProjects
-                    }) {
+                    for (project in com.intellij.openapi.project.ProjectManager.getInstance().openProjects) {
                         val links =
                             dev.envpilot.jetbrains.sync.LinkedProjectsService
                                 .getInstance(project).all()
@@ -101,10 +111,10 @@ class ConvexSyncService {
             }
 
             override fun onConnected() {
+                // The socket replays its own subscription set on reconnect.
                 SyncState.realtimeConnected = true
                 SyncState.notifyChanged()
-                // Re-subscribe everything on (re)connect.
-                for (projectId in projectByQueryId.get().values.toSet()) {
+                for (projectId in pendingProjects.getAndSet(emptySet())) {
                     watchProject(projectId)
                 }
             }

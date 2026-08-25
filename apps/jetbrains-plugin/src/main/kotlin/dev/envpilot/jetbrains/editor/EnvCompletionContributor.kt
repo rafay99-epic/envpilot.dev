@@ -11,9 +11,8 @@ import com.intellij.patterns.PlatformPatterns
 import com.intellij.patterns.StandardPatterns
 import com.intellij.psi.PsiPlainTextFile
 import com.intellij.util.ProcessingContext
-import dev.envpilot.jetbrains.api.EnvpilotApi
 import dev.envpilot.jetbrains.auth.AuthService
-import dev.envpilot.jetbrains.config.EnvpilotSettings
+import dev.envpilot.jetbrains.convex.ConvexApi
 import dev.envpilot.jetbrains.sync.LinkedProjectsService
 import dev.envpilot.jetbrains.telemetry.EnvSentry
 import kotlinx.coroutines.runBlocking
@@ -69,15 +68,15 @@ class EnvCompletionContributor : CompletionContributor() {
             // async); failures degrade to cached keys only.
             return try {
                 runBlocking {
-                    val auth = AuthService.getInstance()
-                    if (auth.getSession() == null) return@runBlocking cached.ifEmpty { null }
-                    val api =
-                        EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
-                            auth.getFreshToken(force)
-                        }
+                    if (AuthService.getInstance().getSession() == null) return@runBlocking cached.ifEmpty { null }
                     for (link in links) {
                         if (service.cachedKeys(link.projectId) != null) continue
-                        val meta = api.pullValues(link.projectId, link.environment.takeIf { it.isNotBlank() }, metadataOnly = true)
+                        val meta =
+                            ConvexApi.pullValues(
+                                link.projectId,
+                                link.environment.takeIf { it.isNotBlank() },
+                                metadataOnly = true,
+                            )
                         val keys = meta.variables.map { it.key }.toSet()
                         service.cacheKeys(link.projectId, keys)
                         cached.addAll(keys)

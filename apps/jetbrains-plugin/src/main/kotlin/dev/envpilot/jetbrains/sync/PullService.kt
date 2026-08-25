@@ -2,9 +2,9 @@ package dev.envpilot.jetbrains.sync
 
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
-import dev.envpilot.jetbrains.api.EnvpilotApi
 import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.config.EnvpilotSettings
+import dev.envpilot.jetbrains.convex.ConvexApi
 import dev.envpilot.jetbrains.editor.EnvCloak
 import dev.envpilot.jetbrains.editor.EnvEditorService
 import java.nio.file.Files
@@ -27,15 +27,10 @@ object PullService {
         link: LinkedProject,
         project: Project? = null,
     ): Int {
-        val auth = AuthService.getInstance()
-        if (auth.getSession() == null) throw PullAborted("Not signed in")
-        val api =
-            EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
-                auth.getFreshToken(force)
-            }
+        if (AuthService.getInstance().getSession() == null) throw PullAborted("Not signed in")
         val environment = link.environment.takeIf { it.isNotBlank() }
 
-        val result = api.pullValues(link.projectId, environment, metadataOnly = false)
+        val result = ConvexApi.pullValues(link.projectId, environment, metadataOnly = false)
         val failed =
             result.meta.decryptionFailures.orEmpty() +
                 result.variables.filter { it.value == "[DECRYPTION_FAILED]" }.map { it.key }
@@ -44,10 +39,10 @@ object PullService {
         }
 
         // Fetch everything first so a failure mid-pull writes nothing.
-        val fileMetas = api.listFiles(link.projectId, environment)
+        val fileMetas = ConvexApi.listFiles(link.projectId, environment)
         val downloaded =
             fileMetas.map { meta ->
-                val (m, bytes) = api.fileContent(meta.id)
+                val (m, bytes) = ConvexApi.fileContent(meta.id)
                 m to bytes
             }
 

@@ -116,24 +116,24 @@ class ConvexWireTest {
     }
 
     @Test
-    fun `query result number reads plain and int64-wrapped values`() {
+    fun `query result number reads plain and integer-encoded values`() {
         val plain =
             """
             {"type":"Transition","modifications":[
               {"type":"QueryUpdated","queryId":3,"value":1724592000000}
             ]}
             """.trimIndent()
-        assertEquals(1724592000000L, ConvexWire.queryResultNumber(plain, 3))
+        assertEquals("1724592000000", ConvexWire.queryValueFromTransition(plain, 3))
         // int64 encoding: base64 little-endian bytes of 1000
         val wrapped =
             """
             {"type":"Transition","modifications":[
               {"type":"QueryUpdated","queryId":3,
-               "value":{"${'$'}encoding":"int64","bytes":"AP8AAAAAAAA="}}
+               "value":{"${'$'}integer":"AP8AAAAAAAA="}}
             ]}
             """.trimIndent()
         // LE bytes [0,255,0,0,0,0,0,0] → 0xFF << 8 = 65280
-        assertEquals(65280L, ConvexWire.queryResultNumber(wrapped, 3))
-        assertNull(ConvexWire.queryResultNumber("""{"type":"Transition","modifications":[]}""", 3))
+        assertEquals("65280", ConvexWire.queryValueFromTransition(wrapped, 3))
+        assertNull(ConvexWire.queryValueFromTransition("""{"type":"Transition","modifications":[]}""", 3))
     }
 }

@@ -14,9 +14,9 @@ import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
-import dev.envpilot.jetbrains.api.EnvpilotApi
 import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.config.EnvpilotSettings
+import dev.envpilot.jetbrains.convex.ConvexApi
 import dev.envpilot.jetbrains.editor.EnvEditorService
 import dev.envpilot.jetbrains.model.VALID_ENVIRONMENTS
 import dev.envpilot.jetbrains.sync.LinkedProject
@@ -232,39 +232,33 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     }
 
     private suspend fun fetchRows(): List<Pair<String, Any>> {
-        val auth = AuthService.getInstance()
-        if (auth.getSession() == null) {
+        if (AuthService.getInstance().getSession() == null) {
             return listOf(
                 "Not signed in — use Tools ▸ Envpilot ▸ Sign In" to Any(),
             )
         }
-        val api =
-            EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
-                auth.getFreshToken(force)
-            }
         val editorService = EnvEditorService.getInstance(project)
         val linksByProject = LinkedProjectsService.getInstance(project).all().groupBy { it.projectId }
         val rows = mutableListOf<Pair<String, Any>>()
-        for (org in api.orgs()) {
+        for (org in ConvexApi.orgs()) {
             rows.add("Org: ${org.name} (${org.slug})" to org)
             // One flaky org must not blank out the whole tree.
             val projects =
                 try {
-                    api.projects(org.id)
+                    ConvexApi.projects(org.id)
                 } catch (e: Exception) {
                     rows.add("      Load failed: ${e.message ?: e::class.simpleName} — hit Refresh" to org)
                     continue
                 }
             for (proj in projects) {
                 rows.add("  Project: ${proj.name} (${proj.variableCount} vars)" to proj)
-                rows.addAll(rowsForLink(api, editorService, linksByProject[proj.id].orEmpty()))
+                rows.addAll(rowsForLink(editorService, linksByProject[proj.id].orEmpty()))
             }
         }
         return rows
     }
 
     private suspend fun rowsForLink(
-        api: EnvpilotApi,
         editorService: EnvEditorService,
         links: List<LinkedProject>,
     ): List<Pair<String, Any>> {
@@ -277,14 +271,13 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                     EnvEditorService.LinkStatus.NOT_PULLED -> "NOT PULLED"
                 }
             rows.add("      ${link.environment} → ${link.directoryPath}  [$status]" to link)
-            rows.addAll(secretFileRows(api, editorService, link))
-            rows.addAll(variableKeyRows(api, editorService, link))
+            rows.addAll(secretFileRows(editorService, link))
+            rows.addAll(variableKeyRows(editorService, link))
         }
         return rows
     }
 
     private suspend fun secretFileRows(
-        api: EnvpilotApi,
         editorService: EnvEditorService,
         link: LinkedProject,
     ): List<Pair<String, Any>> {
@@ -292,7 +285,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         val metas =
             editorService.cachedFiles(fileKey) ?: run {
                 try {
-                    api.listFiles(link.projectId, link.environment.takeIf { it.isNotBlank() })
+                    ConvexApi.listFiles(link.projectId, link.environment.takeIf { it.isNotBlank() })
                         .also { editorService.cacheFiles(fileKey, it) }
                 } catch (_: Exception) {
                     null
@@ -309,14 +302,13 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     }
 
     private suspend fun variableKeyRows(
-        api: EnvpilotApi,
         editorService: EnvEditorService,
         link: LinkedProject,
     ): List<Pair<String, Any>> {
         val keys =
             editorService.cachedKeys(link.projectId) ?: run {
                 try {
-                    api.pullValues(link.projectId, link.environment.takeIf { it.isNotBlank() }, metadataOnly = true)
+                    ConvexApi.pullValues(link.projectId, link.environment.takeIf { it.isNotBlank() }, metadataOnly = true)
                         .variables.map { it.key }.toSet()
                         .also { editorService.cacheKeys(link.projectId, it) }
                 } catch (_: Exception) {
@@ -497,8 +489,7 @@ class LinkDirectoryDialog(
             return
         }
         dev.envpilot.jetbrains.convex.ConvexSyncService.getInstance().watchProject(selected.id)
-        // Pull immediately so the user sees the env file land — no hidden
-        // "now go click Pull Now" step.
+        // Pull immediately — linking should visibly land the env file.
         pullScope.launch {
             val ok = SyncScheduler.getInstance().runCycle(project)
             refreshOpenEnvEditors(project)

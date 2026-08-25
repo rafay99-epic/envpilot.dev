@@ -22,7 +22,7 @@ object ConvexWire {
         data object Other : ServerMessage
     }
 
-    data class QueryAdd(val queryId: Int, val udfPath: String, val args: Map<String, String>)
+    data class QueryAdd(val queryId: Int, val udfPath: String, val args: Map<String, Any?>)
 
     fun connectMessage(
         sessionId: String,
@@ -87,6 +87,37 @@ object ConvexWire {
         )
     }
 
+    fun actionMessage(
+        requestId: Int,
+        udfPath: String,
+        args: Map<String, Any?>,
+    ): String =
+        gson.toJson(
+            mapOf(
+                "type" to "Action",
+                "requestId" to requestId,
+                "udfPath" to udfPath,
+                "args" to listOf(args),
+            ),
+        )
+
+    data class ActionResponse(val requestId: Int, val success: Boolean, val result: String?, val error: String?)
+
+    /** Parse an ActionResponse; null for any other message type. */
+    fun parseActionResponse(text: String): ActionResponse? =
+        try {
+            val obj = JsonParser.parseString(text).asJsonObject
+            if (obj.str("type") != "ActionResponse") {
+                null
+            } else if (obj.get("success").asBoolean) {
+                ActionResponse(obj.get("requestId").asInt, true, obj.get("result")?.toString() ?: "null", null)
+            } else {
+                ActionResponse(obj.get("requestId").asInt, false, null, obj.str("result") ?: "action failed")
+            }
+        } catch (_: Exception) {
+            null
+        }
+
     fun parseServerMessage(text: String): ServerMessage =
         try {
             val obj = JsonParser.parseString(text).asJsonObject
@@ -101,17 +132,21 @@ object ConvexWire {
             ServerMessage.Other
         }
 
-    /** Extract the numeric result of a QueryUpdated modification (int64-wrapped or plain). */
-    fun queryResultNumber(
+    /**
+     * Raw JSON value of a QueryUpdated modification, or null when the
+     * transition has none for [queryId]. One-shot queries await this; live
+     * subscribers ignore it.
+     */
+    fun queryValueFromTransition(
         text: String,
         queryId: Int,
-    ): Long? =
+    ): String? =
         try {
             val obj = JsonParser.parseString(text).asJsonObject
             if (obj.str("type") != "Transition") {
                 null
             } else {
-                findQueryValue(obj, queryId)
+                findQueryValue(obj, queryId)?.toString()
             }
         } catch (_: Exception) {
             null
@@ -128,9 +163,20 @@ object ConvexWire {
             if (m.get("queryId").asInt != queryId) continue
             val value = m.get("value") ?: return null
             if (value.isJsonPrimitive) return value.asLong
-            val encoding = value.asJsonObject?.get("\$encoding")?.asString
-            if (encoding == "int64") {
-                return decodeU64Le(value.asJsonObject.get("bytes").asString)
+            if (!value.isJsonObject) return null
+            val encoded = value.asJsonObject
+            // Convex wire: {"$integer": base64-LE} for int64, {"$float": base64-LE double}.
+            encoded.get("\$integer")?.takeIf { it.isJsonPrimitive }?.let {
+                return decodeU64Le(it.asString)
+            }
+            encoded.get("\$float")?.takeIf { it.isJsonPrimitive }?.let {
+                val bytes = java.util.Base64.getDecoder().decode(it.asString)
+                return java.lang.Double.longBitsToDouble(
+                    java.nio.ByteBuffer
+                        .wrap(bytes)
+                        .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                        .long,
+                ).toLong()
             }
             return null
         }

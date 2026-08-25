@@ -7,9 +7,8 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
-import dev.envpilot.jetbrains.api.EnvpilotApi
 import dev.envpilot.jetbrains.auth.AuthService
-import dev.envpilot.jetbrains.config.EnvpilotSettings
+import dev.envpilot.jetbrains.convex.ConvexApi
 import dev.envpilot.jetbrains.model.VALID_ENVIRONMENTS
 import dev.envpilot.jetbrains.telemetry.EnvSentry
 import kotlinx.coroutines.CoroutineScope
@@ -93,12 +92,8 @@ class RequestVariableDialog(
 
         scope.launch {
             try {
-                val auth = AuthService.getInstance()
-                val api =
-                    EnvpilotApi(EnvpilotSettings.getInstance().effectiveServerUrl()) { force ->
-                        auth.getFreshToken(force)
-                    }
-                api.createVariableRequest(projectId, key, value, environments, sensitive, description)
+                check(AuthService.getInstance().getSession() != null) { "Not signed in" }
+                ConvexApi.createVariableRequest(projectId, key, value, environments, sensitive, description)
                 notify("Variable request for $key submitted — awaiting approval.", NotificationType.INFORMATION)
             } catch (e: Exception) {
                 EnvSentry.capture(e, mapOf("surface" to "request-variable"))
