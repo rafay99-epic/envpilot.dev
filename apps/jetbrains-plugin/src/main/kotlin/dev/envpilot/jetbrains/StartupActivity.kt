@@ -43,6 +43,8 @@ class StartupActivity : ProjectActivity {
         }
 
         SyncScheduler.getInstance().startFor(project)
+        dev.envpilot.jetbrains.convex.ConvexSyncService.getInstance().ensureStarted()
+        watchLinkedProjects(project)
 
         // Perceived real-time: pull the moment the user returns to the IDE.
         project.messageBus.connect().subscribe(
@@ -103,6 +105,15 @@ class StartupActivity : ProjectActivity {
         if (removed > 0) {
             com.intellij.openapi.diagnostic.logger<StartupActivity>()
                 .info("Auto-unsync on close: removed $removed managed file(s)")
+        }
+    }
+
+    private fun watchLinkedProjects(project: Project) {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            for (link in dev.envpilot.jetbrains.sync.LinkedProjectsService
+                .getInstance(project).all()) {
+                dev.envpilot.jetbrains.convex.ConvexSyncService.getInstance().watchProject(link.projectId)
+            }
         }
     }
 

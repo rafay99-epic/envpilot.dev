@@ -45,6 +45,18 @@ class EnvpilotSettingsConfigurable : BoundConfigurable("Envpilot") {
                         .comment("File variables are written to inside linked directories")
                 }
             }
+            group("Real-time") {
+                row {
+                    checkBox("Real-time sync (experimental)")
+                        .bindSelected(state::realTimeSync)
+                }.comment("Push updates over a Convex WebSocket; falls back to interval polling.")
+                row("Convex URL:") {
+                    textField()
+                        .bindText(state::convexUrl)
+                        .comment("Leave empty to use the build-baked default.")
+                        .align(com.intellij.ui.dsl.builder.AlignX.FILL)
+                }
+            }
             group("Editor & security") {
                 row("Pause sync when idle (minutes):") {
                     spinner(0..120, 5)

@@ -496,6 +496,7 @@ class LinkDirectoryDialog(
             super.doOKAction()
             return
         }
+        dev.envpilot.jetbrains.convex.ConvexSyncService.getInstance().watchProject(selected.id)
         // Pull immediately so the user sees the env file land — no hidden
         // "now go click Pull Now" step.
         pullScope.launch {

@@ -15,6 +15,7 @@ val workosClientId: String = System.getenv("WORKOS_CLIENT_ID") ?: ""
 val defaultServerUrl: String =
     System.getenv("ENVPILOT_SERVER_URL") ?: "https://www.envpilot.dev"
 val sentryDsn: String = System.getenv("SENTRY_JETBRAINS_DSN") ?: ""
+val convexUrl: String = System.getenv("NEXT_PUBLIC_CONVEX_URL") ?: ""
 
 val generatedSrcDir = layout.buildDirectory.dir("generated/src/kotlin")
 
@@ -23,6 +24,7 @@ val generateBuildConfig by tasks.registering {
     inputs.property("workosClientId", workosClientId)
     inputs.property("defaultServerUrl", defaultServerUrl)
     inputs.property("sentryDsn", sentryDsn)
+    inputs.property("convexUrl", convexUrl)
     outputs.file(outFile)
     doLast {
         outFile.parentFile.mkdirs()
@@ -34,6 +36,7 @@ val generateBuildConfig by tasks.registering {
                 val WORKOS_CLIENT_ID = "${workosClientId.replace("\"", "\\\"")}"
                 val DEFAULT_SERVER_URL = "${defaultServerUrl.replace("\"", "\\\"")}"
                 val SENTRY_DSN = "${sentryDsn.replace("\"", "\\\"")}"
+                val CONVEX_URL = "${convexUrl.replace("\"", "\\\"")}"
             }
             """.trimIndent() + "\n",
         )

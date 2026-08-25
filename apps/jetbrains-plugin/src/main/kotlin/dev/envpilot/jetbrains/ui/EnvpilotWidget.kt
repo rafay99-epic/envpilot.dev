@@ -97,6 +97,10 @@ class EnvpilotWidget : StatusBarWidget, StatusBarWidget.TextPresentation {
             else ->
                 buildString {
                     append("Envpilot — click for sign-in options")
+                    append(
+                        "\nReal-time: " +
+                            if (SyncState.realtimeConnected) "connected" else "off (interval polling)",
+                    )
                     SyncState.lastError?.let { append("\nLast sync error: $it") }
                 }
         }

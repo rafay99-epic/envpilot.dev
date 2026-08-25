@@ -4,7 +4,6 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
-import com.intellij.util.messages.Topic
 import dev.envpilot.jetbrains.config.EnvpilotSettings
 import dev.envpilot.jetbrains.telemetry.EnvSentry
 import kotlinx.coroutines.CoroutineScope
@@ -15,45 +14,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
-
-interface SyncStateListener {
-    fun syncStateChanged()
-}
-
-/** App-wide observable sync status consumed by the status bar widget. */
-object SyncState {
-    @Volatile var syncing: Boolean = false
-        private set
-
-    @Volatile var lastError: String? = null
-        private set
-
-    @Volatile var lastSyncAtMs: Long = 0
-        private set
-
-    fun markStart() {
-        syncing = true
-    }
-
-    fun markSuccess() {
-        syncing = false
-        lastError = null
-        lastSyncAtMs = System.currentTimeMillis()
-    }
-
-    fun markFailure(message: String) {
-        syncing = false
-        lastError = message
-    }
-
-    fun notifyChanged() {
-        ApplicationManager.getApplication().messageBus
-            .syncPublisher(SYNC_TOPIC).syncStateChanged()
-    }
-
-    val SYNC_TOPIC: Topic<SyncStateListener> =
-        Topic.create("EnvpilotSyncStateChanged", SyncStateListener::class.java)
-}
 
 @Service(Service.Level.APP)
 class SyncScheduler {
