@@ -4,7 +4,6 @@ import com.intellij.ide.BrowserUtil
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import dev.envpilot.jetbrains.BuildConfig
-import dev.envpilot.jetbrains.telemetry.EnvSentry
 import java.net.InetSocketAddress
 import java.net.URI
 import java.net.URLEncoder
@@ -69,10 +68,10 @@ object AuthKitLogin {
         } catch (e: java.util.concurrent.ExecutionException) {
             // The callback future wraps its own LoginCancelled — rethrow as-is.
             (e.cause as? LoginCancelled)?.let { throw it }
-            EnvSentry.capture(e, mapOf("surface" to "authkit-login"))
+            dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "authkit-login"))
             throw LoginCancelled("Sign-in failed: ${e.cause?.message ?: e.message}")
         } catch (e: Exception) {
-            EnvSentry.capture(e, mapOf("surface" to "authkit-login"))
+            dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "authkit-login"))
             throw LoginCancelled("Sign-in failed: ${e.message ?: e::class.simpleName}")
         } finally {
             server.stop(0)

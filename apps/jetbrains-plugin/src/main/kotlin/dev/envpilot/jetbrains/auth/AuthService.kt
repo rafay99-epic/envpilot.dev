@@ -4,7 +4,6 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.util.messages.Topic
-import dev.envpilot.jetbrains.telemetry.EnvSentry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -104,7 +103,7 @@ class AuthService {
                 if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
                 if (e.transient) {
                     log.warn("Transient session refresh failure: ${e.message}")
-                    EnvSentry.capture(e, mapOf("surface" to "token-refresh"))
+                    dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "token-refresh"))
                     null
                 } else {
                     log.warn("Session refresh rejected — signing out.")

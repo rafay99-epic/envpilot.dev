@@ -67,7 +67,7 @@ dependencies {
         intellijIdeaCommunity("2025.1")
     }
     implementation("com.google.code.gson:gson:2.11.0")
-    implementation("io.sentry:sentry:7.14.0")
+    implementation("io.sentry:sentry:8.53.0")
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
 }

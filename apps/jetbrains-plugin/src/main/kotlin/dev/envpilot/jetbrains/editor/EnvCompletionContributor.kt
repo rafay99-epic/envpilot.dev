@@ -14,7 +14,6 @@ import com.intellij.util.ProcessingContext
 import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.convex.ConvexApi
 import dev.envpilot.jetbrains.sync.LinkedProjectsService
-import dev.envpilot.jetbrains.telemetry.EnvSentry
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -84,7 +83,7 @@ class EnvCompletionContributor : CompletionContributor() {
                     cached.ifEmpty { null }
                 }
             } catch (e: Exception) {
-                EnvSentry.capture(e, mapOf("surface" to "completion"))
+                dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "completion"))
                 cached.ifEmpty { null }
             }
         }

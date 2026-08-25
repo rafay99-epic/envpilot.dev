@@ -77,7 +77,7 @@ object VersionCheck {
             }
         } catch (e: Exception) {
             log.warn("Version manifest refresh failed: ${e.message}")
-            dev.envpilot.jetbrains.telemetry.EnvSentry.capture(e, mapOf("surface" to "version-check"))
+            dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "version-check"))
         }
         return true
     }

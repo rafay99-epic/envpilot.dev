@@ -13,7 +13,6 @@ import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.editor.EnvCloak
 import dev.envpilot.jetbrains.guards.CopyGuardHandler
 import dev.envpilot.jetbrains.sync.SyncScheduler
-import dev.envpilot.jetbrains.telemetry.EnvSentry
 import dev.envpilot.jetbrains.version.VersionCheck
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +21,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Per project open: initialize auth + telemetry, run the version check, start
+ * Per project open: initialize auth + error reporting, run the version check, start
  * auto-sync, register the copy guard and cloak-on-open listeners. Everything
  * is cancelled/disposed when the project closes.
  */
@@ -33,7 +32,7 @@ class StartupActivity : ProjectActivity {
     }
 
     override suspend fun execute(project: Project) {
-        EnvSentry.init()
+        dev.envpilot.jetbrains.errors.Errors.init()
         AuthService.getInstance().initialize()
 
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
@@ -200,7 +199,7 @@ class StartupActivity : ProjectActivity {
                         as com.intellij.openapi.editor.actionSystem.EditorAction
                 cutAction.setupHandler(CopyGuardHandler(cutAction.handler, isCut = true))
             } catch (e: Exception) {
-                dev.envpilot.jetbrains.telemetry.EnvSentry.capture(e, mapOf("surface" to "copy-guard"))
+                dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "copy-guard"))
                 com.intellij.openapi.diagnostic.logger<StartupActivity>()
                     .warn("Copy guard registration failed: ${e.message}")
             }

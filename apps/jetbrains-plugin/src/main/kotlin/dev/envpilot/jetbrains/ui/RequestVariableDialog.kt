@@ -10,7 +10,6 @@ import com.intellij.ui.dsl.builder.panel
 import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.convex.ConvexApi
 import dev.envpilot.jetbrains.model.VALID_ENVIRONMENTS
-import dev.envpilot.jetbrains.telemetry.EnvSentry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -96,8 +95,8 @@ class RequestVariableDialog(
                 ConvexApi.createVariableRequest(projectId, key, value, environments, sensitive, description)
                 notify("Variable request for $key submitted — awaiting approval.", NotificationType.INFORMATION)
             } catch (e: Exception) {
-                EnvSentry.capture(e, mapOf("surface" to "request-variable"))
-                notify("Request failed: ${e.message ?: e::class.simpleName}", NotificationType.ERROR)
+                dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "request-variable"))
+                notify("Request failed: ${dev.envpilot.jetbrains.errors.Errors.friendly(e)}", NotificationType.ERROR)
             }
         }
         super.doOKAction()

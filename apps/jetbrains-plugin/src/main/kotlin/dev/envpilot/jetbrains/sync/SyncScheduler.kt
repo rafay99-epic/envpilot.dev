@@ -5,7 +5,6 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import dev.envpilot.jetbrains.config.EnvpilotSettings
-import dev.envpilot.jetbrains.telemetry.EnvSentry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -64,8 +63,8 @@ class SyncScheduler {
                 PullService.pull(link, project)
             } catch (e: Exception) {
                 log.warn("Pull failed for ${link.projectName}/${link.environment}: ${e.message}")
-                EnvSentry.capture(e, mapOf("surface" to "sync", "project" to link.projectName))
-                SyncState.markFailure("${link.projectName}: ${e.message ?: e::class.simpleName}")
+                dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "sync", "project" to link.projectName))
+                SyncState.markFailure("${link.projectName}: ${dev.envpilot.jetbrains.errors.Errors.friendly(e)}")
                 allOk = false
                 break
             }

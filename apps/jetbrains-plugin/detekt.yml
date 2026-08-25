@@ -18,7 +18,7 @@ exceptions:
     active: false
 naming:
   FunctionNaming:
-    ignoreAnnotated: ['Test']
+    ignoreAnnotated: ["Test"]
 style:
   MagicNumber:
     active: false
@@ -31,4 +31,4 @@ style:
   LoopWithTooManyJumpStatements:
     active: false
   UnusedPrivateMember:
-    ignoreAnnotated: ['Test']
+    ignoreAnnotated: ["Test"]

@@ -6,7 +6,6 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.util.Disposer
@@ -48,18 +47,24 @@ class EnvpilotToolWindowFactory : ToolWindowFactory {
 }
 
 class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
-    companion object {
-        private val log = logger<EnvpilotToolWindowPanel>()
-    }
-
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val listModel = DefaultListModel<String>()
     private val items = mutableListOf<Any>()
     private lateinit var list: JBList<String>
+    private val errorBanner =
+        javax.swing.JPanel(java.awt.BorderLayout()).apply { isVisible = false }
+    private val errorLabel =
+        javax.swing.JLabel("", com.intellij.icons.AllIcons.General.BalloonWarning, javax.swing.JLabel.LEFT)
 
     init {
         layout = java.awt.BorderLayout()
         list = JBList(listModel)
+        list.emptyText.text = "Loading your organizations…"
+        list.emptyText.appendSecondaryText(
+            "Use Tools ▸ Envpilot ▸ Sign In if you're not signed in yet.",
+            com.intellij.ui.SimpleTextAttributes.GRAYED_ATTRIBUTES,
+            null,
+        )
         list.cellRenderer =
             com.intellij.ui.SimpleListCellRenderer.create { label, value, index ->
                 label.text = value
@@ -72,6 +77,23 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                     }
             }
         add(JBScrollPane(list), java.awt.BorderLayout.CENTER)
+
+        errorBanner.background = javax.swing.UIManager.getColor("Panel.background")
+        errorBanner.border =
+            javax.swing.border.CompoundBorder(
+                javax.swing.border.MatteBorder(0, 0, 1, 0, javax.swing.UIManager.getColor("Component.borderColor")),
+                javax.swing.border.EmptyBorder(8, 12, 8, 12),
+            )
+        val retry = javax.swing.JButton("Retry")
+        retry.isFocusable = false
+        retry.margin = java.awt.Insets(2, 10, 2, 10)
+        retry.addActionListener {
+            hideError()
+            reload()
+        }
+        errorBanner.add(errorLabel, java.awt.BorderLayout.CENTER)
+        errorBanner.add(retry, java.awt.BorderLayout.EAST)
+        add(errorBanner, java.awt.BorderLayout.SOUTH)
 
         Disposer.register(project) { scope.cancel() }
         reload()
@@ -210,25 +232,55 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         }
 
     /** Fetch on IO, mutate the Swing model on the EDT. */
+    private val reloadGeneration = java.util.concurrent.atomic.AtomicLong(0)
+
     private fun reload() {
+        val generation = reloadGeneration.incrementAndGet()
         scope.launch {
-            val rows: List<Pair<String, Any>> =
-                try {
-                    fetchRows()
-                } catch (e: Exception) {
-                    log.warn("Reload failed", e)
-                    val msg =
-                        e.message?.takeIf { it.isNotBlank() }
-                            ?: e::class.simpleName ?: "unknown error"
-                    listOf("Error: $msg" to Any())
-                }
+            var rows: List<Pair<String, Any>>? = null
+            var failure: String? = null
+            try {
+                rows = fetchRows()
+            } catch (e: Exception) {
+                dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "tool-window"))
+                failure = dev.envpilot.jetbrains.errors.Errors.friendly(e)
+            }
             ApplicationManager.getApplication().invokeLater {
+                // A newer reload supersedes this one.
+                if (generation != reloadGeneration.get()) return@invokeLater
+                if (failure != null) {
+                    showError(failure)
+                    return@invokeLater
+                }
+                hideError()
                 items.clear()
-                items.addAll(rows.map { it.second })
+                items.addAll(rows!!.map { it.second })
                 listModel.clear()
                 rows.forEach { listModel.addElement(it.first) }
+                list.emptyText.clear()
+                if (rows.isEmpty()) {
+                    list.emptyText.text = "No organizations to show yet."
+                    list.emptyText.appendSecondaryText(
+                        "Create one at envpilot.dev, then hit Refresh.",
+                        com.intellij.ui.SimpleTextAttributes.GRAYED_ATTRIBUTES,
+                        null,
+                    )
+                }
             }
         }
+    }
+
+    private fun showError(message: String) {
+        errorLabel.text = message
+        errorBanner.isVisible = true
+        items.clear()
+        listModel.clear()
+        list.emptyText.clear()
+        list.emptyText.text = "Couldn't load your Envpilot data."
+    }
+
+    private fun hideError() {
+        errorBanner.isVisible = false
     }
 
     private suspend fun fetchRows(): List<Pair<String, Any>> {
@@ -247,7 +299,9 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                 try {
                     ConvexApi.projects(org.id)
                 } catch (e: Exception) {
-                    rows.add("      Load failed: ${e.message ?: e::class.simpleName} — hit Refresh" to org)
+                    rows.add(
+                        "      ⚠ ${dev.envpilot.jetbrains.errors.Errors.friendly(e)} (hit Refresh)" to org,
+                    )
                     continue
                 }
             for (proj in projects) {
