@@ -46,16 +46,12 @@ class EnvpilotSettingsConfigurable : BoundConfigurable("Envpilot") {
                 }
             }
             group("Real-time") {
-                row {
-                    checkBox("Real-time sync (experimental)")
-                        .bindSelected(state::realTimeSync)
-                }.comment("Push updates over a Convex WebSocket; falls back to interval polling.")
                 row("Convex URL:") {
                     textField()
                         .bindText(state::convexUrl)
                         .comment("Leave empty to use the build-baked default.")
                         .align(com.intellij.ui.dsl.builder.AlignX.FILL)
-                }
+                }.comment("Realtime updates use the same connection as pulls and fall back to interval polling.")
             }
             group("Editor & security") {
                 row("Pause sync when idle (minutes):") {

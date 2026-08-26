@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpServer
 import dev.envpilot.jetbrains.BuildConfig
 import java.net.InetSocketAddress
 import java.net.URI
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -182,7 +183,7 @@ object AuthKitLogin {
             ?.split("&")
             ?.mapNotNull { part ->
                 val idx = part.indexOf('=')
-                if (idx <= 0) null else part.substring(0, idx) to part.substring(idx + 1)
+                if (idx <= 0) null else dec(part.substring(0, idx)) to dec(part.substring(idx + 1))
             }
             ?.firstOrNull { it.first == key }
             ?.second
@@ -196,27 +197,44 @@ object AuthKitLogin {
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build()
-        val response = http.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() >= 400) {
+        repeat(3) { attempt ->
+            val response =
+                try {
+                    http.send(request, HttpResponse.BodyHandlers.ofString())
+                } catch (e: java.io.IOException) {
+                    if (attempt < 2) {
+                        Thread.sleep(250L shl attempt)
+                        return@repeat
+                    }
+                    throw LoginCancelled("WorkOS is temporarily unreachable.", transient = true)
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw LoginCancelled("Sign-in was interrupted.", transient = true)
+                }
+            if (response.statusCode() < 400) {
+                return gson().fromJson(response.body(), JsonObjectResponse::class.java)
+                    ?: throw LoginCancelled("Empty response from WorkOS")
+            }
             val message =
                 runCatching {
                     gson().fromJson(response.body(), JsonObjectResponse::class.java)
                 }.getOrNull()
-            // 5xx / 429 are transient — callers keep credentials and retry.
-            val transient = response.statusCode() >= 500 || response.statusCode() == 429
+            val transient = isTransientFailure(response.statusCode(), message?.error)
+            if (transient && attempt < 2) {
+                Thread.sleep(250L shl attempt)
+                return@repeat
+            }
             throw LoginCancelled(
-                "WorkOS rejected the request: ${message?.errorDescription ?: response.statusCode()}",
+                "WorkOS rejected the request: ${message?.errorDescription ?: message?.error ?: response.statusCode()}",
                 transient,
             )
         }
-        return gson().fromJson(response.body(), JsonObjectResponse::class.java)
-            ?: throw LoginCancelled("Empty response from WorkOS")
+        throw LoginCancelled("WorkOS is temporarily unreachable.", transient = true)
     }
 
     class TokenResponse(
         val accessToken: String,
-        /** WorkOS refresh grants may omit this — callers keep their old token. */
-        val refreshToken: String,
+        val refreshToken: String?,
         val user: WorkosUser?,
     )
 
@@ -225,6 +243,7 @@ object AuthKitLogin {
     class JsonObjectResponse {
         val accessToken: String? = null
         val refreshToken: String? = null
+        val error: String? = null
         val errorDescription: String? = null
         val user: WorkosUser? = null
     }
@@ -234,7 +253,7 @@ object AuthKitLogin {
         if (access.isNullOrBlank()) {
             throw LoginCancelled("WorkOS returned no access token.")
         }
-        return TokenResponse(access, body.refreshToken ?: "", body.user)
+        return TokenResponse(access, body.refreshToken, body.user)
     }
 
     private fun pkceVerifier(): String {
@@ -248,7 +267,16 @@ object AuthKitLogin {
             MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(StandardCharsets.US_ASCII)),
         )
 
+    internal fun isTransientFailure(
+        statusCode: Int,
+        error: String?,
+    ): Boolean =
+        error != "invalid_grant" &&
+            (statusCode == 408 || statusCode == 429 || statusCode >= 500)
+
     private fun enc(v: String): String = URLEncoder.encode(v, StandardCharsets.UTF_8)
+
+    private fun dec(v: String): String = URLDecoder.decode(v, StandardCharsets.UTF_8)
 
     private fun gson() = com.google.gson.Gson()
 }

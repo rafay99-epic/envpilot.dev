@@ -20,6 +20,7 @@ data class PulledVariable(
 data class PullMeta(
     val decryptionFailures: List<String>?,
     val role: String?,
+    val capabilities: Map<String, Boolean>,
 )
 
 data class PullResult(val variables: List<PulledVariable>, val meta: PullMeta)

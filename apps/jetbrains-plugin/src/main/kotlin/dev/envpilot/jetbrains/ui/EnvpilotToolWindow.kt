@@ -144,14 +144,30 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
 
             override fun actionPerformed(e: AnActionEvent) {
                 (selected() as? LinkedProject)?.let { link ->
-                    LinkedProjectsService.getInstance(project).remove(link)
-                    notifyBalloon(
-                        project,
-                        "Unlinked ${link.projectName} (${link.environment}) from ${link.directoryPath}. " +
-                            "The env file stays on disk until the IDE closes.",
-                        com.intellij.notification.NotificationType.INFORMATION,
-                    )
-                    reload()
+                    scope.launch {
+                        try {
+                            val links = LinkedProjectsService.getInstance(project)
+                            val lastProjectLink = links.all().none { it !== link && it.projectId == link.projectId }
+                            if (lastProjectLink && link.deviceId.isNotBlank()) {
+                                dev.envpilot.jetbrains.convex.ConvexApi.unlinkDevice(link.projectId, link.deviceId)
+                            }
+                            links.remove(link)
+                            notifyBalloon(
+                                project,
+                                "Unlinked ${link.projectName} (${link.environment}) from ${link.directoryPath}. " +
+                                    "Managed files stay on disk until the IDE closes.",
+                                com.intellij.notification.NotificationType.INFORMATION,
+                            )
+                            reload()
+                        } catch (error: Exception) {
+                            dev.envpilot.jetbrains.errors.Errors.report(error, mapOf("surface" to "unlink"))
+                            notifyBalloon(
+                                project,
+                                "Unlink failed: ${dev.envpilot.jetbrains.errors.Errors.friendly(error)}",
+                                com.intellij.notification.NotificationType.ERROR,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -191,8 +207,10 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
             AllIcons.Actions.Preview,
         ) {
             override fun update(e: AnActionEvent) {
+                val projectIds = LinkedProjectsService.getInstance(project).all().map { it.projectId }.distinct()
                 e.presentation.isEnabled = AuthService.getInstance().email != null &&
-                    EnvEditorService.getInstance(project).managedPaths().isNotEmpty()
+                    EnvEditorService.getInstance(project).managedPaths().isNotEmpty() &&
+                    EnvEditorService.getInstance(project).canReveal(projectIds)
             }
 
             override fun actionPerformed(e: AnActionEvent) {
@@ -522,16 +540,19 @@ class LinkDirectoryDialog(
 
     override fun doOKAction() {
         val dir = java.io.File(dirField.text).canonicalPath
-        val added =
-            LinkedProjectsService.getInstance(project).add(
-                LinkedProject(
-                    projectId = selected.id,
-                    projectName = selected.name,
-                    environment = environment,
-                    directoryPath = dir,
-                ),
+        val deviceId = dev.envpilot.jetbrains.sync.JetBrainsDevice.id()
+        val link =
+            LinkedProject(
+                orgId = selected.organizationId,
+                projectId = selected.id,
+                projectName = selected.name,
+                environment = environment,
+                directoryPath = dir,
+                deviceId = deviceId,
+                accountId = AuthService.getInstance().userId.orEmpty(),
             )
-        if (!added) {
+        val links = LinkedProjectsService.getInstance(project)
+        if (links.contains(link)) {
             com.intellij.notification.NotificationGroupManager.getInstance()
                 .getNotificationGroup("dev.envpilot.notifications")
                 .createNotification(
@@ -542,42 +563,54 @@ class LinkDirectoryDialog(
             super.doOKAction()
             return
         }
-        dev.envpilot.jetbrains.convex.ConvexSyncService.getInstance().watchProject(selected.id)
-        // Pull immediately — linking should visibly land the env file.
+        super.doOKAction()
         pullScope.launch {
-            val ok = SyncScheduler.getInstance().runCycle(project)
-            refreshOpenEnvEditors(project)
-            notifyBalloon(
-                project,
-                if (ok) {
-                    "Linked ${selected.name} — env file pulled into $dir"
-                } else {
-                    "Linked ${selected.name}, but the pull failed: ${dev.envpilot.jetbrains.sync.SyncState.lastError ?: "unknown error"}"
-                },
-                if (ok) {
-                    com.intellij.notification.NotificationType.INFORMATION
-                } else {
-                    com.intellij.notification.NotificationType.ERROR
-                },
-            )
-        }
-        val settings = EnvpilotSettings.getInstance().state
-        if (settings.commitGuardAutoInstall) {
-            val installed =
-                dev.envpilot.jetbrains.guards.CommitGuard.install(
-                    dir,
-                    settings.targetFile.ifBlank { ".env.local" },
+            try {
+                dev.envpilot.jetbrains.convex.ConvexApi.linkDevice(
+                    selected.id,
+                    deviceId,
+                    dev.envpilot.jetbrains.sync.JetBrainsDevice.name(),
                 )
-            if (!installed) {
-                com.intellij.notification.NotificationGroupManager.getInstance()
-                    .getNotificationGroup("dev.envpilot.notifications")
-                    .createNotification(
-                        "Linked, but no git repository found — commit guard not installed.",
-                        com.intellij.notification.NotificationType.WARNING,
-                    )
-                    .notify(project)
+                links.add(link)
+                dev.envpilot.jetbrains.convex.ConvexSyncService.getInstance().watchProject(selected.id)
+                val ok = SyncScheduler.getInstance().runCycle(project)
+                refreshOpenEnvEditors(project)
+                notifyBalloon(
+                    project,
+                    if (ok) {
+                        "Linked ${selected.name}. Pulled values into $dir."
+                    } else {
+                        "Linked ${selected.name}, but pull failed: ${dev.envpilot.jetbrains.sync.SyncState.lastError ?: "unknown error"}"
+                    },
+                    if (ok) {
+                        com.intellij.notification.NotificationType.INFORMATION
+                    } else {
+                        com.intellij.notification.NotificationType.ERROR
+                    },
+                )
+                val settings = EnvpilotSettings.getInstance().state
+                if (settings.commitGuardAutoInstall) {
+                    val installed =
+                        dev.envpilot.jetbrains.guards.CommitGuard.install(
+                            dir,
+                            settings.targetFile.ifBlank { ".env.local" },
+                        )
+                    if (!installed) {
+                        notifyBalloon(
+                            project,
+                            "Linked, but no Git repository was found. Commit guard was not installed.",
+                            com.intellij.notification.NotificationType.WARNING,
+                        )
+                    }
+                }
+            } catch (error: Exception) {
+                dev.envpilot.jetbrains.errors.Errors.report(error, mapOf("surface" to "link"))
+                notifyBalloon(
+                    project,
+                    "Link failed: ${dev.envpilot.jetbrains.errors.Errors.friendly(error)}",
+                    com.intellij.notification.NotificationType.ERROR,
+                )
             }
         }
-        super.doOKAction()
     }
 }

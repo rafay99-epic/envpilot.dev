@@ -13,6 +13,8 @@ data class LinkedProject(
     var projectName: String = "",
     var environment: String = "development",
     var directoryPath: String = "",
+    var deviceId: String = "",
+    var accountId: String = "",
 )
 
 @Service(Service.Level.PROJECT)
@@ -30,16 +32,25 @@ class LinkedProjectsService : PersistentStateComponent<LinkedProjectsService.Sta
         state = s
     }
 
-    fun all(): List<LinkedProject> = state.links.toList()
+    fun all(): List<LinkedProject> {
+        val accountId = dev.envpilot.jetbrains.auth.AuthService.getInstance().userId ?: return emptyList()
+        state.links.filter { it.accountId.isBlank() }.forEach { it.accountId = accountId }
+        return state.links.filter { it.accountId == accountId }
+    }
+
+    fun contains(link: LinkedProject): Boolean {
+        val accountId = link.accountId.ifBlank { dev.envpilot.jetbrains.auth.AuthService.getInstance().userId ?: return false }
+        return state.links.any {
+            it.accountId == accountId && it.projectId == link.projectId && it.environment == link.environment &&
+                it.directoryPath == link.directoryPath
+        }
+    }
 
     fun add(link: LinkedProject): Boolean {
-        val duplicate =
-            state.links.any {
-                it.projectId == link.projectId && it.environment == link.environment &&
-                    it.directoryPath == link.directoryPath
-            }
-        if (duplicate) return false
-        // Same project+environment+directory must not be linked twice.
+        if (link.accountId.isBlank()) {
+            link.accountId = dev.envpilot.jetbrains.auth.AuthService.getInstance().userId ?: return false
+        }
+        if (contains(link)) return false
         state.links.add(link)
         return true
     }
@@ -49,4 +60,19 @@ class LinkedProjectsService : PersistentStateComponent<LinkedProjectsService.Sta
     companion object {
         fun getInstance(project: Project): LinkedProjectsService = project.getService(LinkedProjectsService::class.java)
     }
+}
+
+object JetBrainsDevice {
+    private const val DEVICE_ID_KEY = "dev.envpilot.deviceId"
+
+    fun id(): String {
+        val properties = com.intellij.ide.util.PropertiesComponent.getInstance()
+        return properties.getValue(DEVICE_ID_KEY) ?: "jetbrains_${java.util.UUID.randomUUID()}".also {
+            properties.setValue(DEVICE_ID_KEY, it)
+        }
+    }
+
+    fun name(): String =
+        "${com.intellij.openapi.application.ApplicationInfo.getInstance().fullApplicationName} " +
+            "(${System.getProperty("os.name")})"
 }

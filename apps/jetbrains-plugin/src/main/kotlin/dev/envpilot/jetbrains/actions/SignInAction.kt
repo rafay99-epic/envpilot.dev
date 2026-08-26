@@ -8,7 +8,6 @@ import dev.envpilot.jetbrains.auth.AuthService
 class SignInAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val service = AuthService.getInstance()
-        if (service.email != null) return
         service.startSignIn { email, error ->
             ApplicationManager.getApplication().invokeLater {
                 when {
@@ -31,6 +30,7 @@ class SignInAction : AnAction() {
     }
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabled = AuthService.getInstance().email == null && !AuthService.outdated
+        e.presentation.isEnabled = !AuthService.outdated
+        e.presentation.text = if (AuthService.getInstance().email == null) "Sign In to Envpilot" else "Add Envpilot Account"
     }
 }

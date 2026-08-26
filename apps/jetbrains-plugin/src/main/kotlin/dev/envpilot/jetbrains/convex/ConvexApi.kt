@@ -75,6 +75,9 @@ object ConvexApi {
                 PullMeta(
                     decryptionFailures = meta?.getAsJsonArray("decryptionFailures")?.map { it.asString },
                     role = meta?.str("role"),
+                    capabilities =
+                        meta?.getAsJsonObject("capabilities")?.entrySet()
+                            ?.associate { (key, value) -> key to value.asBoolean }.orEmpty(),
                 ),
         )
     }
@@ -139,6 +142,32 @@ object ConvexApi {
                 put("isSensitive", isSensitive)
                 description?.let { put("description", it) }
             },
+        )
+    }
+
+    suspend fun linkDevice(
+        projectId: String,
+        deviceId: String,
+        deviceName: String,
+    ) {
+        socket().mutation(
+            "features/users/projectAccess:linkExtension",
+            mapOf(
+                "projectId" to projectId,
+                "deviceId" to deviceId,
+                "deviceName" to deviceName,
+                "expiresInDays" to 30,
+            ),
+        )
+    }
+
+    suspend fun unlinkDevice(
+        projectId: String,
+        deviceId: String,
+    ) {
+        socket().mutation(
+            "features/users/projectAccess:unlinkExtension",
+            mapOf("projectId" to projectId, "deviceId" to deviceId),
         )
     }
 

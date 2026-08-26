@@ -92,18 +92,10 @@ class StartupActivity : ProjectActivity {
      */
     private fun unsyncOnClose(project: Project) {
         if (!dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.autoUnsyncOnClose) return
-        val service = dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project)
-        var removed = 0
-        for (path in service.managedPaths()) {
-            val managed = service.managed(path) ?: continue
-            for (secretPath in managed.secretFilePaths) {
-                if (java.nio.file.Files.deleteIfExists(java.nio.file.Path.of(secretPath))) removed++
-            }
-            if (java.nio.file.Files.deleteIfExists(java.nio.file.Path.of(path))) removed++
-        }
-        if (removed > 0) {
+        val result = dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project).purgeManagedFiles()
+        if (result.removed > 0 || result.preserved > 0) {
             com.intellij.openapi.diagnostic.logger<StartupActivity>()
-                .info("Auto-unsync on close: removed $removed managed file(s)")
+                .info("Auto-unsync on close: removed ${result.removed}, preserved ${result.preserved} modified/pre-existing file(s)")
         }
     }
 
@@ -152,32 +144,43 @@ class StartupActivity : ProjectActivity {
 
     private var lastHoverAtMs = 0L
 
-    /** Hover a managed key in a .env file → tooltip telling you it is Envpilot-hidden. */
+    /** Show masked Envpilot metadata when hovering managed env keys or code references. */
     private fun installKeyHover(project: Project) {
         EditorFactory.getInstance().eventMulticaster.addEditorMouseMotionListener(
             object : com.intellij.openapi.editor.event.EditorMouseMotionListener {
                 override fun mouseMoved(e: com.intellij.openapi.editor.event.EditorMouseEvent) {
                     val editor = e.editor ?: return
                     if (editor.project != project) return
-                    if (!editor.virtualFile?.name?.startsWith(".env")!!) return
+                    val file = editor.virtualFile ?: return
                     val service = dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project)
-                    val managed = service.managed(editor.virtualFile!!.path) ?: return
                     if (service.isRevealed()) return
                     if (System.currentTimeMillis() - lastHoverAtMs < 1500) return
                     val offset = editor.xyToLogicalPosition(e.mouseEvent.point).let { editor.logicalPositionToOffset(it) }
                     val line = editor.document.getLineNumber(offset)
                     val lineStart = editor.document.getLineStartOffset(line)
+                    val lineEnd = editor.document.getLineEndOffset(line)
+                    val lineText = editor.document.charsSequence.subSequence(lineStart, lineEnd).toString()
+                    val column = offset - lineStart
+                    val managed = service.managed(file.path)
+                    val envKey = lineText.trimStart().substringBefore('=').trim().takeIf { file.name.startsWith(".env") }
                     val key =
-                        editor.document.charsSequence
-                            .subSequence(lineStart, offset).toString()
-                            .trimStart().substringBefore('=').trim()
-                    if (key in managed.keys && key.isNotBlank()) {
-                        lastHoverAtMs = System.currentTimeMillis()
-                        com.intellij.codeInsight.hint.HintManager.getInstance().showInformationHint(
-                            editor,
-                            "$key — Envpilot-managed, value hidden",
-                        )
-                    }
+                        (
+                            envKey?.takeIf { it in managed?.keys.orEmpty() }
+                                ?: dev.envpilot.jetbrains.editor.EnvKeyReferences.at(lineText, column)?.key
+                        ) ?: return
+                    val link =
+                        dev.envpilot.jetbrains.sync.LinkedProjectsService.getInstance(project).all().firstOrNull {
+                            val targetName =
+                                dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" }
+                            val keys = service.managed(java.nio.file.Path.of(it.directoryPath, targetName).toString())?.keys.orEmpty()
+                            runCatching { java.nio.file.Path.of(file.path).startsWith(java.nio.file.Path.of(it.directoryPath)) }
+                                .getOrDefault(false) && key in keys
+                        } ?: return
+                    lastHoverAtMs = System.currentTimeMillis()
+                    com.intellij.codeInsight.hint.HintManager.getInstance().showInformationHint(
+                        editor,
+                        "$key = ••••••••  Envpilot: ${link.projectName} / ${link.environment}",
+                    )
                 }
             },
             project,

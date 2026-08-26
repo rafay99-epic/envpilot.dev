@@ -19,7 +19,6 @@ class EnvpilotSettings : PersistentStateComponent<EnvpilotSettings.State> {
         var autoUnsyncOnClose: Boolean = true
         var conflictResolution: String = "merge"
         var idlePauseMinutes: Int = 0
-        var realTimeSync: Boolean = true
         var convexUrl: String = ""
     }
 

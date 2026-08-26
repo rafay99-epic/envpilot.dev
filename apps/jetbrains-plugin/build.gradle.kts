@@ -1,3 +1,6 @@
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
+import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
+
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.2.20"
@@ -45,6 +48,7 @@ val generateBuildConfig by tasks.registering {
 
 kotlin {
     jvmToolchain(21)
+    compilerOptions.jvmDefault = JvmDefaultMode.NO_COMPATIBILITY
 }
 
 sourceSets.main {
@@ -82,6 +86,24 @@ intellijPlatform {
             untilBuild = provider { null }
         }
     }
+    signing {
+        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
+        privateKey = providers.environmentVariable("PRIVATE_KEY")
+        password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
+    }
+    publishing {
+        token = providers.environmentVariable("PUBLISH_TOKEN")
+    }
+    pluginVerification {
+        ides {
+            recommended()
+            select {
+                types = listOf(IntelliJPlatformType.AndroidStudio)
+                sinceBuild = "251"
+                untilBuild = "251.*"
+            }
+        }
+    }
 }
 
 tasks {
@@ -97,6 +119,7 @@ tasks {
 
 // ktlint scans the generated source dir too — declare the ordering.
 tasks.named("runKtlintCheckOverMainSourceSet") { dependsOn(generateBuildConfig) }
+tasks.named("runKtlintFormatOverMainSourceSet") { dependsOn(generateBuildConfig) }
 tasks.named("runKtlintCheckOverKotlinScripts") { dependsOn(generateBuildConfig) }
 
 // Quality gate: detekt (lint) + ktlint (format checks) run as part of

@@ -54,38 +54,62 @@ object PullService {
         val values = result.variables.associate { it.key to it.value }
         val mode = EnvFiles.ConflictMode.from(EnvpilotSettings.getInstance().state.conflictResolution)
         val existing = EnvFiles.readIfExists(targetFile)
+        val previousManaged = project?.let { EnvEditorService.getInstance(it).managed(targetFile.toString()) }
         val merged = EnvFiles.resolve(existing, values, mode)
-        if (mode == EnvFiles.ConflictMode.BACKUP && existing != null && existing != merged) {
-            EnvFiles.atomicWrite(EnvFiles.backupPath(targetFile), existing)
-        }
-        EnvFiles.atomicWrite(targetFile, merged)
-
+        val resolvedFiles =
+            downloaded.map { (meta, bytes) ->
+                val dest =
+                    resolveWithin(dir, meta.path)
+                        ?: throw PullAborted("Refusing unsafe file path from server: ${meta.path}")
+                Triple(meta, bytes, dest)
+            }
+        val rollback =
+            snapshot(
+                buildSet {
+                    add(targetFile)
+                    add(EnvFiles.backupPath(targetFile))
+                    for ((_, _, dest) in resolvedFiles) {
+                        add(dest)
+                        add(secretBackupPath(dest))
+                    }
+                },
+            )
         val writtenSecrets = mutableListOf<String>()
         val secretHashes = mutableMapOf<String, String>()
-        val previous = project?.let { EnvEditorService.getInstance(it) }
-        for ((meta, bytes) in downloaded) {
-            val dest =
-                resolveWithin(dir, meta.path)
-                    ?: throw PullAborted("Refusing unsafe file path from server: ${meta.path}")
-            Files.createDirectories(dest.parent)
-            if (Files.exists(dest)) {
-                guardExistingFile(dest, bytes, previous?.managed(dest.toString())?.secretFilePaths)
+        try {
+            if (mode == EnvFiles.ConflictMode.BACKUP && existing != null && existing != merged) {
+                EnvFiles.atomicWrite(EnvFiles.backupPath(targetFile), existing)
             }
-            Files.write(dest, bytes)
-            if (meta.mode != null && isPosix(dest)) {
-                Files.setPosixFilePermissions(dest, posixPerms(meta.mode))
+            EnvFiles.atomicWrite(targetFile, merged)
+
+            for ((meta, bytes, dest) in resolvedFiles) {
+                Files.createDirectories(dest.parent)
+                if (Files.exists(dest)) {
+                    guardExistingFile(dest, bytes, previousManaged?.secretFilePaths)
+                }
+                Files.write(dest, bytes)
+                if (meta.mode != null && isPosix(dest)) {
+                    Files.setPosixFilePermissions(dest, posixPerms(meta.mode))
+                }
+                writtenSecrets.add(dest.toString())
+                secretHashes[dest.toString()] = EnvCloak.hashOf(dest)
             }
-            writtenSecrets.add(dest.toString())
-            secretHashes[dest.toString()] = EnvCloak.hashOf(dest)
+        } catch (e: Exception) {
+            restore(rollback)
+            throw PullAborted("Pull could not be written safely: ${e.message ?: e.javaClass.simpleName}")
         }
         if (project != null) {
             try {
-                EnvEditorService.getInstance(project).recordSync(
+                val editorState = EnvEditorService.getInstance(project)
+                editorState.cacheKeys(link.projectId, values.keys)
+                editorState.cacheCapabilities(link.projectId, result.meta.capabilities)
+                editorState.recordSync(
                     targetFile.toString(),
                     values.keys,
                     EnvCloak.hashOf(targetFile),
                     writtenSecrets,
                     secretHashes,
+                    envCreated = previousManaged?.envCreated ?: (existing == null),
                 )
             } catch (e: Exception) {
                 log.warn("Editor state update failed: ${e.message}")
@@ -114,7 +138,7 @@ object PullService {
         val oursNow = previouslyOurs?.contains(dest.toString()) == true
         val current = Files.readAllBytes(dest)
         if (!oursNow && !current.contentEquals(incoming)) {
-            val backup = dest.resolveSibling(dest.fileName.toString() + ".envpilot-bak")
+            val backup = secretBackupPath(dest)
             Files.write(backup, current)
             log.warn("Overwriting non-Envpilot file $dest — previous copy saved to $backup")
         }
@@ -142,6 +166,38 @@ object PullService {
     }
 
     private fun isPosix(p: Path): Boolean = p.fileSystem.supportedFileAttributeViews().contains("posix")
+
+    private data class FileSnapshot(
+        val path: Path,
+        val content: ByteArray?,
+        val permissions: Set<PosixFilePermission>?,
+    )
+
+    private fun snapshot(paths: Set<Path>): List<FileSnapshot> =
+        paths.map { path ->
+            val exists = Files.exists(path)
+            FileSnapshot(
+                path,
+                if (exists) Files.readAllBytes(path) else null,
+                if (exists && isPosix(path)) Files.getPosixFilePermissions(path) else null,
+            )
+        }
+
+    private fun restore(snapshots: List<FileSnapshot>) {
+        for ((path, content, permissions) in snapshots.asReversed()) {
+            runCatching {
+                if (content == null) {
+                    Files.deleteIfExists(path)
+                } else {
+                    path.parent?.let(Files::createDirectories)
+                    Files.write(path, content)
+                    if (permissions != null && isPosix(path)) Files.setPosixFilePermissions(path, permissions)
+                }
+            }.onFailure { log.error("Failed to roll back $path", it) }
+        }
+    }
+
+    private fun secretBackupPath(path: Path): Path = path.resolveSibling(path.fileName.toString() + ".envpilot-bak")
 
     private fun posixPerms(mode: Int): Set<PosixFilePermission> {
         val perms = mutableSetOf<PosixFilePermission>()

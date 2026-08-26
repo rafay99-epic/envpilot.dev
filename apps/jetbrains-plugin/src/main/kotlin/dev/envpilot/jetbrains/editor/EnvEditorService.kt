@@ -25,6 +25,7 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
         var syncedAtMs: Long = 0
         var secretFilePaths: List<String> = emptyList()
         var secretHashes: Map<String, String> = emptyMap()
+        var envCreated: Boolean = false
     }
 
     class State {
@@ -37,6 +38,7 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
         val syncedAtMs: Long,
         val secretFilePaths: List<String>,
         val secretHashes: Map<String, String>,
+        val envCreated: Boolean,
     ) {
         fun isDrifted(): Boolean = syncedHash.isEmpty()
     }
@@ -48,6 +50,7 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
     // Transient caches — rebuilt from the server, never persisted.
     private val metadataCache = ConcurrentHashMap<String, Pair<Long, Set<String>>>()
     private val filesCache = ConcurrentHashMap<String, Pair<Long, List<dev.envpilot.jetbrains.model.SecretFileMeta>>>()
+    private val capabilityCache = ConcurrentHashMap<String, Map<String, Boolean>>()
     private val metadataTtlMs = 30_000L
 
     @Volatile var revealUntilMs: Long = 0
@@ -64,6 +67,7 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
         hash: String,
         secretFilePaths: List<String> = emptyList(),
         secretHashes: Map<String, String> = emptyMap(),
+        envCreated: Boolean = false,
     ) {
         val entry =
             ManagedFileState().apply {
@@ -72,6 +76,7 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
                 this.syncedAtMs = System.currentTimeMillis()
                 this.secretFilePaths = secretFilePaths
                 this.secretHashes = secretHashes
+                this.envCreated = envCreated
             }
         state.managed[path] = entry
     }
@@ -84,6 +89,7 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
             syncedAtMs = entry.syncedAtMs,
             secretFilePaths = entry.secretFilePaths,
             secretHashes = entry.secretHashes,
+            envCreated = entry.envCreated,
         )
     }
 
@@ -130,6 +136,64 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
         keys: Set<String>,
     ) {
         metadataCache[projectId] = System.currentTimeMillis() to keys
+    }
+
+    fun cacheCapabilities(
+        projectId: String,
+        capabilities: Map<String, Boolean>,
+    ) {
+        capabilityCache[projectId] = capabilities
+    }
+
+    fun canReveal(projectIds: Collection<String>): Boolean =
+        projectIds.isNotEmpty() &&
+            projectIds.all {
+                capabilityCache[it]?.get("project.secrets.reveal") == true
+            }
+
+    data class PurgeResult(val removed: Int, val preserved: Int)
+
+    fun purgeManagedFiles(): PurgeResult {
+        var removed = 0
+        var preserved = 0
+        for ((envPath, entry) in state.managed.toMap()) {
+            var keepState = false
+            val env = java.nio.file.Path.of(envPath)
+            if (java.nio.file.Files.exists(env)) {
+                val unchanged = runCatching { EnvCloak.hashOf(env) == entry.syncedHash }.getOrDefault(false)
+                if (entry.envCreated && unchanged) {
+                    makeWritable(env)
+                    if (java.nio.file.Files.deleteIfExists(env)) removed++
+                } else {
+                    preserved++
+                    keepState = true
+                }
+            }
+            for (secretPath in entry.secretFilePaths) {
+                val secret = java.nio.file.Path.of(secretPath)
+                if (!java.nio.file.Files.exists(secret)) continue
+                val unchanged =
+                    runCatching { EnvCloak.hashOf(secret) == entry.secretHashes[secretPath] }
+                        .getOrDefault(false)
+                if (unchanged) {
+                    makeWritable(secret)
+                    if (java.nio.file.Files.deleteIfExists(secret)) removed++
+                } else {
+                    preserved++
+                    keepState = true
+                }
+            }
+            if (!keepState) state.managed.remove(envPath)
+        }
+        metadataCache.clear()
+        filesCache.clear()
+        capabilityCache.clear()
+        revealUntilMs = 0
+        return PurgeResult(removed, preserved)
+    }
+
+    private fun makeWritable(path: java.nio.file.Path) {
+        path.toFile().setWritable(true, true)
     }
 
     fun revealFor(seconds: Long = 30) {

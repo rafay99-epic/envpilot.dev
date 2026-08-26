@@ -110,30 +110,34 @@ class ConvexWireTest {
     }
 
     @Test
+    fun `mutation uses Convex function request shape`() {
+        val message = JsonParser.parseString(ConvexWire.mutationMessage(7, "users:link", mapOf("id" to "p1"))).asJsonObject
+        assertEquals("Mutation", message.get("type").asString)
+        assertEquals(7, message.get("requestId").asInt)
+        assertEquals("p1", message.getAsJsonArray("args")[0].asJsonObject.get("id").asString)
+    }
+
+    @Test
     fun `garbage parses to Other not a crash`() {
         assertEquals(ConvexWire.ServerMessage.Other, ConvexWire.parseServerMessage("not json"))
         assertEquals(ConvexWire.ServerMessage.Other, ConvexWire.parseServerMessage("""{"type":"Unknown"}"""))
     }
 
     @Test
-    fun `query result number reads plain and integer-encoded values`() {
-        val plain =
+    fun `query result preserves every JSON shape`() {
+        val message =
             """
             {"type":"Transition","modifications":[
-              {"type":"QueryUpdated","queryId":3,"value":1724592000000}
+              {"type":"QueryUpdated","queryId":1,"value":[{"_id":"p1","name":"App"}]},
+              {"type":"QueryUpdated","queryId":2,"value":{"ok":true}},
+              {"type":"QueryUpdated","queryId":3,"value":1724592000000},
+              {"type":"QueryUpdated","queryId":4,"value":{"${'$'}integer":"AP8AAAAAAAA="}}
             ]}
             """.trimIndent()
-        assertEquals("1724592000000", ConvexWire.queryValueFromTransition(plain, 3))
-        // int64 encoding: base64 little-endian bytes of 1000
-        val wrapped =
-            """
-            {"type":"Transition","modifications":[
-              {"type":"QueryUpdated","queryId":3,
-               "value":{"${'$'}integer":"AP8AAAAAAAA="}}
-            ]}
-            """.trimIndent()
-        // LE bytes [0,255,0,0,0,0,0,0] → 0xFF << 8 = 65280
-        assertEquals("65280", ConvexWire.queryValueFromTransition(wrapped, 3))
+        assertEquals("[{\"_id\":\"p1\",\"name\":\"App\"}]", ConvexWire.queryValueFromTransition(message, 1))
+        assertEquals("{\"ok\":true}", ConvexWire.queryValueFromTransition(message, 2))
+        assertEquals("1724592000000", ConvexWire.queryValueFromTransition(message, 3))
+        assertEquals("{\"${'$'}integer\":\"AP8AAAAAAAA=\"}", ConvexWire.queryValueFromTransition(message, 4))
         assertNull(ConvexWire.queryValueFromTransition("""{"type":"Transition","modifications":[]}""", 3))
     }
 }

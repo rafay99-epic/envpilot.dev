@@ -81,6 +81,7 @@ jobs:
       admin_version: ${{ steps.versions.outputs.admin }}
       cli_version: ${{ steps.versions.outputs.cli }}
       ext_version: ${{ steps.versions.outputs.extension }}
+      jetbrains_version: ${{ steps.versions.outputs.jetbrains }}
       action_version: ${{ steps.versions.outputs.action }}
       docker_version: ${{ steps.versions.outputs.docker }}
     steps:
@@ -225,6 +226,7 @@ jobs:
             echo "admin=$(jq -r '.version' apps/admin/package.json)"
             echo "cli=$(jq -r '.version' apps/cli/package.json)"
             echo "extension=$(jq -r '.version' apps/vscode-extension/package.json)"
+            echo "jetbrains=$(cut -d= -f2 apps/jetbrains-plugin/gradle.properties | tr -d '[:space:]')"
             echo "action=$(jq -r '.version' packages/github-action/package.json)"
             echo "docker=$(jq -r '.version' packages/docker-image/package.json)"
           } >> "$GITHUB_OUTPUT"
@@ -526,20 +528,24 @@ jobs:
   build-jetbrains:
     name: Build JetBrains plugin
     needs: [changes, checks-passed]
-    # main-only (minutes diet): see build-cli.
     if: |
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.outputs.run_jetbrains == 'true'
     runs-on: ubuntu-latest
-    environment: Production
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'Production' || 'development' }}
+    env:
+      WORKOS_CLIENT_ID: ${{ github.event_name == 'pull_request' && 'client_ci_stub' || '' }}
+      NEXT_PUBLIC_CONVEX_URL: ${{ github.event_name == 'pull_request' && 'https://convex-ci.invalid' || '' }}
+      ENVPILOT_SERVER_URL: ${{ github.event_name == 'pull_request' && 'https://www.envpilot.dev' || '' }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/load-env
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
           environment: production
           required: |
             ENVPILOT_SERVER_URL
+            NEXT_PUBLIC_CONVEX_URL
             WORKOS_CLIENT_ID
       - uses: actions/setup-java@v5
         with:
@@ -548,7 +554,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Build plugin
         working-directory: apps/jetbrains-plugin
-        run: ./gradlew build -x verifyPlugin
+        run: ./gradlew build verifyPlugin
       - name: Verify build-time values are embedded in the jar
         working-directory: apps/jetbrains-plugin
         run: |
@@ -556,12 +562,20 @@ jobs:
             echo "::error::WORKOS_CLIENT_ID is empty — refusing to ship."
             exit 1
           fi
+          if [ -z "$NEXT_PUBLIC_CONVEX_URL" ]; then
+            echo "::error::NEXT_PUBLIC_CONVEX_URL is empty — refusing to ship."
+            exit 1
+          fi
           JAR=build/libs/envpilot-$(grep pluginVersion gradle.properties | cut -d= -f2).jar
           if ! unzip -p "$JAR" dev/envpilot/jetbrains/BuildConfig.class | grep -qF "$WORKOS_CLIENT_ID"; then
             echo "::error::BuildConfig does not contain the WorkOS client id — refusing to ship a broken build."
             exit 1
           fi
-          echo "WorkOS client id embedded in $JAR ✓"
+          if ! unzip -p "$JAR" dev/envpilot/jetbrains/BuildConfig.class | grep -qF "$NEXT_PUBLIC_CONVEX_URL"; then
+            echo "::error::BuildConfig does not contain the Convex URL — refusing to ship a broken build."
+            exit 1
+          fi
+          echo "Required build-time values embedded in $JAR ✓"
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v7
         with:
@@ -758,7 +772,7 @@ jobs:
       !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.outputs.run_jetbrains == 'true' &&
-      needs.deploy-convex.result == 'success'
+      (needs.deploy-convex.result == 'success' || needs.deploy-convex.result == 'skipped')
     uses: ./.github/workflows/deploy-jetbrains.yml
     with:
       force: false
@@ -890,11 +904,12 @@ jobs:
             echo "| Convex | — | $(status '${{ needs.deploy-convex.result }}') |"
             echo "| CLI | ${{ needs.changes.outputs.cli_version }} | $(status '${{ needs.deploy-cli.result }}') |"
             echo "| Extension | ${{ needs.changes.outputs.ext_version }} | $(status '${{ needs.deploy-extension.result }}') |"
+            echo "| JetBrains | ${{ needs.changes.outputs.jetbrains_version }} | $(status '${{ needs.deploy-jetbrains.result }}') |"
             echo "| Homebrew | ${{ needs.changes.outputs.cli_version }} | $(status '${{ needs.deploy-homebrew.result }}') |"
             echo "| GitHub Action | ${{ needs.changes.outputs.action_version }} | $(status '${{ needs.deploy-action.result }}') |"
             echo "| Docker image | ${{ needs.changes.outputs.docker_version }} | $(status '${{ needs.deploy-docker-image.result }}') |"
             echo ""
-            echo "**Install:** \`npm i -g @envpilot/cli\` · \`brew install rafay99-epic/apps/envpilot\` · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot)"
+            echo "**Install:** \`npm i -g @envpilot/cli\` · \`brew install rafay99-epic/apps/envpilot\` · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot) · [JetBrains Marketplace](https://plugins.jetbrains.com/)"
             echo ""
             echo "**Machine surfaces:** \`uses: rafay99-epic/envpilot-action@v1\` · \`docker pull ghcr.io/rafay99-epic/envpilot:1\`"
           } > /tmp/release-body.md
@@ -916,6 +931,14 @@ jobs:
           name: envpilot-vsix-${{ github.sha }}
           path: release-artifacts
 
+      - name: Download JetBrains plugin artifact
+        if: needs.changes.outputs.run_jetbrains == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: envpilot-jetbrains-${{ github.sha }}
+          path: release-artifacts
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
@@ -926,3 +949,4 @@ jobs:
           files: |
             release-artifacts/*.vsix
             release-artifacts/*.tgz
+            release-artifacts/*.zip

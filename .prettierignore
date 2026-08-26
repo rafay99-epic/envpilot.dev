@@ -22,3 +22,4 @@ playwright-report
 # marker into a heading and destroys the frontmatter. Structure here is
 # parsed by src/lib/changelog.ts, not styled.
 apps/web/content/CHANGELOG.md
+apps/jetbrains-plugin/.intellijPlatform/

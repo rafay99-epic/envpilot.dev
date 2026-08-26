@@ -55,6 +55,9 @@ class AuthService {
     private val cached = AtomicReference<Session?>(null)
 
     val email: String? get() = cached.get()?.email
+    val userId: String? get() = cached.get()?.userId
+
+    fun accounts(): List<AccountSummary> = store.accounts()
 
     /** Load persisted state once at startup. */
     fun initialize() {
@@ -89,12 +92,7 @@ class AuthService {
                 // CAS: only persist when the stored refresh token is still the one we used.
                 val stored = store.load()
                 if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
-                val updated =
-                    sessionForRefresh.copy(
-                        accessToken = result.accessToken,
-                        refreshToken = result.refreshToken,
-                        sessionId = Jwt.sessionId(result.accessToken) ?: sessionForRefresh.sessionId,
-                    )
+                val updated = sessionForRefresh.withRefresh(result)
                 store.save(updated)
                 cached.set(updated)
                 result.accessToken
@@ -120,14 +118,10 @@ class AuthService {
         scope.launch {
             try {
                 val token = AuthKitLogin.signIn()
-                val session =
-                    Session(
-                        userId = token.user?.id ?: token.accessToken,
-                        email = token.user?.email ?: "unknown",
-                        accessToken = token.accessToken,
-                        refreshToken = token.refreshToken,
-                        sessionId = Jwt.sessionId(token.accessToken),
-                    )
+                val session = token.toSession()
+                if (!purgeManagedFiles()) {
+                    throw AuthKitLogin.LoginCancelled("Save or revert managed files before changing accounts.")
+                }
                 store.save(session)
                 cached.set(session)
                 notifyChanged()
@@ -140,17 +134,75 @@ class AuthService {
 
     fun signOut() {
         scope.launch {
-            clearSession()
+            val safeToSwitch = purgeManagedFiles()
+            cached.get()?.userId?.let { store.remove(it, activateNext = safeToSwitch) }
+            cached.set(if (safeToSwitch) store.load() else null)
+            notifyChanged()
+        }
+    }
+
+    fun signOutAll() {
+        scope.launch {
+            purgeManagedFiles()
+            cached.set(null)
+            store.clearAll()
+            notifyChanged()
+        }
+    }
+
+    fun switchAccount(userId: String) {
+        scope.launch {
+            if (!purgeManagedFiles()) return@launch
+            val session = store.activate(userId) ?: return@launch
+            cached.set(session)
             notifyChanged()
         }
     }
 
     private suspend fun clearSession() {
-        cached.set(null)
-        store.clear()
+        val safeToSwitch = purgeManagedFiles()
+        cached.get()?.userId?.let { store.remove(it, activateNext = safeToSwitch) }
+        cached.set(if (safeToSwitch) store.load() else null)
     }
 
     private fun notifyChanged() {
         ApplicationManager.getApplication().messageBus.syncPublisher(AUTH_TOPIC).authChanged()
+        dev.envpilot.jetbrains.convex.ConvexSyncService.getInstance().restartForAuthChange()
     }
+
+    private fun purgeManagedFiles(): Boolean {
+        var preserved = 0
+        for (project in com.intellij.openapi.project.ProjectManager.getInstance().openProjects) {
+            preserved += dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project).purgeManagedFiles().preserved
+        }
+        if (preserved > 0) {
+            com.intellij.notification.NotificationGroupManager.getInstance()
+                .getNotificationGroup("dev.envpilot.notifications")
+                .createNotification(
+                    "Account change blocked because $preserved managed file(s) contain local changes or predated Envpilot.",
+                    com.intellij.notification.NotificationType.WARNING,
+                )
+                .notify(null)
+        }
+        return preserved == 0
+    }
+}
+
+internal fun Session.withRefresh(result: AuthKitLogin.TokenResponse): Session =
+    copy(
+        accessToken = result.accessToken,
+        refreshToken = result.refreshToken?.takeIf { it.isNotBlank() } ?: refreshToken,
+        sessionId = Jwt.sessionId(result.accessToken) ?: sessionId,
+    )
+
+internal fun AuthKitLogin.TokenResponse.toSession(): Session {
+    val identity = user ?: throw AuthKitLogin.LoginCancelled("WorkOS returned no user identity.")
+    val refresh = refreshToken?.takeIf { it.isNotBlank() } ?: throw AuthKitLogin.LoginCancelled("WorkOS returned no refresh token.")
+    return Session(
+        userId = identity.id,
+        email = identity.email,
+        accessToken = accessToken,
+        refreshToken = refresh,
+        sessionId = Jwt.sessionId(accessToken),
+    )
 }

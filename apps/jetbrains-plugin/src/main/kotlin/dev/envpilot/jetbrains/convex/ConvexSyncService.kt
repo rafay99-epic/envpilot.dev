@@ -41,7 +41,6 @@ class ConvexSyncService {
 
     @Synchronized
     fun ensureStarted() {
-        if (!EnvpilotSettings.getInstance().state.realTimeSync) return
         if (socket.get() != null) return
         scope.launch { start() }
     }
@@ -51,6 +50,19 @@ class ConvexSyncService {
     fun stop() {
         socket.getAndSet(null)?.stop()
         SyncState.realtimeConnected = false
+    }
+
+    @Synchronized
+    fun restartForAuthChange() {
+        stop()
+        projectByQueryId.set(emptyMap())
+        queryIdByProject.set(emptyMap())
+        pendingProjects.set(emptySet())
+        ensureStarted()
+        for (project in com.intellij.openapi.project.ProjectManager.getInstance().openProjects) {
+            dev.envpilot.jetbrains.sync.LinkedProjectsService.getInstance(project).all()
+                .forEach { watchProject(it.projectId) }
+        }
     }
 
     /** Idempotent: one version query per Envpilot project, buffered until connected. */

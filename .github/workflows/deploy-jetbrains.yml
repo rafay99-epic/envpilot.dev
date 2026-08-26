@@ -2,7 +2,7 @@ name: Deploy JetBrains Plugin
 
 # Builds the IntelliJ/Android Studio plugin with production values pulled
 # from Envpilot (never hardcoded), verifies they are baked into the artifact,
-# and publishes to JetBrains Marketplace when publishing credentials exist.
+# and publishes the signed artifact to JetBrains Marketplace.
 # Called by ci.yml after the full verification gate; also dispatchable
 # standalone. Marketplace rejects duplicate versions — bump
 # apps/jetbrains-plugin/gradle.properties pluginVersion to ship.
@@ -47,13 +47,19 @@ jobs:
 
       # Prod client id + server URL come from Envpilot — same bootstrap as the
       # CLI/extension. Marketplace credentials are read from the same pulled
-      # environment when present; publishing is skipped loudly when absent.
+      # environment. A missing value fails the release instead of producing a
+      # green workflow that did not publish anything.
       - uses: ./.github/actions/load-env
         with:
           token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
           environment: production
           required: |
+            CERTIFICATE_CHAIN
             ENVPILOT_SERVER_URL
+            JETBRAINS_PUBLISH_TOKEN
+            NEXT_PUBLIC_CONVEX_URL
+            PRIVATE_KEY
+            PRIVATE_KEY_PASSWORD
             WORKOS_CLIENT_ID
 
       - uses: actions/setup-java@v5
@@ -78,6 +84,10 @@ jobs:
             echo "::error::WORKOS_CLIENT_ID is empty — refusing to publish."
             exit 1
           fi
+          if [ -z "$NEXT_PUBLIC_CONVEX_URL" ]; then
+            echo "::error::NEXT_PUBLIC_CONVEX_URL is empty — refusing to publish."
+            exit 1
+          fi
           VERSION=$(grep pluginVersion gradle.properties | cut -d= -f2)
           ZIP="build/distributions/envpilot-${VERSION}.zip"
           unzip -o -q "$ZIP" "envpilot-${VERSION}.jar" -d /tmp/verify
@@ -85,22 +95,18 @@ jobs:
             echo "::error::Packaged $ZIP does not contain the WorkOS client id — refusing to publish a broken build."
             exit 1
           fi
-          echo "WorkOS client id embedded in $ZIP ✓"
+          if ! unzip -p "/tmp/verify/envpilot-${VERSION}.jar" dev/envpilot/jetbrains/BuildConfig.class | grep -qF "$NEXT_PUBLIC_CONVEX_URL"; then
+            echo "::error::Packaged $ZIP does not contain the Convex URL — refusing to publish a broken build."
+            exit 1
+          fi
+          echo "Required build-time values embedded in $ZIP ✓"
 
       - name: Publish to JetBrains Marketplace
         id: publish
         working-directory: apps/jetbrains-plugin
         env:
           PUBLISH_TOKEN: ${{ env.JETBRAINS_PUBLISH_TOKEN }}
-          CERTIFICATE_CHAIN: ${{ env.CERTIFICATE_CHAIN }}
-          PRIVATE_KEY: ${{ env.PRIVATE_KEY }}
-          PRIVATE_KEY_PASSWORD: ${{ env.PRIVATE_KEY_PASSWORD }}
-        run: |
-          if [ -z "$PUBLISH_TOKEN" ]; then
-            echo "::notice::JETBRAINS_PUBLISH_TOKEN not set in the Envpilot production environment — skipping Marketplace publish. Add it (plus CERTIFICATE_CHAIN, PRIVATE_KEY, PRIVATE_KEY_PASSWORD) to publish."
-            exit 0
-          fi
-          ./gradlew publishPlugin
+        run: ./gradlew publishPlugin
 
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v7

@@ -46,7 +46,6 @@ class EnvpilotWidget : StatusBarWidget, StatusBarWidget.TextPresentation {
     override fun install(statusBar: StatusBar) {
         this.statusBar = statusBar
         Disposer.register(this) {
-            this.statusBar?.removeWidget(ID)
             this.statusBar = null
         }
         ApplicationManager.getApplication().messageBus.connect(this)
@@ -111,8 +110,16 @@ class EnvpilotWidget : StatusBarWidget, StatusBarWidget.TextPresentation {
             val group = DefaultActionGroup()
             if (email == null) {
                 group.add(action("dev.envpilot.SignIn") ?: return@Consumer)
+                if (AuthService.getInstance().accounts().isNotEmpty()) {
+                    group.add(action("dev.envpilot.SwitchAccount") ?: return@Consumer)
+                    group.add(action("dev.envpilot.SignOutAll") ?: return@Consumer)
+                }
             } else {
                 group.addSeparator("Signed in as $email")
+                if (AuthService.getInstance().accounts().size > 1) {
+                    group.add(action("dev.envpilot.SwitchAccount") ?: return@Consumer)
+                    group.add(action("dev.envpilot.SignOutAll") ?: return@Consumer)
+                }
                 group.add(action("dev.envpilot.SignOut") ?: return@Consumer)
             }
             JBPopupFactory.getInstance()

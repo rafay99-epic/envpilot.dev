@@ -86,6 +86,14 @@
                     class="dev.envpilot.jetbrains.actions.SignOutAction"
                     text="Sign Out"
                     description="Clear the stored Envpilot session"/>
+            <action id="dev.envpilot.SwitchAccount"
+                    class="dev.envpilot.jetbrains.actions.SwitchAccountAction"
+                    text="Switch Account"
+                    description="Switch between signed-in Envpilot accounts"/>
+            <action id="dev.envpilot.SignOutAll"
+                    class="dev.envpilot.jetbrains.actions.SignOutAllAction"
+                    text="Sign Out All Accounts"
+                    description="Clear every stored Envpilot account"/>
         </group>
     </actions>
 </idea-plugin>

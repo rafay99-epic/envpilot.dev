@@ -17,8 +17,8 @@ export const APP_VERSIONS = {
   web: "1.66.5",
   cli: "1.22.3",
   extension: "1.17.0",
-  // JetBrains plugin: first public build (PR #193). No floor yet — the
-  // plugin's version check treats a missing minJetbrains as "no block".
+  // JetBrains plugin: first public build (PR #193). The first release is also
+  // the initial supported floor.
   jetbrains: "0.1.0",
   minJetbrains: "0.1.0",
   // Registry-native floors: 1.18.0 (CLI) / 1.15.0 (extension) are the first

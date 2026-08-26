@@ -27,6 +27,18 @@ Both routes are now route handlers whose redirect is a plain HTTP 307 every navi
 
 <!-- entry -->
 ---
+title: Envpilot Comes to JetBrains IDEs
+version: v1.67.0
+date: 2026-08-27
+types: [feature]
+---
+
+Envpilot now works inside IntelliJ IDEA, Android Studio, WebStorm and other JetBrains IDEs. Link a project and environment, pull variables and secret files, request new variables, and keep local files synchronized through the same permissions and Convex data plane used by the existing clients.
+
+The plugin supports multiple Envpilot accounts, safe account switching, automatic cleanup of unchanged generated files, drift protection for files with local edits, capability-gated secret reveal, AuthKit browser sign-in and session refresh, and native IDE status and tool-window controls. It does not embed the web dashboard.
+
+<!-- entry -->
+---
 title: Dynamic Routes Build Cleanly Again
 version: v1.66.3
 date: 2026-08-23

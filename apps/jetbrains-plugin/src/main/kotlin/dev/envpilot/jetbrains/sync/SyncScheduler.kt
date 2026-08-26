@@ -60,6 +60,15 @@ class SyncScheduler {
         var allOk = true
         for (link in links) {
             try {
+                if (link.deviceId.isBlank()) {
+                    val deviceId = JetBrainsDevice.id()
+                    dev.envpilot.jetbrains.convex.ConvexApi.linkDevice(
+                        link.projectId,
+                        deviceId,
+                        JetBrainsDevice.name(),
+                    )
+                    link.deviceId = deviceId
+                }
                 PullService.pull(link, project)
             } catch (e: Exception) {
                 log.warn("Pull failed for ${link.projectName}/${link.environment}: ${e.message}")
