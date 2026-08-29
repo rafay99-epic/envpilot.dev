@@ -34,7 +34,7 @@ port_for() {
 }
 
 names=(convex)
-commands=("bun --bun convex dev")
+commands=("convex dev")
 colors=(green)
 palette=(blue magenta cyan yellow)
 
@@ -75,7 +75,7 @@ printf '→ starting: %s\n' "$(
   echo "${names[*]}"
 )"
 
-exec bunx --bun concurrently \
+exec bunx concurrently \
   --names "$(
     IFS=,
     echo "${names[*]}"

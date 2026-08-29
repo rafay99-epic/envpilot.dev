@@ -28,7 +28,7 @@ case "$DEPLOYMENT" in
     ;;
 esac
 
-exec bunx --bun concurrently --names web,convex,admin --prefix-colors blue,green,magenta \
-  "bun --bun turbo dev --filter=@envpilot/web" \
-  "bun --bun convex dev" \
-  "bun --bun turbo dev --filter=@envpilot/admin"
+exec bunx concurrently --names web,convex,admin --prefix-colors blue,green,magenta \
+  "turbo dev --filter=@envpilot/web" \
+  "convex dev" \
+  "turbo dev --filter=@envpilot/admin"
