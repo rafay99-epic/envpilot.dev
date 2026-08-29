@@ -15,6 +15,18 @@
 
 <!-- entry -->
 ---
+title: Sign-In Redirects Survive Every Click
+version: v1.66.5
+date: 2026-08-29
+types: [fix]
+---
+
+The sign-in and sign-up routes redirected during page render. Under Cache Components that redirect reached the browser, but client-side navigations never acted on it — clicking sign-in left users stuck on the referring page while the network tab showed clean 200s. Opening /sign-in directly always worked, which made the failure hard to pin down.
+
+Both routes are now route handlers whose redirect is a plain HTTP 307 every navigation mode follows. Return URLs and the sign-up screen hint are unchanged.
+
+<!-- entry -->
+---
 title: Dynamic Routes Build Cleanly Again
 version: v1.66.3
 date: 2026-08-23
