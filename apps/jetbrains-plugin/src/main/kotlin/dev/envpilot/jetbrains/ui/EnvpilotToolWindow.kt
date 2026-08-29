@@ -21,6 +21,7 @@ import dev.envpilot.jetbrains.model.VALID_ENVIRONMENTS
 import dev.envpilot.jetbrains.sync.LinkedProject
 import dev.envpilot.jetbrains.sync.LinkedProjectsService
 import dev.envpilot.jetbrains.sync.SyncScheduler
+import dev.envpilot.jetbrains.sync.targetFileFor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -50,6 +51,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val listModel = DefaultListModel<String>()
     private val items = mutableListOf<Any>()
+    private val accessibleProjects = java.util.concurrent.ConcurrentHashMap<String, ApiProject>()
     private lateinit var list: JBList<String>
     private val errorBanner =
         javax.swing.JPanel(java.awt.BorderLayout()).apply { isVisible = false }
@@ -127,12 +129,22 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     private fun linkAction() =
         object : AnAction("Link Directory…", "Link a directory to a project environment", AllIcons.General.Add) {
             override fun update(e: AnActionEvent) {
+                val selectedProject = selected() as? ApiProject
                 e.presentation.isEnabled =
-                    AuthService.getInstance().email != null && selected() is ApiProject
+                    AuthService.getInstance().email != null &&
+                    selectedProject != null &&
+                    EnvEditorService.getInstance(project).hasAccessMeta(selectedProject.id) &&
+                    EnvEditorService.getInstance(project).allowedEnvironments(selectedProject.id).isNotEmpty()
             }
 
             override fun actionPerformed(e: AnActionEvent) {
-                (selected() as? ApiProject)?.let { LinkDirectoryDialog(project, it).show() }
+                (selected() as? ApiProject)?.let {
+                    LinkDirectoryDialog(
+                        project,
+                        it,
+                        EnvEditorService.getInstance(project).allowedEnvironments(it.id),
+                    ).show()
+                }
             }
         }
 
@@ -155,7 +167,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                             notifyBalloon(
                                 project,
                                 "Unlinked ${link.projectName} (${link.environment}) from ${link.directoryPath}. " +
-                                    "Managed files stay on disk until the IDE closes.",
+                                    "Managed files follow the project's Convex unsync policy.",
                                 com.intellij.notification.NotificationType.INFORMATION,
                             )
                             reload()
@@ -214,8 +226,34 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
             }
 
             override fun actionPerformed(e: AnActionEvent) {
-                EnvEditorService.getInstance(project).revealFor(30)
-                refreshOpenEnvEditors(project)
+                scope.launch {
+                    val links = LinkedProjectsService.getInstance(project).all().distinctBy { it.projectId }
+                    val editor = EnvEditorService.getInstance(project)
+                    try {
+                        for (link in links) {
+                            val result = ConvexApi.accessMeta(link.projectId)
+                            editor.cacheAccessMeta(link.projectId, result)
+                        }
+                        if (!editor.canReveal(links.map { it.projectId })) {
+                            notifyBalloon(
+                                project,
+                                "Your role does not allow revealing secret values.",
+                                com.intellij.notification.NotificationType.WARNING,
+                            )
+                            return@launch
+                        }
+                        editor.revealFor(30)
+                        refreshOpenEnvEditors(project)
+                        kotlinx.coroutines.delay(30_000)
+                        refreshOpenEnvEditors(project)
+                    } catch (error: Exception) {
+                        notifyBalloon(
+                            project,
+                            dev.envpilot.jetbrains.errors.Errors.friendly(error),
+                            com.intellij.notification.NotificationType.ERROR,
+                        )
+                    }
+                }
             }
         }
 
@@ -226,20 +264,26 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
             AllIcons.Actions.AddFile,
         ) {
             override fun update(e: AnActionEvent) {
-                e.presentation.isEnabled = AuthService.getInstance().email != null &&
-                    LinkedProjectsService.getInstance(project).all().isNotEmpty()
+                val editor = EnvEditorService.getInstance(project)
+                e.presentation.isEnabled =
+                    AuthService.getInstance().email != null &&
+                    accessibleProjects.keys.any { editor.hasCapability(it, "project.requests.submit") }
             }
 
             override fun actionPerformed(e: AnActionEvent) {
-                val links = LinkedProjectsService.getInstance(project).all()
+                val editor = EnvEditorService.getInstance(project)
                 val projects =
-                    links.distinctBy { it.projectId }
-                        .map { it.projectId to it.projectName }
+                    accessibleProjects.values
+                        .filter { editor.hasCapability(it.id, "project.requests.submit") }
+                        .sortedBy { it.name.lowercase() }
+                        .map {
+                            RequestProject(it.id, it.name, editor.allowedEnvironments(it.id))
+                        }
                 if (projects.isEmpty()) {
                     com.intellij.notification.NotificationGroupManager.getInstance()
                         .getNotificationGroup("dev.envpilot.notifications")
                         .createNotification(
-                            "Link a project directory first, then request variables for it.",
+                            "Your current project access does not allow variable requests.",
                             com.intellij.notification.NotificationType.WARNING,
                         )
                         .notify(project)
@@ -310,6 +354,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         val editorService = EnvEditorService.getInstance(project)
         val linksByProject = LinkedProjectsService.getInstance(project).all().groupBy { it.projectId }
         val rows = mutableListOf<Pair<String, Any>>()
+        accessibleProjects.clear()
         for (org in ConvexApi.orgs()) {
             rows.add("Org: ${org.name} (${org.slug})" to org)
             // One flaky org must not blank out the whole tree.
@@ -323,6 +368,9 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                     continue
                 }
             for (proj in projects) {
+                accessibleProjects[proj.id] = proj
+                runCatching { ConvexApi.accessMeta(proj.id) }
+                    .onSuccess { editorService.cacheAccessMeta(proj.id, it) }
                 rows.add("  Project: ${proj.name} (${proj.variableCount} vars)" to proj)
                 rows.addAll(rowsForLink(editorService, linksByProject[proj.id].orEmpty()))
             }
@@ -380,9 +428,14 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         val keys =
             editorService.cachedKeys(link.projectId) ?: run {
                 try {
-                    ConvexApi.pullValues(link.projectId, link.environment.takeIf { it.isNotBlank() }, metadataOnly = true)
-                        .variables.map { it.key }.toSet()
-                        .also { editorService.cacheKeys(link.projectId, it) }
+                    val result =
+                        ConvexApi.pullValues(
+                            link.projectId,
+                            link.environment.takeIf { it.isNotBlank() },
+                            metadataOnly = true,
+                        )
+                    editorService.cacheAccessMeta(link.projectId, result.meta)
+                    result.variables.map { it.key }.toSet().also { editorService.cacheKeys(link.projectId, it) }
                 } catch (_: Exception) {
                     null
                 }
@@ -397,8 +450,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     private fun selected(): Any? = list.selectedIndex.takeIf { it >= 0 && it < items.size }?.let { items[it] }
 
     private fun targetPathFor(link: LinkedProject): String {
-        val target = EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" }
-        return java.nio.file.Paths.get(link.directoryPath, target).toString()
+        return java.nio.file.Paths.get(link.directoryPath, targetFileFor(link)).toString()
     }
 
     private fun linkStatus(link: LinkedProject): EnvEditorService.LinkStatus =
@@ -448,8 +500,11 @@ private fun notifyBalloon(
 class LinkDirectoryDialog(
     private val project: Project,
     private val selected: ApiProject,
+    allowedEnvironments: List<String>,
 ) : DialogWrapper(project) {
-    private var environment = VALID_ENVIRONMENTS.first()
+    private val environmentChecks =
+        VALID_ENVIRONMENTS.filter { it in allowedEnvironments }
+            .map { it to javax.swing.JCheckBox(it.replaceFirstChar(Char::uppercase)) }
     private val dirField = com.intellij.openapi.ui.TextFieldWithBrowseButton()
     private val pathPreview = javax.swing.JLabel()
     private val pullScope =
@@ -478,6 +533,7 @@ class LinkDirectoryDialog(
             },
         )
         workspaceRoots = detectWorkspaceRoots()
+        environmentChecks.first().second.isSelected = true
         updatePathPreview()
         init()
     }
@@ -488,14 +544,15 @@ class LinkDirectoryDialog(
             .flatMap { com.intellij.openapi.roots.ModuleRootManager.getInstance(it).contentRoots.toList() }
             .map { it.path }
             .distinct()
-            .filter { it != null } as List<String>
 
     private fun updatePathPreview() {
         val base = dirField.text.trim().ifBlank { "?" }
-        val target = EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" }
+        val environments = selectedEnvironments()
+        val targets = environments.map { targetFileFor(it, environments.size) }
         pathPreview.text =
-            "<html><body style=\"margin:0\">Will write <code>${escapeHtml("$base/$target")}</code>" +
-            " &nbsp;($environment)</body></html>"
+            "<html><body style=\"margin:0\">Will write " +
+            targets.joinToString(", ") { "<code>${escapeHtml("$base/$it")}</code>" } +
+            "</body></html>"
     }
 
     private fun escapeHtml(s: String): String = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -516,10 +573,11 @@ class LinkDirectoryDialog(
                         }
                     }.comment("Detected content roots (worktrees/modules) — picking one fills the field below.")
                 }
-                row("Environment:") {
-                    cell(javax.swing.JComboBox(VALID_ENVIRONMENTS.toTypedArray()))
-                        .onChanged { environment = it.selectedItem as String }
-                }.comment("Which environment's values to pull into this directory.")
+                row("Environments:") {
+                    environmentChecks.forEach { (_, check) ->
+                        cell(check).onChanged { updatePathPreview() }
+                    }
+                }.comment("One env file is created per selected environment.")
                 row("Directory:") {
                     cell(dirField).align(com.intellij.ui.dsl.builder.AlignX.FILL)
                 }.comment("Change the env file name in Settings ▸ Tools ▸ Envpilot.")
@@ -535,24 +593,32 @@ class LinkDirectoryDialog(
         if (!dir.exists() || !dir.isDirectory) {
             return com.intellij.openapi.ui.ValidationInfo("Directory does not exist", dirField)
         }
+        if (selectedEnvironments().isEmpty()) {
+            return com.intellij.openapi.ui.ValidationInfo("Pick at least one environment", environmentChecks.first().second)
+        }
         return null
     }
 
     override fun doOKAction() {
         val dir = java.io.File(dirField.text).canonicalPath
         val deviceId = dev.envpilot.jetbrains.sync.JetBrainsDevice.id()
-        val link =
-            LinkedProject(
-                orgId = selected.organizationId,
-                projectId = selected.id,
-                projectName = selected.name,
-                environment = environment,
-                directoryPath = dir,
-                deviceId = deviceId,
-                accountId = AuthService.getInstance().userId.orEmpty(),
-            )
+        val environments = selectedEnvironments()
+        val pending =
+            environments.mapIndexed { index, environment ->
+                LinkedProject(
+                    orgId = selected.organizationId,
+                    projectId = selected.id,
+                    projectName = selected.name,
+                    environment = environment,
+                    targetFile = targetFileFor(environment, environments.size),
+                    includeSecretFiles = index == 0,
+                    directoryPath = dir,
+                    deviceId = deviceId,
+                    accountId = AuthService.getInstance().userId.orEmpty(),
+                )
+            }
         val links = LinkedProjectsService.getInstance(project)
-        if (links.contains(link)) {
+        if (pending.all(links::contains)) {
             com.intellij.notification.NotificationGroupManager.getInstance()
                 .getNotificationGroup("dev.envpilot.notifications")
                 .createNotification(
@@ -571,7 +637,7 @@ class LinkDirectoryDialog(
                     deviceId,
                     dev.envpilot.jetbrains.sync.JetBrainsDevice.name(),
                 )
-                links.add(link)
+                pending.forEach(links::add)
                 dev.envpilot.jetbrains.convex.ConvexSyncService.getInstance().watchProject(selected.id)
                 val ok = SyncScheduler.getInstance().runCycle(project)
                 refreshOpenEnvEditors(project)
@@ -591,10 +657,7 @@ class LinkDirectoryDialog(
                 val settings = EnvpilotSettings.getInstance().state
                 if (settings.commitGuardAutoInstall) {
                     val installed =
-                        dev.envpilot.jetbrains.guards.CommitGuard.install(
-                            dir,
-                            settings.targetFile.ifBlank { ".env.local" },
-                        )
+                        dev.envpilot.jetbrains.guards.CommitGuard.install(dir)
                     if (!installed) {
                         notifyBalloon(
                             project,
@@ -613,4 +676,6 @@ class LinkDirectoryDialog(
             }
         }
     }
+
+    private fun selectedEnvironments(): List<String> = environmentChecks.filter { it.second.isSelected }.map { it.first }
 }

@@ -16,22 +16,27 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.swing.JComponent
 
+data class RequestProject(
+    val id: String,
+    val name: String,
+    val allowedEnvironments: List<String>,
+)
+
 /**
  * Submit a variable request (same approval flow as the web). The value is
  * encrypted server-side by the createWithValue action.
  */
 class RequestVariableDialog(
     private val project: Project,
-    // pairs of (projectId, projectName)
-    private val projects: List<Pair<String, String>>,
+    private val projects: List<RequestProject>,
 ) : DialogWrapper(project) {
     private val keyField = javax.swing.JTextField()
-    private val valueField = javax.swing.JTextField()
+    private val valueField = javax.swing.JPasswordField()
     private val descriptionField = javax.swing.JTextField()
     private val envChecks = VALID_ENVIRONMENTS.map { it to javax.swing.JCheckBox(it.capitalize()) }
     private val sensitiveCheck = javax.swing.JCheckBox("Sensitive value", true)
     private val projectCombo =
-        javax.swing.JComboBox(projects.map { it.second }.toTypedArray())
+        javax.swing.JComboBox(projects.map { it.name }.toTypedArray())
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -39,6 +44,8 @@ class RequestVariableDialog(
         title = "Request Variable"
         setOKButtonText("Submit Request")
         envChecks.first().second.isSelected = true
+        projectCombo.addActionListener { updateEnvironmentAccess() }
+        updateEnvironmentAccess()
         init()
     }
 
@@ -53,7 +60,7 @@ class RequestVariableDialog(
                 }.comment("UPPER_SNAKE_CASE — letters, digits and underscores, starting with a letter.")
                 row("Proposed value:") {
                     cell(valueField).align(AlignX.FILL)
-                }.comment("Encrypted server-side before storage; never leaves the machine in plaintext.")
+                }.comment("Sent over TLS and encrypted by the existing Convex action before storage.")
                 row("Description:") {
                     cell(descriptionField).align(AlignX.FILL)
                 }.comment("Optional context for whoever approves this request.")
@@ -72,7 +79,10 @@ class RequestVariableDialog(
         if (!Regex("^[A-Z][A-Z0-9_]*$").matches(keyField.text.trim())) {
             return ValidationInfo("Key must be UPPER_SNAKE_CASE (A-Z, 0-9, _)", keyField)
         }
-        if (valueField.text.isBlank()) {
+        if (keyField.text.trim().length > 100) {
+            return ValidationInfo("Key must be 100 characters or less", keyField)
+        }
+        if (valueField.password.isEmpty()) {
             return ValidationInfo("Value is required", valueField)
         }
         if (envChecks.none { it.second.isSelected }) {
@@ -82,12 +92,26 @@ class RequestVariableDialog(
     }
 
     override fun doOKAction() {
-        val projectId = projects.getOrNull(projectCombo.selectedIndex)?.first ?: return
+        val selectedProject = projects.getOrNull(projectCombo.selectedIndex) ?: return
+        val projectId = selectedProject.id
         val key = keyField.text.trim()
-        val value = valueField.text
+        val value = String(valueField.password)
         val description = descriptionField.text.trim().takeIf { it.isNotEmpty() }
         val environments = envChecks.filter { it.second.isSelected }.map { it.first }
         val sensitive = sensitiveCheck.isSelected
+
+        val confirmed =
+            com.intellij.openapi.ui.Messages.showYesNoDialog(
+                project,
+                "Submit $key for ${selectedProject.name}?\n\n" +
+                    "Environments: ${environments.joinToString(", ")}\n" +
+                    "Sensitive: ${if (sensitive) "Yes" else "No"}",
+                "Submit Variable Request",
+                "Submit Request",
+                "Cancel",
+                com.intellij.icons.AllIcons.General.QuestionDialog,
+            )
+        if (confirmed != com.intellij.openapi.ui.Messages.YES) return
 
         scope.launch {
             try {
@@ -100,6 +124,17 @@ class RequestVariableDialog(
             }
         }
         super.doOKAction()
+    }
+
+    private fun updateEnvironmentAccess() {
+        val allowed = projects.getOrNull(projectCombo.selectedIndex)?.allowedEnvironments.orEmpty()
+        envChecks.forEach { (environment, check) ->
+            check.isEnabled = environment in allowed
+            if (!check.isEnabled) check.isSelected = false
+        }
+        if (envChecks.none { it.second.isSelected }) {
+            envChecks.firstOrNull { it.second.isEnabled }?.second?.isSelected = true
+        }
     }
 
     private fun notify(

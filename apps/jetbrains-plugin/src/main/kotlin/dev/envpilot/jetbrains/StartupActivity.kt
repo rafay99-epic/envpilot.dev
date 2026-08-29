@@ -44,6 +44,7 @@ class StartupActivity : ProjectActivity {
         SyncScheduler.getInstance().startFor(project)
         dev.envpilot.jetbrains.convex.ConvexSyncService.getInstance().ensureStarted()
         watchLinkedProjects(project)
+        restoreCommitGuard(project)
 
         // Perceived real-time: pull the moment the user returns to the IDE.
         project.messageBus.connect().subscribe(
@@ -91,8 +92,7 @@ class StartupActivity : ProjectActivity {
      * wrote (tracked in EnvEditorService) are ever touched.
      */
     private fun unsyncOnClose(project: Project) {
-        if (!dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.autoUnsyncOnClose) return
-        val result = dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project).purgeManagedFiles()
+        val result = dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project).purgeManagedFiles(respectAutoUnsync = true)
         if (result.removed > 0 || result.preserved > 0) {
             com.intellij.openapi.diagnostic.logger<StartupActivity>()
                 .info("Auto-unsync on close: removed ${result.removed}, preserved ${result.preserved} modified/pre-existing file(s)")
@@ -106,6 +106,14 @@ class StartupActivity : ProjectActivity {
                 dev.envpilot.jetbrains.convex.ConvexSyncService.getInstance().watchProject(link.projectId)
             }
         }
+    }
+
+    private fun restoreCommitGuard(project: Project) {
+        if (!dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.commitGuardEnabled) return
+        dev.envpilot.jetbrains.sync.LinkedProjectsService.getInstance(project).all()
+            .map { it.directoryPath }
+            .distinct()
+            .forEach(dev.envpilot.jetbrains.guards.CommitGuard::install)
     }
 
     private fun cloakIfManaged(
@@ -135,7 +143,7 @@ class StartupActivity : ProjectActivity {
                 ) {
                     if (pluginDescriptor.pluginId.idString != dev.envpilot.jetbrains.version.VersionCheck.PLUGIN_ID) return
                     for (project in com.intellij.openapi.project.ProjectManager.getInstance().openProjects) {
-                        unsyncOnClose(project)
+                        dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project).purgeManagedFiles()
                     }
                 }
             },

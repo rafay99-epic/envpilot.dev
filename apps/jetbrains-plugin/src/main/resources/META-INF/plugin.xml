@@ -20,11 +20,19 @@
             <code>.env</code> file and materialize secret files with their
             correct permissions — manually, or automatically on a sync
             interval.</li>
+            <li><b>Protect</b> local secrets with value cloaking, clipboard
+            blocking, drift detection, timed and permission-checked reveals,
+            and an optional Git commit guard.</li>
+            <li><b>Request</b> variables through the existing approval flow.
+            Project eligibility and environment scope come from Envpilot's
+            role capability registry.</li>
+            <li><b>Switch accounts</b> without mixing project links or tokens.
+            Sessions stay in the IDE password store.</li>
         </ul>
         <br>
         <p>Secrets stay encrypted server-side (WorkOS Vault), every delivery
-        is audit-logged, and pulls abort loudly rather than ever writing
-        partial or half-decrypted data.</p>
+        is audit-logged, and pulls stop before writing if data is incomplete
+        or cannot be decrypted.</p>
         <br>
         <p>Requires an Envpilot account — create one at
         <a href="https://www.envpilot.dev">envpilot.dev</a>.</p>
@@ -94,6 +102,36 @@
                     class="dev.envpilot.jetbrains.actions.SignOutAllAction"
                     text="Sign Out All Accounts"
                     description="Clear every stored Envpilot account"/>
+            <separator/>
+            <action id="dev.envpilot.PullNow"
+                    class="dev.envpilot.jetbrains.actions.PullNowAction"
+                    text="Pull Now"
+                    description="Pull variables and secret files for linked directories"/>
+            <action id="dev.envpilot.ShowStatus"
+                    class="dev.envpilot.jetbrains.actions.ShowStatusAction"
+                    text="Show Status"
+                    description="Show Envpilot connection and sync status"/>
+            <action id="dev.envpilot.ToggleCloaking"
+                    class="dev.envpilot.jetbrains.actions.ToggleCloakingAction"
+                    text="Toggle Cloaking"
+                    description="Mask or unmask managed secret values"/>
+            <action id="dev.envpilot.RevealValues"
+                    class="dev.envpilot.jetbrains.actions.RevealValuesAction"
+                    text="Reveal Values for 30 Seconds"
+                    description="Temporarily show managed secret values"/>
+            <action id="dev.envpilot.RevealValueAtCaret"
+                    class="dev.envpilot.jetbrains.actions.RevealValueAtCaretAction"
+                    text="Reveal Value at Caret"
+                    description="Reveal one managed variable after checking Convex permissions"/>
+            <separator/>
+            <action id="dev.envpilot.InstallCommitGuard"
+                    class="dev.envpilot.jetbrains.actions.InstallCommitGuardAction"
+                    text="Install Commit Guard"
+                    description="Block commits containing env files"/>
+            <action id="dev.envpilot.RemoveCommitGuard"
+                    class="dev.envpilot.jetbrains.actions.RemoveCommitGuardAction"
+                    text="Remove Commit Guard"
+                    description="Remove Envpilot commit guard blocks"/>
         </group>
     </actions>
 </idea-plugin>

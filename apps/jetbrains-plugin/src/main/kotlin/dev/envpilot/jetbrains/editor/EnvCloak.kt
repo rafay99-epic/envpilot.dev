@@ -40,7 +40,7 @@ object EnvCloak {
         val managed = service.managed(path)
 
         clearFolds(editor)
-        if (managed == null || service.isRevealed()) return
+        if (managed == null || !isHidden(project, service)) return
 
         val isEnvFile = editor.virtualFile.name.startsWith(".env")
         val text = editor.document
@@ -79,7 +79,17 @@ object EnvCloak {
     ): Boolean {
         val path = editor.virtualFile?.path ?: return false
         val service = EnvEditorService.getInstance(project)
-        return service.managed(path) != null && !service.isRevealed()
+        return service.managed(path) != null && isHidden(project, service)
+    }
+
+    private fun isHidden(
+        project: Project,
+        service: EnvEditorService,
+    ): Boolean {
+        if (service.isRevealed()) return false
+        if (dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.cloakValues) return true
+        val projectIds = dev.envpilot.jetbrains.sync.LinkedProjectsService.getInstance(project).all().map { it.projectId }.distinct()
+        return !service.canReveal(projectIds)
     }
 
     fun hashOf(path: Path): String =

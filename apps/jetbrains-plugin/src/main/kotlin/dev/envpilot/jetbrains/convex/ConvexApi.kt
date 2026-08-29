@@ -43,6 +43,26 @@ object ConvexApi {
             )
         }
 
+    suspend fun accessMeta(projectId: String): PullMeta {
+        val obj =
+            parseObject(
+                socket().query(
+                    "features/auth/queries:resolveLegacyRoles",
+                    mapOf("projectId" to projectId),
+                ),
+            )
+        return PullMeta(
+            decryptionFailures = null,
+            role = obj.str("role"),
+            environmentScope = obj.stringArray("environmentScope"),
+            truncatedAt = null,
+            autoUnsyncOnClose = true,
+            capabilities =
+                obj.getAsJsonObject("capabilities")?.entrySet()
+                    ?.associate { (key, value) -> key to value.asBoolean }.orEmpty(),
+        )
+    }
+
     suspend fun pullValues(
         projectId: String,
         environment: String?,
@@ -75,6 +95,9 @@ object ConvexApi {
                 PullMeta(
                     decryptionFailures = meta?.getAsJsonArray("decryptionFailures")?.map { it.asString },
                     role = meta?.str("role"),
+                    environmentScope = meta?.stringArray("environmentScope"),
+                    truncatedAt = meta?.get("truncatedAt")?.takeIf { it.isJsonPrimitive }?.asInt,
+                    autoUnsyncOnClose = meta?.get("autoUnsyncOnClose")?.asBoolean ?: true,
                     capabilities =
                         meta?.getAsJsonObject("capabilities")?.entrySet()
                             ?.associate { (key, value) -> key to value.asBoolean }.orEmpty(),
@@ -120,7 +143,8 @@ object ConvexApi {
                 mode = obj.octal("mode"),
                 size = obj.get("size")?.takeIf { it.isJsonPrimitive }?.asLong ?: 0L,
             )
-        val bytes = java.util.Base64.getDecoder().decode(obj.str("content") ?: "")
+        val content = obj.str("content") ?: error("Envpilot returned a file without content")
+        val bytes = java.util.Base64.getDecoder().decode(content)
         return meta to bytes
     }
 
@@ -173,21 +197,18 @@ object ConvexApi {
 
     // ── Parsing helpers (wire boundary) ──────────────────────────────────────
 
-    private fun parseArray(body: String): List<JsonObject> =
-        try {
-            val parsed = JsonParser.parseString(body)
-            when {
-                parsed.isJsonNull -> emptyList()
-                parsed.isJsonArray -> parsed.asJsonArray.map { it.asJsonObject }
-                else -> emptyList()
-            }
-        } catch (_: Exception) {
-            emptyList()
-        }
+    private fun parseArray(body: String): List<JsonObject> {
+        val parsed = JsonParser.parseString(body)
+        if (parsed.isJsonNull) return emptyList()
+        require(parsed.isJsonArray) { "Invalid response from Envpilot" }
+        return parsed.asJsonArray.map { it.asJsonObject }
+    }
 
     private fun parseObject(body: String): JsonObject = JsonParser.parseString(body).asJsonObject
 
     private fun JsonObject.str(key: String): String? = get(key)?.takeIf { it.isJsonPrimitive && !it.asJsonPrimitive.isNumber }?.asString
+
+    private fun JsonObject.stringArray(key: String): List<String>? = get(key)?.takeIf { it.isJsonArray }?.asJsonArray?.map { it.asString }
 
     private fun JsonObject.octal(key: String): Int? =
         get(key)?.takeIf { it.isJsonPrimitive }?.asString?.let {

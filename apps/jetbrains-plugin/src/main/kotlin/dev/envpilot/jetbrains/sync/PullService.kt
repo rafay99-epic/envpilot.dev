@@ -31,6 +31,9 @@ object PullService {
         val environment = link.environment.takeIf { it.isNotBlank() }
 
         val result = ConvexApi.pullValues(link.projectId, environment, metadataOnly = false)
+        result.meta.truncatedAt?.let {
+            throw PullAborted("Project has more than $it variables. Pull stopped to prevent an incomplete env file.")
+        }
         val failed =
             result.meta.decryptionFailures.orEmpty() +
                 result.variables.filter { it.value == "[DECRYPTION_FAILED]" }.map { it.key }
@@ -39,7 +42,7 @@ object PullService {
         }
 
         // Fetch everything first so a failure mid-pull writes nothing.
-        val fileMetas = ConvexApi.listFiles(link.projectId, environment)
+        val fileMetas = if (link.includeSecretFiles) ConvexApi.listFiles(link.projectId, environment) else emptyList()
         val downloaded =
             fileMetas.map { meta ->
                 val (m, bytes) = ConvexApi.fileContent(meta.id)
@@ -47,10 +50,7 @@ object PullService {
             }
 
         val dir = Path.of(link.directoryPath)
-        val targetFile =
-            dir.resolve(
-                EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" },
-            )
+        val targetFile = dir.resolve(targetFileFor(link))
         val values = result.variables.associate { it.key to it.value }
         val mode = EnvFiles.ConflictMode.from(EnvpilotSettings.getInstance().state.conflictResolution)
         val existing = EnvFiles.readIfExists(targetFile)
@@ -102,7 +102,7 @@ object PullService {
             try {
                 val editorState = EnvEditorService.getInstance(project)
                 editorState.cacheKeys(link.projectId, values.keys)
-                editorState.cacheCapabilities(link.projectId, result.meta.capabilities)
+                editorState.cacheAccessMeta(link.projectId, result.meta)
                 editorState.recordSync(
                     targetFile.toString(),
                     values.keys,
@@ -110,6 +110,7 @@ object PullService {
                     writtenSecrets,
                     secretHashes,
                     envCreated = previousManaged?.envCreated ?: (existing == null),
+                    autoUnsyncOnClose = result.meta.autoUnsyncOnClose,
                 )
             } catch (e: Exception) {
                 log.warn("Editor state update failed: ${e.message}")

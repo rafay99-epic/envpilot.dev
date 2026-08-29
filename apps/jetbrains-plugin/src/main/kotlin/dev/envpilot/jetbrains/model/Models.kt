@@ -20,6 +20,9 @@ data class PulledVariable(
 data class PullMeta(
     val decryptionFailures: List<String>?,
     val role: String?,
+    val environmentScope: List<String>?,
+    val truncatedAt: Int?,
+    val autoUnsyncOnClose: Boolean,
     val capabilities: Map<String, Boolean>,
 )
 

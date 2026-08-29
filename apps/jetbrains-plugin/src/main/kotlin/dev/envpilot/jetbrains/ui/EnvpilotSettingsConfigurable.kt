@@ -59,25 +59,13 @@ class EnvpilotSettingsConfigurable : BoundConfigurable("Envpilot") {
                         .bindIntValue(state::idlePauseMinutes)
                 }.comment("0 = never pause. While the IDE is idle longer than this, background sync waits.")
                 row {
-                    checkBox("Cloak managed values in editors")
-                        .bindSelected(state::cloakValues)
-                }
-                row {
                     checkBox("Autocomplete env keys in .env files")
                         .bindSelected(state::autocompleteEnabled)
-                }
-                row {
-                    checkBox("Commit guard (block commits of managed env files)")
-                        .bindSelected(state::commitGuardEnabled)
                 }
                 row {
                     checkBox("Auto-install commit-guard git hook when linking")
                         .bindSelected(state::commitGuardAutoInstall)
                 }
-                row {
-                    checkBox("Remove pulled env files when the IDE closes")
-                        .bindSelected(state::autoUnsyncOnClose)
-                }.comment("Decrypted secrets on disk defeat the point of the vault — delete them on close.")
             }
             group("Version") {
                 row {

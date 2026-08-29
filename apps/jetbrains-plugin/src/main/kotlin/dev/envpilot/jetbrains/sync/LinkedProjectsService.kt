@@ -12,6 +12,8 @@ data class LinkedProject(
     var projectId: String = "",
     var projectName: String = "",
     var environment: String = "development",
+    var targetFile: String = "",
+    var includeSecretFiles: Boolean = true,
     var directoryPath: String = "",
     var deviceId: String = "",
     var accountId: String = "",
@@ -35,7 +37,9 @@ class LinkedProjectsService : PersistentStateComponent<LinkedProjectsService.Sta
     fun all(): List<LinkedProject> {
         val accountId = dev.envpilot.jetbrains.auth.AuthService.getInstance().userId ?: return emptyList()
         state.links.filter { it.accountId.isBlank() }.forEach { it.accountId = accountId }
-        return state.links.filter { it.accountId == accountId }
+        val links = state.links.filter { it.accountId == accountId }
+        normalizeDirectories(links)
+        return links
     }
 
     fun contains(link: LinkedProject): Boolean {
@@ -57,6 +61,17 @@ class LinkedProjectsService : PersistentStateComponent<LinkedProjectsService.Sta
 
     fun remove(link: LinkedProject): Boolean = state.links.remove(link)
 
+    private fun normalizeDirectories(links: List<LinkedProject>) {
+        links.groupBy { Triple(it.projectId, it.directoryPath, it.accountId) }.values.forEach { directoryLinks ->
+            directoryLinks.forEachIndexed { index, link -> link.includeSecretFiles = index == 0 }
+            if (directoryLinks.size > 1) {
+                directoryLinks.forEach { link ->
+                    link.targetFile = targetFileFor(link.environment, directoryLinks.size)
+                }
+            }
+        }
+    }
+
     companion object {
         fun getInstance(project: Project): LinkedProjectsService = project.getService(LinkedProjectsService::class.java)
     }
@@ -76,3 +91,20 @@ object JetBrainsDevice {
         "${com.intellij.openapi.application.ApplicationInfo.getInstance().fullApplicationName} " +
             "(${System.getProperty("os.name")})"
 }
+
+fun targetFileFor(link: LinkedProject): String =
+    link.targetFile.ifBlank {
+        dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" }
+    }
+
+fun targetFileFor(
+    environment: String,
+    selectedEnvironmentCount: Int,
+): String =
+    if (selectedEnvironmentCount == 1) {
+        dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" }
+    } else if (environment == "development") {
+        ".env.local"
+    } else {
+        ".env.$environment"
+    }

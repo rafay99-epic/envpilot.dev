@@ -1,10 +1,18 @@
 package dev.envpilot.jetbrains
 
 import dev.envpilot.jetbrains.sync.EnvFiles
+import dev.envpilot.jetbrains.sync.targetFileFor
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class EnvFilesTest {
+    @Test
+    fun `multi environment links use separate conventional files`() {
+        assertEquals(".env.local", targetFileFor("development", 2))
+        assertEquals(".env.staging", targetFileFor("staging", 2))
+        assertEquals(".env.production", targetFileFor("production", 3))
+    }
+
     @Test
     fun `merge into empty produces sorted key value lines`() {
         val out = EnvFiles.merge(null, linkedMapOf("B" to "2", "A" to "1"))

@@ -33,7 +33,7 @@ date: 2026-08-27
 types: [feature]
 ---
 
-Envpilot now works inside IntelliJ IDEA, Android Studio, WebStorm and other JetBrains IDEs. Link a project and environment, pull variables and secret files, request new variables, and keep local files synchronized through the same permissions and Convex data plane used by the existing clients.
+Envpilot now works inside IntelliJ IDEA, Android Studio, WebStorm and other JetBrains IDEs. Link directories to one or more environments, pull variables and secret files, request variables within your role and environment scope, and switch between accounts. Native editor protection includes value cloaking, clipboard blocking, drift detection, timed or per-key reveals, safe cleanup, and an optional Git commit guard. Authentication, permissions, requests, values, and files use the existing Convex data plane.
 
 The plugin supports multiple Envpilot accounts, safe account switching, automatic cleanup of unchanged generated files, drift protection for files with local edits, capability-gated secret reveal, AuthKit browser sign-in and session refresh, and native IDE status and tool-window controls. It does not embed the web dashboard.
 
