@@ -356,7 +356,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         val rows = mutableListOf<Pair<String, Any>>()
         accessibleProjects.clear()
         for (org in ConvexApi.orgs()) {
-            rows.add("Org: ${org.name} (${org.slug})" to org)
+            rows.add("${org.name} (${org.slug})" to org)
             // One flaky org must not blank out the whole tree.
             val projects =
                 try {
@@ -371,7 +371,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                 accessibleProjects[proj.id] = proj
                 runCatching { ConvexApi.accessMeta(proj.id) }
                     .onSuccess { editorService.cacheAccessMeta(proj.id, it) }
-                rows.add("  Project: ${proj.name} (${proj.variableCount} vars)" to proj)
+                rows.add("  ${proj.name} (${proj.variableCount} vars)" to proj)
                 rows.addAll(rowsForLink(editorService, linksByProject[proj.id].orEmpty()))
             }
         }
