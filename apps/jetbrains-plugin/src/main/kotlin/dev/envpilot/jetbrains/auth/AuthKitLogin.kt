@@ -240,11 +240,22 @@ object AuthKitLogin {
 
     class WorkosUser(val id: String, val email: String)
 
+    // WorkOS returns snake_case JSON; Gson maps fields by exact name, so the
+    // wire keys must be annotated or every value parses as null.
     class JsonObjectResponse {
+        @com.google.gson.annotations.SerializedName("access_token")
         val accessToken: String? = null
+
+        @com.google.gson.annotations.SerializedName("refresh_token")
         val refreshToken: String? = null
+
+        @com.google.gson.annotations.SerializedName("error")
         val error: String? = null
+
+        @com.google.gson.annotations.SerializedName("error_description")
         val errorDescription: String? = null
+
+        @com.google.gson.annotations.SerializedName("user")
         val user: WorkosUser? = null
     }
 
