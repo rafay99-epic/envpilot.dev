@@ -66,8 +66,6 @@ object Errors {
                 "Your account doesn't have access to this resource."
             raw.contains("Decryption failed", true) ->
                 raw // already user-facing from PullService
-            raw.contains("Port", true) && raw.contains("busy", true) ->
-                raw
             else -> raw.replaceFirstChar { it.uppercase() }.let { if (it.endsWith(".")) it else "$it." }
         }
     }

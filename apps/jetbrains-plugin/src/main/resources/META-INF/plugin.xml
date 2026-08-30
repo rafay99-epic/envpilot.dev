@@ -10,8 +10,9 @@
         <br>
         <p><b>How it works:</b></p>
         <ul>
-            <li><b>Sign in</b> from Tools ▸ Envpilot ▸ Sign In. A browser-based
-            WorkOS login opens — approve it once and the IDE stays connected.</li>
+            <li><b>Sign in</b> from Tools ▸ Envpilot ▸ Sign In. A WorkOS
+            device-flow login opens in your browser — approve it once and the
+            IDE stays connected.</li>
             <li><b>Browse</b> your organizations and projects in the Envpilot
             tool window (View ▸ Tool Windows ▸ Envpilot).</li>
             <li><b>Link</b> any project folder to a project + environment

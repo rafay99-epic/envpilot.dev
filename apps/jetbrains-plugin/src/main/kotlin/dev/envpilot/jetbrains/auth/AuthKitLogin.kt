@@ -1,34 +1,29 @@
 package dev.envpilot.jetbrains.auth
 
 import com.intellij.ide.BrowserUtil
-import com.sun.net.httpserver.HttpExchange
-import com.sun.net.httpserver.HttpServer
 import dev.envpilot.jetbrains.BuildConfig
-import java.net.InetSocketAddress
 import java.net.URI
-import java.net.URLDecoder
 import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.time.Duration
-import java.util.Base64
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeUnit
 
 /**
- * WorkOS AuthKit login: OAuth2 authorization-code + PKCE, callback landing on
- * a loopback HTTP server (the JetBrains-endorsed pattern for IDE plugins).
- * Token exchange and refresh are standard WorkOS endpoints — no custom
- * protocol logic.
+ * WorkOS AuthKit device authorization flow — the same login the VS Code
+ * extension and CLI use: request a device code, open the hosted approval
+ * page in the browser, poll the token endpoint until approved. No redirect
+ * URI, no loopback server, no port to collide with other IDE instances.
+ *
+ * Token exchange and refresh are standard WorkOS endpoints. `refresh` keeps
+ * its own retry treatment (transient failures keep credentials, rejected
+ * grants clear them — see AuthService).
  */
 object AuthKitLogin {
-    private const val AUTHORIZE_URL = "https://api.workos.com/user_management/authorize"
+    private const val DEVICE_AUTHORIZE_URL = "https://api.workos.com/user_management/authorize/device"
     private const val AUTHENTICATE_URL = "https://api.workos.com/user_management/authenticate"
-    private const val REDIRECT_PORT = 6318
-    private const val REDIRECT_URI = "http://localhost:$REDIRECT_PORT/callback"
+    private const val DEVICE_CODE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
 
     class LoginCancelled(message: String, val transient: Boolean = false) : Exception(message)
 
@@ -39,44 +34,26 @@ object AuthKitLogin {
             .build()
 
     /**
-     * Run the full browser login. Blocks the calling (IO) coroutine until the
-     * user approves, the code is exchanged, or it times out.
+     * Run the device flow. Blocks the calling (IO) coroutine until the user
+     * approves, the code expires, or the approval is denied in the browser.
      */
     fun signIn(): TokenResponse {
-        val verifier = pkceVerifier()
-        val challenge = pkceChallenge(verifier)
-        val state = pkceVerifier()
-        val codeFuture = CompletableFuture<String>()
-
-        val server =
-            try {
-                startCallbackServer(codeFuture, state)
-            } catch (e: java.net.BindException) {
-                throw LoginCancelled(
-                    "Port $REDIRECT_PORT is busy — close other IDE instances and retry.",
-                    transient = true,
-                )
+        val device = requestDeviceCode()
+        BrowserUtil.browse(device.verificationUriComplete)
+        val deadline = System.currentTimeMillis() + device.expiresIn * 1000L
+        var intervalSeconds = device.interval
+        while (System.currentTimeMillis() < deadline) {
+            Thread.sleep(intervalSeconds * 1000L)
+            when (val poll = pollForToken(device.deviceCode)) {
+                is PollResult.Complete -> return poll.token
+                PollResult.Pending -> Unit
+                PollResult.Network -> Unit
+                PollResult.SlowDown -> intervalSeconds += 5
+                PollResult.Denied -> throw LoginCancelled("Sign-in was denied in the browser.")
+                PollResult.Expired -> throw LoginCancelled("The sign-in code expired — start again.")
             }
-        try {
-            BrowserUtil.browse(authorizeUrl(challenge, state))
-            val code =
-                try {
-                    codeFuture.get(5, TimeUnit.MINUTES)
-                } catch (e: java.util.concurrent.TimeoutException) {
-                    throw LoginCancelled("Sign-in timed out — no browser approval within 5 minutes.")
-                }
-            return exchangeCode(code, verifier)
-        } catch (e: java.util.concurrent.ExecutionException) {
-            // The callback future wraps its own LoginCancelled — rethrow as-is.
-            (e.cause as? LoginCancelled)?.let { throw it }
-            dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "authkit-login"))
-            throw LoginCancelled("Sign-in failed: ${e.cause?.message ?: e.message}")
-        } catch (e: Exception) {
-            dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "authkit-login"))
-            throw LoginCancelled("Sign-in failed: ${e.message ?: e::class.simpleName}")
-        } finally {
-            server.stop(0)
         }
+        throw LoginCancelled("Sign-in timed out — no browser approval.")
     }
 
     /** Standard WorkOS refresh grant (rotates the refresh token). */
@@ -92,110 +69,116 @@ object AuthKitLogin {
         return parseToken(body)
     }
 
-    // ── Internals ────────────────────────────────────────────────────────────
+    // ── Device flow ──────────────────────────────────────────────────────────
 
-    private fun authorizeUrl(
-        codeChallenge: String,
-        state: String,
-    ): String {
-        val params =
-            linkedMapOf(
-                "client_id" to BuildConfig.WORKOS_CLIENT_ID,
-                "redirect_uri" to REDIRECT_URI,
-                "response_type" to "code",
-                "code_challenge" to codeChallenge,
-                "code_challenge_method" to "S256",
-                "state" to state,
-                "provider" to "authkit",
-            )
-        return AUTHORIZE_URL + "?" +
-            params.entries.joinToString("&") { (k, v) ->
-                "${enc(k)}=${enc(v)}"
-            }
+    private class DeviceCode(
+        val deviceCode: String,
+        val userCode: String,
+        val verificationUri: String,
+        val verificationUriComplete: String,
+        val expiresIn: Int,
+        val interval: Int,
+    )
+
+    private sealed interface PollResult {
+        data class Complete(val token: TokenResponse) : PollResult
+
+        data object Pending : PollResult
+
+        data object SlowDown : PollResult
+
+        data object Denied : PollResult
+
+        data object Expired : PollResult
+
+        data object Network : PollResult
     }
 
-    private fun exchangeCode(
-        code: String,
-        verifier: String,
-    ): TokenResponse {
-        val body =
-            postAuthenticate(
-                mapOf(
-                    "grant_type" to "authorization_code",
-                    "client_id" to BuildConfig.WORKOS_CLIENT_ID,
-                    "code" to code,
-                    "code_verifier" to verifier,
-                ),
-            )
-        return parseToken(body)
-    }
-
-    private fun startCallbackServer(
-        codeFuture: CompletableFuture<String>,
-        state: String,
-    ): HttpServer {
-        val server = HttpServer.create(InetSocketAddress("127.0.0.1", REDIRECT_PORT), 0)
-        server.createContext("/callback") { exchange ->
-            val code = queryParam(exchange, "code")
-            val error = queryParam(exchange, "error")
-            val returnedState = queryParam(exchange, "state")
-            when {
-                returnedState != state -> {
-                    respond(exchange, "State mismatch — aborting login.")
-                    codeFuture.completeExceptionally(LoginCancelled("State mismatch — aborting login."))
-                }
-                error != null -> {
-                    respond(exchange, "Sign-in denied: $error")
-                    codeFuture.completeExceptionally(LoginCancelled("Sign-in denied: $error"))
-                }
-                code != null -> {
-                    respond(exchange, "You are all set! You may close this window.")
-                    codeFuture.complete(code)
-                }
-                else -> {
-                    respond(exchange, "No code in callback.")
-                    codeFuture.completeExceptionally(LoginCancelled("No code in callback"))
-                }
+    private fun requestDeviceCode(): DeviceCode {
+        val response =
+            try {
+                post(DEVICE_AUTHORIZE_URL, mapOf("client_id" to BuildConfig.WORKOS_CLIENT_ID))
+            } catch (e: java.io.IOException) {
+                throw LoginCancelled("Could not reach WorkOS to start authentication.", transient = true)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw LoginCancelled("Sign-in was interrupted.", transient = true)
             }
+        if (response.statusCode() >= 400) {
+            val message = errorMessage(response.body())
+            throw LoginCancelled(
+                message?.let { "WorkOS rejected the device-code request: $it" }
+                    ?: "WorkOS rejected the device-code request.",
+                transient = response.statusCode() >= 500,
+            )
         }
-        server.executor = null
-        server.start()
-        return server
-    }
-
-    private fun respond(
-        exchange: HttpExchange,
-        message: String,
-    ) {
-        val bytes =
-            "<html><body>${message.replace("<", "&lt;")}</body></html>"
-                .toByteArray(StandardCharsets.UTF_8)
-        exchange.responseHeaders.add("Content-Type", "text/html; charset=utf-8")
-        exchange.sendResponseHeaders(200, bytes.size.toLong())
-        exchange.responseBody.use { it.write(bytes) }
-    }
-
-    private fun queryParam(
-        exchange: HttpExchange,
-        key: String,
-    ): String? =
-        exchange.requestURI.query
-            ?.split("&")
-            ?.mapNotNull { part ->
-                val idx = part.indexOf('=')
-                if (idx <= 0) null else dec(part.substring(0, idx)) to dec(part.substring(idx + 1))
+        val obj =
+            try {
+                com.google.gson.JsonParser.parseString(response.body()).asJsonObject
+            } catch (_: Exception) {
+                throw LoginCancelled("WorkOS returned an unexpected device-code response.")
             }
-            ?.firstOrNull { it.first == key }
-            ?.second
+        val values =
+            listOf(
+                str(obj, "device_code"),
+                str(obj, "user_code"),
+                str(obj, "verification_uri"),
+                str(obj, "verification_uri_complete"),
+            ).map { value ->
+                value?.takeIf { it.isNotBlank() }
+                    ?: throw LoginCancelled("WorkOS returned an unexpected device-code response.")
+            }
+        return DeviceCode(
+            deviceCode = values[0],
+            userCode = values[1],
+            verificationUri = values[2],
+            verificationUriComplete = values[3],
+            expiresIn = obj.get("expires_in")?.takeIf { it.isJsonPrimitive }?.asInt ?: 300,
+            interval = obj.get("interval")?.takeIf { it.isJsonPrimitive }?.asInt ?: 5,
+        )
+    }
+
+    /**
+     * One poll attempt. 200 issues tokens; the documented OAuth errors map to
+     * their own outcome; anything else is treated as transient so a hiccup
+     * doesn't abort an otherwise-live flow.
+     */
+    private fun pollForToken(deviceCode: String): PollResult {
+        val response =
+            try {
+                post(
+                    AUTHENTICATE_URL,
+                    mapOf(
+                        "client_id" to BuildConfig.WORKOS_CLIENT_ID,
+                        "grant_type" to DEVICE_CODE_GRANT,
+                        "device_code" to deviceCode,
+                    ),
+                )
+            } catch (e: Exception) {
+                return PollResult.Network
+            }
+        if (response.statusCode() < 400) {
+            val body = gson().fromJson(response.body(), JsonObjectResponse::class.java)
+            return PollResult.Complete(parseToken(body ?: throw LoginCancelled("Empty response from WorkOS")))
+        }
+        return when (oauthError(response.body())) {
+            "authorization_pending" -> PollResult.Pending
+            "slow_down" -> PollResult.SlowDown
+            "access_denied" -> PollResult.Denied
+            "expired_token" -> PollResult.Expired
+            else -> PollResult.Network
+        }
+    }
+
+    // ── Transport (token refresh path) ───────────────────────────────────────
 
     private fun postAuthenticate(form: Map<String, String>): JsonObjectResponse {
-        val body = form.entries.joinToString("&") { "${enc(it.key)}=${enc(it.value)}" }
         val request =
             HttpRequest.newBuilder()
                 .uri(URI.create(AUTHENTICATE_URL))
                 .timeout(Duration.ofSeconds(30))
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .POST(HttpRequest.BodyPublishers.ofString(form.entries.joinToString("&") { "${enc(it.key)}=${enc(it.value)}" }))
                 .build()
         repeat(3) { attempt ->
             val response =
@@ -232,6 +215,23 @@ object AuthKitLogin {
         throw LoginCancelled("WorkOS is temporarily unreachable.", transient = true)
     }
 
+    private fun post(
+        url: String,
+        form: Map<String, String>,
+    ): HttpResponse<String> {
+        val body = form.entries.joinToString("&") { "${enc(it.key)}=${enc(it.value)}" }
+        val request =
+            HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(30))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build()
+        return http.send(request, HttpResponse.BodyHandlers.ofString())
+    }
+
+    // ── Shapes & parsing ─────────────────────────────────────────────────────
+
     class TokenResponse(
         val accessToken: String,
         val refreshToken: String?,
@@ -256,16 +256,17 @@ object AuthKitLogin {
         return TokenResponse(access, body.refreshToken, body.user)
     }
 
-    private fun pkceVerifier(): String {
-        val bytes = ByteArray(32)
-        java.security.SecureRandom().nextBytes(bytes)
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-    }
+    private fun parseJson(body: String): JsonObjectResponse? =
+        runCatching { gson().fromJson(body, JsonObjectResponse::class.java) }.getOrNull()
 
-    private fun pkceChallenge(verifier: String): String =
-        Base64.getUrlEncoder().withoutPadding().encodeToString(
-            MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(StandardCharsets.US_ASCII)),
-        )
+    private fun str(
+        obj: com.google.gson.JsonObject,
+        key: String,
+    ): String? = obj.get(key)?.takeIf { it.isJsonPrimitive && !it.asJsonPrimitive.isNumber }?.asString
+
+    private fun errorMessage(body: String): String? = parseJson(body)?.let { it.errorDescription ?: it.error }
+
+    private fun oauthError(body: String): String? = parseJson(body)?.error
 
     internal fun isTransientFailure(
         statusCode: Int,
@@ -275,8 +276,6 @@ object AuthKitLogin {
             (statusCode == 408 || statusCode == 429 || statusCode >= 500)
 
     private fun enc(v: String): String = URLEncoder.encode(v, StandardCharsets.UTF_8)
-
-    private fun dec(v: String): String = URLDecoder.decode(v, StandardCharsets.UTF_8)
 
     private fun gson() = com.google.gson.Gson()
 }
