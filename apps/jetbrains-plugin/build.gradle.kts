@@ -22,29 +22,32 @@ val convexUrl: String = System.getenv("NEXT_PUBLIC_CONVEX_URL") ?: ""
 
 val generatedSrcDir = layout.buildDirectory.dir("generated/src/kotlin")
 
-val generateBuildConfig by tasks.registering {
-    val outFile = generatedSrcDir.get().file("dev/envpilot/jetbrains/BuildConfig.kt").asFile
-    inputs.property("workosClientId", workosClientId)
-    inputs.property("defaultServerUrl", defaultServerUrl)
-    inputs.property("sentryDsn", sentryDsn)
-    inputs.property("convexUrl", convexUrl)
-    outputs.file(outFile)
-    doLast {
-        outFile.parentFile.mkdirs()
-        outFile.writeText(
-            """
-            package dev.envpilot.jetbrains
+val generateBuildConfig =
+    tasks.register("generateBuildConfig") {
+        val outFile = generatedSrcDir.get().file("dev/envpilot/jetbrains/BuildConfig.kt").asFile
+        inputs.property("pluginVersion", version.toString())
+        inputs.property("workosClientId", workosClientId)
+        inputs.property("defaultServerUrl", defaultServerUrl)
+        inputs.property("sentryDsn", sentryDsn)
+        inputs.property("convexUrl", convexUrl)
+        outputs.file(outFile)
+        doLast {
+            outFile.parentFile.mkdirs()
+            outFile.writeText(
+                """
+                package dev.envpilot.jetbrains
 
-            object BuildConfig {
-                val WORKOS_CLIENT_ID = "${workosClientId.replace("\"", "\\\"")}"
-                val DEFAULT_SERVER_URL = "${defaultServerUrl.replace("\"", "\\\"")}"
-                val SENTRY_DSN = "${sentryDsn.replace("\"", "\\\"")}"
-                val CONVEX_URL = "${convexUrl.replace("\"", "\\\"")}"
-            }
-            """.trimIndent() + "\n",
-        )
+                object BuildConfig {
+                    val PLUGIN_VERSION = "${version.toString().replace("\"", "\\\"")}"
+                    val WORKOS_CLIENT_ID = "${workosClientId.replace("\"", "\\\"")}"
+                    val DEFAULT_SERVER_URL = "${defaultServerUrl.replace("\"", "\\\"")}"
+                    val SENTRY_DSN = "${sentryDsn.replace("\"", "\\\"")}"
+                    val CONVEX_URL = "${convexUrl.replace("\"", "\\\"")}"
+                }
+                """.trimIndent() + "\n",
+            )
+        }
     }
-}
 
 kotlin {
     jvmToolchain(21)

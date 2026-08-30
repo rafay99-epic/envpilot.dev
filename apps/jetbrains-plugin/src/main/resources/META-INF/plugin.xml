@@ -57,7 +57,7 @@
             displayName="Envpilot"
             instance="dev.envpilot.jetbrains.ui.EnvpilotSettingsConfigurable"/>
 
-        <postStartupActivity
+        <backgroundPostStartupActivity
             implementation="dev.envpilot.jetbrains.StartupActivity"/>
 
         <completion.contributor

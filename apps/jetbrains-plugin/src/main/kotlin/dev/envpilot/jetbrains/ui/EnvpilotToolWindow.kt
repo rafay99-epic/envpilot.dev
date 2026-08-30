@@ -518,10 +518,10 @@ class LinkDirectoryDialog(
         setOKButtonText("Link Directory")
         dirField.text = project.basePath ?: ""
         dirField.addBrowseFolderListener(
-            "Choose Directory",
-            "The Envpilot env file will be written into this directory.",
             project,
-            com.intellij.openapi.fileChooser.FileChooserDescriptorFactory.createSingleFolderDescriptor(),
+            com.intellij.openapi.fileChooser.FileChooserDescriptorFactory.createSingleFolderDescriptor()
+                .withTitle("Choose Directory")
+                .withDescription("The Envpilot env file will be written into this directory."),
         )
         dirField.childComponent.document.addDocumentListener(
             object : javax.swing.event.DocumentListener {

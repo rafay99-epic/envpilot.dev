@@ -2,9 +2,7 @@ package dev.envpilot.jetbrains.version
 
 import com.google.gson.Gson
 import com.google.gson.JsonObject
-import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.extensions.PluginId
 import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.config.EnvpilotSettings
 import java.net.URI
@@ -19,6 +17,10 @@ import java.time.Duration
  *  - behind `jetbrains` (latest) → soft notice (surfaced in settings page)
  *
  * Fail-open: fetch failures never block; a learned min still applies offline.
+ *
+ * The plugin's own version comes from the build-time BuildConfig, not from
+ * PluginManagerCore: the plugin-descriptor lookup APIs became internal
+ * (2026.2) with no public replacement that covers older IDEs.
  */
 object VersionCheck {
     private val log = logger<VersionCheck>()
@@ -31,7 +33,7 @@ object VersionCheck {
 
     const val PLUGIN_ID = "dev.envpilot"
 
-    fun currentVersion(): String? = PluginManagerCore.getPlugin(PluginId.getId(PLUGIN_ID))?.version
+    fun currentVersion(): String? = dev.envpilot.jetbrains.BuildConfig.PLUGIN_VERSION.takeIf { it.isNotBlank() }
 
     @Volatile var latestKnown: String? = null
         private set

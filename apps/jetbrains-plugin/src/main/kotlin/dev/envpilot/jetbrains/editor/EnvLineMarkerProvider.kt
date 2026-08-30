@@ -36,7 +36,7 @@ class EnvLineMarkerProvider : LineMarkerProvider {
                 }
             },
             GutterIconRenderer.Alignment.LEFT,
-        )
+        ) { "Envpilot env file" }
     }
 
     private companion object {
