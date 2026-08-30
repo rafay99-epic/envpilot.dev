@@ -58,6 +58,9 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     private val errorLabel =
         javax.swing.JLabel("", com.intellij.icons.AllIcons.General.BalloonWarning, javax.swing.JLabel.LEFT)
 
+    /** Fetch on IO, mutate the Swing model on the EDT. Declared before init: reload() runs from init. */
+    private val reloadGeneration = java.util.concurrent.atomic.AtomicLong(0)
+
     init {
         layout = java.awt.BorderLayout()
         list = JBList(listModel)
@@ -292,9 +295,6 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                 RequestVariableDialog(project, projects).show()
             }
         }
-
-    /** Fetch on IO, mutate the Swing model on the EDT. */
-    private val reloadGeneration = java.util.concurrent.atomic.AtomicLong(0)
 
     private fun reload() {
         val generation = reloadGeneration.incrementAndGet()

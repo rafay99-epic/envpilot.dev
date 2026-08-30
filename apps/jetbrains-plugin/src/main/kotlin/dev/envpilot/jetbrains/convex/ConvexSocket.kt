@@ -202,13 +202,16 @@ class ConvexSocket(
             ),
             true,
         )
-        sendFullQuerySet()
+        // Authenticate before subscribing: convex-js sends Authenticate first,
+        // and queries sent before auth can come back as unauthenticated
+        // failures on some deployments.
         val token = kotlinx.coroutines.runBlocking { tokenProvider() }
         if (token == null) {
             log.warn("Convex socket has no token — auth skipped")
         } else {
             send(ConvexWire.authenticateMessage(token, identityVersion.getAndIncrement()))
         }
+        sendFullQuerySet()
         listener.onConnected()
         ws.request(1)
     }

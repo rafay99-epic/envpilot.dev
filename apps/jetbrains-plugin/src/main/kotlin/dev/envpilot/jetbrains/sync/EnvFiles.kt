@@ -41,7 +41,9 @@ object EnvFiles {
                     i++
                     continue
                 }
-            if (entry.key in pulled && entry.key !in seen) {
+            // Update every occurrence: dotenv semantics let the LAST duplicate
+            // win, so leaving a stale later line would resurrect old values.
+            if (entry.key in pulled) {
                 lines[i] = "${entry.key}=${pulled[entry.key]}"
                 seen.add(entry.key)
             }

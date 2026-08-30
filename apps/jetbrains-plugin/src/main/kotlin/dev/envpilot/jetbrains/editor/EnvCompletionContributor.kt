@@ -52,6 +52,7 @@ class EnvCompletionContributor : CompletionContributor() {
         }
 
         private fun fetchKeys(project: Project): Set<String>? {
+            if (!dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.autocompleteEnabled) return null
             val service = EnvEditorService.getInstance(project)
             val links = LinkedProjectsService.getInstance(project).all()
             if (links.isEmpty()) return null

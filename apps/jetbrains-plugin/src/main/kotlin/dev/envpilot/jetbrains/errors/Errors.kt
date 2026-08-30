@@ -9,8 +9,7 @@ import io.sentry.SentryLevel
 /**
  * The one error-handling entry point. Everything that fails reports through
  * [report] (Sentry + idea.log, no-ops without a DSN) and reaches the UI as a
- * friendly sentence via [friendly]. Known failure modes are thrown as
- * [EnvpilotException]; unexpected ones are wrapped by [run].
+ * friendly sentence via [friendly].
  */
 object Errors {
     private val log = logger<Errors>()
@@ -51,7 +50,6 @@ object Errors {
 
     /** Human sentence for the UI — what happened and what to do next. */
     fun friendly(e: Throwable): String {
-        if (e is EnvpilotException) return e.message ?: "Something went wrong."
         val raw = e.message ?: e::class.simpleName ?: "unknown error"
         return when {
             raw.contains("Not signed in", true) ->
@@ -73,34 +71,4 @@ object Errors {
             else -> raw.replaceFirstChar { it.uppercase() }.let { if (it.endsWith(".")) it else "$it." }
         }
     }
-
-    /** Run [block], reporting and wrapping unexpected failures for the UI. */
-    inline fun <T> run(
-        context: Map<String, String> = emptyMap(),
-        block: () -> T,
-    ): T =
-        try {
-            block()
-        } catch (e: EnvpilotException) {
-            report(e, context)
-            throw e
-        } catch (e: Exception) {
-            report(e, context)
-            throw EnvpilotException(
-                title = friendly(e),
-                retryable = true,
-                cause = e,
-            )
-        }
 }
-
-/**
- * Known failure modes with UI-ready wording. Throw these where the failure is
- * understood; unexpected failures get wrapped by [Errors.run].
- */
-class EnvpilotException(
-    val title: String,
-    val hint: String = "",
-    val retryable: Boolean = true,
-    cause: Throwable? = null,
-) : Exception(if (hint.isBlank()) title else "$title $hint", cause)

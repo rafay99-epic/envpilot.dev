@@ -33,9 +33,13 @@ class FileDriftListener : BulkFileListener {
                         SyncState.notifyChanged()
                     }
                 }
-                // Secret files are drift-watched against their synced hashes.
-                val managed = service.managedPaths().firstNotNullOfOrNull { service.managed(it) }
-                val secretHash = managed?.secretHashes?.get(event.file.path) ?: continue
+                // Secret files are drift-watched against their synced hashes —
+                // every managed entry, not just the first one.
+                val secretHash =
+                    service.managedPaths()
+                        .mapNotNull { service.managed(it) }
+                        .firstNotNullOfOrNull { it.secretHashes[event.file.path] }
+                        ?: continue
                 val currentHash =
                     runCatching {
                         EnvCloak.hashOf(Path.of(event.file.path))

@@ -17,7 +17,7 @@ version = providers.gradleProperty("pluginVersion").get()
 val workosClientId: String = System.getenv("WORKOS_CLIENT_ID") ?: ""
 val defaultServerUrl: String =
     System.getenv("ENVPILOT_SERVER_URL") ?: "https://www.envpilot.dev"
-val sentryDsn: String = System.getenv("SENTRY_JETBRAINS_DSN") ?: ""
+val sentryDsn: String = System.getenv("SENTRY_DSN") ?: ""
 val convexUrl: String = System.getenv("NEXT_PUBLIC_CONVEX_URL") ?: ""
 
 val generatedSrcDir = layout.buildDirectory.dir("generated/src/kotlin")

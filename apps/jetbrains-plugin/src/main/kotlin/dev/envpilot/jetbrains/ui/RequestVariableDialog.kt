@@ -5,6 +5,7 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
+import com.intellij.openapi.util.Disposer
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import dev.envpilot.jetbrains.auth.AuthService
@@ -13,6 +14,7 @@ import dev.envpilot.jetbrains.model.VALID_ENVIRONMENTS
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import javax.swing.JComponent
 
@@ -46,6 +48,7 @@ class RequestVariableDialog(
         envChecks.first().second.isSelected = true
         projectCombo.addActionListener { updateEnvironmentAccess() }
         updateEnvironmentAccess()
+        Disposer.register(myDisposable) { scope.cancel() }
         init()
     }
 

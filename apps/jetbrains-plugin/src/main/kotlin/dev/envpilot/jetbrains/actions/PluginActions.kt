@@ -60,6 +60,12 @@ class ShowStatusAction : DumbAwareAction() {
     }
 }
 
+class OpenDashboardAction : DumbAwareAction() {
+    override fun actionPerformed(e: AnActionEvent) {
+        com.intellij.ide.BrowserUtil.browse(EnvpilotSettings.getInstance().effectiveServerUrl())
+    }
+}
+
 class ToggleCloakingAction : DumbAwareAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -121,7 +127,11 @@ class RevealValueAtCaretAction : DumbAwareAction() {
                 val variable =
                     result.variables.firstOrNull { it.key == match.key }
                         ?: error("${match.key} was not found in ${match.link.environment}")
-                notify(project, "${match.key} = ${variable.value}", NotificationType.INFORMATION)
+                // The notification hub persists balloons — never print the raw
+                // secret there. Clipboard keeps it out of the scrollback.
+                com.intellij.openapi.ide.CopyPasteManager.getInstance()
+                    .setContents(java.awt.datatransfer.StringSelection(variable.value))
+                notify(project, "${match.key} copied to clipboard.", NotificationType.INFORMATION)
             } catch (error: Exception) {
                 dev.envpilot.jetbrains.errors.Errors.report(error, mapOf("surface" to "reveal-at-caret"))
                 notify(project, dev.envpilot.jetbrains.errors.Errors.friendly(error), NotificationType.ERROR)

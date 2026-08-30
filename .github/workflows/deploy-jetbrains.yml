@@ -90,12 +90,12 @@ jobs:
           fi
           VERSION=$(grep pluginVersion gradle.properties | cut -d= -f2)
           ZIP="build/distributions/envpilot-${VERSION}.zip"
-          unzip -o -q "$ZIP" "envpilot-${VERSION}.jar" -d /tmp/verify
-          if ! unzip -p "/tmp/verify/envpilot-${VERSION}.jar" dev/envpilot/jetbrains/BuildConfig.class | grep -qF "$WORKOS_CLIENT_ID"; then
+          unzip -o -q "$ZIP" "envpilot/lib/envpilot-${VERSION}.jar" -d /tmp/verify
+          if ! unzip -p "/tmp/verify/envpilot/lib/envpilot-${VERSION}.jar" dev/envpilot/jetbrains/BuildConfig.class | grep -qF "$WORKOS_CLIENT_ID"; then
             echo "::error::Packaged $ZIP does not contain the WorkOS client id — refusing to publish a broken build."
             exit 1
           fi
-          if ! unzip -p "/tmp/verify/envpilot-${VERSION}.jar" dev/envpilot/jetbrains/BuildConfig.class | grep -qF "$NEXT_PUBLIC_CONVEX_URL"; then
+          if ! unzip -p "/tmp/verify/envpilot/lib/envpilot-${VERSION}.jar" dev/envpilot/jetbrains/BuildConfig.class | grep -qF "$NEXT_PUBLIC_CONVEX_URL"; then
             echo "::error::Packaged $ZIP does not contain the Convex URL — refusing to publish a broken build."
             exit 1
           fi

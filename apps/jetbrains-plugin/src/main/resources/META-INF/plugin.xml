@@ -111,6 +111,10 @@
                     class="dev.envpilot.jetbrains.actions.ShowStatusAction"
                     text="Show Status"
                     description="Show Envpilot connection and sync status"/>
+            <action id="dev.envpilot.OpenDashboard"
+                    class="dev.envpilot.jetbrains.actions.OpenDashboardAction"
+                    text="Open Dashboard"
+                    description="Open the Envpilot dashboard in your browser"/>
             <action id="dev.envpilot.ToggleCloaking"
                     class="dev.envpilot.jetbrains.actions.ToggleCloakingAction"
                     text="Toggle Cloaking"

@@ -47,7 +47,7 @@ class StartupActivity : ProjectActivity {
         restoreCommitGuard(project)
 
         // Perceived real-time: pull the moment the user returns to the IDE.
-        project.messageBus.connect().subscribe(
+        project.messageBus.connect(project).subscribe(
             com.intellij.openapi.application.ApplicationActivationListener.TOPIC,
             object : com.intellij.openapi.application.ApplicationActivationListener {
                 override fun applicationActivated(ideFrame: com.intellij.openapi.wm.IdeFrame) {
@@ -64,7 +64,7 @@ class StartupActivity : ProjectActivity {
         installKeyHover(project)
 
         // Cloak managed values when a file opens or becomes active.
-        project.messageBus.connect().subscribe(
+        project.messageBus.connect(project).subscribe(
             FileEditorManagerListener.FILE_EDITOR_MANAGER,
             object : FileEditorManagerListener {
                 override fun fileOpened(
@@ -162,6 +162,7 @@ class StartupActivity : ProjectActivity {
                     val file = editor.virtualFile ?: return
                     val service = dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project)
                     if (service.isRevealed()) return
+                    if (!dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.hoverEnabled) return
                     if (System.currentTimeMillis() - lastHoverAtMs < 1500) return
                     val offset = editor.xyToLogicalPosition(e.mouseEvent.point).let { editor.logicalPositionToOffset(it) }
                     val line = editor.document.getLineNumber(offset)

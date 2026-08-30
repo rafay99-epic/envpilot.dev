@@ -4,6 +4,7 @@ import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.bindIntValue
+import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
@@ -54,13 +55,34 @@ class EnvpilotSettingsConfigurable : BoundConfigurable("Envpilot") {
                 }.comment("Realtime updates use the same connection as pulls and fall back to interval polling.")
             }
             group("Editor & security") {
+                row {
+                    checkBox("Cloak secret values in editors")
+                        .bindSelected(state::cloakValues)
+                }
+                row {
+                    checkBox("Autocomplete env keys in .env files")
+                        .bindSelected(state::autocompleteEnabled)
+                }
+                row {
+                    checkBox("Show Envpilot hover on variable references")
+                        .bindSelected(state::hoverEnabled)
+                }
+                row("When a pulled file already exists:") {
+                    comboBox(listOf("merge", "backup", "overwrite"))
+                        .bindItem({ state.conflictResolution }, { state.conflictResolution = it ?: "merge" })
+                        .comment("merge preserves your comments and unknown keys; backup keeps the old file as .envpilot-bak.")
+                }
                 row("Pause sync when idle (minutes):") {
                     spinner(0..120, 5)
                         .bindIntValue(state::idlePauseMinutes)
                 }.comment("0 = never pause. While the IDE is idle longer than this, background sync waits.")
                 row {
-                    checkBox("Autocomplete env keys in .env files")
-                        .bindSelected(state::autocompleteEnabled)
+                    checkBox("Delete unchanged pulled files when the IDE closes")
+                        .bindSelected(state::autoUnsyncOnClose)
+                }.comment("Modified or pre-existing files are always kept. Server can disable this per project.")
+                row {
+                    checkBox("Restore commit-guard git hooks on project open")
+                        .bindSelected(state::commitGuardEnabled)
                 }
                 row {
                     checkBox("Auto-install commit-guard git hook when linking")

@@ -14,6 +14,7 @@ class EnvpilotSettings : PersistentStateComponent<EnvpilotSettings.State> {
         var targetFile: String = ".env.local"
         var cloakValues: Boolean = true
         var autocompleteEnabled: Boolean = true
+        var hoverEnabled: Boolean = true
         var commitGuardEnabled: Boolean = false
         var commitGuardAutoInstall: Boolean = false
         var autoUnsyncOnClose: Boolean = true
