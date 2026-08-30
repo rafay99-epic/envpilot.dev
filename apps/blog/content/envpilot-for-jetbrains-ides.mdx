@@ -1,0 +1,53 @@
+---
+title: "Envpilot for JetBrains IDEs: Secrets Where You Ship"
+description: "Half your team ships from Android Studio and IntelliJ. The new Envpilot plugin brings vaulted variables, real-time sync and editor-grade secret protection to every JetBrains IDE. Here is why we built it and how to use it today."
+date: "2026-08-31"
+tags: ["product", "jetbrains", "security"]
+keywords:
+  [
+    "jetbrains plugin environment variables",
+    "android studio env sync",
+    "intellij secrets management",
+    "envpilot jetbrains plugin",
+    "dotenv alternative jetbrains",
+  ]
+author:
+  name: "Abdul Rafay"
+---
+
+For a long time, Envpilot lived in the browser and the terminal. The web dashboard managed variables, the CLI pulled them, and the VS Code extension synced them while you typed. That covered a lot of workflows. It did not cover the Android Studio window that half of this team lives in, or the IntelliJ instance running the backend, or the WebStorm project where a missing `REDIS_URL` only surfaces at runtime.
+
+So we built the JetBrains plugin. It is live on the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/33346-envpilot) today, and it runs on IntelliJ IDEA, Android Studio, PyCharm, GoLand, WebStorm, Rider and every other IDE on the IntelliJ platform, 2025.1 and newer.
+
+## The daily loop, without the browser
+
+The flow is deliberately short. Sign in once through the WorkOS AuthKit device flow: the IDE shows you a code, your browser approves it, done. No loopback server, no port to collide with a second IDE instance, nothing for an admin to whitelist.
+
+Then you link a directory to a project and one or more environments. The plugin pulls decrypted variables into your `.env` file and materializes secret files with their correct POSIX permissions. Everything is fetched before anything is written; if a single value fails to decrypt, the pull aborts instead of leaving you a half-written file. When a variable changes on the server, a WebSocket subscription notices and the next sync cycle starts before you switch back to the IDE.
+
+The tool window shows your organizations, projects and linked directories with variable counts and sync state per environment. The status bar shows who you are and whether real-time sync is connected. Neither requires opening a browser tab.
+
+## Protection that matches what the file is
+
+A pulled `.env` file is a decrypted secret sitting on disk. The plugin treats it that way:
+
+- **Cloaking.** Managed values fold to `••••••••` in the editor. The bytes on disk are untouched; the mask is render-level.
+- **Clipboard guard.** Copy and cut are blocked while values are hidden. Reveal for thirty seconds lifts it deliberately.
+- **Reveal with permission checks.** Revealing values asks the server whether your role allows it. The answer is enforced by the same capability registry that gates the CLI and the API.
+- **Drift detection.** Edit a managed file by hand and it is flagged before the next sync overwrites your change.
+- **Cleanup.** On IDE close, unchanged pulled files are deleted. Modified or pre-existing files are kept.
+- **Commit guard.** An optional git hook blocks commits touching `.env` files unless you set one environment variable on purpose.
+
+None of this is new policy. It is the same enforcement core the CLI, the extension, the API and the MCP server already route through, expressed in IDE terms.
+
+## Verified before it shipped
+
+One detail worth calling out because it affects maintenance for years: the plugin clears the JetBrains Marketplace verifier with zero findings. No internal API usage, no scheduled-for-removal calls, no deprecated APIs, on every IDE base from 2025.1 through 2026.2.
+
+That took deliberate choices. The plugin reads its own version from a build-time constant instead of the plugin descriptor lookup APIs, because the platform internalized those in 2026.2 and shipped the public replacement only there. The startup hook registers on the background extension point that is replacing the old one. Sign-in uses the device flow the extension and CLI already use, which removed an entire class of local-server problems before they could exist. When the platform moves, the plugin should not have to chase it.
+
+## Use it today
+
+Install from the [Marketplace](https://plugins.jetbrains.com/plugin/33346-envpilot) or via **Settings → Plugins → Marketplace → search Envpilot**. Sign in, link a directory, pull. If your team already uses Envpilot, your projects and permissions are already there waiting.
+
+The changelog has the release notes, and the CLI's `envpilot` commands keep working exactly as before. If something bites you, the plugin reports failures as plain sentences with a retry path, and every delivery is audit-logged on the server side.

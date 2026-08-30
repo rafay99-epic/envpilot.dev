@@ -15,6 +15,18 @@
 
 <!-- entry -->
 ---
+title: The JetBrains Plugin Reaches the Marketplace
+version: v1.66.6
+date: 2026-08-31
+types: [feature]
+---
+
+Envpilot 0.1.2 is live on the JetBrains Marketplace for IntelliJ IDEA, Android Studio, PyCharm, GoLand, WebStorm and the rest of the IntelliJ family. Link directories to one or more environments, pull variables and secret files with their permissions, browse organizations and projects from a tool window, request variables within your role, and switch between accounts without mixing tokens. The plugin verifier now reports zero internal API, zero scheduled-for-removal and zero deprecated usages on every supported IDE base from 2025.1 through 2026.2.
+
+Sign-in uses the WorkOS AuthKit device flow: the IDE shows a code, your browser handles the approval, and nothing listens on a local port. Editors cloak pulled values until you reveal them for thirty seconds, the clipboard guard blocks copy and cut while values are hidden, drift is flagged before the next sync overwrites it, unchanged files are cleaned up when the IDE closes, and an optional git hook blocks `.env` commits. Each release bakes its production endpoints and version at build time, so the version lookup stays independent of the plugin descriptor APIs the platform internalized in 2026.2.
+
+<!-- entry -->
+---
 title: Sign-In Redirects Survive Every Click
 version: v1.66.5
 date: 2026-08-29
@@ -24,6 +36,18 @@ types: [fix]
 The sign-in and sign-up routes redirected during page render. Under Cache Components that redirect reached the browser, but client-side navigations never acted on it — clicking sign-in left users stuck on the referring page while the network tab showed clean 200s. Opening /sign-in directly always worked, which made the failure hard to pin down.
 
 Both routes are now route handlers whose redirect is a plain HTTP 307 every navigation mode follows. Return URLs and the sign-up screen hint are unchanged.
+
+<!-- entry -->
+---
+title: Envpilot Comes to JetBrains IDEs
+version: v1.67.0
+date: 2026-08-27
+types: [feature]
+---
+
+Envpilot now works inside IntelliJ IDEA, Android Studio, WebStorm and other JetBrains IDEs. Link directories to one or more environments, pull variables and secret files, request variables within your role and environment scope, and switch between accounts. Native editor protection includes value cloaking, clipboard blocking, drift detection, timed or per-key reveals, safe cleanup, and an optional Git commit guard. Authentication, permissions, requests, values, and files use the existing Convex data plane.
+
+The plugin supports multiple Envpilot accounts, safe account switching, automatic cleanup of unchanged generated files, drift protection for files with local edits, capability-gated secret reveal, AuthKit browser sign-in and session refresh, and native IDE status and tool-window controls. It does not embed the web dashboard.
 
 <!-- entry -->
 ---

@@ -69,6 +69,7 @@ import type * as features_files_helpers from "../features/files/helpers.js";
 import type * as features_files_mutations from "../features/files/mutations.js";
 import type * as features_files_queries from "../features/files/queries.js";
 import type * as features_files_values from "../features/files/values.js";
+import type * as features_ide_queries from "../features/ide/queries.js";
 import type * as features_integrations_dispatch from "../features/integrations/dispatch.js";
 import type * as features_integrations_messages from "../features/integrations/messages.js";
 import type * as features_integrations_notify from "../features/integrations/notify.js";
@@ -205,6 +206,7 @@ declare const fullApi: ApiFromModules<{
   "features/files/mutations": typeof features_files_mutations;
   "features/files/queries": typeof features_files_queries;
   "features/files/values": typeof features_files_values;
+  "features/ide/queries": typeof features_ide_queries;
   "features/integrations/dispatch": typeof features_integrations_dispatch;
   "features/integrations/messages": typeof features_integrations_messages;
   "features/integrations/notify": typeof features_integrations_notify;

@@ -1,0 +1,143 @@
+<idea-plugin>
+    <id>dev.envpilot</id>
+    <name>Envpilot</name>
+    <vendor url="https://www.envpilot.dev">Envpilot</vendor>
+    <description><![CDATA[
+        <p>Envpilot keeps your environment variables and secret files in one
+        secure, central place — and this plugin brings them straight into
+        IntelliJ IDEA, WebStorm, PyCharm, GoLand, Rider, Android Studio and
+        every other JetBrains IDE.</p>
+        <br>
+        <p><b>How it works:</b></p>
+        <ul>
+            <li><b>Sign in</b> from Tools ▸ Envpilot ▸ Sign In. A WorkOS
+            device-flow login opens in your browser — approve it once and the
+            IDE stays connected.</li>
+            <li><b>Browse</b> your organizations and projects in the Envpilot
+            tool window (View ▸ Tool Windows ▸ Envpilot).</li>
+            <li><b>Link</b> any project folder to a project + environment
+            (development, staging or production).</li>
+            <li><b>Pull</b> decrypted variables into your target
+            <code>.env</code> file and materialize secret files with their
+            correct permissions — manually, or automatically on a sync
+            interval.</li>
+            <li><b>Protect</b> local secrets with value cloaking, clipboard
+            blocking, drift detection, timed and permission-checked reveals,
+            and an optional Git commit guard.</li>
+            <li><b>Request</b> variables through the existing approval flow.
+            Project eligibility and environment scope come from Envpilot's
+            role capability registry.</li>
+            <li><b>Switch accounts</b> without mixing project links or tokens.
+            Sessions stay in the IDE password store.</li>
+        </ul>
+        <br>
+        <p>Secrets stay encrypted server-side (WorkOS Vault), every delivery
+        is audit-logged, and pulls stop before writing if data is incomplete
+        or cannot be decrypted.</p>
+        <br>
+        <p>Requires an Envpilot account — create one at
+        <a href="https://www.envpilot.dev">envpilot.dev</a>.</p>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService
+            serviceImplementation="dev.envpilot.jetbrains.auth.AuthService"/>
+        <applicationService
+            serviceImplementation="dev.envpilot.jetbrains.config.EnvpilotSettings"/>
+
+        <statusBarWidgetFactory
+            id="dev.envpilot.widget"
+            implementation="dev.envpilot.jetbrains.ui.EnvpilotWidgetFactory"/>
+
+        <applicationConfigurable
+            parentId="tools"
+            id="dev.envpilot.settings"
+            displayName="Envpilot"
+            instance="dev.envpilot.jetbrains.ui.EnvpilotSettingsConfigurable"/>
+
+        <backgroundPostStartupActivity
+            implementation="dev.envpilot.jetbrains.StartupActivity"/>
+
+        <completion.contributor
+            language="TEXT"
+            implementationClass="dev.envpilot.jetbrains.editor.EnvCompletionContributor"/>
+
+        <codeInsight.lineMarkerProvider
+            language="TEXT"
+            implementationClass="dev.envpilot.jetbrains.editor.EnvLineMarkerProvider"/>
+
+        <bulkFileListener
+            implementation="dev.envpilot.jetbrains.guards.FileDriftListener"/>
+
+        <toolWindow id="Envpilot"
+                    icon="/icons/envpilot-13.svg"
+                    anchor="right"
+                    factoryClass="dev.envpilot.jetbrains.ui.EnvpilotToolWindowFactory"/>
+
+        <notificationGroup
+            id="dev.envpilot.notifications"
+            displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <group id="dev.envpilot.ToolsGroup"
+               text="Envpilot"
+               description="Envpilot"
+               popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="dev.envpilot.SignIn"
+                    class="dev.envpilot.jetbrains.actions.SignInAction"
+                    text="Sign In to Envpilot"
+                    description="Start the WorkOS device-flow login"/>
+            <action id="dev.envpilot.SignOut"
+                    class="dev.envpilot.jetbrains.actions.SignOutAction"
+                    text="Sign Out"
+                    description="Clear the stored Envpilot session"/>
+            <action id="dev.envpilot.SwitchAccount"
+                    class="dev.envpilot.jetbrains.actions.SwitchAccountAction"
+                    text="Switch Account"
+                    description="Switch between signed-in Envpilot accounts"/>
+            <action id="dev.envpilot.SignOutAll"
+                    class="dev.envpilot.jetbrains.actions.SignOutAllAction"
+                    text="Sign Out All Accounts"
+                    description="Clear every stored Envpilot account"/>
+            <separator/>
+            <action id="dev.envpilot.PullNow"
+                    class="dev.envpilot.jetbrains.actions.PullNowAction"
+                    text="Pull Now"
+                    description="Pull variables and secret files for linked directories"/>
+            <action id="dev.envpilot.ShowStatus"
+                    class="dev.envpilot.jetbrains.actions.ShowStatusAction"
+                    text="Show Status"
+                    description="Show Envpilot connection and sync status"/>
+            <action id="dev.envpilot.OpenDashboard"
+                    class="dev.envpilot.jetbrains.actions.OpenDashboardAction"
+                    text="Open Dashboard"
+                    description="Open the Envpilot dashboard in your browser"/>
+            <action id="dev.envpilot.ToggleCloaking"
+                    class="dev.envpilot.jetbrains.actions.ToggleCloakingAction"
+                    text="Toggle Cloaking"
+                    description="Mask or unmask managed secret values"/>
+            <action id="dev.envpilot.RevealValues"
+                    class="dev.envpilot.jetbrains.actions.RevealValuesAction"
+                    text="Reveal Values for 30 Seconds"
+                    description="Temporarily show managed secret values"/>
+            <action id="dev.envpilot.RevealValueAtCaret"
+                    class="dev.envpilot.jetbrains.actions.RevealValueAtCaretAction"
+                    text="Reveal Value at Caret"
+                    description="Reveal one managed variable after checking Convex permissions"/>
+            <separator/>
+            <action id="dev.envpilot.InstallCommitGuard"
+                    class="dev.envpilot.jetbrains.actions.InstallCommitGuardAction"
+                    text="Install Commit Guard"
+                    description="Block commits containing env files"/>
+            <action id="dev.envpilot.RemoveCommitGuard"
+                    class="dev.envpilot.jetbrains.actions.RemoveCommitGuardAction"
+                    text="Remove Commit Guard"
+                    description="Remove Envpilot commit guard blocks"/>
+        </group>
+    </actions>
+</idea-plugin>

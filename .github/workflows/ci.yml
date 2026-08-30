@@ -67,6 +67,7 @@ jobs:
       deploy_admin: ${{ steps.flags.outputs.deploy_admin }}
       run_cli: ${{ steps.flags.outputs.run_cli }}
       run_extension: ${{ steps.flags.outputs.run_extension }}
+      run_jetbrains: ${{ steps.flags.outputs.run_jetbrains }}
       run_action: ${{ steps.flags.outputs.run_action }}
       run_docker_image: ${{ steps.flags.outputs.run_docker_image }}
       run_convex: ${{ steps.flags.outputs.run_convex }}
@@ -80,6 +81,7 @@ jobs:
       admin_version: ${{ steps.versions.outputs.admin }}
       cli_version: ${{ steps.versions.outputs.cli }}
       ext_version: ${{ steps.versions.outputs.extension }}
+      jetbrains_version: ${{ steps.versions.outputs.jetbrains }}
       action_version: ${{ steps.versions.outputs.action }}
       docker_version: ${{ steps.versions.outputs.docker }}
     steps:
@@ -105,6 +107,8 @@ jobs:
               - 'apps/cli/**'
             extension:
               - 'apps/vscode-extension/**'
+            jetbrains:
+              - 'apps/jetbrains-plugin/**'
             action:
               - 'packages/github-action/**'
             docker_image:
@@ -144,6 +148,7 @@ jobs:
           ADMIN: ${{ steps.filter.outputs.admin }}
           CLI: ${{ steps.filter.outputs.cli }}
           EXTENSION: ${{ steps.filter.outputs.extension }}
+          JETBRAINS: ${{ steps.filter.outputs.jetbrains }}
           ACTION: ${{ steps.filter.outputs.action }}
           DOCKER_IMAGE: ${{ steps.filter.outputs.docker_image }}
           CONVEX: ${{ steps.filter.outputs.convex }}
@@ -164,6 +169,7 @@ jobs:
           deploy_admin=$(bool "$ADMIN" "$VERCEL_SHARED")
           run_cli=$(bool "$CLI" "$SHARED")
           run_extension=$(bool "$EXTENSION" "$SHARED")
+          run_jetbrains=$(bool "$JETBRAINS" "$SHARED")
           run_action=$(bool "$ACTION" "$SHARED")
           run_docker_image=$(bool "$DOCKER_IMAGE" "$SHARED")
           # Shared changes (lockfile, configs) can break convex typecheck,
@@ -173,7 +179,7 @@ jobs:
           deploy_convex="$CONVEX"
 
           any=false
-          for f in "$run_web" "$run_blog" "$run_docs" "$run_admin" "$run_cli" "$run_extension" "$run_convex" "$run_action" "$run_docker_image"; do
+          for f in "$run_web" "$run_blog" "$run_docs" "$run_admin" "$run_cli" "$run_extension" "$run_jetbrains" "$run_convex" "$run_action" "$run_docker_image"; do
             [ "$f" = "true" ] && any=true
           done
 
@@ -188,6 +194,7 @@ jobs:
             echo "deploy_admin=$deploy_admin"
             echo "run_cli=$run_cli"
             echo "run_extension=$run_extension"
+            echo "run_jetbrains=$run_jetbrains"
             echo "run_action=$run_action"
             echo "run_docker_image=$run_docker_image"
             echo "run_convex=$run_convex"
@@ -205,6 +212,7 @@ jobs:
             echo "| Docs | $run_docs | $deploy_docs |"
             echo "| CLI | $run_cli | $run_cli |"
             echo "| Extension | $run_extension | $run_extension |"
+            echo "| JetBrains | $run_jetbrains | $run_jetbrains |"
             echo "| Convex | $run_convex | $deploy_convex |"
             echo "| Docker image | $run_docker_image | $run_docker_image |"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -218,6 +226,7 @@ jobs:
             echo "admin=$(jq -r '.version' apps/admin/package.json)"
             echo "cli=$(jq -r '.version' apps/cli/package.json)"
             echo "extension=$(jq -r '.version' apps/vscode-extension/package.json)"
+            echo "jetbrains=$(cut -d= -f2 apps/jetbrains-plugin/gradle.properties | tr -d '[:space:]')"
             echo "action=$(jq -r '.version' packages/github-action/package.json)"
             echo "docker=$(jq -r '.version' packages/docker-image/package.json)"
           } >> "$GITHUB_OUTPUT"
@@ -516,6 +525,66 @@ jobs:
           retention-days: 30
           overwrite: true
 
+  build-jetbrains:
+    name: Build JetBrains plugin
+    needs: [changes, checks-passed]
+    if: |
+      needs.changes.outputs.run_jetbrains == 'true'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'Production' || 'development' }}
+    env:
+      WORKOS_CLIENT_ID: ${{ github.event_name == 'pull_request' && 'client_ci_stub' || '' }}
+      NEXT_PUBLIC_CONVEX_URL: ${{ github.event_name == 'pull_request' && 'https://convex-ci.invalid' || '' }}
+      ENVPILOT_SERVER_URL: ${{ github.event_name == 'pull_request' && 'https://www.envpilot.dev' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/load-env
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
+          required: |
+            ENVPILOT_SERVER_URL
+            NEXT_PUBLIC_CONVEX_URL
+            WORKOS_CLIENT_ID
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Build plugin
+        working-directory: apps/jetbrains-plugin
+        run: ./gradlew build verifyPlugin
+      - name: Verify build-time values are embedded in the jar
+        working-directory: apps/jetbrains-plugin
+        run: |
+          if [ -z "$WORKOS_CLIENT_ID" ]; then
+            echo "::error::WORKOS_CLIENT_ID is empty — refusing to ship."
+            exit 1
+          fi
+          if [ -z "$NEXT_PUBLIC_CONVEX_URL" ]; then
+            echo "::error::NEXT_PUBLIC_CONVEX_URL is empty — refusing to ship."
+            exit 1
+          fi
+          JAR=build/libs/envpilot-$(grep pluginVersion gradle.properties | cut -d= -f2).jar
+          if ! unzip -p "$JAR" dev/envpilot/jetbrains/BuildConfig.class | grep -qF "$WORKOS_CLIENT_ID"; then
+            echo "::error::BuildConfig does not contain the WorkOS client id — refusing to ship a broken build."
+            exit 1
+          fi
+          if ! unzip -p "$JAR" dev/envpilot/jetbrains/BuildConfig.class | grep -qF "$NEXT_PUBLIC_CONVEX_URL"; then
+            echo "::error::BuildConfig does not contain the Convex URL — refusing to ship a broken build."
+            exit 1
+          fi
+          echo "Required build-time values embedded in $JAR ✓"
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: envpilot-jetbrains-${{ github.sha }}
+          path: apps/jetbrains-plugin/build/distributions/*.zip
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
   # ------------------------------------------------------------------
   # Stage 4: deploys — main only, fully verified, via reusable workflows.
   #
@@ -696,6 +765,21 @@ jobs:
     permissions:
       contents: write
 
+  deploy-jetbrains:
+    name: Deploy JetBrains plugin
+    needs: [changes, build-jetbrains, deploy-convex]
+    if: |
+      !failure() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.run_jetbrains == 'true' &&
+      (needs.deploy-convex.result == 'success' || needs.deploy-convex.result == 'skipped')
+    uses: ./.github/workflows/deploy-jetbrains.yml
+    with:
+      force: false
+    secrets: inherit
+    permissions:
+      contents: write
+
   deploy-homebrew:
     name: Deploy Homebrew formula
     needs: [changes, deploy-cli]
@@ -726,6 +810,7 @@ jobs:
       - deploy-docs
       - deploy-cli
       - deploy-extension
+      - deploy-jetbrains
       - deploy-homebrew
       - deploy-action
       - deploy-docker-image
@@ -762,6 +847,8 @@ jobs:
       needs.deploy-cli.result != 'cancelled' &&
       needs.deploy-extension.result != 'failure' &&
       needs.deploy-extension.result != 'cancelled' &&
+      needs.deploy-jetbrains.result != 'failure' &&
+      needs.deploy-jetbrains.result != 'cancelled' &&
       needs.deploy-action.result != 'failure' &&
       needs.deploy-action.result != 'cancelled' &&
       needs.deploy-docker-image.result != 'failure' &&
@@ -817,11 +904,12 @@ jobs:
             echo "| Convex | — | $(status '${{ needs.deploy-convex.result }}') |"
             echo "| CLI | ${{ needs.changes.outputs.cli_version }} | $(status '${{ needs.deploy-cli.result }}') |"
             echo "| Extension | ${{ needs.changes.outputs.ext_version }} | $(status '${{ needs.deploy-extension.result }}') |"
+            echo "| JetBrains | ${{ needs.changes.outputs.jetbrains_version }} | $(status '${{ needs.deploy-jetbrains.result }}') |"
             echo "| Homebrew | ${{ needs.changes.outputs.cli_version }} | $(status '${{ needs.deploy-homebrew.result }}') |"
             echo "| GitHub Action | ${{ needs.changes.outputs.action_version }} | $(status '${{ needs.deploy-action.result }}') |"
             echo "| Docker image | ${{ needs.changes.outputs.docker_version }} | $(status '${{ needs.deploy-docker-image.result }}') |"
             echo ""
-            echo "**Install:** \`npm i -g @envpilot/cli\` · \`brew install rafay99-epic/apps/envpilot\` · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot)"
+            echo "**Install:** \`npm i -g @envpilot/cli\` · \`brew install rafay99-epic/apps/envpilot\` · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot) · [JetBrains Marketplace](https://plugins.jetbrains.com/)"
             echo ""
             echo "**Machine surfaces:** \`uses: rafay99-epic/envpilot-action@v1\` · \`docker pull ghcr.io/rafay99-epic/envpilot:1\`"
           } > /tmp/release-body.md
@@ -843,6 +931,14 @@ jobs:
           name: envpilot-vsix-${{ github.sha }}
           path: release-artifacts
 
+      - name: Download JetBrains plugin artifact
+        if: needs.changes.outputs.run_jetbrains == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: envpilot-jetbrains-${{ github.sha }}
+          path: release-artifacts
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
@@ -853,3 +949,4 @@ jobs:
           files: |
             release-artifacts/*.vsix
             release-artifacts/*.tgz
+            release-artifacts/*.zip

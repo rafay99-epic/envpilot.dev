@@ -33,17 +33,25 @@ test.describe("GET /api/version", () => {
     expect(response.headers()["content-type"]).toContain("application/json");
   });
 
-  test("exposes latest + minimum for both CLI and extension", async ({
+  test("exposes latest + minimum for every desktop client", async ({
     request,
   }) => {
     const body = await (await request.get("/api/version")).json();
 
-    for (const key of ["cli", "extension", "minCli", "minExtension"] as const) {
+    for (const key of [
+      "cli",
+      "extension",
+      "jetbrains",
+      "minCli",
+      "minExtension",
+      "minJetbrains",
+    ] as const) {
       expect(body[key], `missing ${key}`).toMatch(SEMVER);
     }
 
     // Minimum must never exceed latest, or every client would be hard-blocked.
     expect(compare(body.minCli, body.cli)).toBeLessThanOrEqual(0);
     expect(compare(body.minExtension, body.extension)).toBeLessThanOrEqual(0);
+    expect(compare(body.minJetbrains, body.jetbrains)).toBeLessThanOrEqual(0);
   });
 });
