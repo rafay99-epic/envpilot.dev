@@ -84,6 +84,8 @@ intellijPlatform {
         id = "dev.envpilot"
         name = "Envpilot"
         version = project.version.toString()
+        // Marketplace "What's New" per release; edit change-notes.html with each bump.
+        changeNotes = layout.projectDirectory.file("change-notes.html").asFile.readText()
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }

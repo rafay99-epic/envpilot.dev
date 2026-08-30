@@ -117,10 +117,10 @@ object EnvCloak {
                     }
                 }
             }
-        editor.document.addDocumentListener(listener)
+        // Two-arg overload removes the listener when the disposable is disposed.
+        val disposable = Disposer.newDisposable()
+        editor.document.addDocumentListener(listener, disposable)
         editor.putUserData(FOLD_LISTENER, listener)
-        Disposer.register(project) {
-            editor.document.removeDocumentListener(listener)
-        }
+        Disposer.register(project, disposable)
     }
 }

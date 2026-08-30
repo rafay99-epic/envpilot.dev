@@ -71,15 +71,23 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
             null,
         )
         list.cellRenderer =
-            com.intellij.ui.SimpleListCellRenderer.create { label, value, index ->
-                label.text = value
-                label.icon =
-                    when (val item = items.getOrNull(index)) {
-                        is dev.envpilot.jetbrains.model.Org -> AllIcons.Nodes.Module
-                        is ApiProject -> projectIcon(item.id)
-                        is LinkedProject -> linkIcon(item)
-                        else -> null
-                    }
+            object : com.intellij.ui.ColoredListCellRenderer<String>() {
+                override fun customizeCellRenderer(
+                    list: javax.swing.JList<out String>,
+                    value: String?,
+                    index: Int,
+                    selected: Boolean,
+                    focused: Boolean,
+                ) {
+                    icon =
+                        when (val item = items.getOrNull(index)) {
+                            is dev.envpilot.jetbrains.model.Org -> AllIcons.Nodes.Module
+                            is ApiProject -> projectIcon(item.id)
+                            is LinkedProject -> linkIcon(item)
+                            else -> null
+                        }
+                    append(value ?: "")
+                }
             }
         add(JBScrollPane(list), java.awt.BorderLayout.CENTER)
 
