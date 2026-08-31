@@ -34,8 +34,11 @@ export function MarketplaceWidget({
     const el = host.current;
     if (!el) return;
 
-    const setup = () =>
+    let cancelled = false;
+    const setup = () => {
+      if (cancelled) return;
       window.MarketplaceWidget?.setupMarketplaceWidget(mode, PLUGIN_ID, el);
+    };
     const existing = document.getElementById(
       SCRIPT_ID
     ) as HTMLScriptElement | null;
@@ -43,7 +46,10 @@ export function MarketplaceWidget({
     if (existing) {
       if (window.MarketplaceWidget) setup();
       else existing.addEventListener("load", setup, { once: true });
-      return;
+      return () => {
+        cancelled = true;
+        existing.removeEventListener("load", setup);
+      };
     }
 
     const script = document.createElement("script");
@@ -51,6 +57,10 @@ export function MarketplaceWidget({
     script.src = SCRIPT_SRC;
     script.onload = setup;
     document.head.appendChild(script);
+    return () => {
+      cancelled = true;
+      script.onload = null;
+    };
   }, [mode]);
 
   return <div ref={host} />;

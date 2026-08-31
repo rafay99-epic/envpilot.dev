@@ -472,10 +472,11 @@ The blog and docs apps read the root `.env.local` via symlinks created by `bun r
 When adding comments make sure the comments are too the point and logicall and not all over the codebase you don't need to esplain all the codebase as well. Just one comment to reference something or which is very important then don't add useless comments to the codebase.
 
 ## Feature Gate
-Any new feature that is added into the web application should be a part of the cli, vs code extension, github action mcp server, docker image, jetbrain plugin as well. 
 
-Make sure the logic should be on the BE side, that is convex, there is convex dertivate for all the platform so please use that for any kind of connection and if not sure about use the skills for searching, skills such as cavaman skills, ponly tail searhing and review skills as well. 
+Any new feature that is added into the web application should be a part of the cli, vs code extension, github action mcp server, docker image, jetbrain plugin as well.
+
+Make sure the logic should be on the BE side, that is convex, there is convex dertivate for all the platform so please use that for any kind of connection and if not sure about use the skills for searching, skills such as cavaman skills, ponly tail searhing and review skills as well.
 
 these skills are defined and already as set as global so please load them and use them please
 
-Docs need to be upto date as well, new feature new cli or any new changes or any new commands the docs project need to be updated as well. 
+Docs need to be upto date as well, new feature new cli or any new changes or any new commands the docs project need to be updated as well.
