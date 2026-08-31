@@ -40,8 +40,9 @@ envpilot/
 │   ├── admin/                # Admin dashboard (@envpilot/admin)
 │   ├── cli/                  # CLI tool (@envpilot/cli)
 │   │   └── src/              # Commands, lib, types
-│   └── vscode-extension/     # VS Code extension (envpilot)
-│       └── src/              # Extension, services, providers
+│   ├── vscode-extension/     # VS Code extension (envpilot)
+│   │   └── src/              # Extension, services, providers
+│   └── jetbrains-plugin/     # JetBrains IDE plugin (Gradle + Kotlin)
 ├── packages/
 │   ├── ui/                   # Shared React UI components (@envpilot/ui, TS via transpilePackages)
 │   ├── github-action/        # Envpilot GitHub Action (@envpilot/github-action)

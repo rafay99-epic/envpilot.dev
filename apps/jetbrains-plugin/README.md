@@ -1,11 +1,11 @@
 # Envpilot for JetBrains IDEs
 
-[![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/33346-Envpilot?label=version)](https://plugins.jetbrains.com/plugin/33346-envpilot)
-[![Downloads](https://img.shields.io/jetbrains/plugin/dt/33346-Envpilot)](https://plugins.jetbrains.com/plugin/33346-envpilot)
-[![Rating](https://img.shields.io/jetbrains/plugin/rating/33346-Envpilot)](https://plugins.jetbrains.com/plugin/33346-envpilot)
-[![Users](https://img.shields.io/jetbrains/plugin/users/33346-Envpilot)](https://plugins.jetbrains.com/plugin/33346-envpilot)
+[![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/33946-Envpilot?label=version)](https://plugins.jetbrains.com/plugin/33946-envpilot)
+[![Downloads](https://img.shields.io/jetbrains/plugin/dt/33946-Envpilot)](https://plugins.jetbrains.com/plugin/33946-envpilot)
+[![Rating](https://img.shields.io/jetbrains/plugin/rating/33946-Envpilot)](https://plugins.jetbrains.com/plugin/33946-envpilot)
+[![Users](https://img.shields.io/jetbrains/plugin/users/33946-Envpilot)](https://plugins.jetbrains.com/plugin/33946-envpilot)
 [![Build](https://github.com/rafay99-epic/envpilot.dev/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rafay99-epic/envpilot.dev/actions/workflows/ci.yml)
-[![Platform](https://img.shields.io/badge/platform-IntelliJ%20%7C%20Android%20Studio%20%7C%20PyCharm%20%7C%20GoLand%20%7C%20WebStorm-3574f0)](https://plugins.jetbrains.com/plugin/33346-envpilot)
+[![Platform](https://img.shields.io/badge/platform-IntelliJ%20%7C%20Android%20Studio%20%7C%20PyCharm%20%7C%20GoLand%20%7C%20WebStorm-3574f0)](https://plugins.jetbrains.com/plugin/33946-envpilot)
 
 Envpilot keeps environment variables and secret files in one secure, central place, and this plugin brings them straight into IntelliJ IDEA, Android Studio, PyCharm, GoLand, WebStorm, Rider and every other IntelliJ-based IDE.
 
@@ -20,9 +20,9 @@ Envpilot keeps environment variables and secret files in one secure, central pla
 
 ## Install
 
-From the Marketplace: **Settings → Plugins → Marketplace → search "Envpilot"**, or from any IDE open https://plugins.jetbrains.com/plugin/33346-envpilot and hit Install.
+From the Marketplace: **Settings → Plugins → Marketplace → search "Envpilot"**, or from any IDE open https://plugins.jetbrains.com/plugin/33946-envpilot and hit Install.
 
-From disk: download the signed zip from a [release](https://plugins.jetbrains.com/plugin/33346-envpilot/versions), then **Settings → Plugins → ⚙ → Install Plugin from Disk**.
+From disk: download the signed zip from a [release](https://plugins.jetbrains.com/plugin/33946-envpilot/versions), then **Settings → Plugins → ⚙ → Install Plugin from Disk**.
 
 ## Building from source
 

@@ -103,6 +103,13 @@ export const SECTIONS: DocSection[] = [
     ],
   },
   {
+    slug: "jetbrains",
+    label: "JetBrains",
+    blurb: "IntelliJ IDEA, Android Studio, PyCharm, GoLand and friends.",
+    icon: "blocks",
+    pages: ["overview", "sync", "protection", "troubleshooting"],
+  },
+  {
     slug: "action",
     label: "GitHub Action",
     blurb: "Pull variables and secret files into a workflow run.",
@@ -198,12 +205,27 @@ function readVersion(relativePath: string): string {
   return version;
 }
 
+/**
+ * The JetBrains plugin is a Gradle project: its version lives in
+ * gradle.properties (`pluginVersion=`), not a package.json.
+ */
+function readGradleVersion(): string {
+  const path = resolve(process.cwd(), "../jetbrains-plugin/gradle.properties");
+  const props = readFileSync(path, "utf-8");
+  const match = props.match(/^pluginVersion=(\S+)$/m);
+  if (!match) {
+    throw new Error(`[docs/content] no pluginVersion in ${path}`);
+  }
+  return match[1];
+}
+
 const PACKAGE_VERSIONS: Record<string, string> = {
   cliVersion: readVersion("../cli/package.json"),
   extensionVersion: readVersion("../vscode-extension/package.json"),
   actionVersion: readVersion("../../packages/github-action/package.json"),
   dockerVersion: readVersion("../../packages/docker-image/package.json"),
   webVersion: readVersion("../web/package.json"),
+  jetbrainsVersion: readGradleVersion(),
 };
 
 /**

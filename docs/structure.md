@@ -30,11 +30,14 @@ envpilot/
 │   ├── admin/                     # Admin dashboard (@envpilot/admin)
 │   │   └── src/
 │   │
-│   └── vscode-extension/          # VS Code extension (envpilot)
-│       └── src/
-│           ├── providers/         # Tree view providers
-│           ├── services/          # Extension services
-│           └── ui/                # VS Code UI components
+│   ├── vscode-extension/          # VS Code extension (envpilot)
+│   │   └── src/
+│   │       ├── providers/         # Tree view providers
+│   │       ├── services/          # Extension services
+│   │       └── ui/                # VS Code UI components
+│   │
+│   └── jetbrains-plugin/          # JetBrains IDE plugin (Gradle + Kotlin)
+│       └── src/main/kotlin/       # auth, sync, guards, editor, ui, actions
 │
 ├── packages/                      # Shared packages
 │   ├── ui/                        # Shared React UI components (@envpilot/ui, TS source)

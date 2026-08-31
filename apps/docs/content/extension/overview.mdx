@@ -52,7 +52,7 @@ In VS Code **Restricted Mode** the extension never writes secrets: sync, pull an
 
 ## Limits
 
-- **VS Code and Cursor only.** There is no JetBrains, Neovim, or Zed build.
+- **VS Code and Cursor only.** JetBrains IDEs are covered by the [JetBrains plugin](/jetbrains/overview); there is no Neovim or Zed build.
 - **Uploading secret files is not possible from the editor** — the extension writes them, the CLI and dashboard manage them.
 - Everything is bounded by your role. Revealing values, for instance, requires a capability an owner grants; see [Protection](/extension/protection).
 - The extension enforces a minimum supported version against the server and fails open on network errors.

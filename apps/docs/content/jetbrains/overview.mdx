@@ -1,0 +1,62 @@
+---
+title: JetBrains overview
+description: Install the plugin, sign in, and pull variables and secret files into IntelliJ IDEA, Android Studio, PyCharm, GoLand, WebStorm, and Rider.
+icon: blocks
+version: "{{jetbrainsVersion}}"
+---
+
+# JetBrains overview
+
+Envpilot v{{jetbrainsVersion}} for JetBrains IDEs: pull variables and secret files into your project, keep them current over a live connection, and keep them from leaking through the editor.
+
+Works on any IntelliJ-platform IDE 2025.1 or newer, with no upper bound: IntelliJ IDEA, Android Studio, PyCharm, GoLand, WebStorm, Rider.
+
+## Install
+
+Search for **Envpilot** under **Settings → Plugins → Marketplace**, or press install right here:
+
+<MarketplaceWidget mode="install" />
+
+Machines without Marketplace access: download the signed zip from the [versions page](https://plugins.jetbrains.com/plugin/33946-envpilot/versions) and install it with **Settings → Plugins → ⚙ → Install Plugin from Disk**.
+
+## Sign in
+
+<Steps>
+
+### Start the login
+
+**Tools → Envpilot → Sign In to Envpilot.**
+
+### Approve in the browser
+
+A WorkOS device-flow login opens in your browser. Approve it once and the IDE stays connected.
+
+### Done
+
+The session lives in the IDE password store, not in a file in your project.
+
+</Steps>
+
+Multiple accounts are fine. **Switch Account**, **Sign Out**, and **Sign Out All Accounts** live in the same Tools menu, and each account keeps its own project links and tokens.
+
+## What you get
+
+| Area                                | What happens                                                       |
+| ----------------------------------- | ------------------------------------------------------------------ |
+| Tool window                         | Browse organizations, projects and environments, link directories  |
+| Status bar widget                   | Connection and sync state at a glance                              |
+| [Sync](/jetbrains/sync)             | Variables written to the target `.env`, secret files materialized  |
+| [Protection](/jetbrains/protection) | Value cloaking, clipboard guard, drift detection, commit guard     |
+| Editor                              | Autocomplete and gutter markers in `.env` files                    |
+| Requests                            | Ask for a variable through the [approval flow](/platform/requests) |
+
+## Limits
+
+- Requires an Envpilot account. [Sign up](https://www.envpilot.dev/sign-up) free.
+- Writing is a pull path only. The plugin writes what your role can read; uploading secret files happens in the dashboard or CLI.
+- Reveals and other sensitive actions are capability-gated. See [RBAC](/platform/rbac).
+
+## Next
+
+- [Linking & sync](/jetbrains/sync)
+- [Protection](/jetbrains/protection)

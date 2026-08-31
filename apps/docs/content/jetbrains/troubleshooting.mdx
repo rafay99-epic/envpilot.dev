@@ -1,0 +1,19 @@
+---
+title: Troubleshooting
+description: Tool window missing, sign-in stuck, sync not running. The usual fixes.
+icon: blocks
+---
+
+# Troubleshooting
+
+**The tool window is gone.** **View → Tool Windows → Envpilot** brings it back.
+
+**Sign-in does not complete.** The device-flow login opens in your browser and needs your approval there. Pop-up blockers are the usual suspect; copy the code from the IDE notification into the browser page by hand.
+
+**Nothing syncs.** Run **Tools → Envpilot → Show Status** first. Then check the basics: signed in, directory still linked, `autoSync` on, and your role can still read the project. A revoked access means no pull, and files removed by `autoUnsyncOnClose` stay gone.
+
+**Pull says a value cannot be decrypted.** The pull aborts instead of writing partial data, by design. Re-pull once; if it persists, rewrite the value from the dashboard so it gets a fresh vault reference.
+
+**The plugin does not load.** It needs an IntelliJ-platform IDE 2025.1 or newer. **Help → About** shows the IDE version; **Settings → Plugins** shows the installed plugin version.
+
+**Still stuck.** [Open an issue](https://github.com/rafay99-epic/envpilot.dev/issues/new) with the IDE version, the plugin version, and what **Show Status** reported.
