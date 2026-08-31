@@ -1,4 +1,5 @@
 import {
+  Blocks,
   BookOpen,
   Container,
   FileText,
@@ -24,6 +25,7 @@ export const DOC_ICONS: Record<string, LucideIcon> = {
   "chevron-right": Rocket,
   terminal: Terminal,
   puzzle: Puzzle,
+  blocks: Blocks,
   monitor: Monitor,
   shield: Shield,
   users: Users,

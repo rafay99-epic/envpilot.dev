@@ -16,6 +16,10 @@ const RESOURCES = [
     label: "vs code marketplace",
     href: "https://marketplace.visualstudio.com/items?itemName=envpilot.envpilot",
   },
+  {
+    label: "jetbrains marketplace",
+    href: "https://plugins.jetbrains.com/plugin/33946-envpilot",
+  },
 ];
 
 export interface SidebarItem {

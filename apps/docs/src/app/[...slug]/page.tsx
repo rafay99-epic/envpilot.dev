@@ -24,6 +24,7 @@ import { DocsShell } from "@/components/shell";
 import { DocSkeleton } from "@/components/doc-skeleton";
 import { LLMActions } from "@/components/LLMActions";
 import { Callout, Steps, Endpoint } from "@/components/mdx";
+import { MarketplaceWidget } from "@/components/marketplace-widget";
 import Link from "next/link";
 
 // Shared MDX overrides plus the docs-only building blocks.
@@ -33,6 +34,7 @@ const mdxComponents = {
   Callout,
   Steps,
   Endpoint,
+  MarketplaceWidget,
 };
 
 const mdxOptions = {

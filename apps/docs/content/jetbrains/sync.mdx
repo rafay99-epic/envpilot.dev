@@ -1,0 +1,65 @@
+---
+title: Linking & sync
+description: Link directories to projects and environments, control the sync loop, and understand how files get written.
+icon: blocks
+---
+
+# Linking & sync
+
+## Link a directory
+
+<Steps>
+
+### Open the Envpilot tool window
+
+**View → Tool Windows → Envpilot** (it docks to the right).
+
+### Pick organization, project, environment
+
+Development, staging, or production.
+
+### Link the folder
+
+Variables land in the target file and [secret files](/platform/secret-files) are materialized at their recorded paths.
+
+</Steps>
+
+**Tools → Envpilot → Pull Now** syncs on demand. **Show Status** reports connection and sync state.
+
+## What sync does
+
+- The loop runs every `syncIntervalSeconds` (default 300, clamped to 60–3600) while `autoSync` is on.
+- A live connection pushes changes the moment they land server-side, and pulls when you return to the IDE. The interval loop is the fallback, not the source of fresh values.
+- Timer, realtime pushes, IDE activation, and manual pulls are single-flight. One write at a time, never interleaved files.
+- `autoUnsyncOnClose` (on by default) removes the synced `.env` files when the project closes, so a laptop left open is not a `.env` archive.
+
+## Secret files
+
+Secret files are written with their own recorded permissions. A keystore gets `0600`/`0400`, not a `.env`'s bits.
+
+The fetch completes and decrypts fully before any write starts. Incomplete or undecryptable data aborts the pull loudly instead of half-writing a file.
+
+## Settings
+
+**Settings → Tools → Envpilot**:
+
+| Setting               | Default      | What it does                                        |
+| --------------------- | ------------ | --------------------------------------------------- |
+| `autoSync`            | on           | Run the sync loop                                   |
+| `syncIntervalSeconds` | 300          | Permission-check loop, clamped 60–3600              |
+| `targetFile`          | `.env.local` | The file variables are written to                   |
+| `autoUnsyncOnClose`   | on           | Delete synced `.env` files when the project closes  |
+| `conflictResolution`  | `merge`      | What happens when the target file already exists    |
+| `idlePauseMinutes`    | 0            | Pause the loop after N idle minutes; 0 never pauses |
+| `serverUrl`           | baked        | Override the Envpilot API base URL                  |
+
+## Limits
+
+- One project and one environment per linked directory. Link different directories to different environments; each syncs independently.
+- The interval loop is a permission check, not a value poll. Values arrive over the live connection.
+- Sync writes what your role can read. Nothing indicates that other variables exist.
+
+## Next
+
+- [Protection](/jetbrains/protection)
+- [Secret files](/platform/secret-files)

@@ -1,0 +1,44 @@
+---
+title: Protection
+description: Value cloaking, clipboard guard, drift detection, timed reveals, and the commit guard.
+icon: shield
+---
+
+# Protection
+
+A synced `.env` is plaintext on your disk. The plugin adds guards around it. They live in **Tools → Envpilot**.
+
+## Value cloaking
+
+`cloakValues` (on by default) masks managed values in the editor. **Toggle Cloaking** flips it, **Reveal Values for 30 Seconds** unmasks temporarily and re-masks itself, and **Reveal Value at Caret** shows one value after the server checks your permissions.
+
+Reveals are capability-gated: the server checks your role before answering. Re-masking is always allowed.
+
+<Callout type="warning" title="Cloaking is a decoration, not redaction">
+  The file on disk is untouched, so sync and diffs see real text. Cloaking
+  defends against shoulder-surfing, not against a terminal `cat` or a
+  screenshot.
+</Callout>
+
+## Clipboard guard
+
+Copy and cut are blocked inside Envpilot-managed files. "Copy the whole `.env` into a chat window" is how most secrets actually travel, so the guard explains itself instead of copying.
+
+## Drift detection
+
+Managed files are watched. An edit that did not come from a pull is flagged, so what you run and what your team ships do not silently diverge. The write path is the dashboard, the CLI, or a [request](/platform/requests). Editing the file on disk is not a write path.
+
+## Commit guard
+
+**Install Commit Guard** blocks commits that would carry an env file out of the repo. **Remove Commit Guard** takes it off again. Both toggles are off by default (`commitGuardEnabled`, `commitGuardAutoInstall`) and also live in **Settings → Tools → Envpilot**.
+
+## Limits
+
+- Guards apply to files Envpilot manages. A `.env` you created by hand is not tracked, and nothing about it is protected.
+- The clipboard guard covers the editor's copy and cut. It cannot stop a screenshot or a file manager.
+- If a secret is exposed anyway, [rotate it](/platform/rotation).
+
+## Next
+
+- [Troubleshooting](/jetbrains/troubleshooting)
+- [Security](/platform/security)

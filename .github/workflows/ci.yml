@@ -909,7 +909,7 @@ jobs:
             echo "| GitHub Action | ${{ needs.changes.outputs.action_version }} | $(status '${{ needs.deploy-action.result }}') |"
             echo "| Docker image | ${{ needs.changes.outputs.docker_version }} | $(status '${{ needs.deploy-docker-image.result }}') |"
             echo ""
-            echo "**Install:** \`npm i -g @envpilot/cli\` · \`brew install rafay99-epic/apps/envpilot\` · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot) · [JetBrains Marketplace](https://plugins.jetbrains.com/)"
+            echo "**Install:** \`npm i -g @envpilot/cli\` · \`brew install rafay99-epic/apps/envpilot\` · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot) · [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/33946-envpilot)"
             echo ""
             echo "**Machine surfaces:** \`uses: rafay99-epic/envpilot-action@v1\` · \`docker pull ghcr.io/rafay99-epic/envpilot:1\`"
           } > /tmp/release-body.md

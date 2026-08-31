@@ -206,6 +206,7 @@ Package versions to bump when making changes:
 - **Admin panel** (`apps/admin/`): bump `apps/admin/package.json`
 - **CLI** (`apps/cli/`): bump `apps/cli/package.json`
 - **VS Code extension** (`apps/vscode-extension/`): bump `apps/vscode-extension/package.json`
+- **JetBrains plugin** (`apps/jetbrains-plugin/`): Gradle project — bump `pluginVersion` in `gradle.properties` (the Marketplace rejects duplicates), NOT a package.json. Keep `APP_VERSIONS.jetbrains` in `apps/web/src/lib/versions.ts` in sync once the version is live on the Marketplace.
 - **Blog / Docs apps** (`apps/blog/`, `apps/docs/`): bump their package.json —
   NOT in `versions.ts`/`APP_VERSIONS` (static sites, not polling clients).
 - **GitHub Action** (`packages/github-action/`): bump `packages/github-action/package.json` — the bump IS the release trigger (deploy-action publishes it, tags `vX.Y.Z`, and moves the floating `v1` so `@v1` consumers always get the latest). Does NOT go in `versions.ts`/`APP_VERSIONS` — the action is tag-pinned, not a polling client.
@@ -343,7 +344,7 @@ went public and Actions became free for it; do not re-add config there.
 
 ## Architecture
 
-Envpilot is a secure environment variable management platform with three client surfaces: a **Next.js web app**, a **CLI tool**, and a **VS Code extension**, managed as a **bun workspaces + Turborepo** monorepo.
+Envpilot is a secure environment variable management platform with four client surfaces: a **Next.js web app**, a **CLI tool**, a **VS Code extension**, and a **JetBrains IDE plugin**, managed as a **bun workspaces + Turborepo** monorepo.
 
 ### Data Flow
 
@@ -469,3 +470,13 @@ The blog and docs apps read the root `.env.local` via symlinks created by `bun r
 ## Comments
 
 When adding comments make sure the comments are too the point and logicall and not all over the codebase you don't need to esplain all the codebase as well. Just one comment to reference something or which is very important then don't add useless comments to the codebase.
+
+## Feature Gate
+
+Any new feature that is added into the web application should be a part of the cli, vs code extension, github action mcp server, docker image, jetbrain plugin as well.
+
+Make sure the logic should be on the BE side, that is convex, there is convex dertivate for all the platform so please use that for any kind of connection and if not sure about use the skills for searching, skills such as cavaman skills, ponly tail searhing and review skills as well.
+
+these skills are defined and already as set as global so please load them and use them please
+
+Docs need to be upto date as well, new feature new cli or any new changes or any new commands the docs project need to be updated as well.

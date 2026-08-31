@@ -22,6 +22,7 @@
   <a href="https://www.npmjs.com/package/@envpilot/cli"><img src="https://img.shields.io/npm/v/@envpilot/cli?style=flat-square&logo=npm&logoColor=white&label=CLI" alt="npm" /></a>
   <a href="https://marketplace.visualstudio.com/items?itemName=EnvPilot.envpilot"><img src="https://img.shields.io/visual-studio-marketplace/v/EnvPilot.envpilot?style=flat-square&logo=visualstudiocode&logoColor=white&label=VS%20Code" alt="VS Code Marketplace" /></a>
   <a href="https://open-vsx.org/extension/envpilot/envpilot"><img src="https://img.shields.io/open-vsx/v/envpilot/envpilot?style=flat-square&logo=vscodium&logoColor=white&label=Open%20VSX" alt="Open VSX" /></a>
+  <a href="https://plugins.jetbrains.com/plugin/33946-envpilot"><img src="https://img.shields.io/jetbrains/plugin/v/33946-Envpilot?style=flat-square&label=JetBrains" alt="JetBrains Marketplace" /></a>
 </p>
 
 <p align="center">
@@ -60,6 +61,7 @@ breach yields zero plaintext secrets.
 | Web dashboard     | [envpilot.dev](https://www.envpilot.dev)                                                                                                            |
 | CLI               | [`npm i -g @envpilot/cli`](https://www.npmjs.com/package/@envpilot/cli)                                                                             |
 | VS Code extension | [Marketplace](https://marketplace.visualstudio.com/items?itemName=EnvPilot.envpilot) · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot) |
+| JetBrains plugin  | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/33946-envpilot)                                                                        |
 | GitHub Action     | [`rafay99-epic/envpilot-action@v1`](https://github.com/rafay99-epic/envpilot-action)                                                                |
 | REST API          | [API docs](https://docs.envpilot.dev)                                                                                                               |
 | MCP server        | [MCP docs](https://docs.envpilot.dev/mcp/overview)                                                                                                  |
@@ -121,7 +123,7 @@ for a place to start.
 <summary><strong>Development setup &amp; repo layout</strong></summary>
 
 Envpilot is a Bun + Turborepo monorepo: Next.js web app, Convex backend, CLI,
-VS Code extension, and shared packages.
+VS Code extension, JetBrains plugin, and shared packages.
 
 ```bash
 bun install
@@ -138,6 +140,7 @@ apps/
   cli/                # CLI npm package (@envpilot/cli)
   admin/              # Admin dashboard (@envpilot/admin)
   vscode-extension/   # VS Code extension (envpilot)
+  jetbrains-plugin/   # JetBrains IDE plugin (Gradle, Kotlin)
 convex/               # Shared Convex backend
 packages/
   ui/                 # Shared React UI components (@envpilot/ui)

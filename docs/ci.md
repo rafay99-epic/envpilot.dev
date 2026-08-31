@@ -35,6 +35,7 @@ cache):
 | `convex/`                                          | convex                      |
 | `apps/web`, `apps/blog`, `apps/docs`, `apps/admin` | web / blog / docs / admin   |
 | `apps/cli`, `apps/vscode-extension`                | cli / extension             |
+| `apps/jetbrains-plugin`                            | jetbrains                   |
 | `packages/github-action`                           | action                      |
 | `packages/ui`                                      | web + blog + docs (fan-out) |
 | root manifests / shared config                     | all surfaces                |
@@ -50,6 +51,7 @@ deploy-convex
   │    seed-feature-registry, seed-tier-features,
   │    seed-role-registry, migrate-roles, seed-changelog
   → publish-cli (npm) + publish-extension (Open VSX) + publish-action (public repo)
+  → deploy-jetbrains (signed plugin → JetBrains Marketplace)
   → deploy-homebrew
   → deploy-web / deploy-blog / deploy-docs / deploy-admin  (vercel deploy --prod)
   → release (GitHub release with .tgz / .vsix artifacts)
