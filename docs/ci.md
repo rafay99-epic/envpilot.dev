@@ -51,7 +51,7 @@ deploy-convex
   │    seed-feature-registry, seed-tier-features,
   │    seed-role-registry, migrate-roles, seed-changelog
   → publish-cli (npm) + publish-extension (Open VSX) + publish-action (public repo)
-  → deploy-jetbrains (signed plugin → JetBrains Marketplace)
+  → deploy-jetbrains (signed plugin → JetBrains Marketplace, version-guarded)
   → deploy-homebrew
   → deploy-web / deploy-blog / deploy-docs / deploy-admin  (vercel deploy --prod)
   → release (GitHub release with .tgz / .vsix artifacts)
@@ -59,6 +59,12 @@ deploy-convex
 
 Vercel's own git integration is disabled in each app's `vercel.json` — prod
 deploys happen only through the `deploy-*` jobs.
+
+`deploy-cli`, `deploy-extension` and `deploy-jetbrains` each compare the local
+version against the registry (npm, Open VSX, JetBrains Marketplace) and skip
+the publish when it is not ahead — a registry lookup failure fails the job
+loudly rather than blind-publishing. Bumping the version is the release
+trigger; a push that only touches docs inside those app folders is a no-op.
 
 ### Auto-seeding
 

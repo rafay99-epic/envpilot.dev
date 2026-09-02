@@ -21,7 +21,7 @@ date: 2026-08-31
 types: [feature]
 ---
 
-Envpilot 0.1.2 is live on the JetBrains Marketplace for IntelliJ IDEA, Android Studio, PyCharm, GoLand, WebStorm and the rest of the IntelliJ family. Link directories to one or more environments, pull variables and secret files with their permissions, browse organizations and projects from a tool window, request variables within your role, and switch between accounts without mixing tokens. The plugin verifier now reports zero internal API, zero scheduled-for-removal and zero deprecated usages on every supported IDE base from 2025.1 through 2026.2.
+Envpilot 0.1.4 is live on the JetBrains Marketplace for IntelliJ IDEA, Android Studio, PyCharm, GoLand, WebStorm and the rest of the IntelliJ family. Link directories to one or more environments, pull variables and secret files with their permissions, browse organizations and projects from a tool window, request variables within your role, and switch between accounts without mixing tokens. The plugin verifier now reports zero internal API, zero scheduled-for-removal and zero deprecated usages on every supported IDE base from 2025.1 through 2026.2.
 
 Sign-in uses the WorkOS AuthKit device flow: the IDE shows a code, your browser handles the approval, and nothing listens on a local port. Editors cloak pulled values until you reveal them for thirty seconds, the clipboard guard blocks copy and cut while values are hidden, drift is flagged before the next sync overwrites it, unchanged files are cleaned up when the IDE closes, and an optional git hook blocks `.env` commits. Each release bakes its production endpoints and version at build time, so the version lookup stays independent of the plugin descriptor APIs the platform internalized in 2026.2.
 

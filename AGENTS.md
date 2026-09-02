@@ -206,7 +206,7 @@ Package versions to bump when making changes:
 - **Admin panel** (`apps/admin/`): bump `apps/admin/package.json`
 - **CLI** (`apps/cli/`): bump `apps/cli/package.json`
 - **VS Code extension** (`apps/vscode-extension/`): bump `apps/vscode-extension/package.json`
-- **JetBrains plugin** (`apps/jetbrains-plugin/`): Gradle project — bump `pluginVersion` in `gradle.properties` (the Marketplace rejects duplicates), NOT a package.json. Keep `APP_VERSIONS.jetbrains` in `apps/web/src/lib/versions.ts` in sync once the version is live on the Marketplace.
+- **JetBrains plugin** (`apps/jetbrains-plugin/`): Gradle project — bump `pluginVersion` in `gradle.properties`, NOT a package.json. The bump IS the release trigger: `deploy-jetbrains` asks the Marketplace what it already has and skips the publish when the local version is not ahead, so an unrelated push touching `apps/jetbrains-plugin/**` (a README edit) no longer fails the deploy and blocks the GitHub Release. Keep `APP_VERSIONS.jetbrains` in `apps/web/src/lib/versions.ts` in sync once the version is live on the Marketplace — the plugin polls `/api/version`, so a stale `latest` silences every update notice.
 - **Blog / Docs apps** (`apps/blog/`, `apps/docs/`): bump their package.json —
   NOT in `versions.ts`/`APP_VERSIONS` (static sites, not polling clients).
 - **GitHub Action** (`packages/github-action/`): bump `packages/github-action/package.json` — the bump IS the release trigger (deploy-action publishes it, tags `vX.Y.Z`, and moves the floating `v1` so `@v1` consumers always get the latest). Does NOT go in `versions.ts`/`APP_VERSIONS` — the action is tag-pinned, not a polling client.

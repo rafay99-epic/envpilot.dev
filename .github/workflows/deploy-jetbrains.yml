@@ -4,14 +4,17 @@ name: Deploy JetBrains Plugin
 # from Envpilot (never hardcoded), verifies they are baked into the artifact,
 # and publishes the signed artifact to JetBrains Marketplace.
 # Called by ci.yml after the full verification gate; also dispatchable
-# standalone. Marketplace rejects duplicate versions — bump
-# apps/jetbrains-plugin/gradle.properties pluginVersion to ship.
+# standalone. Marketplace REJECTS duplicate versions, so the job first asks
+# the Marketplace what it already has and skips the publish when
+# apps/jetbrains-plugin/gradle.properties pluginVersion is not ahead —
+# otherwise every unrelated push touching apps/jetbrains-plugin/** (a README
+# edit is enough) turns the deploy red and blocks the GitHub Release.
 
 on:
   workflow_call:
     inputs:
       force:
-        description: Skip the version guard (reserved; Marketplace rejects duplicate versions itself)
+        description: Publish even if the Marketplace already has this version
         type: boolean
         required: false
         default: false
@@ -23,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: Skip the version guard
+        description: Publish even if the Marketplace already has this version
         type: boolean
         required: false
         default: false
@@ -62,15 +65,63 @@ jobs:
             PRIVATE_KEY_PASSWORD
             WORKOS_CLIENT_ID
 
+      # The Marketplace is the source of truth for what is already public.
+      # Same shape as the extension's Open VSX guard: a 404/empty list means
+      # never published, a transport error fails LOUDLY (never blind-publish,
+      # never silently skip a real release).
+      - name: Compare local version against JetBrains Marketplace
+        id: guard
+        env:
+          PLUGIN_ID: "33946"
+        run: |
+          LOCAL=$(grep '^pluginVersion=' apps/jetbrains-plugin/gradle.properties | cut -d= -f2 | tr -d '[:space:]')
+          if [ -z "$LOCAL" ]; then
+            echo "::error::Could not read pluginVersion from gradle.properties."
+            exit 1
+          fi
+          echo "local_version=$LOCAL" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ inputs.force }}" = "true" ]; then
+            echo "Force publish requested — skipping version guard."
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CODE=$(curl -s -o /tmp/jb-updates.json -w '%{http_code}' \
+            "https://plugins.jetbrains.com/api/plugins/$PLUGIN_ID/updates?channel=&size=1" || echo "000")
+
+          case "$CODE" in
+            200) REMOTE=$(jq -r '.[0].version // empty' /tmp/jb-updates.json) ;;
+            404) REMOTE="" ;;
+            *)
+              echo "::error::JetBrains Marketplace lookup failed (HTTP $CODE)."
+              exit 1
+              ;;
+          esac
+
+          if [ -z "$REMOTE" ]; then
+            echo "Plugin not on the Marketplace yet — publishing $LOCAL."
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          elif [ "$LOCAL" != "$REMOTE" ] && [ "$(printf '%s\n%s\n' "$REMOTE" "$LOCAL" | sort -V | tail -1)" = "$LOCAL" ]; then
+            echo "Local $LOCAL > Marketplace $REMOTE — publishing."
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Local $LOCAL is not ahead of Marketplace $REMOTE — skipping publish."
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-java@v5
+        if: steps.guard.outputs.should_publish == 'true'
         with:
           distribution: zulu
           java-version: 21
 
       - uses: gradle/actions/setup-gradle@v6
+        if: steps.guard.outputs.should_publish == 'true'
 
       # Backend-first ordering is enforced by ci.yml (needs deploy-convex).
       - name: Build and verify plugin
+        if: steps.guard.outputs.should_publish == 'true'
         working-directory: apps/jetbrains-plugin
         run: ./gradlew build verifyPlugin
 
@@ -78,6 +129,7 @@ jobs:
       # id breaks sign-in, so a build missing it must never reach the
       # Marketplace.
       - name: Verify build-time values are embedded in the jar
+        if: steps.guard.outputs.should_publish == 'true'
         working-directory: apps/jetbrains-plugin
         run: |
           if [ -z "$WORKOS_CLIENT_ID" ]; then
@@ -102,6 +154,7 @@ jobs:
           echo "Required build-time values embedded in $ZIP ✓"
 
       - name: Publish to JetBrains Marketplace
+        if: steps.guard.outputs.should_publish == 'true'
         id: publish
         working-directory: apps/jetbrains-plugin
         env:
@@ -109,6 +162,7 @@ jobs:
         run: ./gradlew publishPlugin
 
       - name: Upload plugin artifact
+        if: steps.guard.outputs.should_publish == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: envpilot-jetbrains-${{ github.sha }}
