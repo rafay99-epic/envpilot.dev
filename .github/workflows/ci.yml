@@ -226,7 +226,7 @@ jobs:
             echo "admin=$(jq -r '.version' apps/admin/package.json)"
             echo "cli=$(jq -r '.version' apps/cli/package.json)"
             echo "extension=$(jq -r '.version' apps/vscode-extension/package.json)"
-            echo "jetbrains=$(cut -d= -f2 apps/jetbrains-plugin/gradle.properties | tr -d '[:space:]')"
+            echo "jetbrains=$(grep '^pluginVersion=' apps/jetbrains-plugin/gradle.properties | cut -d= -f2 | tr -d '[:space:]')"
             echo "action=$(jq -r '.version' packages/github-action/package.json)"
             echo "docker=$(jq -r '.version' packages/docker-image/package.json)"
           } >> "$GITHUB_OUTPUT"

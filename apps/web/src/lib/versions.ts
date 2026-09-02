@@ -14,12 +14,13 @@
  * device-flow auth cutover broke every pre-1.12.1 CLI / pre-1.7.2 extension).
  */
 export const APP_VERSIONS = {
-  web: "1.66.5",
+  web: "1.66.6",
   cli: "1.22.3",
   extension: "1.17.0",
-  // JetBrains plugin: first public build (PR #193). The first release is also
-  // the initial supported floor.
-  jetbrains: "0.1.0",
+  // JetBrains plugin: `latest` must track what is live on the Marketplace,
+  // or the plugin's /api/version poll tells every user they are current.
+  // 0.1.0 stays the supported floor — no breaking contract change since.
+  jetbrains: "0.1.4",
   minJetbrains: "0.1.0",
   // Registry-native floors: 1.18.0 (CLI) / 1.15.0 (extension) are the first
   // builds that call the real features/* Convex paths and consume
