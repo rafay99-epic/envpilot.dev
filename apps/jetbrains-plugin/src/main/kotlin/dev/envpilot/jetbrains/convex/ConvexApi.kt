@@ -43,7 +43,6 @@ object ConvexApi {
             )
         }
 
-    /** Whether the organization's tier allows the JetBrains surface. */
     suspend fun jetbrainsAccess(organizationId: String): Boolean {
         val obj =
             parseObject(

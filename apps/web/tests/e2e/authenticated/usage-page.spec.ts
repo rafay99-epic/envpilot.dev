@@ -69,8 +69,6 @@ test.describe("usage page (revamped layout)", () => {
     ).toBeVisible();
     await expect(page.getByText("Bulk Import", { exact: true })).toBeVisible();
 
-    // Developer Tools — every client surface the org can be gated on is
-    // listed, so an owner can see at a glance which ones their plan allows.
     await expect(
       page.getByRole("heading", { name: "Developer Tools" })
     ).toBeVisible();
