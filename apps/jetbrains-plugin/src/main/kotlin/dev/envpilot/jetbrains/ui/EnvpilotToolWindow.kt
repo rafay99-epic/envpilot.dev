@@ -134,10 +134,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                 e.presentation.isEnabled = AuthService.getInstance().email != null
             }
 
-            override fun actionPerformed(e: AnActionEvent) {
-                dev.envpilot.jetbrains.access.PluginAccess.invalidate()
-                reload()
-            }
+            override fun actionPerformed(e: AnActionEvent) = reload()
         }
 
     private fun linkAction() =
@@ -367,9 +364,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         val rows = mutableListOf<Pair<String, Any>>()
         accessibleProjects.clear()
         for (org in ConvexApi.orgs()) {
-            val gate = dev.envpilot.jetbrains.access.PluginAccess.check(org.id)
-            val suffix = if (gate.allowed) "" else "  [JetBrains plugin disabled]"
-            rows.add("${org.name} (${org.slug})$suffix" to org)
+            rows.add("${org.name} (${org.slug})" to org)
             // One flaky org must not blank out the whole tree.
             val projects =
                 try {
@@ -645,11 +640,10 @@ class LinkDirectoryDialog(
         super.doOKAction()
         pullScope.launch {
             try {
-                val gate = dev.envpilot.jetbrains.access.PluginAccess.check(selected.organizationId)
-                if (!gate.allowed) {
+                if (!dev.envpilot.jetbrains.convex.ConvexApi.jetbrainsAccess(selected.organizationId)) {
                     notifyBalloon(
                         project,
-                        dev.envpilot.jetbrains.access.PluginAccess.DENIED_MESSAGE,
+                        dev.envpilot.jetbrains.errors.Errors.PLUGIN_DISABLED,
                         com.intellij.notification.NotificationType.WARNING,
                     )
                     return@launch

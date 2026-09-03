@@ -37,10 +37,4 @@ data class SecretFileMeta(
     val size: Long,
 )
 
-/**
- * One boolean feature-registry answer. [reason] is only set on a denial, and
- * [tierName] is "unknown" when the server has no active row for the key.
- */
-data class FeatureGate(val allowed: Boolean, val reason: String?, val tierName: String)
-
 val VALID_ENVIRONMENTS = listOf("development", "staging", "production")

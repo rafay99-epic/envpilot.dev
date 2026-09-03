@@ -20,7 +20,7 @@ export const APP_VERSIONS = {
   // JetBrains plugin: `latest` must track what is live on the Marketplace,
   // or the plugin's /api/version poll tells every user they are current.
   // 0.1.0 stays the supported floor — no breaking contract change since.
-  jetbrains: "0.2.0",
+  jetbrains: "0.1.5",
   minJetbrains: "0.1.0",
   // Registry-native floors: 1.18.0 (CLI) / 1.15.0 (extension) are the first
   // builds that call the real features/* Convex paths and consume
