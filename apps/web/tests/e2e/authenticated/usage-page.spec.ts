@@ -69,6 +69,22 @@ test.describe("usage page (revamped layout)", () => {
     ).toBeVisible();
     await expect(page.getByText("Bulk Import", { exact: true })).toBeVisible();
 
+    // Developer Tools — every client surface the org can be gated on is
+    // listed, so an owner can see at a glance which ones their plan allows.
+    await expect(
+      page.getByRole("heading", { name: "Developer Tools" })
+    ).toBeVisible();
+    for (const tool of [
+      "CLI Access",
+      "VS Code Extension",
+      "JetBrains IDE Plugin",
+    ]) {
+      await expect(
+        page.getByText(tool, { exact: true }),
+        `client surface "${tool}" should be listed under Developer Tools`
+      ).toBeVisible();
+    }
+
     // 4. Info bar — FAQ links.
     await expect(
       page.getByRole("link", { name: /how it works/i })

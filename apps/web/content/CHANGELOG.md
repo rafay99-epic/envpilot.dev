@@ -15,6 +15,18 @@
 
 <!-- entry -->
 ---
+title: The JetBrains Plugin Answers to the Feature Registry
+version: v0.2.0
+date: 2026-09-03
+types: [feature]
+---
+
+The JetBrains plugin shipped without a tier gate. Every other client surface has one, so an owner could turn off the VS Code extension, the CLI or the API for an organization and the JetBrains plugin would keep syncing regardless.
+
+`jetbrains_access` is now a feature-registry key like the rest, visible on the usage page and toggleable from the admin panel. The plugin checks it before it links a directory and before every sync cycle, marks an organization `[JetBrains plugin disabled]` in the tool window, and says which organization refused rather than failing later with an opaque authorization error. A transport failure fails open, so an offline IDE never loses its env files, and Refresh re-reads the gate immediately instead of waiting out the five-minute cache.
+
+<!-- entry -->
+---
 title: The JetBrains Plugin Reaches the Marketplace
 version: v1.66.6
 date: 2026-08-31

@@ -66,6 +66,17 @@ class SyncScheduler {
             var allOk = true
             for (link in links) {
                 try {
+                    // Tier gate first: an org that has the JetBrains surface
+                    // turned off must not pull, and must say why rather than
+                    // failing later with an opaque authorization error.
+                    val gate = dev.envpilot.jetbrains.access.PluginAccess.check(link.orgId)
+                    if (!gate.allowed) {
+                        SyncState.markFailure(
+                            "${link.projectName}: ${dev.envpilot.jetbrains.access.PluginAccess.DENIED_MESSAGE}",
+                        )
+                        allOk = false
+                        continue
+                    }
                     if (link.deviceId.isBlank()) {
                         val deviceId = JetBrainsDevice.id()
                         dev.envpilot.jetbrains.convex.ConvexApi.linkDevice(

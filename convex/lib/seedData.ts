@@ -132,13 +132,22 @@ export const SEED_FEATURES = [
     sortOrder: 2,
   },
   {
+    key: "jetbrains_access",
+    displayName: "JetBrains IDE Plugin",
+    valueType: "boolean" as const,
+    category: "Tools",
+    defaultValue: "true",
+    resettable: false,
+    sortOrder: 3,
+  },
+  {
     key: "vscode_unsync_customization",
     displayName: "VS Code Unsync Customization",
     valueType: "boolean" as const,
     category: "Tools",
     defaultValue: "false",
     resettable: false,
-    sortOrder: 3,
+    sortOrder: 4,
   },
 
   // Security

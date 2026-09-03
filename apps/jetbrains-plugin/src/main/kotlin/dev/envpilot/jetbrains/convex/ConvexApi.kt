@@ -2,6 +2,7 @@ package dev.envpilot.jetbrains.convex
 
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import dev.envpilot.jetbrains.model.FeatureGate
 import dev.envpilot.jetbrains.model.Org
 import dev.envpilot.jetbrains.model.Project
 import dev.envpilot.jetbrains.model.PullMeta
@@ -14,6 +15,9 @@ import dev.envpilot.jetbrains.model.SecretFileMeta
  * CLI and extension use — one enforcement core, no separate REST surface.
  */
 object ConvexApi {
+    /** `checkFeature`'s answer for a key the registry has no active row for. */
+    const val UNKNOWN_TIER = "unknown"
+
     private val gson = com.google.gson.Gson()
 
     private fun socket(): ConvexSocket =
@@ -42,6 +46,28 @@ object ConvexApi {
                 variableCount = p.get("variableCount")?.takeIf { it.isJsonPrimitive }?.asInt ?: 0,
             )
         }
+
+    /**
+     * Resolve one boolean feature-registry gate for an organization. Denials
+     * carry the server's reason so the surface can say WHY it refused.
+     */
+    suspend fun checkFeature(
+        organizationId: String,
+        featureKey: String,
+    ): FeatureGate {
+        val obj =
+            parseObject(
+                socket().query(
+                    "features/featureRegistry/queries:checkFeature",
+                    mapOf("organizationId" to organizationId, "featureKey" to featureKey),
+                ),
+            )
+        return FeatureGate(
+            allowed = obj.get("allowed")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
+            reason = obj.str("reason"),
+            tierName = obj.str("tierName") ?: UNKNOWN_TIER,
+        )
+    }
 
     suspend fun accessMeta(projectId: String): PullMeta {
         val obj =
