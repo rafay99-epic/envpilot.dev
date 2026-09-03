@@ -640,6 +640,14 @@ class LinkDirectoryDialog(
         super.doOKAction()
         pullScope.launch {
             try {
+                if (!dev.envpilot.jetbrains.convex.ConvexApi.jetbrainsAccess(selected.organizationId)) {
+                    notifyBalloon(
+                        project,
+                        dev.envpilot.jetbrains.errors.Errors.PLUGIN_DISABLED,
+                        com.intellij.notification.NotificationType.WARNING,
+                    )
+                    return@launch
+                }
                 dev.envpilot.jetbrains.convex.ConvexApi.linkDevice(
                     selected.id,
                     deviceId,

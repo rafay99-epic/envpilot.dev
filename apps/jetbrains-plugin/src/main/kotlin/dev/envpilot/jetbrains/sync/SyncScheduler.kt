@@ -64,8 +64,18 @@ class SyncScheduler {
             SyncState.markStart()
             SyncState.notifyChanged()
             var allOk = true
+            val gates = mutableMapOf<String, Boolean>()
             for (link in links) {
                 try {
+                    val allowed =
+                        gates[link.orgId]
+                            ?: dev.envpilot.jetbrains.convex.ConvexApi.jetbrainsAccess(link.orgId)
+                                .also { gates[link.orgId] = it }
+                    if (!allowed) {
+                        SyncState.markFailure(dev.envpilot.jetbrains.errors.Errors.PLUGIN_DISABLED)
+                        allOk = false
+                        continue
+                    }
                     if (link.deviceId.isBlank()) {
                         val deviceId = JetBrainsDevice.id()
                         dev.envpilot.jetbrains.convex.ConvexApi.linkDevice(

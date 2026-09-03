@@ -43,6 +43,17 @@ object ConvexApi {
             )
         }
 
+    suspend fun jetbrainsAccess(organizationId: String): Boolean {
+        val obj =
+            parseObject(
+                socket().query(
+                    "features/featureRegistry/queries:checkFeature",
+                    mapOf("organizationId" to organizationId, "featureKey" to "jetbrains_access"),
+                ),
+            )
+        return obj.get("allowed")?.takeIf { it.isJsonPrimitive }?.asBoolean == true
+    }
+
     suspend fun accessMeta(projectId: String): PullMeta {
         val obj =
             parseObject(

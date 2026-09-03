@@ -12,6 +12,10 @@ import io.sentry.SentryLevel
  * friendly sentence via [friendly].
  */
 object Errors {
+    const val PLUGIN_DISABLED =
+        "Envpilot for JetBrains isn't enabled on your organization's plan. " +
+            "Ask an owner to enable it in the Envpilot dashboard."
+
     private val log = logger<Errors>()
 
     private val initialized = java.util.concurrent.atomic.AtomicBoolean(false)

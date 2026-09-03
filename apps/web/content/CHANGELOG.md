@@ -15,6 +15,16 @@
 
 <!-- entry -->
 ---
+title: JetBrains Plugin Respects the Tier Gate
+version: v0.1.5
+date: 2026-09-03
+types: [fix]
+---
+
+The JetBrains plugin shipped without a tier gate, so turning the plugin off for an organization did nothing. `jetbrains_access` is now a feature-registry key like `extension_access` and `cli_access`: toggle it from the admin panel and the plugin stops linking and syncing, with a message saying why.
+
+<!-- entry -->
+---
 title: The JetBrains Plugin Reaches the Marketplace
 version: v1.66.6
 date: 2026-08-31

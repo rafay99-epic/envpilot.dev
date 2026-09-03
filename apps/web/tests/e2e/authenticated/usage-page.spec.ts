@@ -69,6 +69,20 @@ test.describe("usage page (revamped layout)", () => {
     ).toBeVisible();
     await expect(page.getByText("Bulk Import", { exact: true })).toBeVisible();
 
+    await expect(
+      page.getByRole("heading", { name: "Developer Tools" })
+    ).toBeVisible();
+    for (const tool of [
+      "CLI Access",
+      "VS Code Extension",
+      "JetBrains IDE Plugin",
+    ]) {
+      await expect(
+        page.getByText(tool, { exact: true }),
+        `client surface "${tool}" should be listed under Developer Tools`
+      ).toBeVisible();
+    }
+
     // 4. Info bar — FAQ links.
     await expect(
       page.getByRole("link", { name: /how it works/i })

@@ -192,6 +192,13 @@ export const featureCategories: FeatureCategory[] = [
         icon: Puzzle,
         description: "Sync variables in your editor",
       },
+      {
+        key: "jetbrains_access",
+        label: "JetBrains IDE Plugin",
+        icon: Puzzle,
+        description:
+          "Sync variables in IntelliJ, WebStorm, PyCharm and friends",
+      },
     ],
   },
   {
@@ -322,6 +329,7 @@ export const PRO_VALUES: Record<string, string> = {
   variable_tags: "true",
   api_access: "true",
   extension_access: "true",
+  jetbrains_access: "true",
   cli_access: "true",
   granular_permissions: "true",
   audit_log_retention_days: "365",
@@ -350,8 +358,9 @@ export const FREE_VALUES: Record<string, string> = {
   bulk_export: "false",
   variable_tags: "true",
   api_access: "true",
-  extension_access: "false",
-  cli_access: "false",
+  extension_access: "true",
+  jetbrains_access: "true",
+  cli_access: "true",
   granular_permissions: "true",
   audit_log_retention_days: "7",
   sso_enabled: "false",
