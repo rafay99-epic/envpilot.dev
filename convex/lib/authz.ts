@@ -11,9 +11,11 @@ import {
   SYSTEM_PROFILES,
   SEEDED_CUSTOM_PROFILES,
   UNKNOWN_ROLE_PROFILE,
+  effectiveEnvironments,
   hasCapability,
   resolveCapabilities,
 } from "./roleProfiles";
+export { effectiveEnvironments } from "./roleProfiles";
 import type { OrgAction, ProjectAction } from "./capabilities";
 
 // ─── Unified role model ───────────────────────────────────────────────────────
@@ -139,6 +141,7 @@ export async function getRoleProfile(
         row.slug,
         row.capabilities as RoleProfile["capabilities"]
       ),
+      environments: row.environments,
     };
   }
   if (row && !row.isActive) {
@@ -307,6 +310,32 @@ export function isEnvironmentScopeAllowed(
   return variableEnvironments.every((env) => scope.includes(env));
 }
 
+/** User-facing denial for a single out-of-scope environment write. */
+export function environmentAccessMessage(env: string): string {
+  return `You do not have access to the ${env} environment in this project. Ask a project manager or team lead.`;
+}
+
+/**
+ * Assert that a member scope being written (assignment, invitation) does not
+ * widen past the target role's default. Undefined role default = unrestricted,
+ * so any list narrows it. Omitted/undefined environments (no scope supplied)
+ * always passes — callers reject an empty array separately.
+ */
+export function assertEnvironmentScopeNarrows(
+  profile: Pick<RoleProfile, "environments">,
+  environments: string[] | undefined
+): void {
+  if (!environments) return;
+  const ceiling = profile.environments;
+  if (!ceiling) return;
+  const outOfBounds = environments.some((env) => !ceiling.includes(env));
+  if (outOfBounds) {
+    throw new ConvexError(
+      `This role is limited to ${ceiling.join(", ")}. A member scope can only narrow it.`
+    );
+  }
+}
+
 // ─── Security hold (suspension) ───────────────────────────────────────────────
 //
 // A suspended membership keeps its role/assignments/grants but is denied at
@@ -427,6 +456,31 @@ export async function assertProjectAction(
   // fetching when omitted — behavior is identical either way.
   preloadedProject?: Doc<"projects"> | null
 ): Promise<ProjectAuthResult> {
+  return assertProjectCapability(
+    ctx,
+    userId,
+    projectId,
+    PROJECT_ACTION_TO_CAPABILITY[action],
+    preloadedProject,
+    action
+  );
+}
+
+/**
+ * Same as assertProjectAction, keyed by capability instead of a legacy
+ * action string. Capabilities that never had a pre-registry action
+ * (protection.*) are checked through here so the parity fixtures stay
+ * frozen.
+ */
+export async function assertProjectCapability(
+  ctx: MutationCtx | QueryCtx,
+  userId: Id<"users">,
+  projectId: Id<"projects">,
+  capability: CapabilityKey,
+  preloadedProject?: Doc<"projects"> | null,
+  actionLabel: string = capability
+): Promise<ProjectAuthResult> {
+  const action = actionLabel;
   const project =
     preloadedProject !== undefined
       ? preloadedProject
@@ -449,7 +503,6 @@ export async function assertProjectAction(
 
   const role = normalizeOrgRole(membership.role);
   const profile = await getRoleProfile(ctx, role);
-  const capability = PROJECT_ACTION_TO_CAPABILITY[action];
 
   // The owner class (org.manage) bypasses project assignment checks
   if (bypassesAssignment(profile)) {
@@ -484,10 +537,12 @@ export async function assertProjectAction(
     assigned: true,
     profile,
     // Environment scope constrains env-scopeable roles; managers are
-    // unrestricted (profile-driven — no slug comparisons)
-    environmentScope: hasCapability(profile, "access.env_scoped")
-      ? projectMembership.environments
-      : undefined,
+    // unrestricted (profile-driven — no slug comparisons). Role default
+    // narrowed by the assignment list.
+    environmentScope: effectiveEnvironments(
+      profile,
+      projectMembership.environments
+    ),
   };
 }
 
@@ -699,9 +754,8 @@ async function resolveResourceAccess(
   // resources it can't even see in lists.)
   if (
     projectMembership &&
-    hasCapability(profile, "access.env_scoped") &&
     !isEnvironmentScopeAllowed(
-      projectMembership.environments,
+      effectiveEnvironments(profile, projectMembership.environments),
       args.resourceEnvironments
     )
   ) {

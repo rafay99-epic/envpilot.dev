@@ -117,9 +117,10 @@ export async function runDoctor(
 
   // Neither probe consumes the other's result, and probeSecrets pays for a
   // full vault decrypt, so running them back to back doubled the wait.
-  const [projectProbe, secrets] = await Promise.all([
+  const [projectProbe, secrets, hiddenScope] = await Promise.all([
     probeProject(session, project),
     probeSecrets(session, project, environment),
+    probeHiddenByScope(session, project),
   ]);
 
   const scan = scanDelivery(root, {
@@ -136,7 +137,7 @@ export async function runDoctor(
       fixesApplied
     ),
     reachGroup(session, secrets),
-    secretsGroup(secrets),
+    secretsGroup(secrets, hiddenScope),
     deliveryGroup(scan),
     hygieneGroup(root, options, fixesApplied),
   ];
@@ -175,6 +176,11 @@ type SecretsProbe =
       fromCache: boolean;
       cacheAge: string;
     }
+  | { kind: "failed"; message: string }
+  | { kind: "skipped"; reason: string };
+
+type HiddenScopeProbe =
+  | { kind: "ok"; hiddenKeys: string[] }
   | { kind: "failed"; message: string }
   | { kind: "skipped"; reason: string };
 
@@ -243,6 +249,26 @@ async function probeProject(
       };
     }
     return { kind: "ok", name: remote.name };
+  } catch (err) {
+    return { kind: "failed", message: sanitizeConvexError(err) };
+  }
+}
+
+/**
+ * Keys that exist in the linked project but that environment scope hides
+ * from the caller entirely — listWithAccess never returns them. Doctor-only
+ * visibility aid; keys only, never values.
+ */
+async function probeHiddenByScope(
+  session: SessionProbe,
+  project: ProjectEntry | null
+): Promise<HiddenScopeProbe> {
+  if (session.kind !== "ok")
+    return { kind: "skipped", reason: "needs a live session" };
+  if (!project) return { kind: "skipped", reason: "no linked project" };
+  try {
+    const result = await createAPIClient().getHiddenByScope(project.projectId);
+    return { kind: "ok", hiddenKeys: result.hiddenKeys };
   } catch (err) {
     return { kind: "failed", message: sanitizeConvexError(err) };
   }
@@ -654,7 +680,10 @@ function apiUrlCheck(): CheckResult {
 
 // ── Group 4: Secrets ────────────────────────────────────────────────────────
 
-function secretsGroup(secrets: SecretsProbe): CheckGroup {
+function secretsGroup(
+  secrets: SecretsProbe,
+  hiddenScope: HiddenScopeProbe
+): CheckGroup {
   const results: CheckResult[] = [];
 
   switch (secrets.kind) {
@@ -696,6 +725,15 @@ function secretsGroup(secrets: SecretsProbe): CheckGroup {
       }
       break;
     }
+  }
+
+  if (hiddenScope.kind === "ok" && hiddenScope.hiddenKeys.length > 0) {
+    results.push({
+      id: "secrets.hidden-by-scope",
+      label: "Hidden by environment scope",
+      status: "warn",
+      detail: `${hiddenScope.hiddenKeys.length} ${hiddenScope.hiddenKeys.length === 1 ? "key" : "keys"} in this project ${hiddenScope.hiddenKeys.length === 1 ? "is" : "are"} outside your environment scope: ${hiddenScope.hiddenKeys.slice(0, 5).join(", ")}${hiddenScope.hiddenKeys.length > 5 ? ", …" : ""}`,
+    });
   }
 
   return { title: "Secrets", results };

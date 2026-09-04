@@ -24,6 +24,7 @@ import {
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import {
   assertOrgAction,
+  effectiveEnvironments,
   normalizeOrgRole,
   getRoleProfile,
   hasCapability,
@@ -36,6 +37,12 @@ import {
   findBatchInternalConflicts,
   environmentConflictMessage,
 } from "./helpers";
+import {
+  assertProtectedWrite,
+  isProtectedWrite,
+  touchedEnvironments,
+} from "../../lib/protection";
+import { cancelPendingForTarget } from "../changeRequests/mutations";
 
 /**
  * Environment Variable Mutations
@@ -60,7 +67,7 @@ type BatchCreateContext = {
   gate: Awaited<ReturnType<typeof resolveOrgGateContext>>;
 };
 
-async function createCore(
+export async function createCore(
   ctx: MutationCtx,
   args: {
     key: string;
@@ -72,6 +79,10 @@ async function createCore(
     createdBy: Id<"users">;
     rotationFrequencyDays?: number;
     tagIds?: Id<"variableTags">[];
+    // Set ONLY by changeRequests/apply.ts. Never a client-supplied argument:
+    // it is what lets a write into a protected environment through.
+    viaRequestId?: Id<"changeRequests">;
+    override?: boolean;
   },
   batch?: BatchCreateContext
 ) {
@@ -100,6 +111,16 @@ async function createCore(
   // environments all fall inside their assignment scope. Stays per-row: the
   // scope is one check but the environments differ per variable.
   assertWithinEnvironmentScope(environmentScope, args.environments);
+
+  // Protected environments: refuse a direct write, unless this is the apply
+  // path or an audited break-glass override.
+  await assertProtectedWrite(ctx, {
+    project,
+    envs: args.environments,
+    actorId: args.createdBy,
+    viaRequestId: args.viaRequestId,
+    override: args.override,
+  });
 
   // Rate limit: prevent excessive variable creation. Batches are charged once
   // up front against variableBatchCreate instead (see startFromTemplate), so
@@ -290,6 +311,21 @@ async function createCore(
     resourceType: "variable",
   });
 
+  if (args.override && isProtectedWrite(project, args.environments)) {
+    await createAuditLog(ctx, {
+      organizationId: project.organizationId,
+      projectId: args.projectId,
+      variableId,
+      userId: args.createdBy,
+      action: "change.overridden",
+      details: {
+        key: args.key,
+        environments: args.environments,
+        kind: "create",
+      },
+    });
+  }
+
   return variableId;
 }
 
@@ -302,6 +338,7 @@ const createArgs = {
   isSensitive: v.optional(v.boolean()),
   rotationFrequencyDays: v.optional(v.number()),
   tagIds: v.optional(v.array(v.id("variableTags"))),
+  override: v.optional(v.boolean()),
 };
 
 export const create = mutation({
@@ -443,7 +480,7 @@ export const createMany = internalMutation({
   },
 });
 
-async function updateCore(
+export async function updateCore(
   ctx: MutationCtx,
   args: {
     variableId: Id<"environmentVariables">;
@@ -455,6 +492,8 @@ async function updateCore(
     changeReason?: string;
     rotationFrequencyDays?: number;
     tagIds?: Id<"variableTags">[];
+    viaRequestId?: Id<"changeRequests">;
+    override?: boolean;
   }
 ) {
   const now = Date.now();
@@ -464,6 +503,8 @@ async function updateCore(
     changeReason,
     rotationFrequencyDays,
     tagIds: rawTagIds,
+    viaRequestId,
+    override,
     ...updates
   } = args;
 
@@ -496,7 +537,7 @@ async function updateCore(
     const updaterProfile = editorMembership
       ? await getRoleProfile(ctx, editorMembership.role)
       : null;
-    if (updaterProfile && hasCapability(updaterProfile, "access.env_scoped")) {
+    if (updaterProfile) {
       const editorAssignment = await ctx.db
         .query("projectMembers")
         .withIndex("by_project_and_user", (q) =>
@@ -504,8 +545,11 @@ async function updateCore(
         )
         .first();
 
+      // The role's own default scope applies when the assignment names none,
+      // so a developer cannot move a variable into an environment their role
+      // never had (effectiveEnvironments, not the raw member row).
       assertWithinEnvironmentScope(
-        editorAssignment?.environments,
+        effectiveEnvironments(updaterProfile, editorAssignment?.environments),
         updates.environments
       );
     }
@@ -524,6 +568,18 @@ async function updateCore(
       );
     }
   }
+
+  const touched = touchedEnvironments(
+    variable.environments,
+    updates.environments
+  );
+  await assertProtectedWrite(ctx, {
+    project,
+    envs: touched,
+    actorId: updatedBy,
+    viaRequestId,
+    override,
+  });
 
   // Validate rotation frequency bounds
   if (rotationFrequencyDays !== undefined) {
@@ -708,6 +764,17 @@ async function updateCore(
     resourceType: "variable",
   });
 
+  if (override && isProtectedWrite(project, touched)) {
+    await createAuditLog(ctx, {
+      organizationId: project.organizationId,
+      projectId: variable.projectId,
+      variableId,
+      userId: updatedBy,
+      action: "change.overridden",
+      details: { key: variable.key, environments: touched, kind: "update" },
+    });
+  }
+
   return variableId;
 }
 
@@ -720,6 +787,7 @@ const updateArgs = {
   changeReason: v.optional(v.string()),
   rotationFrequencyDays: v.optional(v.number()),
   tagIds: v.optional(v.array(v.id("variableTags"))),
+  override: v.optional(v.boolean()),
 };
 
 export const update = mutation({
@@ -730,9 +798,14 @@ export const update = mutation({
   },
 });
 
-async function removeCore(
+export async function removeCore(
   ctx: MutationCtx,
-  args: { variableId: Id<"environmentVariables">; deletedBy: Id<"users"> }
+  args: {
+    variableId: Id<"environmentVariables">;
+    deletedBy: Id<"users">;
+    viaRequestId?: Id<"changeRequests">;
+    override?: boolean;
+  }
 ) {
   const now = Date.now();
 
@@ -752,6 +825,14 @@ async function removeCore(
     projectId: variable.projectId,
     action: "project:delete_variable",
     preloadedProject: project,
+  });
+
+  await assertProtectedWrite(ctx, {
+    project,
+    envs: variable.environments,
+    actorId: args.deletedBy,
+    viaRequestId: args.viaRequestId,
+    override: args.override,
   });
 
   // Idempotent no-op: a variable that's already soft-deleted must not be
@@ -805,6 +886,30 @@ async function removeCore(
     resourceType: "variable",
   });
 
+  if (args.override && isProtectedWrite(project, variable.environments)) {
+    await createAuditLog(ctx, {
+      organizationId: project.organizationId,
+      projectId: variable.projectId,
+      variableId: args.variableId,
+      userId: args.deletedBy,
+      action: "change.overridden",
+      details: {
+        key: variable.key,
+        environments: variable.environments,
+        kind: "delete",
+      },
+    });
+  }
+
+  // Proposals aimed at a resource that no longer exists can never be applied.
+  await cancelPendingForTarget(
+    ctx,
+    args.variableId,
+    args.deletedBy,
+    "target deleted",
+    args.viaRequestId
+  );
+
   return args.variableId;
 }
 
@@ -819,6 +924,7 @@ export const removeFromEnvironment = mutation({
   args: {
     variableId: v.id("environmentVariables"),
     environment: v.string(),
+    override: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
@@ -837,6 +943,13 @@ export const removeFromEnvironment = mutation({
       projectId: variable.projectId,
       action: "project:delete_variable",
       preloadedProject: project,
+    });
+
+    await assertProtectedWrite(ctx, {
+      project,
+      envs: variable.environments,
+      actorId: actor._id,
+      override: args.override,
     });
 
     if (!variable.environments.includes(args.environment)) {
@@ -871,12 +984,37 @@ export const removeFromEnvironment = mutation({
       resourceType: "variable",
     });
 
+    if (args.override && isProtectedWrite(project, variable.environments)) {
+      await createAuditLog(ctx, {
+        organizationId: project.organizationId,
+        projectId: variable.projectId,
+        variableId: args.variableId,
+        userId: actor._id,
+        action: "change.overridden",
+        details: {
+          key: variable.key,
+          environments: variable.environments,
+          kind: "detach_environment",
+        },
+      });
+    }
+
+    // The variable's environment set moved, so pending proposals against it
+    // no longer describe the resource they were filed for.
+    await cancelPendingForTarget(
+      ctx,
+      args.variableId,
+      actor._id,
+      "target environment detached"
+    );
+
     return args.variableId;
   },
 });
 
 const removeArgs = {
   variableId: v.id("environmentVariables"),
+  override: v.optional(v.boolean()),
 };
 
 export const remove = mutation({
@@ -890,6 +1028,7 @@ export const remove = mutation({
 export const bulkDelete = mutation({
   args: {
     variableIds: v.array(v.id("environmentVariables")),
+    override: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
@@ -944,6 +1083,28 @@ export const bulkDelete = mutation({
         throw new Error("All variables must belong to the same project");
       }
 
+      await assertProtectedWrite(ctx, {
+        project,
+        envs: variable.environments,
+        actorId: actor._id,
+        override: args.override,
+      });
+
+      if (args.override && isProtectedWrite(project, variable.environments)) {
+        await createAuditLog(ctx, {
+          organizationId: project.organizationId,
+          projectId: variable.projectId,
+          variableId,
+          userId: actor._id,
+          action: "change.overridden",
+          details: {
+            key: variable.key,
+            environments: variable.environments,
+            kind: "delete",
+          },
+        });
+      }
+
       // Soft delete
       await ctx.db.patch(variableId, {
         deletedAt: now,
@@ -973,6 +1134,13 @@ export const bulkDelete = mutation({
         actorId: actor._id,
       });
 
+      await cancelPendingForTarget(
+        ctx,
+        variableId,
+        actor._id,
+        "target deleted"
+      );
+
       deletedKeys.push(variable.key);
       deletedCount++;
     }
@@ -996,170 +1164,252 @@ export const bulkDelete = mutation({
   },
 });
 
-export const restore = mutation({
+export async function restoreCore(
+  ctx: MutationCtx,
   args: {
-    variableId: v.id("environmentVariables"),
-  },
-  handler: async (ctx, args) => {
-    const actor = await requireAuthedUser(ctx);
-    const now = Date.now();
+    variableId: Id<"environmentVariables">;
+    restoredBy: Id<"users">;
+    viaRequestId?: Id<"changeRequests">;
+    override?: boolean;
+  }
+) {
+  const now = Date.now();
 
-    const variable = await ctx.db.get(args.variableId);
-    if (!variable) {
-      throw new Error("Variable not found");
-    }
+  const variable = await ctx.db.get(args.variableId);
+  if (!variable) {
+    throw new Error("Variable not found");
+  }
 
-    if (!variable.deletedAt) {
-      throw new Error("Variable is not deleted");
-    }
+  if (!variable.deletedAt) {
+    throw new Error("Variable is not deleted");
+  }
 
-    // Past the retention window the variable is purge-eligible: its vault
-    // objects may be destroyed at any moment, so restoring would race the
-    // GC and could resurrect a variable whose values no longer exist.
-    if (variable.deletedAt < now - PURGE_RETENTION_DAYS * 24 * 60 * 60 * 1000) {
-      throw new Error(
-        `Variable can no longer be restored — the ${PURGE_RETENTION_DAYS}-day retention window has passed and it is scheduled for permanent deletion.`
-      );
-    }
+  // Past the retention window the variable is purge-eligible: its vault
+  // objects may be destroyed at any moment, so restoring would race the
+  // GC and could resurrect a variable whose values no longer exist.
+  if (variable.deletedAt < now - PURGE_RETENTION_DAYS * 24 * 60 * 60 * 1000) {
+    throw new Error(
+      `Variable can no longer be restored — the ${PURGE_RETENTION_DAYS}-day retention window has passed and it is scheduled for permanent deletion.`
+    );
+  }
 
-    const project = await ctx.db.get(variable.projectId);
-    if (!project) {
-      throw new Error("Project not found");
-    }
+  const project = await ctx.db.get(variable.projectId);
+  if (!project) {
+    throw new Error("Project not found");
+  }
 
-    // Authorization: owner, or assigned PM / team lead
-    await authorizeVariableAccess(ctx, {
-      userId: actor._id,
-      projectId: variable.projectId,
-      action: "project:delete_variable",
-    });
+  // Authorization: owner, or assigned PM / team lead
+  await authorizeVariableAccess(ctx, {
+    userId: args.restoredBy,
+    projectId: variable.projectId,
+    action: "project:delete_variable",
+  });
 
-    // Restoring must not break per-environment key uniqueness: a variable
-    // with the same key may have been (re)created for these environments
-    // while this one sat in the trash — resurrecting it would make pulls
-    // nondeterministic for the clashing environment(s).
-    const envClashes = await findEnvironmentConflicts(ctx, {
-      projectId: variable.projectId,
+  await assertProtectedWrite(ctx, {
+    project,
+    envs: variable.environments,
+    actorId: args.restoredBy,
+    viaRequestId: args.viaRequestId,
+    override: args.override,
+  });
+
+  // Restoring must not break per-environment key uniqueness: a variable
+  // with the same key may have been (re)created for these environments
+  // while this one sat in the trash — resurrecting it would make pulls
+  // nondeterministic for the clashing environment(s).
+  const envClashes = await findEnvironmentConflicts(ctx, {
+    projectId: variable.projectId,
+    key: variable.key,
+    environments: variable.environments,
+  });
+  if (envClashes.length > 0) {
+    throw new ConvexError(
+      `Cannot restore: variable "${variable.key}" already exists in environment(s): ${envClashes.join(", ")}. Delete or re-scope the active variable first.`
+    );
+  }
+
+  await ctx.db.patch(args.variableId, {
+    deletedAt: undefined,
+    updatedAt: now,
+  });
+
+  await createAuditLog(ctx, {
+    organizationId: project.organizationId,
+    projectId: variable.projectId,
+    variableId: args.variableId,
+    userId: args.restoredBy,
+    action: "variable.restored",
+    details: {
       key: variable.key,
       environments: variable.environments,
-    });
-    if (envClashes.length > 0) {
-      throw new ConvexError(
-        `Cannot restore: variable "${variable.key}" already exists in environment(s): ${envClashes.join(", ")}. Delete or re-scope the active variable first.`
-      );
-    }
+      deletedAt: variable.deletedAt,
+      restoredAt: now,
+    },
+    involvesSensitiveData: variable.isSensitive,
+    resourceType: "variable",
+  });
 
-    await ctx.db.patch(args.variableId, {
-      deletedAt: undefined,
-      updatedAt: now,
-    });
-
+  if (args.override && isProtectedWrite(project, variable.environments)) {
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
       projectId: variable.projectId,
       variableId: args.variableId,
-      userId: actor._id,
-      action: "variable.restored",
+      userId: args.restoredBy,
+      action: "change.overridden",
       details: {
         key: variable.key,
         environments: variable.environments,
-        deletedAt: variable.deletedAt,
-        restoredAt: now,
+        kind: "restore",
       },
-      involvesSensitiveData: variable.isSensitive,
-      resourceType: "variable",
     });
+  }
 
-    return args.variableId;
+  return args.variableId;
+}
+
+export const restore = mutation({
+  args: {
+    variableId: v.id("environmentVariables"),
+    override: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    return restoreCore(ctx, {
+      variableId: args.variableId,
+      restoredBy: actor._id,
+      override: args.override,
+    });
   },
 });
+
+export async function rollbackCore(
+  ctx: MutationCtx,
+  args: {
+    variableId: Id<"environmentVariables">;
+    targetVersion: number;
+    actorId: Id<"users">;
+    viaRequestId?: Id<"changeRequests">;
+    override?: boolean;
+  }
+) {
+  const now = Date.now();
+
+  const variable = await ctx.db.get(args.variableId);
+  if (!variable || variable.deletedAt) {
+    throw new Error("Variable not found");
+  }
+
+  const targetVersionRecord = await ctx.db
+    .query("variableVersions")
+    .withIndex("by_variable_and_version", (q) =>
+      q.eq("variableId", args.variableId).eq("version", args.targetVersion)
+    )
+    .first();
+
+  if (!targetVersionRecord) {
+    throw new Error("Target version not found");
+  }
+
+  const project = await ctx.db.get(variable.projectId);
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  // Authorization: owner only
+  await assertOrgAction(
+    ctx,
+    args.actorId,
+    project.organizationId,
+    "org:rollback_variable"
+  );
+
+  await assertProtectedWrite(ctx, {
+    project,
+    envs: variable.environments,
+    actorId: args.actorId,
+    viaRequestId: args.viaRequestId,
+    override: args.override,
+  });
+
+  const newVersion = variable.version + 1;
+
+  // Versions created since value updates started minting a fresh vault
+  // object per change carry distinct vaultRefs, so this patch genuinely
+  // restores the secret value. Legacy versions (written while updates
+  // overwrote the vault object in place) share the variable's current
+  // vaultRef — for those, only metadata is restored.
+  const valueRestored = targetVersionRecord.vaultRef !== variable.vaultRef;
+
+  await ctx.db.patch(args.variableId, {
+    vaultRef: targetVersionRecord.vaultRef,
+    description: targetVersionRecord.description,
+    environments: targetVersionRecord.environments,
+    version: newVersion,
+    lastModifiedBy: args.actorId,
+    updatedAt: now,
+  });
+
+  await ctx.db.insert("variableVersions", {
+    variableId: args.variableId,
+    version: newVersion,
+    vaultRef: targetVersionRecord.vaultRef,
+    description: targetVersionRecord.description,
+    environments: targetVersionRecord.environments,
+    changedBy: args.actorId,
+    changeReason: `Rolled back to version ${args.targetVersion}`,
+    createdAt: now,
+  });
+
+  await createAuditLog(ctx, {
+    organizationId: project.organizationId,
+    projectId: variable.projectId,
+    variableId: args.variableId,
+    userId: args.actorId,
+    action: "variable.rollback",
+    details: {
+      key: variable.key,
+      environments: targetVersionRecord.environments,
+      rollbackToVersion: args.targetVersion,
+      previousVersion: variable.version,
+      newVersion,
+      valueRestored,
+    },
+    involvesSensitiveData: variable.isSensitive,
+    resourceType: "variable",
+  });
+
+  if (args.override && isProtectedWrite(project, variable.environments)) {
+    await createAuditLog(ctx, {
+      organizationId: project.organizationId,
+      projectId: variable.projectId,
+      variableId: args.variableId,
+      userId: args.actorId,
+      action: "change.overridden",
+      details: {
+        key: variable.key,
+        environments: variable.environments,
+        kind: "rollback",
+      },
+    });
+  }
+
+  return { variableId: args.variableId, valueRestored };
+}
 
 export const rollback = mutation({
   args: {
     variableId: v.id("environmentVariables"),
     targetVersion: v.number(),
+    override: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    const now = Date.now();
-
-    const variable = await ctx.db.get(args.variableId);
-    if (!variable || variable.deletedAt) {
-      throw new Error("Variable not found");
-    }
-
-    const targetVersionRecord = await ctx.db
-      .query("variableVersions")
-      .withIndex("by_variable_and_version", (q) =>
-        q.eq("variableId", args.variableId).eq("version", args.targetVersion)
-      )
-      .first();
-
-    if (!targetVersionRecord) {
-      throw new Error("Target version not found");
-    }
-
-    const project = await ctx.db.get(variable.projectId);
-    if (!project) {
-      throw new Error("Project not found");
-    }
-
-    // Authorization: owner only
-    await assertOrgAction(
-      ctx,
-      actor._id,
-      project.organizationId,
-      "org:rollback_variable"
-    );
-
-    const newVersion = variable.version + 1;
-
-    // Versions created since value updates started minting a fresh vault
-    // object per change carry distinct vaultRefs, so this patch genuinely
-    // restores the secret value. Legacy versions (written while updates
-    // overwrote the vault object in place) share the variable's current
-    // vaultRef — for those, only metadata is restored.
-    const valueRestored = targetVersionRecord.vaultRef !== variable.vaultRef;
-
-    await ctx.db.patch(args.variableId, {
-      vaultRef: targetVersionRecord.vaultRef,
-      description: targetVersionRecord.description,
-      environments: targetVersionRecord.environments,
-      version: newVersion,
-      lastModifiedBy: actor._id,
-      updatedAt: now,
-    });
-
-    await ctx.db.insert("variableVersions", {
+    return rollbackCore(ctx, {
       variableId: args.variableId,
-      version: newVersion,
-      vaultRef: targetVersionRecord.vaultRef,
-      description: targetVersionRecord.description,
-      environments: targetVersionRecord.environments,
-      changedBy: actor._id,
-      changeReason: `Rolled back to version ${args.targetVersion}`,
-      createdAt: now,
+      targetVersion: args.targetVersion,
+      actorId: actor._id,
+      override: args.override,
     });
-
-    await createAuditLog(ctx, {
-      organizationId: project.organizationId,
-      projectId: variable.projectId,
-      variableId: args.variableId,
-      userId: actor._id,
-      action: "variable.rollback",
-      details: {
-        key: variable.key,
-        environments: targetVersionRecord.environments,
-        rollbackToVersion: args.targetVersion,
-        previousVersion: variable.version,
-        newVersion,
-        valueRestored,
-      },
-      involvesSensitiveData: variable.isSensitive,
-      resourceType: "variable",
-    });
-
-    return { variableId: args.variableId, valueRestored };
   },
 });
 

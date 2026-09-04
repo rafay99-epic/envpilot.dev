@@ -14,6 +14,31 @@ import {
 } from "./crypto";
 import * as blobStore from "./blobStore";
 import { rateLimiter } from "../../lib/rateLimits";
+import {
+  PROTECTED_ENVIRONMENT_CODE,
+  touchedEnvironments,
+} from "../../lib/protection";
+
+const sourceValidator = v.union(
+  v.literal("web"),
+  v.literal("cli"),
+  v.literal("mcp"),
+  v.literal("extension")
+);
+
+/**
+ * The payload lib/protection.ts throws. Rebuilt here because this action
+ * detects protection BEFORE anything is encrypted or stored, so a refused
+ * upload leaves no blob and no vault object behind.
+ */
+function protectedEnvironmentError(environments: string[]) {
+  const list = environments.join(", ");
+  return {
+    code: PROTECTED_ENVIRONMENT_CODE,
+    message: `${list} ${environments.length === 1 ? "is a protected environment" : "are protected environments"}. Propose this change and a second person will apply it.`,
+    environments,
+  };
+}
 
 /**
  * Composed secret-file actions — the ONLY place plaintext and key material
@@ -51,6 +76,11 @@ interface UploadResult {
   size: number;
   sha256: string;
 }
+
+/** Either the file was written, or a proposal was filed for it. */
+type UploadOutcome =
+  | UploadResult
+  | { requested: true; requestId: Id<"changeRequests"> };
 
 interface FileContentRefs {
   vaultRef: string;
@@ -128,15 +158,22 @@ export const uploadFile = action({
     environments: v.array(v.string()),
     // Present to replace an existing file's contents in place.
     replaceFileId: v.optional(v.id("projectFiles")),
+    // File a change request instead of failing when the write is protected.
+    request: v.optional(v.boolean()),
+    override: v.optional(v.boolean()),
+    source: v.optional(sourceValidator),
   },
-  returns: v.object({
-    fileId: v.id("projectFiles"),
-    size: v.number(),
-    sha256: v.string(),
-  }),
+  returns: v.union(
+    v.object({
+      fileId: v.id("projectFiles"),
+      size: v.number(),
+      sha256: v.string(),
+    }),
+    v.object({ requested: v.literal(true), requestId: v.id("changeRequests") })
+  ),
   // Explicit return type: the handler calls api.features.files.* — which
   // includes this action — so inference would be circular (TS7022).
-  handler: async (ctx, args): Promise<UploadResult> => {
+  handler: async (ctx, args): Promise<UploadOutcome> => {
     const userId = await requireCurrentUserId(ctx);
     // Throttle BEFORE the encrypt/blob/vault work, not after — the point is
     // to stop a loop consuming storage and WorkOS calls at all.
@@ -150,6 +187,27 @@ export const uploadFile = action({
       plaintext = fromBase64(args.content);
     } catch {
       throw new ConvexError("File content is not valid base64");
+    }
+
+    // STEP 0 — protection. Resolved before the encrypt so a refused upload
+    // costs no blob and no vault object.
+    const target = args.replaceFileId
+      ? await ctx.runQuery(
+          internal.features.changeRequests.queries._targetSnapshot,
+          { fileId: args.replaceFileId }
+        )
+      : null;
+    const protectedEnvs: string[] = await ctx.runQuery(
+      internal.features.changeRequests.queries.protectedEnvironmentsForWrite,
+      {
+        projectId: args.projectId,
+        fileId: args.replaceFileId,
+        environments: args.environments,
+      }
+    );
+    const needsRequest = protectedEnvs.length > 0 && args.override !== true;
+    if (needsRequest && args.request !== true) {
+      throw new ConvexError(protectedEnvironmentError(protectedEnvs));
     }
 
     // STEP 1 — everything that can say no, before anything that costs money
@@ -166,6 +224,8 @@ export const uploadFile = action({
         environments: args.environments,
         size: plaintext.length,
         replaceFileId: args.replaceFileId,
+        override: args.override,
+        staging: needsRequest,
       }
     );
 
@@ -197,8 +257,41 @@ export const uploadFile = action({
       throw vaultError;
     }
 
-    // STEP 5 — pointers into Convex.
+    // STEP 5 — pointers into Convex, or a proposal that stages both refs
+    // until a second person approves it.
     try {
+      if (needsRequest) {
+        const requestId: Id<"changeRequests"> = await ctx.runMutation(
+          internal.features.changeRequests.mutations.createStaged,
+          {
+            projectId: args.projectId,
+            resourceType: "file",
+            kind: args.replaceFileId ? "update" : "create",
+            targetId: args.replaceFileId,
+            environments: touchedEnvironments(
+              target?.environments,
+              args.environments
+            ),
+            payload: JSON.stringify({
+              name: preflight.name,
+              path: preflight.path,
+              mode: preflight.mode,
+              contentType: args.contentType,
+              size: plaintext.length,
+              sha256,
+              digestSalt,
+              description: args.description,
+              environments: args.environments,
+            }),
+            vaultRef,
+            storageId,
+            label: preflight.path,
+            source: args.source ?? "web",
+          }
+        );
+        return { requested: true as const, requestId };
+      }
+
       if (args.replaceFileId) {
         const previous: {
           previousVaultRef: string;
@@ -214,6 +307,7 @@ export const uploadFile = action({
             vaultRef,
             storageId,
             contentType: args.contentType,
+            override: args.override,
           }
         );
         // The row now points at the new pair, so the old one is unreachable
@@ -242,6 +336,7 @@ export const uploadFile = action({
           digestSalt,
           vaultRef,
           storageId,
+          override: args.override,
         }
       );
       return { fileId, size: plaintext.length, sha256 };

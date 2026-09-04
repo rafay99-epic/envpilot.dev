@@ -14,7 +14,11 @@ import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { sanitizeConvexError, isRateLimitError } from "@/lib/error-messages";
+import {
+  sanitizeConvexError,
+  isRateLimitError,
+  getProtectedEnvironmentError,
+} from "@/lib/error-messages";
 import { createLogger } from "@/lib/logger";
 import type { Id } from "@convex/_generated/dataModel";
 
@@ -73,6 +77,8 @@ export function ImportDialog({
   const [importError, setImportError] = useState<{
     message: string;
     partial: boolean;
+    /** The target environment is protected: the import can be filed as proposals. */
+    proposable: boolean;
   } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -122,7 +128,7 @@ export function ImportDialog({
     tryParse(text, format);
   };
 
-  const handleImport = async () => {
+  const handleImport = async (request = false) => {
     if (!content.trim()) return;
     setIsImporting(true);
     setResult(null);
@@ -141,6 +147,7 @@ export function ImportDialog({
         environment,
         mode,
         entries,
+        request,
       });
 
       setResult(
@@ -172,6 +179,7 @@ export function ImportDialog({
       setImportError({
         message: sanitizeConvexError(err) || "Import failed.",
         partial: isRateLimitError(err),
+        proposable: getProtectedEnvironmentError(err) !== null,
       });
     }
     // Runs on both paths: the catch above swallows, and neither branch returns early.
@@ -274,6 +282,17 @@ export function ImportDialog({
                       rather than duplicated.
                     </p>
                   )}
+                  {importError.proposable && (
+                    <button
+                      type="button"
+                      data-testid="import-propose"
+                      disabled={isImporting}
+                      onClick={() => void handleImport(true)}
+                      className="mt-2 rounded-lg border px-3 py-1.5 text-xs font-medium border-line text-ink hover:bg-surface-hover disabled:opacity-50"
+                    >
+                      Propose these changes
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -289,7 +308,7 @@ export function ImportDialog({
               }
               variableCount={previewKeys.length}
               onCancel={handleClose}
-              onImport={handleImport}
+              onImport={() => void handleImport()}
             />
           </>
         )}

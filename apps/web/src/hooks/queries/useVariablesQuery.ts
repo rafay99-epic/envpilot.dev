@@ -26,7 +26,14 @@ type MutationLike<TArgs, TResult> = {
   mutateAsync: (args: TArgs) => Promise<TResult>;
 };
 
-export function useCreateVariable(): MutationLike<
+/**
+ * `canCreate` mirrors the caller's `project.variables.create` capability. A
+ * user without it but with `project.requests.submit` (e.g. a developer on a
+ * protected project) files a change request instead of writing directly —
+ * the direct action rejects them anyway, so routing here is what makes the
+ * drawer's "Request Variables" flow actually submit something.
+ */
+export function useCreateVariable(canCreate: boolean): MutationLike<
   {
     key: string;
     value: string;
@@ -42,18 +49,35 @@ export function useCreateVariable(): MutationLike<
   const createWithValue = useAction(
     api.features.variables.values.createWithValue
   );
+  const requestWithValue = useAction(
+    api.features.variables.requests.actions.createWithValue
+  );
 
   return {
-    mutateAsync: async ({ projectId, tagIds, ...data }) => {
-      await createWithValue({
+    mutateAsync: async ({
+      projectId,
+      tagIds,
+      rotationFrequencyDays,
+      ...data
+    }) => {
+      if (!canCreate) {
+        // Request action's validator has no rotationFrequencyDays/tagIds —
+        // both already stripped by the destructure above.
+        await requestWithValue({
+          ...data,
+          projectId: projectId as Id<"projects">,
+        });
+        return { requested: true };
+      }
+      // A protected environment turns the direct write into a proposal, so
+      // the result is a union and the caller's toast depends on which arm.
+      const result = await createWithValue({
         ...data,
         projectId: projectId as Id<"projects">,
         tagIds: tagIds as Id<"variableTags">[] | undefined,
+        rotationFrequencyDays,
       });
-      // Direct creation only. The request-for-approval path is a separate
-      // flow (variables/requests); the old route never returned true here
-      // either, so callers see the same branch they always did.
-      return { requested: false };
+      return { requested: "requested" in result };
     },
   };
 }
@@ -70,7 +94,7 @@ export function useUpdateVariable(): MutationLike<
     rotationFrequencyDays?: number;
     tagIds?: string[];
   },
-  void
+  { requested: boolean }
 > {
   const updateWithValue = useAction(
     api.features.variables.values.updateWithValue
@@ -83,11 +107,12 @@ export function useUpdateVariable(): MutationLike<
       tagIds,
       ...data
     }) => {
-      await updateWithValue({
+      const result = await updateWithValue({
         ...data,
         variableId: variableId as Id<"environmentVariables">,
         tagIds: tagIds as Id<"variableTags">[] | undefined,
       });
+      return { requested: "requested" in result };
     },
   };
 }

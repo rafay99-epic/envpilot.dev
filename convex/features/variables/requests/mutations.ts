@@ -16,12 +16,14 @@ import {
   assertProjectAction,
   isEnvironmentScopeAllowed,
   getRoleProfile,
+  environmentAccessMessage,
 } from "../../../lib/authz";
 import { hasCapability } from "../../../lib/roleProfiles";
 import {
   checkCountedLimit,
   countActiveVariables,
 } from "../../featureRegistry/gates";
+import { protectedEnvironmentsIn } from "../../../lib/protection";
 import { getProjectAndOrgRole, canReviewRequests } from "./helpers";
 
 const VALID_ENVIRONMENTS = ["development", "staging", "production"] as const;
@@ -244,9 +246,10 @@ async function createCore(
   // Environment scope: scoped developers may only request variables whose
   // environments all fall inside their assignment scope
   if (!isEnvironmentScopeAllowed(environmentScope, args.environments)) {
-    throw new ConvexError(
-      `Your access is limited to these environments: ${(environmentScope ?? []).join(", ")}`
-    );
+    const blocked = args.environments.find(
+      (env) => !(environmentScope ?? []).includes(env)
+    )!;
+    throw new ConvexError(environmentAccessMessage(blocked));
   }
 
   const requester = await ctx.db.get(args.requestedBy);
@@ -496,7 +499,7 @@ async function reviewCore(
     // Authorization FIRST — before any state is disclosed. Without this
     // order, a caller from another org could distinguish pending vs
     // resolved requests (and probe origin-key liveness) from the error.
-    const { project } = await getProjectAndOrgRole(
+    const { project, orgRole } = await getProjectAndOrgRole(
       ctx,
       request.projectId,
       actor._id
@@ -633,6 +636,28 @@ async function reviewCore(
       );
     }
 
+    // Protected environments: this legacy path inserts the variable itself
+    // rather than going through createCore, so the two-person rule has to be
+    // enforced here too — reviewing a request is not the same capability as
+    // approving a change into production.
+    const protectedEnvs = protectedEnvironmentsIn(
+      project,
+      approvedEnvironments
+    );
+    if (protectedEnvs.length > 0) {
+      const reviewerProfile = await getRoleProfile(ctx, orgRole);
+      if (!hasCapability(reviewerProfile, "project.protection.approve")) {
+        throw new ConvexError(
+          "Approving a request into a protected environment needs the approve-changes capability"
+        );
+      }
+      if (actor._id === request.requestedBy) {
+        throw new ConvexError(
+          "You cannot approve your own request into a protected environment"
+        );
+      }
+    }
+
     const variableId = await ctx.db.insert("environmentVariables", {
       key: request.key,
       vaultRef: finalVaultRef,
@@ -720,6 +745,25 @@ async function reviewCore(
       resourceType: "variable",
       involvesSensitiveData: request.isSensitive,
     });
+
+    if (protectedEnvs.length > 0) {
+      await createAuditLog(ctx, {
+        organizationId: project.organizationId,
+        projectId: project._id,
+        variableId,
+        userId: actor._id,
+        action: "change.applied",
+        details: {
+          resourceType: "variable",
+          kind: "create",
+          environments: approvedEnvironments,
+          label: request.key,
+          legacyRequestId: args.requestId,
+          reviewedBy: actor._id,
+        },
+        resourceType: "variable",
+      });
+    }
 
     await notifyRequesterOfVerdict(ctx, {
       request,

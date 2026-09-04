@@ -35,6 +35,8 @@ import {
   useConvexUser,
   useProjectBySlug,
   usePendingRequestCount,
+  usePendingChangeCount,
+  usePendingOrgChangeCount,
   useHasSharedWithMe,
 } from "@/hooks";
 
@@ -130,6 +132,16 @@ export function DashboardNav() {
     navProject?._id,
     convexUserId
   );
+  // Protected-environment proposals sit in the same inboxes, so the badges
+  // count both queues.
+  const pendingChangeCount = usePendingChangeCount(
+    navProject?._id,
+    convexUserId
+  );
+  const pendingOrgChangeCount = usePendingOrgChangeCount(
+    organization?.id,
+    convexUserId
+  );
 
   // Org-level settings href
   const orgSettingsHref = organization?.slug
@@ -165,6 +177,7 @@ export function DashboardNav() {
             href: "/dashboard/requests",
             label: "Requests",
             icon: <Inbox className="h-4 w-4" />,
+            badge: pendingOrgChangeCount,
           },
         ]
       : []),
@@ -237,7 +250,7 @@ export function DashboardNav() {
           href: `/dashboard/projects/${projectSlug}/requests`,
           label: "Requests",
           icon: <GitPullRequest className="h-4 w-4" />,
-          badge: pendingRequestCount,
+          badge: pendingRequestCount + pendingChangeCount,
         },
         {
           href: `/dashboard/projects/${projectSlug}/accounts`,

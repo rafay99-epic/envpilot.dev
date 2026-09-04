@@ -6,6 +6,51 @@
  */
 
 /**
+ * Returns a ConvexError's raw `.data` payload, or undefined for anything
+ * else. Lets callers branch on structured fields (e.g. `data.code ===
+ * "PROTECTED_ENVIRONMENT"`) without importing convex server code into web
+ * lib — the type guard for that shape lives in convex/lib/protection.ts.
+ */
+export function getConvexErrorData(error: unknown): unknown {
+  if (error instanceof Error && "data" in error) {
+    return (error as Error & { data: unknown }).data;
+  }
+  return undefined;
+}
+
+/**
+ * Client-side mirror of `isProtectedEnvironmentError` in
+ * convex/lib/protection.ts — duplicated on purpose, since importing convex
+ * server modules into the browser bundle would pull the whole runtime in.
+ * Returns the payload when the write was refused because it touched a
+ * protected environment, so callers can offer "propose this change".
+ */
+export function getProtectedEnvironmentError(
+  error: unknown
+): { message: string; environments: string[] } | null {
+  const data = getConvexErrorData(error);
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("code" in data) ||
+    data.code !== "PROTECTED_ENVIRONMENT"
+  ) {
+    return null;
+  }
+  const environments =
+    "environments" in data && Array.isArray(data.environments)
+      ? data.environments.filter(
+          (env): env is string => typeof env === "string"
+        )
+      : [];
+  const message =
+    "message" in data && typeof data.message === "string"
+      ? data.message
+      : `${environments.join(", ")} is protected. A second person applies this change.`;
+  return { message, environments };
+}
+
+/**
  * Strips Convex internal metadata (Request IDs, stack traces, file paths)
  * from error messages so users see clean, human-readable errors.
  */
@@ -29,6 +74,19 @@ export function sanitizeConvexError(error: unknown): string {
     typeof (error as Error & { data: unknown }).data === "string"
   ) {
     return (error as Error & { data: string }).data;
+  }
+
+  // Structured ConvexError payloads (e.g. PROTECTED_ENVIRONMENT) carry their
+  // user-facing text in a `message` field alongside a `code` callers branch
+  // on via `getConvexErrorData`.
+  const structuredData = getConvexErrorData(error);
+  if (
+    typeof structuredData === "object" &&
+    structuredData !== null &&
+    "message" in structuredData &&
+    typeof (structuredData as { message: unknown }).message === "string"
+  ) {
+    return (structuredData as { message: string }).message;
   }
 
   const raw =

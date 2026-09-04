@@ -3,6 +3,15 @@ import { Id } from "../../_generated/dataModel";
 import { resolveFeatureValue, type OrgGateContext } from "./resolver";
 import type { Surface } from "../../lib/surfaces";
 
+// A limit is a number or null (unlimited). The resolver types denials by
+// feature, so a boolean here means a boolean-typed row was read as a limit:
+// true is unlimited, false is 0.
+function asLimit(value: boolean | number | null): number | null {
+  if (value === null || value === true) return null;
+  if (value === false) return 0;
+  return value;
+}
+
 // ==========================================
 // PAGINATION SHAPE (structural — matches Convex's query builder return type)
 // ==========================================
@@ -79,7 +88,7 @@ export async function checkNumericLimit(
     featureKey,
     context
   );
-  const limit = resolved.value as number | null;
+  const limit = asLimit(resolved.value);
 
   if (limit === null) {
     // Unlimited
@@ -146,7 +155,7 @@ export async function checkCountedLimit(
     featureKey,
     context
   );
-  const limit = resolved.value as number | null;
+  const limit = asLimit(resolved.value);
 
   if (limit === null) {
     // Unlimited (or enforcement disabled) — never count.

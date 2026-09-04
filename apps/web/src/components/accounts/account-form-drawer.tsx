@@ -33,6 +33,8 @@ interface AccountFormDrawerProps {
   onRevealCredentials?: () => Promise<AccountVaultPayload | null>;
   title?: string;
   submitLabel?: string;
+  /** Environments this project protects; selecting one turns save into a proposal. */
+  protectedEnvironments?: readonly string[];
 }
 
 export function AccountFormDrawer({
@@ -43,6 +45,7 @@ export function AccountFormDrawer({
   onRevealCredentials,
   title,
   submitLabel,
+  protectedEnvironments,
 }: AccountFormDrawerProps) {
   const isEditing = !!account;
 
@@ -78,6 +81,7 @@ export function AccountFormDrawer({
         onCancel={onClose}
         isSubmitting={isSubmitting}
         submitLabel={submitLabel}
+        protectedEnvironments={protectedEnvironments}
       />
     </DrawerPanel>
   );
@@ -90,6 +94,7 @@ interface AccountFormProps {
   onCancel: () => void;
   isSubmitting: boolean;
   submitLabel?: string;
+  protectedEnvironments?: readonly string[];
 }
 
 function AccountForm({
@@ -99,6 +104,7 @@ function AccountForm({
   onCancel,
   isSubmitting,
   submitLabel,
+  protectedEnvironments,
 }: AccountFormProps) {
   const isEditing = !!account;
   const accountId = account?._id;
@@ -216,6 +222,11 @@ function AccountForm({
       setError(err instanceof Error ? err.message : "An error occurred");
     }
   };
+
+  const protectedSelected = environments.filter((env) =>
+    protectedEnvironments?.includes(env)
+  );
+  const isProposal = protectedSelected.length > 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -381,6 +392,16 @@ function AccountForm({
         </div>
       </div>
 
+      {isProposal && (
+        <p
+          data-testid="account-protected-note"
+          className="text-xs text-warning"
+        >
+          {protectedSelected.join(", ")} is protected. A second person applies
+          this change.
+        </p>
+      )}
+
       {/* Actions */}
       <div className="flex justify-end gap-3 pt-4">
         <button
@@ -393,13 +414,17 @@ function AccountForm({
         </button>
         <button
           type="submit"
+          data-testid="account-submit"
           disabled={isSubmitting || isPrefilling}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
         >
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {isSubmitting
             ? "Saving…"
-            : (submitLabel ?? (isEditing ? "Save Changes" : "Create Account"))}
+            : isProposal
+              ? "Propose change"
+              : (submitLabel ??
+                (isEditing ? "Save Changes" : "Create Account"))}
         </button>
       </div>
     </form>

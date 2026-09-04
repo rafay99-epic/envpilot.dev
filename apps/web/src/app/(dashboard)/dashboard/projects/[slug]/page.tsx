@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { PageHeader } from "@envpilot/ui";
-import { usePaginatedQuery, useQuery } from "convex/react";
+import { useAction, usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
@@ -23,6 +23,7 @@ import {
   useConvexUser,
   useOrganizationTags,
   useCreateTag,
+  useProtection,
 } from "@/hooks";
 import { useVariableHistory as useConvexVariableHistory } from "@/hooks";
 import { ENVIRONMENTS, DEFAULT_PROJECT_COLOR } from "@/constants/project";
@@ -43,7 +44,11 @@ import { useRevealSecret } from "@/hooks/useRevealSecret";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { useIsMacPlatform } from "@/hooks/useIsMacPlatform";
-import { sanitizeConvexError, isTierLimitError } from "@/lib/error-messages";
+import {
+  sanitizeConvexError,
+  isTierLimitError,
+  getProtectedEnvironmentError,
+} from "@/lib/error-messages";
 import { createLogger } from "@/lib/logger";
 import {
   useCreateVariable,
@@ -187,12 +192,16 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const variables = rawVariables as Variable[];
 
   // --- TanStack Query: mutations ---
-  const createVariable = useCreateVariable();
+  const createVariable = useCreateVariable(canCreateVariable);
   const updateVariable = useUpdateVariable();
   const deleteVariable = useDeleteVariable();
   const bulkDelete = useBulkDeleteVariables();
   const rollbackVariable = useRollbackVariable();
   const revealSecret = useRevealSecret();
+  const protection = useProtection(projectId);
+  const proposeChange = useAction(
+    api.features.changeRequests.actions.createVariableChange
+  );
 
   // --- Local UI state ---
   const [selectedEnvironment, setSelectedEnvironment] = useState<string>("all");
@@ -323,7 +332,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       if (!options?.silent) {
         toast.success(
           result.requested
-            ? "Variable request submitted for admin approval."
+            ? "Sent for approval."
             : "Variable created successfully."
         );
       }
@@ -361,7 +370,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   ) => {
     if (!projectId) return;
     try {
-      await updateVariable.mutateAsync({
+      const result = await updateVariable.mutateAsync({
         variableId,
         projectId,
         value: data.value || undefined,
@@ -375,7 +384,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         tagIds: data.tagIds,
       });
 
-      toast.success("Variable updated successfully.");
+      toast.success(
+        result.requested
+          ? "Sent for approval."
+          : "Variable updated successfully."
+      );
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to update variable";
@@ -406,6 +419,29 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       setDeletingVariable(null);
       toast.success("Variable deleted successfully.");
     } catch (err) {
+      const blocked = getProtectedEnvironmentError(err);
+      if (blocked) {
+        const variableId = deletingVariable._id;
+        setDeletingVariable(null);
+        toast.error(blocked.message, {
+          action: {
+            label: "Propose deletion",
+            onClick: () => {
+              void proposeChange({
+                projectId,
+                kind: "delete",
+                variableId,
+                source: "web",
+              })
+                .then(() => toast.success("Sent for approval."))
+                .catch((proposeErr: unknown) =>
+                  toast.error(sanitizeConvexError(proposeErr))
+                );
+            },
+          },
+        });
+        return;
+      }
       const message =
         err instanceof Error ? err.message : "Failed to delete variable";
       log.error(
@@ -957,6 +993,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         onClose={() => setEditingVariable(null)}
         variable={editingVariable}
         onSave={handleUpdateVariable}
+        protectedEnvironments={protection?.environments}
         showRotation={showRotation}
         availableTags={orgTags}
         onCreateTag={

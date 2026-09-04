@@ -214,6 +214,17 @@ export const SEED_FEATURES = [
     resettable: false,
     sortOrder: 6,
   },
+  // Gates CONFIGURING protection. Enforcement of an existing config never
+  // consults this key (lib/protection.ts), so a downgrade fails closed.
+  {
+    key: "protected_environments",
+    displayName: "Protected Environments (Change Approval)",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 12,
+  },
   {
     key: "max_active_shares",
     displayName: "Max Active Shares",

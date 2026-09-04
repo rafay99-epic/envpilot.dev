@@ -1,6 +1,9 @@
 "use client";
 
 import { useId, useState, use } from "react";
+import { toast } from "sonner";
+import { useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
 import { FileKey, Plus } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import type { Id } from "@convex/_generated/dataModel";
@@ -9,7 +12,14 @@ import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { ConfirmDialog } from "@/components/ui";
 import { FeatureGate } from "@/components/tier/FeatureGate";
-import { useProjectBySlug, useConvexUser } from "@/hooks";
+import { fileProposal } from "@/components/changes";
+import { getProtectedEnvironmentError } from "@/lib/error-messages";
+import {
+  useProjectBySlug,
+  useConvexUser,
+  useProtection,
+  wasRequested,
+} from "@/hooks";
 import {
   useSecretFiles,
   useSecretFileUploadQuota,
@@ -65,6 +75,10 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
   const project = useProjectBySlug(orgId, slug);
   const isLoadingProject = project === undefined && !!slug;
   const projectId = project?._id as Id<"projects"> | undefined;
+  const protection = useProtection(projectId);
+  const createChangeRequest = useMutation(
+    api.features.changeRequests.mutations.create
+  );
 
   const files = useSecretFiles(projectId);
   const isLoadingFiles = files === undefined;
@@ -115,19 +129,51 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
     setNotice(null);
 
     if (editingFile && !replaceMode) {
-      await updateFile({
-        fileId: editingFile._id,
+      const patch = {
         name: data.name,
         path: data.path,
         mode: data.mode,
         description: data.description,
         environments: data.environments,
-      });
-      setNotice(`Updated ${data.name}`);
+      };
+      try {
+        // A protected environment may turn this into a proposal. The union is
+        // read structurally so this keeps working once the backend adds it.
+        const result: unknown = await updateFile({
+          fileId: editingFile._id,
+          ...patch,
+        });
+        setNotice(
+          wasRequested(result) ? "Sent for approval." : `Updated ${data.name}`
+        );
+      } catch (e) {
+        // files.mutations.update has no proposal path of its own, so a
+        // metadata edit of a protected file is filed here.
+        if (!getProtectedEnvironmentError(e)) throw e;
+        await createChangeRequest({
+          projectId,
+          resourceType: "file",
+          kind: "update",
+          targetId: editingFile._id,
+          environments: [
+            ...new Set([...editingFile.environments, ...data.environments]),
+          ],
+          payload: JSON.stringify(patch),
+          label: data.path,
+          source: "web",
+        });
+        setNotice("Sent for approval.");
+      }
     } else {
       if (!data.file) throw new Error("Choose a file to upload");
       const content = await fileToBase64(data.file);
-      await uploadFile({
+      // The submit button already reads "Propose change" when a protected
+      // environment is selected, so the click IS the confirmation; without
+      // the flag the action refuses with PROTECTED_ENVIRONMENT.
+      const result: unknown = await uploadFile({
+        request: data.environments.some((env) =>
+          protection?.environments.includes(env)
+        ),
         projectId,
         name: data.name,
         path: data.path,
@@ -139,9 +185,11 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
         replaceFileId: replaceMode ? editingFile?._id : undefined,
       });
       setNotice(
-        replaceMode
-          ? `Replaced contents of ${editingFile?.name}`
-          : `Uploaded ${data.name}`
+        wasRequested(result)
+          ? "Sent for approval."
+          : replaceMode
+            ? `Replaced contents of ${editingFile?.name}`
+            : `Uploaded ${data.name}`
       );
     }
     closeDrawers();
@@ -175,11 +223,33 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
     if (!deletingFile) return;
     setError(null);
     setNotice(null);
+    const file = deletingFile;
     try {
-      await deleteFile({ fileId: deletingFile._id });
-      setNotice(`Moved ${deletingFile.name} to trash`);
+      await deleteFile({ fileId: file._id });
+      setNotice(`Moved ${file.name} to trash`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not delete the file");
+      const blocked = getProtectedEnvironmentError(e);
+      if (blocked && projectId) {
+        toast.error(blocked.message, {
+          action: {
+            label: "Propose deletion",
+            onClick: () => {
+              void fileProposal(createChangeRequest, {
+                projectId,
+                resourceType: "file",
+                kind: "delete",
+                targetId: file._id,
+                environments: file.environments,
+                payload: "{}",
+                label: file.path,
+                source: "web",
+              });
+            },
+          },
+        });
+      } else {
+        setError(e instanceof Error ? e.message : "Could not delete the file");
+      }
     } finally {
       setDeletingFile(null);
     }
@@ -343,6 +413,7 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
         onSubmit={handleSubmit}
         file={editingFile}
         replaceMode={replaceMode}
+        protectedEnvironments={protection?.environments}
       />
 
       {permissionsFile && (

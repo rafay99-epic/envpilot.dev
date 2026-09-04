@@ -25,6 +25,44 @@ import {
   variableRequestStatusSchema,
   type VariableRequestStatus,
 } from "../types/index.js";
+import type { ChangeRequestRow, ChangeRequestStatus } from "../lib/api.js";
+
+/**
+ * Row shape for the change-requests table under `envpilot requests`.
+ * Change requests are the protected-environment proposal queue — a separate
+ * table from ordinary variable requests, which route/scope has nothing to
+ * do with protection.
+ */
+interface ChangeRequestDisplayRow {
+  id: string;
+  label: string;
+  kind: string;
+  environments: string;
+  status: string;
+  age: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
+function formatAge(createdAt: number): string {
+  const ms = Date.now() - createdAt;
+  const hours = Math.floor(ms / (60 * 60 * 1000));
+  if (hours < 1) return "<1h";
+  if (hours < 48) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
+export function formatChangeRequestRows(
+  requests: ChangeRequestRow[]
+): ChangeRequestDisplayRow[] {
+  return requests.map((r) => ({
+    id: r._id,
+    label: r.label,
+    kind: r.kind,
+    environments: r.environments.join(", "),
+    status: r.status,
+    age: formatAge(r.createdAt),
+  }));
+}
 
 /** Read all of stdin (for --value-stdin approvals in CI). */
 async function readStdin(): Promise<string> {
@@ -71,12 +109,23 @@ async function runList(options: ListOptions): Promise<void> {
   }
 
   const api = createAPIClient();
-  const requests = await withSpinner("Fetching variable requests...", () =>
-    api.listVariableRequests(project.projectId, status)
+  const changeStatus: ChangeRequestStatus | undefined =
+    status === undefined
+      ? undefined
+      : status === "approved"
+        ? "applied"
+        : status;
+  const [requests, changeRequests] = await withSpinner(
+    "Fetching requests...",
+    () =>
+      Promise.all([
+        api.listVariableRequests(project.projectId, status),
+        api.listChangeRequests(project.projectId, changeStatus),
+      ])
   );
 
   if (options.json) {
-    console.log(JSON.stringify(requests, null, 2));
+    console.log(JSON.stringify({ requests, changeRequests }, null, 2));
     return;
   }
 
@@ -89,16 +138,32 @@ async function runList(options: ListOptions): Promise<void> {
 
   if (requests.length === 0) {
     info("No variable requests found.");
-    return;
+  } else {
+    table(formatRequestRows(requests), [
+      { key: "id", header: "ID" },
+      { key: "key", header: "KEY" },
+      { key: "environments", header: "ENVIRONMENTS" },
+      { key: "status", header: "STATUS" },
+      { key: "requested", header: "REQUESTED" },
+      { key: "reason", header: "REASON" },
+    ]);
   }
 
-  table(formatRequestRows(requests), [
+  // Change requests are a separate queue: protected-environment proposals,
+  // filed automatically instead of a developer's ordinary request.
+  console.log();
+  header("Change requests (protected environments)");
+  if (changeRequests.length === 0) {
+    info("No change requests found.");
+    return;
+  }
+  table(formatChangeRequestRows(changeRequests), [
     { key: "id", header: "ID" },
-    { key: "key", header: "KEY" },
+    { key: "label", header: "LABEL" },
+    { key: "kind", header: "KIND" },
     { key: "environments", header: "ENVIRONMENTS" },
     { key: "status", header: "STATUS" },
-    { key: "requested", header: "REQUESTED" },
-    { key: "reason", header: "REASON" },
+    { key: "age", header: "AGE" },
   ]);
 }
 

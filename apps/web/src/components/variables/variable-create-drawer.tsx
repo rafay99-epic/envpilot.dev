@@ -11,7 +11,7 @@ import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import type { Id } from "@convex/_generated/dataModel";
-import { useOrganizationTags, useCreateTag } from "@/hooks";
+import { useOrganizationTags, useCreateTag, useProtection } from "@/hooks";
 
 interface VariableCreateDrawerProps {
   isOpen: boolean;
@@ -59,6 +59,8 @@ export function VariableCreateDrawer({
   const bulkCheck = useTierLimitCheck(orgId, "bulk_import");
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
   const { allowed: showTags } = useFeatureGate(orgId, "variable_tags");
+  // Same open-only gating as the tier checks above: no idle subscription.
+  const protection = useProtection(isOpen ? projId : undefined);
   const { tags } = useOrganizationTags(showTags ? organizationId : undefined);
   const createTag = useCreateTag();
 
@@ -231,6 +233,7 @@ export function VariableCreateDrawer({
             showRotation={showRotation}
             availableTags={availableTags}
             onCreateTag={handleCreateTag}
+            protectedEnvironments={protection?.environments}
           />
         )
       ) : bulkBlocked ? (

@@ -9,16 +9,29 @@ export function allEnvironments(): string[] {
   return [...ENVIRONMENTS];
 }
 
-export function isUnrestrictedScope(selected: string[]): boolean {
-  return ENVIRONMENTS.every((env) => selected.includes(env));
+/**
+ * Whether `selected` covers every environment available to the member —
+ * every environment when the role default is unrestricted, or every
+ * environment in the role's ceiling otherwise.
+ */
+export function isUnrestrictedScope(
+  selected: string[],
+  ceiling?: string[]
+): boolean {
+  const universe = ceiling ?? ENVIRONMENTS;
+  return universe.every((env) => selected.includes(env));
 }
 
 /**
- * Convert the UI selection to the API payload. All environments checked means
- * unrestricted — send nothing so the backend stores no scope.
+ * Convert the UI selection to the API payload. Covering the full ceiling
+ * (or all environments, when unrestricted) means unrestricted-within-role —
+ * send nothing so the assignment always inherits the role's current default.
  */
-export function scopeToPayload(selected: string[]): string[] | undefined {
-  return isUnrestrictedScope(selected) ? undefined : selected;
+export function scopeToPayload(
+  selected: string[],
+  ceiling?: string[]
+): string[] | undefined {
+  return isUnrestrictedScope(selected, ceiling) ? undefined : selected;
 }
 
 /** Human-readable scope for badges: "development, staging" or "All environments". */

@@ -154,13 +154,14 @@ export function useAllFeatures(
     features: data?.features ?? {},
     isAllowed: (key: string) => {
       const f = data?.features?.[key];
-      if (!f) return true; // Unknown features default to allowed
+      if (!f) return false; // Unknown features deny by default (matches checkFeature)
       if (typeof f.value === "boolean") return f.value;
       return true; // Numeric features are "allowed" (limit checked separately)
     },
     getLimit: (key: string): number | null | undefined => {
       const f = data?.features?.[key];
-      if (!f || typeof f.value === "boolean") return undefined;
+      if (!f) return 0; // Unknown features deny by default — zero capacity, not unlimited
+      if (typeof f.value === "boolean") return undefined;
       return f.value;
     },
   };

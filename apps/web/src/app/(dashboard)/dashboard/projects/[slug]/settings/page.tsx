@@ -22,7 +22,7 @@ export default function ProjectSettingsPage({
 }: ProjectSettingsPageProps) {
   const { slug } = use(params);
   const router = useRouter();
-  const { canDo, organization } = useAuthContext();
+  const { canDo, capabilities, organization } = useAuthContext();
   const canUpdateProject = canDo("org:create_project");
   const canDeleteProject = canDo("org:delete_project");
 
@@ -38,7 +38,11 @@ export default function ProjectSettingsPage({
   const project = liveProject ?? lastKnown;
 
   const tabs = project
-    ? projectSettingsTabs({ project, canDelete: canDeleteProject })
+    ? projectSettingsTabs({
+        project,
+        canDelete: canDeleteProject,
+        canManageProtection: capabilities["project.protection.manage"] === true,
+      })
     : [];
   const tabState = useSettingsTab(tabs);
 

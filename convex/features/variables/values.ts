@@ -1,5 +1,5 @@
 import { v, ConvexError } from "convex/values";
-import { action } from "../../_generated/server";
+import { action, type ActionCtx } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import {
@@ -11,6 +11,31 @@ import { roleLevel, ROLE_LEVEL } from "../../lib/authz";
 import { pool, VAULT_POOL_WIDTH } from "../../lib/pool";
 import { vaultCreate, vaultRead } from "../vault/vault";
 import { isValidVariableKey } from "./helpers";
+import {
+  PROTECTED_ENVIRONMENT_CODE,
+  touchedEnvironments,
+} from "../../lib/protection";
+
+const sourceValidator = v.union(
+  v.literal("web"),
+  v.literal("cli"),
+  v.literal("mcp"),
+  v.literal("extension")
+);
+
+/**
+ * The payload lib/protection.ts throws. Rebuilt here because these actions
+ * detect protection BEFORE the mutation runs, so no vault object is minted
+ * for a write that was never going to land.
+ */
+function protectedEnvironmentError(environments: string[]) {
+  const list = environments.join(", ");
+  return {
+    code: PROTECTED_ENVIRONMENT_CODE,
+    message: `${list} ${environments.length === 1 ? "is a protected environment" : "are protected environments"}. Propose this change and a second person will apply it.`,
+    environments,
+  };
+}
 
 // Explicit result types. Actions here call ctx.runQuery/runMutation/runAction
 // on `api`/`internal`; annotating each handler's return type breaks the
@@ -56,6 +81,8 @@ type PushResult = {
   total: number;
   skipped?: number;
   deniedKeys?: string[];
+  /** Present only when the push targeted a protected environment. */
+  requested?: Array<{ key: string; requestId: Id<"changeRequests"> }>;
 };
 
 /**
@@ -325,9 +352,23 @@ export const createWithValue = action({
     description: v.optional(v.string()),
     rotationFrequencyDays: v.optional(v.number()),
     tagIds: v.optional(v.array(v.id("variableTags"))),
+    override: v.optional(v.boolean()),
+    source: v.optional(sourceValidator),
   },
-  returns: v.object({ _id: v.id("environmentVariables") }),
-  handler: async (ctx, args): Promise<{ _id: Id<"environmentVariables"> }> => {
+  returns: v.union(
+    v.object({ _id: v.id("environmentVariables") }),
+    v.object({
+      requested: v.literal(true),
+      requestId: v.id("changeRequests"),
+    })
+  ),
+  handler: async (
+    ctx,
+    args
+  ): Promise<
+    | { _id: Id<"environmentVariables"> }
+    | { requested: true; requestId: Id<"changeRequests"> }
+  > => {
     const project = await ctx.runQuery(
       internal.features.projects.queries._getById,
       {
@@ -383,6 +424,14 @@ export const createWithValue = action({
       );
     }
 
+    // Protection is resolved before the vault write so a proposal and a
+    // direct create mint exactly one object either way.
+    const protectedEnvs: string[] = await ctx.runQuery(
+      internal.features.changeRequests.queries.protectedEnvironmentsForWrite,
+      { projectId: args.projectId, environments: args.environments }
+    );
+    const needsRequest = protectedEnvs.length > 0 && args.override !== true;
+
     const vault = await ctx.runAction(
       internal.features.vault.vault.createSecret,
       {
@@ -392,6 +441,39 @@ export const createWithValue = action({
         projectId: args.projectId,
       }
     );
+
+    if (needsRequest) {
+      try {
+        const requestId: Id<"changeRequests"> = await ctx.runMutation(
+          internal.features.changeRequests.mutations.createStaged,
+          {
+            projectId: args.projectId,
+            resourceType: "variable",
+            kind: "create",
+            environments: args.environments,
+            payload: JSON.stringify({
+              key: args.key,
+              description: args.description,
+              environments: args.environments,
+              isSensitive: args.isSensitive ?? false,
+              rotationFrequencyDays: args.rotationFrequencyDays,
+              tagIds: args.tagIds,
+            }),
+            vaultRef: vault.id,
+            label: args.key,
+            source: args.source ?? "web",
+          }
+        );
+        return { requested: true as const, requestId };
+      } catch (error) {
+        await ctx
+          .runAction(internal.features.vault.vault.deleteSecret, {
+            vaultRef: vault.id,
+          })
+          .catch(() => {});
+        throw error;
+      }
+    }
 
     let variableId: Id<"environmentVariables">;
     try {
@@ -406,6 +488,7 @@ export const createWithValue = action({
           isSensitive: args.isSensitive ?? false,
           rotationFrequencyDays: args.rotationFrequencyDays,
           tagIds: args.tagIds,
+          override: args.override,
         }
       );
     } catch (error) {
@@ -443,6 +526,9 @@ export const pushBulk = action({
       })
     ),
     mode: v.optional(v.union(v.literal("merge"), v.literal("replace"))),
+    // Opt in to proposing changes when the environment is protected. Without
+    // it a protected push is refused before any vault write.
+    request: v.optional(v.boolean()),
   },
   returns: v.object({
     created: v.number(),
@@ -451,6 +537,9 @@ export const pushBulk = action({
     total: v.number(),
     skipped: v.optional(v.number()),
     deniedKeys: v.optional(v.array(v.string())),
+    requested: v.optional(
+      v.array(v.object({ key: v.string(), requestId: v.id("changeRequests") }))
+    ),
   }),
   handler: async (ctx, args): Promise<PushResult> => {
     const mode = args.mode ?? "merge";
@@ -500,6 +589,37 @@ export const pushBulk = action({
       }
     );
     const existingByKey = new Map(existingVariables.map((v2) => [v2.key, v2]));
+
+    // A variable reached through `environment` may span others too, and a
+    // replace-mode push deletes the keys it did not send. Protection is
+    // resolved over that whole touched set, before any vault write — the
+    // per-variable check inside the mutations would otherwise abort the push
+    // mid-flight with a freshly minted secret orphaned.
+    const pushedKeys = new Set(args.variables.map((entry) => entry.key));
+    const touched = new Set<string>([args.environment]);
+    for (const [key, existing] of existingByKey) {
+      if (mode !== "replace" && !pushedKeys.has(key)) continue;
+      for (const environment of existing.environments) touched.add(environment);
+    }
+
+    const protectedEnvs: string[] = await ctx.runQuery(
+      internal.features.changeRequests.queries.protectedEnvironmentsForWrite,
+      { projectId: args.projectId, environments: [...touched] }
+    );
+    if (protectedEnvs.length > 0 && args.request !== true) {
+      throw new ConvexError(protectedEnvironmentError(protectedEnvs));
+    }
+
+    if (protectedEnvs.length > 0) {
+      return proposeChanges(ctx, {
+        projectId: args.projectId,
+        environment: args.environment,
+        organizationId: project.organizationId,
+        entries: args.variables,
+        existingByKey,
+        source: "cli",
+      });
+    }
 
     let created = 0;
     let updated = 0;
@@ -663,6 +783,127 @@ export const pushBulk = action({
 });
 
 /**
+ * Protected-environment write path for the bulk actions: every changed or
+ * new key becomes one change request instead of a write. Deletions are never
+ * proposed (replace mode only removes on the direct path), and the first
+ * refusal — typically the per-requester pending cap — stops the loop so the
+ * caller gets a partial, honest result rather than a tail of failures.
+ */
+type ExistingVariable = {
+  _id: Id<"environmentVariables">;
+  vaultRef: string;
+  version: number;
+  environments: string[];
+  description?: string;
+  isSensitive: boolean;
+};
+
+async function proposeChanges(
+  ctx: ActionCtx,
+  args: {
+    projectId: Id<"projects">;
+    environment: string;
+    organizationId: Id<"organizations">;
+    entries: Array<{
+      key: string;
+      value: string;
+      description?: string;
+      isSensitive?: boolean;
+    }>;
+    existingByKey: Map<string, ExistingVariable>;
+    source: "web" | "cli" | "mcp" | "extension";
+  }
+): Promise<PushResult> {
+  const requested: Array<{ key: string; requestId: Id<"changeRequests"> }> = [];
+  const deniedKeys: string[] = [];
+  let skipped = 0;
+
+  for (const entry of args.entries) {
+    if (!isValidVariableKey(entry.key)) {
+      skipped++;
+      continue;
+    }
+
+    const existing = args.existingByKey.get(entry.key);
+    if (existing) {
+      const currentValue = await ctx.runAction(
+        internal.features.vault.vault.readSecret,
+        { vaultRef: existing.vaultRef }
+      );
+      const descChanged =
+        entry.description !== undefined &&
+        entry.description !== existing.description;
+      const sensChanged =
+        entry.isSensitive !== undefined &&
+        entry.isSensitive !== existing.isSensitive;
+      if (currentValue === entry.value && !descChanged && !sensChanged) {
+        continue;
+      }
+    }
+
+    const vault = await ctx.runAction(
+      internal.features.vault.vault.createSecret,
+      {
+        name: entry.key,
+        value: entry.value,
+        organizationId: args.organizationId,
+        projectId: args.projectId,
+      }
+    );
+
+    try {
+      const requestId: Id<"changeRequests"> = await ctx.runMutation(
+        internal.features.changeRequests.mutations.createStaged,
+        {
+          projectId: args.projectId,
+          resourceType: "variable",
+          kind: existing ? "update" : "create",
+          targetId: existing?._id,
+          environments: existing ? existing.environments : [args.environment],
+          payload: JSON.stringify(
+            existing
+              ? {
+                  description: entry.description,
+                  isSensitive: entry.isSensitive,
+                }
+              : {
+                  key: entry.key,
+                  description: entry.description,
+                  environments: [args.environment],
+                  isSensitive: entry.isSensitive ?? false,
+                }
+          ),
+          vaultRef: vault.id,
+          label: entry.key,
+          reason: "Proposed from a bulk write to a protected environment",
+          source: args.source,
+        }
+      );
+      requested.push({ key: entry.key, requestId });
+    } catch {
+      await ctx
+        .runAction(internal.features.vault.vault.deleteSecret, {
+          vaultRef: vault.id,
+        })
+        .catch(() => {});
+      deniedKeys.push(entry.key);
+      skipped++;
+      break;
+    }
+  }
+
+  return {
+    created: 0,
+    updated: 0,
+    deleted: 0,
+    total: args.entries.length,
+    ...(skipped > 0 ? { skipped } : {}),
+    ...(deniedKeys.length > 0 ? { deniedKeys } : {}),
+    requested,
+  };
+}
+
+/**
  * Replaces the WorkOS Vault write path of PATCH /api/variables/[id].
  *
  * When a value is supplied, a NEW vault object is minted (the old ref stays
@@ -685,9 +926,23 @@ export const updateWithValue = action({
     changeReason: v.optional(v.string()),
     rotationFrequencyDays: v.optional(v.number()),
     tagIds: v.optional(v.array(v.id("variableTags"))),
+    override: v.optional(v.boolean()),
+    source: v.optional(sourceValidator),
   },
-  returns: v.object({ _id: v.id("environmentVariables") }),
-  handler: async (ctx, args): Promise<{ _id: Id<"environmentVariables"> }> => {
+  returns: v.union(
+    v.object({ _id: v.id("environmentVariables") }),
+    v.object({
+      requested: v.literal(true),
+      requestId: v.id("changeRequests"),
+    })
+  ),
+  handler: async (
+    ctx,
+    args
+  ): Promise<
+    | { _id: Id<"environmentVariables"> }
+    | { requested: true; requestId: Id<"changeRequests"> }
+  > => {
     // Fine-grained write authorization lives in the update mutation, but
     // don't let anonymous callers mint vault objects first: require a
     // verified identity before any vault write.
@@ -696,30 +951,41 @@ export const updateWithValue = action({
       throw new Error("Unauthenticated: no verified user identity on request");
     }
 
+    // The variable is loaded unconditionally now: resolving protection needs
+    // its current environments and version, not just its key.
+    const variable = await ctx.runQuery(
+      api.features.variables.queries.getById,
+      {
+        variableId: args.variableId,
+      }
+    );
+    if (!variable) {
+      throw new Error("Variable not found");
+    }
+    const project = await ctx.runQuery(
+      internal.features.projects.queries._getById,
+      {
+        projectId: variable.projectId,
+      }
+    );
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    const protectedEnvs: string[] = await ctx.runQuery(
+      internal.features.changeRequests.queries.protectedEnvironmentsForWrite,
+      {
+        projectId: variable.projectId,
+        variableId: args.variableId,
+        environments: args.environments,
+      }
+    );
+    const needsRequest = protectedEnvs.length > 0 && args.override !== true;
+
     let vaultRef: string | undefined;
 
-    // Mint a new vault object only when the value is actually changing. Needs
-    // the variable's key + owning org for the key context — mirrors the route.
+    // Mint a new vault object only when the value is actually changing.
     if (args.value !== undefined) {
-      const variable = await ctx.runQuery(
-        api.features.variables.queries.getById,
-        {
-          variableId: args.variableId,
-        }
-      );
-      if (!variable) {
-        throw new Error("Variable not found");
-      }
-      const project = await ctx.runQuery(
-        internal.features.projects.queries._getById,
-        {
-          projectId: variable.projectId,
-        }
-      );
-      if (!project) {
-        throw new Error("Project not found");
-      }
-
       const vault = await ctx.runAction(
         internal.features.vault.vault.createSecret,
         {
@@ -732,6 +998,43 @@ export const updateWithValue = action({
       vaultRef = vault.id;
     }
 
+    if (needsRequest) {
+      try {
+        const requestId: Id<"changeRequests"> = await ctx.runMutation(
+          internal.features.changeRequests.mutations.createStaged,
+          {
+            projectId: variable.projectId,
+            resourceType: "variable",
+            kind: "update",
+            targetId: args.variableId,
+            environments: touchedEnvironments(
+              variable.environments,
+              args.environments
+            ),
+            payload: JSON.stringify({
+              description: args.description,
+              environments: args.environments,
+              isSensitive: args.isSensitive,
+              rotationFrequencyDays: args.rotationFrequencyDays,
+              tagIds: args.tagIds,
+            }),
+            vaultRef,
+            label: variable.key,
+            reason: args.changeReason,
+            source: args.source ?? "web",
+          }
+        );
+        return { requested: true as const, requestId };
+      } catch (error) {
+        if (vaultRef) {
+          await ctx
+            .runAction(internal.features.vault.vault.deleteSecret, { vaultRef })
+            .catch(() => {});
+        }
+        throw error;
+      }
+    }
+
     try {
       await ctx.runMutation(api.features.variables.mutations.update, {
         variableId: args.variableId,
@@ -742,6 +1045,7 @@ export const updateWithValue = action({
         changeReason: args.changeReason,
         rotationFrequencyDays: args.rotationFrequencyDays,
         tagIds: args.tagIds,
+        override: args.override,
       });
     } catch (mutationError) {
       // The mutation performs write authorization + validation. On rejection
@@ -846,6 +1150,8 @@ export const importValues = action({
     mode: v.union(v.literal("merge"), v.literal("replace")),
     changeReason: v.optional(v.string()),
     entries: v.array(v.object({ key: v.string(), value: v.string() })),
+    // Opt in to proposing changes when the environment is protected.
+    request: v.optional(v.boolean()),
   },
   returns: v.object({
     path: v.union(v.literal("direct"), v.literal("requests")),
@@ -997,6 +1303,42 @@ export const importValues = action({
       }
     );
     const existingByKey = new Map(existing.map((e) => [e.key, e]));
+
+    // Protected environment: the direct path is closed. Each changed or new
+    // key becomes a change request instead (opt-in), and replace-mode
+    // deletions are not proposed. Protection covers every environment the
+    // touched variables span, not just the one being imported into.
+    const importedKeys = new Set(entries.map((entry) => entry.key));
+    const touched = new Set<string>([args.environment]);
+    for (const [key, row] of existingByKey) {
+      if (args.mode !== "replace" && !importedKeys.has(key)) continue;
+      for (const environment of row.environments) touched.add(environment);
+    }
+    const protectedEnvs: string[] = await ctx.runQuery(
+      internal.features.changeRequests.queries.protectedEnvironmentsForWrite,
+      { projectId: args.projectId, environments: [...touched] }
+    );
+    if (protectedEnvs.length > 0) {
+      if (args.request !== true) {
+        throw new ConvexError(protectedEnvironmentError(protectedEnvs));
+      }
+      const proposed = await proposeChanges(ctx, {
+        projectId: args.projectId,
+        environment: args.environment,
+        organizationId: project.organizationId,
+        entries,
+        existingByKey,
+        source: "web",
+      });
+      return {
+        path: "requests",
+        created: 0,
+        updated: 0,
+        deleted: 0,
+        requested: proposed.requested?.length ?? 0,
+        skipped: skipped + (proposed.skipped ?? 0),
+      };
+    }
 
     // Two phases. All the vault work (the slow part) happens first, pooled;
     // the mutations that follow are cheap DB writes. Interleaving them the way

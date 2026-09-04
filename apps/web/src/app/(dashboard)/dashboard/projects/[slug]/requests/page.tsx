@@ -10,6 +10,7 @@ import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
+import { ChangeRequestList } from "@/components/changes";
 import {
   usePagination,
   useProjectBySlug,
@@ -133,6 +134,11 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
           <p className="text-sm text-danger">{error}</p>
         </div>
       )}
+
+      <div>
+        <h2 className="mb-3 text-sm font-semibold text-ink">Changes</h2>
+        <ChangeRequestList projectId={projectId} />
+      </div>
 
       <div className="rounded-xl border border-line bg-surface">
         <div className="divide-y divide-line">

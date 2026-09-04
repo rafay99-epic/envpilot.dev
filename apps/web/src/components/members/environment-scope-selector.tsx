@@ -11,6 +11,12 @@ interface EnvironmentScopeSelectorProps {
   disabled?: boolean;
   /** Override the default helper copy. */
   helperText?: string;
+  /**
+   * The role's default scope — the ceiling a member's own scope may only
+   * narrow. Undefined = unrestricted (every environment togglable). An
+   * environment outside the ceiling renders greyed out and unselectable.
+   */
+  ceiling?: string[];
 }
 
 /**
@@ -23,6 +29,7 @@ export function EnvironmentScopeSelector({
   onChange,
   disabled = false,
   helperText = "Developers only see and edit variables in the selected environments. Production access can be withheld here.",
+  ceiling,
 }: EnvironmentScopeSelectorProps) {
   const uid = useId();
   const labelId = `${uid}-label`;
@@ -51,25 +58,34 @@ export function EnvironmentScopeSelector({
         aria-describedby={helpId}
         className="mt-2 space-y-1 rounded-lg border p-2 border-line"
       >
-        {ENVIRONMENTS.map((env) => (
-          <label
-            key={env}
-            className={`flex items-center gap-3 rounded-md px-2 py-1.5 ${
-              disabled
-                ? "cursor-not-allowed opacity-50"
-                : "cursor-pointer hover:bg-surface-hover"
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={selected.includes(env)}
-              disabled={disabled}
-              onChange={(e) => toggle(env, e.target.checked)}
-              className="h-4 w-4"
-            />
-            <span className="text-sm capitalize text-ink">{env}</span>
-          </label>
-        ))}
+        {ENVIRONMENTS.map((env) => {
+          const outOfCeiling = !!ceiling && !ceiling.includes(env);
+          const isDisabled = disabled || outOfCeiling;
+          return (
+            <label
+              key={env}
+              title={
+                outOfCeiling
+                  ? "This role's environment default does not include this environment"
+                  : undefined
+              }
+              className={`flex items-center gap-3 rounded-md px-2 py-1.5 ${
+                isDisabled
+                  ? "cursor-not-allowed opacity-50"
+                  : "cursor-pointer hover:bg-surface-hover"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={!outOfCeiling && selected.includes(env)}
+                disabled={isDisabled}
+                onChange={(e) => toggle(env, e.target.checked)}
+                className="h-4 w-4"
+              />
+              <span className="text-sm capitalize text-ink">{env}</span>
+            </label>
+          );
+        })}
       </div>
       {selected.length === 0 && (
         <p className="mt-1.5 text-xs text-warning">

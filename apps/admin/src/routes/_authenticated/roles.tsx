@@ -46,6 +46,8 @@ interface Role {
   isActive: boolean;
   sortOrder: number;
   capabilities: Record<string, boolean>;
+  /** Environment default for env-scopeable roles. Undefined = unrestricted. */
+  environments?: string[];
   memberCount: number;
   pendingInvitationCount: number;
 }
@@ -84,6 +86,13 @@ const RISK_VARIANT: Record<string, "danger" | "warning" | "info" | "default"> =
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_]{1,30}$/;
 
+const ENV_OPTIONS = ["development", "staging", "production"] as const;
+const ENV_LABEL: Record<(typeof ENV_OPTIONS)[number], string> = {
+  development: "dev",
+  staging: "staging",
+  production: "prod",
+};
+
 /** ConvexError payloads survive prod redaction; plain Error.message does not */
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof ConvexError) return String(err.data);
@@ -98,6 +107,8 @@ interface RoleFormData {
   level: number;
   sortOrder: number;
   cloneFrom: string;
+  /** Selected environment toggles. All three checked = unrestricted. */
+  environments: string[];
 }
 
 const EMPTY_FORM: RoleFormData = {
@@ -108,6 +119,7 @@ const EMPTY_FORM: RoleFormData = {
   level: 10,
   sortOrder: 0,
   cloneFrom: "",
+  environments: [...ENV_OPTIONS],
 };
 
 // ==========================================
@@ -164,9 +176,20 @@ function RolesPage() {
       level: role.level,
       sortOrder: role.sortOrder,
       cloneFrom: "",
+      environments: role.environments ?? [...ENV_OPTIONS],
     });
     setFormError(null);
     setDrawerMode("edit");
+  };
+
+  const toggleFormEnvironment = (env: string) => {
+    setForm((prev) => ({
+      ...prev,
+      environments: prev.environments.includes(env)
+        ? prev.environments.filter((e) => e !== env)
+        : [...prev.environments, env],
+    }));
+    setFormError(null);
   };
 
   const updateFormField = <K extends keyof RoleFormData>(
@@ -185,6 +208,12 @@ function RolesPage() {
     setFormError(null);
   };
 
+  const cloneSource = roles?.find((r) => r.slug === form.cloneFrom);
+  const showEnvironmentToggles =
+    drawerMode === "create"
+      ? cloneSource?.capabilities["access.env_scoped"] === true
+      : editingRole?.capabilities["access.env_scoped"] === true;
+
   const handleSave = async () => {
     if (!form.displayName.trim()) {
       setFormError("Display name is required");
@@ -196,10 +225,17 @@ function RolesPage() {
       );
       return;
     }
+    if (showEnvironmentToggles && form.environments.length === 0) {
+      setFormError(
+        "Select at least one environment, or check all three for unrestricted access"
+      );
+      return;
+    }
+    // All three checked = unrestricted (send undefined/null, never the list).
+    const unrestricted = form.environments.length === ENV_OPTIONS.length;
     setSaving(true);
     try {
       if (drawerMode === "create") {
-        const cloneSource = roles?.find((r) => r.slug === form.cloneFrom);
         await createRole({
           slug: form.slug,
           displayName: form.displayName.trim(),
@@ -207,16 +243,29 @@ function RolesPage() {
           color: form.color,
           level: form.level,
           capabilities: cloneSource ? { ...cloneSource.capabilities } : {},
+          environments:
+            showEnvironmentToggles && !unrestricted
+              ? form.environments
+              : undefined,
         });
         toast("success", `Role "${form.displayName}" created`);
       } else if (editingRole) {
         await updateRoleMeta({
           roleId: editingRole._id,
-          displayName: form.displayName.trim(),
-          description: form.description,
-          color: form.color,
-          sortOrder: form.sortOrder,
-          ...(editingRole.isSystem ? {} : { level: form.level }),
+          // System-role identity is code-defined — only environment scope
+          // (and, via the matrix, capabilities) is editable for those rows.
+          ...(editingRole.isSystem
+            ? {}
+            : {
+                displayName: form.displayName.trim(),
+                description: form.description,
+                color: form.color,
+                sortOrder: form.sortOrder,
+                level: form.level,
+              }),
+          ...(showEnvironmentToggles && {
+            environments: unrestricted ? null : form.environments,
+          }),
         });
         toast("success", `Role "${form.displayName}" updated`);
       }
@@ -349,15 +398,22 @@ function RolesPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => openEdit(role)}
-                        disabled={role.isSystem}
+                        disabled={
+                          role.isSystem &&
+                          role.capabilities["access.env_scoped"] !== true
+                        }
                         aria-label={
                           role.isSystem
-                            ? "System role identity is code-defined — only capabilities are editable in the matrix"
+                            ? role.capabilities["access.env_scoped"] === true
+                              ? "Edit environment scope (identity is code-defined)"
+                              : "System role identity is code-defined — only capabilities are editable in the matrix"
                             : "Edit role"
                         }
                         title={
                           role.isSystem
-                            ? "System role identity is code-defined — only capabilities are editable (in the matrix)"
+                            ? role.capabilities["access.env_scoped"] === true
+                              ? "Edit environment scope — identity is code-defined, capabilities are editable in the matrix"
+                              : "System role identity is code-defined — only capabilities are editable (in the matrix)"
                             : "Edit role"
                         }
                       >
@@ -422,6 +478,23 @@ function RolesPage() {
                       >
                         <Mail className="h-3 w-3" />
                         {role.pendingInvitationCount}
+                      </span>
+                    )}
+                    {role.capabilities["access.env_scoped"] === true && (
+                      <span
+                        className="font-mono text-ink-subtle"
+                        title="Environment scope"
+                      >
+                        {role.environments
+                          ? role.environments
+                              .map(
+                                (env) =>
+                                  ENV_LABEL[
+                                    env as (typeof ENV_OPTIONS)[number]
+                                  ] ?? env
+                              )
+                              .join(", ")
+                          : "all envs"}
                       </span>
                     )}
                   </div>
@@ -515,7 +588,7 @@ function RolesPage() {
           drawerMode === "create"
             ? "Custom roles are platform-global and editable from this panel."
             : editingRole?.isSystem
-              ? "System role: slug and level are code-defined. Capabilities are editable in the matrix (Owner excluded) and survive deploys."
+              ? "System role: identity is code-defined. Capabilities are editable in the matrix (Owner excluded) and environment scope is editable below."
               : "Changes apply immediately to all members holding this role."
         }
         onClose={() => setDrawerMode(null)}
@@ -534,6 +607,7 @@ function RolesPage() {
                 value={form.displayName}
                 onChange={(e) => updateFormField("displayName", e.target.value)}
                 placeholder="e.g. Release Manager"
+                disabled={editingRole?.isSystem ?? false}
               />
 
               {drawerMode === "create" && (
@@ -566,6 +640,7 @@ function RolesPage() {
                 value={form.description}
                 onChange={(e) => updateFormField("description", e.target.value)}
                 placeholder="What this role is for"
+                disabled={editingRole?.isSystem ?? false}
               />
             </fieldset>
 
@@ -585,10 +660,11 @@ function RolesPage() {
                     key={preset.token}
                     type="button"
                     onClick={() => updateFormField("color", preset.token)}
+                    disabled={editingRole?.isSystem ?? false}
                     aria-label={`Color: ${preset.token}`}
                     aria-pressed={form.color === preset.token}
                     title={preset.token}
-                    className={`h-7 w-7 rounded-full border-2 transition-all ${
+                    className={`h-7 w-7 rounded-full border-2 transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                       form.color === preset.token
                         ? "scale-110 border-white shadow-lg"
                         : "border-line hover:scale-105 hover:border-line-strong"
@@ -646,6 +722,7 @@ function RolesPage() {
                     type="number"
                     min={0}
                     value={form.sortOrder}
+                    disabled={editingRole?.isSystem ?? false}
                     onChange={(e) =>
                       updateFormField(
                         "sortOrder",
@@ -672,6 +749,41 @@ function RolesPage() {
                 />
               )}
             </fieldset>
+
+            {showEnvironmentToggles && (
+              <>
+                <hr className="border-line" />
+                <fieldset>
+                  <legend className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-subtle">
+                    Environment Scope
+                  </legend>
+                  <p className="mb-2 text-[10px] text-ink-subtle">
+                    All three checked = unrestricted. A member&apos;s own scope
+                    can only narrow this default.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {ENV_OPTIONS.map((env) => {
+                      const checked = form.environments.includes(env);
+                      return (
+                        <button
+                          key={env}
+                          type="button"
+                          onClick={() => toggleFormEnvironment(env)}
+                          aria-pressed={checked}
+                          className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                            checked
+                              ? "border-accent bg-accent-soft text-ink"
+                              : "border-line text-ink-subtle hover:border-line-strong"
+                          }`}
+                        >
+                          {env}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              </>
+            )}
 
             {formError && <p className="text-xs text-danger">{formError}</p>}
           </div>

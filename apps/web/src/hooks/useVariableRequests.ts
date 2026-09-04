@@ -44,6 +44,35 @@ export function usePendingRequestCount(
 }
 
 /**
+ * Pending PROTECTED-ENVIRONMENT change requests, for the same badges. Kept
+ * beside the variable-request counts rather than summed into them: the two
+ * inboxes have different reviewers and different actions.
+ */
+export function usePendingChangeCount(
+  projectId: Id<"projects"> | string | undefined,
+  userId: Id<"users"> | string | undefined
+) {
+  const count = useQuery(
+    api.features.changeRequests.queries.pendingCountForProject,
+    projectId && userId ? { projectId: projectId as Id<"projects"> } : "skip"
+  );
+  return count ?? 0;
+}
+
+export function usePendingOrgChangeCount(
+  organizationId: Id<"organizations"> | string | undefined,
+  userId: Id<"users"> | string | undefined
+) {
+  const count = useQuery(
+    api.features.changeRequests.queries.pendingCountForOrg,
+    organizationId && userId
+      ? { organizationId: organizationId as Id<"organizations"> }
+      : "skip"
+  );
+  return count ?? 0;
+}
+
+/**
  * Resolve (approve/reject) a variable request directly via Convex.
  */
 export function useResolveVariableRequest() {

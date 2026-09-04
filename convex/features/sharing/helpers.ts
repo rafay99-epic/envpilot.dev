@@ -12,6 +12,7 @@ import {
   getRoleProfile,
   bypassesAssignment,
   hasCapability,
+  effectiveEnvironments,
   type RoleProfile,
 } from "../../lib/authz";
 import { createAuditLog } from "../../lib/audit";
@@ -158,9 +159,8 @@ async function buildVariableAccessMap(
     // Env-scopeable roles never see out-of-scope vars.
     if (
       projectMembership &&
-      hasCapability(profile, "access.env_scoped") &&
       !isEnvironmentScopeAllowed(
-        projectMembership.environments,
+        effectiveEnvironments(profile, projectMembership.environments),
         variable.environments
       )
     ) {
@@ -317,9 +317,8 @@ async function buildAccountAccessMap(
     // Env-scopeable roles never see out-of-scope accounts.
     if (
       projectMembership &&
-      hasCapability(profile, "access.env_scoped") &&
       !isEnvironmentScopeAllowed(
-        projectMembership.environments,
+        effectiveEnvironments(profile, projectMembership.environments),
         account.environments
       )
     ) {

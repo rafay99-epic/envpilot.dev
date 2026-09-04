@@ -29,6 +29,8 @@ interface VariableFormProps {
   showRotation?: boolean;
   availableTags?: Tag[];
   onCreateTag?: (name: string, color: string) => Promise<void>;
+  /** Environments this project protects; selecting one turns save into a proposal. */
+  protectedEnvironments?: readonly string[];
 }
 
 const ROTATION_PRESETS = [
@@ -56,6 +58,7 @@ export function VariableForm({
   showRotation = false,
   availableTags,
   onCreateTag,
+  protectedEnvironments,
 }: VariableFormProps) {
   const [formData, setFormData] = useState<VariableFormData>(() => ({
     ...defaultFormData,
@@ -142,6 +145,15 @@ export function VariableForm({
       setIsSubmitting(false);
     }
   };
+
+  const protectedSelected = formData.environments.filter((env) =>
+    protectedEnvironments?.includes(env)
+  );
+  const isProposal = protectedSelected.length > 0;
+  // A row spanning a protected and an unprotected environment is invisible to
+  // anyone scoped to the unprotected one — the plan's approximation of scope.
+  const spansUnprotected =
+    isProposal && protectedSelected.length < formData.environments.length;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -372,6 +384,26 @@ export function VariableForm({
         </div>
       )}
 
+      {isProposal && (
+        <p
+          data-testid="variable-protected-note"
+          className="text-xs text-warning"
+        >
+          {protectedSelected.join(", ")} is protected. A second person applies
+          this change.
+        </p>
+      )}
+
+      {spansUnprotected && (
+        <p
+          data-testid="variable-spanning-warning"
+          className="text-xs text-ink-subtle"
+        >
+          Developers scoped to development will not see this variable. Keep one
+          row per environment for secrets.
+        </p>
+      )}
+
       {/* Actions */}
       <div className="flex justify-end gap-3 pt-4">
         <button
@@ -384,10 +416,15 @@ export function VariableForm({
         </button>
         <button
           type="submit"
+          data-testid="variable-submit"
           disabled={isSubmitting}
           className="rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
         >
-          {isSubmitting ? "Saving..." : submitLabel}
+          {isSubmitting
+            ? "Saving..."
+            : isProposal
+              ? "Propose change"
+              : submitLabel}
         </button>
       </div>
     </form>

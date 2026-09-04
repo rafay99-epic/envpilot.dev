@@ -104,6 +104,8 @@ interface AccountMutationResponse {
   account?: { _id: string };
   id?: string;
   success?: boolean;
+  /** Set when a protected environment turned the write into a proposal. */
+  requested?: boolean;
 }
 
 export function useCreateAccount() {
@@ -118,11 +120,13 @@ export function useCreateAccount() {
     }: CreateAccountParams): Promise<AccountMutationResponse> => {
       // organizationId was only ever used by the route to re-check membership;
       // the action derives it from the project it authorizes against.
-      const { accountId } = await create({
+      const result = await create({
         ...data,
         projectId: projectId as Id<"projects">,
       });
-      return { id: accountId, success: true };
+      return "requested" in result
+        ? { requested: true, success: true }
+        : { id: result.accountId, success: true };
     },
   };
 }
@@ -147,11 +151,13 @@ export function useUpdateAccount() {
       id,
       ...data
     }: UpdateAccountParams): Promise<AccountMutationResponse> => {
-      const { accountId } = await update({
+      const result = await update({
         ...data,
         accountId: id as Id<"projectAccounts">,
       });
-      return { id: accountId, success: true };
+      return "requested" in result
+        ? { requested: true, success: true }
+        : { id: result.accountId, success: true };
     },
   };
 }

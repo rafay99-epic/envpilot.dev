@@ -43,6 +43,11 @@ import type * as features_billing_gracePeriods from "../features/billing/gracePe
 import type * as features_billing_queries from "../features/billing/queries.js";
 import type * as features_billing_tierLimits from "../features/billing/tierLimits.js";
 import type * as features_billing_webhooks from "../features/billing/webhooks.js";
+import type * as features_changeRequests_actions from "../features/changeRequests/actions.js";
+import type * as features_changeRequests_apply from "../features/changeRequests/apply.js";
+import type * as features_changeRequests_authorize from "../features/changeRequests/authorize.js";
+import type * as features_changeRequests_mutations from "../features/changeRequests/mutations.js";
+import type * as features_changeRequests_queries from "../features/changeRequests/queries.js";
 import type * as features_cicd_pull from "../features/cicd/pull.js";
 import type * as features_community_featureRequests_mutations from "../features/community/featureRequests/mutations.js";
 import type * as features_community_featureRequests_queries from "../features/community/featureRequests/queries.js";
@@ -93,6 +98,7 @@ import type * as features_projects_fromTemplate from "../features/projects/fromT
 import type * as features_projects_helpers from "../features/projects/helpers.js";
 import type * as features_projects_members from "../features/projects/members.js";
 import type * as features_projects_mutations from "../features/projects/mutations.js";
+import type * as features_projects_protection from "../features/projects/protection.js";
 import type * as features_projects_queries from "../features/projects/queries.js";
 import type * as features_projects_tags from "../features/projects/tags.js";
 import type * as features_projects_templates from "../features/projects/templates.js";
@@ -180,6 +186,11 @@ declare const fullApi: ApiFromModules<{
   "features/billing/queries": typeof features_billing_queries;
   "features/billing/tierLimits": typeof features_billing_tierLimits;
   "features/billing/webhooks": typeof features_billing_webhooks;
+  "features/changeRequests/actions": typeof features_changeRequests_actions;
+  "features/changeRequests/apply": typeof features_changeRequests_apply;
+  "features/changeRequests/authorize": typeof features_changeRequests_authorize;
+  "features/changeRequests/mutations": typeof features_changeRequests_mutations;
+  "features/changeRequests/queries": typeof features_changeRequests_queries;
   "features/cicd/pull": typeof features_cicd_pull;
   "features/community/featureRequests/mutations": typeof features_community_featureRequests_mutations;
   "features/community/featureRequests/queries": typeof features_community_featureRequests_queries;
@@ -230,6 +241,7 @@ declare const fullApi: ApiFromModules<{
   "features/projects/helpers": typeof features_projects_helpers;
   "features/projects/members": typeof features_projects_members;
   "features/projects/mutations": typeof features_projects_mutations;
+  "features/projects/protection": typeof features_projects_protection;
   "features/projects/queries": typeof features_projects_queries;
   "features/projects/tags": typeof features_projects_tags;
   "features/projects/templates": typeof features_projects_templates;

@@ -27,6 +27,8 @@ interface FileFormDrawerProps {
   file?: SecretFile | null;
   /** Replace-contents mode: a new file is required, metadata is locked. */
   replaceMode?: boolean;
+  /** Environments this project protects; selecting one turns save into a proposal. */
+  protectedEnvironments?: readonly string[];
 }
 
 const MODES = [
@@ -43,6 +45,7 @@ export function FileFormDrawer({
   onSubmit,
   file,
   replaceMode = false,
+  protectedEnvironments,
 }: FileFormDrawerProps) {
   const isEditing = !!file;
 
@@ -83,6 +86,7 @@ export function FileFormDrawer({
         onSubmit={handleSubmit}
         onCancel={onClose}
         isSubmitting={isSubmitting}
+        protectedEnvironments={protectedEnvironments}
       />
     </DrawerPanel>
   );
@@ -94,6 +98,7 @@ interface FileFormProps {
   onSubmit: (data: FileFormData) => Promise<void>;
   onCancel: () => void;
   isSubmitting: boolean;
+  protectedEnvironments?: readonly string[];
 }
 
 function FileForm({
@@ -102,6 +107,7 @@ function FileForm({
   onSubmit,
   onCancel,
   isSubmitting,
+  protectedEnvironments,
 }: FileFormProps) {
   const isEditing = !!file;
   const needsUpload = !isEditing || replaceMode;
@@ -169,6 +175,11 @@ function FileForm({
       setError(err instanceof Error ? err.message : "An error occurred");
     }
   };
+
+  const protectedSelected = environments.filter((env) =>
+    protectedEnvironments?.includes(env)
+  );
+  const isProposal = protectedSelected.length > 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -347,6 +358,13 @@ function FileForm({
         </p>
       )}
 
+      {isProposal && (
+        <p data-testid="file-protected-note" className="text-xs text-warning">
+          {protectedSelected.join(", ")} is protected. A second person applies
+          this change.
+        </p>
+      )}
+
       <div className="flex justify-end gap-3 pt-4">
         <button
           type="button"
@@ -358,17 +376,20 @@ function FileForm({
         </button>
         <button
           type="submit"
+          data-testid="file-submit"
           disabled={isSubmitting}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
         >
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {isSubmitting
             ? "Saving…"
-            : replaceMode
-              ? "Replace Contents"
-              : isEditing
-                ? "Save Changes"
-                : "Upload File"}
+            : isProposal
+              ? "Propose change"
+              : replaceMode
+                ? "Replace Contents"
+                : isEditing
+                  ? "Save Changes"
+                  : "Upload File"}
         </button>
       </div>
     </form>

@@ -8,6 +8,7 @@ import {
   warning,
   withSpinner,
   diff as showDiff,
+  table,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import { isAuthenticated } from "../lib/config.js";
@@ -34,8 +35,23 @@ import {
   notInitialized,
   fileNotFound,
   handleError,
+  isProtectedEnvironmentError,
+  formatProtectedEnvironments,
 } from "../lib/errors.js";
+import type { PushBulkResult } from "../lib/api.js";
 import type { VariablesMeta } from "../types/index.js";
+
+/** The refusal shown when a push is denied outright (no `--request`). */
+export function protectedPushRefusalMessage(environments: string[]): string {
+  return `${formatProtectedEnvironments(environments)}. Nothing was pushed. Re-run with --request to propose these changes for approval.`;
+}
+
+/** Rows for the `--request` result table: key + the filed request's id. */
+export function formatRequestedRows(
+  requested: PushBulkResult["requested"]
+): Array<{ key: string; requestId: string }> {
+  return (requested ?? []).map((r) => ({ key: r.key, requestId: r.requestId }));
+}
 
 export const pushCommand = new Command("push")
   .description("Upload local .env file to cloud")
@@ -58,6 +74,10 @@ export const pushCommand = new Command("push")
   .option("--dry-run", "Show what would be uploaded without making changes")
   .option("--force", "Skip confirmation")
   .option("--project <name-or-id>", "Push to a specific linked project")
+  .option(
+    "--request",
+    "Propose changes for approval instead of failing when the target environment is protected"
+  )
   .action(async (options) => {
     try {
       if (!isAuthenticated()) {
@@ -279,21 +299,45 @@ export const pushCommand = new Command("push")
       }
 
       // Push variables
-      const result = await withSpinner(
-        `Pushing variables to ${chalk.bold(environment)}...`,
-        async () => {
-          return api.bulkUpsertVariables({
-            projectId,
-            environment,
-            variables: Object.entries(valid).map(([key, value]) => ({
-              key,
-              value,
-            })),
-            mode,
-            ...(organizationId && { organizationId }),
-          });
+      let result: PushBulkResult;
+      try {
+        result = await withSpinner(
+          `Pushing variables to ${chalk.bold(environment)}...`,
+          async () => {
+            return api.bulkUpsertVariables({
+              projectId,
+              environment,
+              variables: Object.entries(valid).map(([key, value]) => ({
+                key,
+                value,
+              })),
+              mode,
+              request: options.request === true,
+              ...(organizationId && { organizationId }),
+            });
+          }
+        );
+      } catch (err) {
+        if (isProtectedEnvironmentError(err) && options.request !== true) {
+          error(protectedPushRefusalMessage(err.data.environments));
+          process.exit(1);
         }
-      );
+        throw err;
+      }
+
+      if (result.requested && result.requested.length > 0) {
+        success(
+          `Filed ${result.requested.length} change request(s) for ${chalk.bold(environment)}.`
+        );
+        console.log();
+        table(formatRequestedRows(result.requested), [
+          { key: "key", header: "KEY" },
+          { key: "requestId", header: "REQUEST ID" },
+        ]);
+        console.log();
+        info("Waiting for a second person to approve.");
+        return;
+      }
 
       success(
         `Pushed ${result?.total || Object.keys(valid).length} variables to ${chalk.bold(environment)}`

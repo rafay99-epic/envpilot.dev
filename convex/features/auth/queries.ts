@@ -9,7 +9,7 @@ import {
   bypassesAssignment,
   assertNotSuspended,
   isSuspendedMembership,
-  hasCapability,
+  effectiveEnvironments,
 } from "../../lib/authz";
 import { expandActions } from "../../lib/roleProfiles";
 import {
@@ -199,9 +199,9 @@ export const resolveLegacyRoles = query({
         )
         .first();
       assigned = projectMembership !== null;
-      if (hasCapability(legacyProfile, "access.env_scoped")) {
-        environmentScope = projectMembership?.environments ?? null;
-      }
+      environmentScope =
+        effectiveEnvironments(legacyProfile, projectMembership?.environments) ??
+        null;
     }
 
     let grantOnly = false;

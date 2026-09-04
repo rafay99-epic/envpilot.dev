@@ -20,6 +20,11 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useProjectBySlug, useConvexUser, useNow } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { ConfirmDialog } from "@/components/ui";
+import { fileProposal } from "@/components/changes";
+import {
+  getProtectedEnvironmentError,
+  sanitizeConvexError,
+} from "@/lib/error-messages";
 
 // Mirrors PURGE_RETENTION_DAYS in convex/features/vault/gc.ts (server-only
 // module — must not end up in the client bundle).
@@ -91,6 +96,12 @@ export default function TrashPage({ params }: TrashPageProps) {
   const restoreFile = useMutation(api.features.files.mutations.restore);
   const restoreDoc = useMutation(api.features.docs.mutations.restore);
   const emptyTrash = useAction(api.features.vault.gc.emptyProjectTrash);
+  const proposeChange = useAction(
+    api.features.changeRequests.actions.createVariableChange
+  );
+  const createChangeRequest = useMutation(
+    api.features.changeRequests.mutations.create
+  );
 
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [emptying, setEmptying] = useState(false);
@@ -123,44 +134,113 @@ export default function TrashPage({ params }: TrashPageProps) {
       await restoreVariable({ variableId });
       toast.success(`Restored ${key}`);
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to restore variable"
-      );
+      const blocked = getProtectedEnvironmentError(err);
+      if (blocked && projectId) {
+        toast.error(blocked.message, {
+          action: {
+            label: "Propose restore",
+            onClick: () => {
+              void proposeChange({
+                projectId,
+                kind: "restore",
+                variableId,
+                source: "web",
+              })
+                .then(() => toast.success("Sent for approval."))
+                .catch((proposeErr: unknown) =>
+                  toast.error(sanitizeConvexError(proposeErr))
+                );
+            },
+          },
+        });
+      } else {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to restore variable"
+        );
+      }
     } finally {
       setRestoringId(null);
     }
   }
 
-  async function handleRestoreAccount(
-    accountId: Id<"projectAccounts">,
-    name: string
-  ) {
+  async function handleRestoreAccount(account: {
+    _id: Id<"projectAccounts">;
+    name: string;
+    environments: string[];
+  }) {
     if (!convexUserId) return;
-    setRestoringId(accountId);
+    setRestoringId(account._id);
     try {
       await restoreAccount({
-        accountId,
+        accountId: account._id,
         restoredBy: convexUserId as Id<"users">,
       });
-      toast.success(`Restored ${name}`);
+      toast.success(`Restored ${account.name}`);
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to restore account"
-      );
+      const blocked = getProtectedEnvironmentError(err);
+      if (blocked && projectId) {
+        toast.error(blocked.message, {
+          action: {
+            label: "Propose restore",
+            onClick: () => {
+              void fileProposal(createChangeRequest, {
+                projectId,
+                resourceType: "account",
+                kind: "restore",
+                targetId: account._id,
+                environments: account.environments,
+                payload: "{}",
+                label: account.name,
+                source: "web",
+              });
+            },
+          },
+        });
+      } else {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to restore account"
+        );
+      }
     } finally {
       setRestoringId(null);
     }
   }
 
-  async function handleRestoreFile(fileId: Id<"projectFiles">, name: string) {
-    setRestoringId(fileId);
+  async function handleRestoreFile(file: {
+    _id: Id<"projectFiles">;
+    name: string;
+    path: string;
+    environments: string[];
+  }) {
+    setRestoringId(file._id);
     try {
-      await restoreFile({ fileId });
-      toast.success(`Restored ${name}`);
+      await restoreFile({ fileId: file._id });
+      toast.success(`Restored ${file.name}`);
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to restore file"
-      );
+      const blocked = getProtectedEnvironmentError(err);
+      if (blocked && projectId) {
+        toast.error(blocked.message, {
+          action: {
+            label: "Propose restore",
+            onClick: () => {
+              void fileProposal(createChangeRequest, {
+                projectId,
+                resourceType: "file",
+                kind: "restore",
+                targetId: file._id,
+                environments: file.environments,
+                payload: "{}",
+                label: file.path,
+                source: "web",
+              });
+            },
+          },
+        });
+      } else {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to restore file"
+        );
+      }
     } finally {
       setRestoringId(null);
     }
@@ -367,9 +447,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
-                        handleRestoreAccount(account._id, account.name)
-                      }
+                      onClick={() => handleRestoreAccount(account)}
                       disabled={restoringId === account._id || emptying}
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
                     >
@@ -424,7 +502,7 @@ export default function TrashPage({ params }: TrashPageProps) {
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleRestoreFile(file._id, file.name)}
+                      onClick={() => handleRestoreFile(file)}
                       disabled={restoringId === file._id || emptying}
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-line bg-surface-raised text-ink-muted hover:bg-surface-hover"
                     >

@@ -9,6 +9,8 @@ import {
   bypassesAssignment,
   profileToLegacyProjectRole,
   hasCapability,
+  effectiveEnvironments,
+  environmentAccessMessage,
   type RoleProfile,
 } from "../../lib/authz";
 
@@ -24,11 +26,9 @@ export function assertWithinEnvironmentScope(
   scope: string[] | undefined,
   environments: string[]
 ): void {
-  if (!isEnvironmentScopeAllowed(scope, environments)) {
-    throw new Error(
-      `Your access is limited to these environments: ${(scope ?? []).join(", ")}`
-    );
-  }
+  if (isEnvironmentScopeAllowed(scope, environments)) return;
+  const blocked = environments.find((env) => !(scope ?? []).includes(env))!;
+  throw new ConvexError(environmentAccessMessage(blocked));
 }
 
 /**
@@ -129,10 +129,11 @@ export async function resolveProjectAccessContext(
       )
       .first();
     assigned = !!projectMembership;
-    // Environment scope constrains env-scopeable roles
-    if (hasCapability(profile, "access.env_scoped")) {
-      environmentScope = projectMembership?.environments;
-    }
+    // Role default narrowed by the assignment; undefined for non-scoped roles.
+    environmentScope = effectiveEnvironments(
+      profile,
+      projectMembership?.environments
+    );
   }
 
   // The owner class and assigned blanket-write roles have write access

@@ -46,6 +46,8 @@ interface ProjectMember {
   role?: string;
   /** Environment scope for developers — absent/empty means unrestricted. */
   environments?: string[];
+  /** The role's default scope — the ceiling this member's scope may only narrow. */
+  roleEnvironments?: string[];
   addedAt: number;
   user: {
     _id: string;
@@ -66,6 +68,8 @@ interface AssignableMember {
   name?: string;
   avatarUrl?: string;
   orgRole: string;
+  /** The role's default scope — the ceiling an added member's scope may only narrow. */
+  roleEnvironments?: string[];
 }
 
 interface Project {
@@ -161,6 +165,14 @@ export default function ProjectMembersPage({
   const addEnvScopeApplies =
     !!selectedAddTarget &&
     isEnvScopedRole(normalizeOrgRole(selectedAddTarget.orgRole));
+  // The target role's default — the ceiling addEnvScope may only narrow.
+  const addEnvCeiling = selectedAddTarget?.roleEnvironments;
+
+  function handleSelectAddTarget(userId: string) {
+    setSelectedUserId(userId);
+    const target = addableMembers.find((m) => m._id === userId);
+    setAddEnvScope(target?.roleEnvironments ?? allEnvironments());
+  }
 
   async function handleAddMember(e: React.FormEvent) {
     e.preventDefault();
@@ -169,9 +181,9 @@ export default function ProjectMembersPage({
     setIsAdding(true);
     setError(null);
 
-    // All environments checked = unrestricted = send nothing.
+    // Covering the full ceiling = unrestricted-within-role = send nothing.
     const environments = addEnvScopeApplies
-      ? scopeToPayload(addEnvScope)
+      ? scopeToPayload(addEnvScope, addEnvCeiling)
       : undefined;
 
     try {
@@ -197,7 +209,7 @@ export default function ProjectMembersPage({
     setEditEnvScope(
       member.environments && member.environments.length > 0
         ? [...member.environments]
-        : allEnvironments()
+        : (member.roleEnvironments ?? allEnvironments())
     );
   }
 
@@ -208,8 +220,11 @@ export default function ProjectMembersPage({
     setIsSavingScope(true);
     setError(null);
 
-    // Omitting `environments` clears the scope (unrestricted).
-    const environments = scopeToPayload(editEnvScope);
+    // Covering the full ceiling = unrestricted-within-role = send nothing.
+    const environments = scopeToPayload(
+      editEnvScope,
+      editingScopeMember.roleEnvironments
+    );
 
     try {
       await projectMemberActions.setEnvironments({
@@ -375,7 +390,9 @@ export default function ProjectMembersPage({
                           className="inline-flex items-center rounded-full border border-line-strong bg-surface-hover/10 px-2 py-0.5 text-xs font-medium text-ink-muted"
                           title="Environment access"
                         >
-                          {formatEnvironmentScope(member.environments)}
+                          {formatEnvironmentScope(
+                            member.environments ?? member.roleEnvironments
+                          )}
                         </span>
                       )}
 
@@ -475,7 +492,7 @@ export default function ProjectMembersPage({
             <select
               id={memberSelectId}
               value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
+              onChange={(e) => handleSelectAddTarget(e.target.value)}
               required
               className="mt-2 block w-full rounded-lg border px-4 py-2.5 focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-line-strong border-line bg-surface-raised text-ink"
             >
@@ -495,6 +512,7 @@ export default function ProjectMembersPage({
               selected={addEnvScope}
               onChange={setAddEnvScope}
               disabled={isAdding}
+              ceiling={addEnvCeiling}
             />
           )}
 
@@ -549,6 +567,7 @@ export default function ProjectMembersPage({
                 selected={editEnvScope}
                 onChange={setEditEnvScope}
                 disabled={isSavingScope}
+                ceiling={editingScopeMember.roleEnvironments}
               />
 
               <div className="flex justify-end gap-3 pt-2">

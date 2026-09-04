@@ -280,6 +280,31 @@ export const CAPABILITIES = {
     risk: "low",
   },
 
+  // ── Protected environments ────────────────────────────────────────────────
+  // No legacy action strings for these: the parity suite pins the pre-registry
+  // action sets, so new capabilities are checked with hasCapability directly.
+  "project.protection.manage": {
+    label: "Configure protected environments",
+    category: "Protection",
+    description:
+      "Choose which environments require a second person to approve every write. Disabling is always allowed with this capability and is audited as critical",
+    risk: "high",
+  },
+  "project.protection.approve": {
+    label: "Approve changes to protected environments",
+    category: "Protection",
+    description:
+      "Apply or reject pending change requests. Never your own: the requester and the approver must be different people",
+    risk: "high",
+  },
+  "project.protection.override": {
+    label: "Override protection (break-glass)",
+    category: "Protection",
+    description:
+      "Write straight into a protected environment without a second approver. Every use is audited as critical and notified",
+    risk: "critical",
+  },
+
   // ── Behavior modifiers ────────────────────────────────────────────────────
   "access.blanket_read": {
     label: "Blanket read",

@@ -32,6 +32,12 @@ export interface RoleProfile {
   level: number;
   isSystem: boolean;
   capabilities: CapabilityMap;
+  /**
+   * Default environment scope for env-scopeable roles. Undefined = every
+   * environment. Only consulted when the profile carries access.env_scoped;
+   * a projectMembers.environments list may narrow it, never widen it.
+   */
+  environments?: string[];
 }
 
 function caps(keys: CapabilityKey[]): CapabilityMap {
@@ -107,6 +113,8 @@ export const SYSTEM_PROFILES: Record<string, RoleProfile> = {
       "project.members.manage",
       "project.share",
       "project.templates.manage",
+      "project.protection.manage",
+      "project.protection.approve",
       "notify.variable_changes",
     ]),
   },
@@ -145,6 +153,8 @@ export const SYSTEM_PROFILES: Record<string, RoleProfile> = {
       "project.members.manage",
       "project.share",
       "project.templates.manage",
+      "project.protection.manage",
+      "project.protection.approve",
       "notify.variable_changes",
     ]),
   },
@@ -174,6 +184,10 @@ export const SYSTEM_PROFILES: Record<string, RoleProfile> = {
       "access.grant_fallback",
       "access.env_scoped",
     ]),
+    // Developers work in development only. Existing assignments are
+    // backfilled to their previous (unrestricted) scope by the
+    // enable-role-environment-defaults migration before this default applies.
+    environments: ["development"],
   },
 };
 
@@ -211,6 +225,8 @@ export const SEEDED_CUSTOM_PROFILES: Record<string, RoleProfile> = {
       "notify.variable_changes",
       "access.env_scoped",
     ]),
+    // Editors never see production. Leads propose production changes.
+    environments: ["development", "staging"],
   },
   viewer: {
     slug: "viewer",
@@ -248,6 +264,22 @@ export function hasCapability(
   key: CapabilityKey
 ): boolean {
   return profile.capabilities[key] === true;
+}
+
+/**
+ * The environments a project member may see and write. Undefined = all.
+ * Role default first, member list narrows it. Non-scopeable roles ignore
+ * both. Pure so the parity suite and members.manage can assert on it.
+ */
+export function effectiveEnvironments(
+  profile: Pick<RoleProfile, "capabilities" | "environments">,
+  memberEnvironments: string[] | undefined
+): string[] | undefined {
+  if (!hasCapability(profile, "access.env_scoped")) return undefined;
+  const roleScope = profile.environments;
+  if (!memberEnvironments) return roleScope;
+  if (!roleScope) return memberEnvironments;
+  return memberEnvironments.filter((env) => roleScope.includes(env));
 }
 
 /**

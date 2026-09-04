@@ -15,6 +15,22 @@
 
 <!-- entry -->
 ---
+title: Protected Environments
+version: v1.67.0
+date: 2026-09-04
+types: [feature, security]
+---
+
+Mark production (or any environment) as protected and every write into it becomes a change request that a second person applies. The new value is encrypted the moment it is proposed, the reviewer never sees plaintext, and approve applies the write in the same transaction. Requester and approver must be different people. Owners hold a break-glass override that is audited as critical and sent to the security channel.
+
+Protection covers variables, shared accounts, and secret files, on every surface: the dashboard proposes instead of saving, `envpilot push` refuses a protected environment unless you pass `--request`, and MCP and the IDE plugins were request-only already. Turning protection off needs only the manage capability, so a plan downgrade never silently unprotects production.
+
+Roles now carry a default environment scope. Developers see development, editors see development and staging, leads see everything. Admins edit the defaults per role in the admin panel; a member's scope can narrow the role default but not widen it. Existing members keep the scope they had: run the `enable-role-environment-defaults` migration once from the admin panel on an existing deployment (it backfills members first, then turns the defaults on).
+
+Two fixes rode along. The admin kill switch on a feature now applies even while tier enforcement is off, and the "Request Variables" drawer files a request instead of failing for users without the create capability.
+
+<!-- entry -->
+---
 title: JetBrains Plugin Hardening
 version: v0.1.6
 date: 2026-09-04

@@ -219,7 +219,7 @@ type ProjectRow = {
   color?: string;
 };
 type MembershipRow = { role: string } | null;
-type ProjectMembershipRow = { environments?: string[] } | null;
+type HiddenByScopeRow = { scope: string[] | null; hiddenKeys: string[] };
 type VariableAccessRow = {
   _id: string;
   key: string;
@@ -316,19 +316,52 @@ export interface FingerprintCheck {
   /** Accessible variables that exist only in other environments. */
   otherEnvKeys: Array<{ key: string; environments: string[] }>;
 }
-type PushBulkResult = {
+export type PushBulkResult = {
   created: number;
   updated: number;
   deleted: number;
   total: number;
   skipped?: number;
   deniedKeys?: string[];
+  /** One entry per key proposed instead of written (protected environment). */
+  requested?: Array<{ key: string; requestId: string }>;
 };
 type PushVariableInput = {
   key: string;
   value: string;
   description?: string;
   isSensitive?: boolean;
+};
+
+/** Result of a single create/update-with-value action: a direct write, or a
+ * filed proposal when the target environment is protected. */
+type ValueWriteResult =
+  | { _id: string }
+  | { requested: true; requestId: string };
+
+export type ChangeRequestStatus =
+  | "pending"
+  | "applied"
+  | "rejected"
+  | "canceled"
+  | "expired";
+export type ChangeRequestKind =
+  | "create"
+  | "update"
+  | "delete"
+  | "restore"
+  | "rollback";
+/** Row shape returned by changeRequests/queries:listForProject. */
+export type ChangeRequestRow = {
+  _id: string;
+  resourceType: "variable" | "account" | "file";
+  kind: ChangeRequestKind;
+  label: string;
+  environments: string[];
+  status: ChangeRequestStatus;
+  reason?: string;
+  createdAt: number;
+  requester: { _id: string; name?: string; email: string } | null;
 };
 
 const fnRef = makeFunctionReference;
@@ -348,16 +381,14 @@ const refs = {
   getProject: fnRef<"query", { projectId: string }, ProjectRow | null>(
     "features/projects/queries:getById"
   ),
-  getProjectMembership: fnRef<
-    "query",
-    { projectId: string },
-    ProjectMembershipRow
-  >("features/projects/members:getProjectMembership"),
   listVariablesWithAccess: fnRef<
     "query",
     { projectId: string; limit?: number },
     VariableAccessRow[]
   >("features/variables/queries:listWithAccess"),
+  hiddenByScope: fnRef<"query", { projectId: string }, HiddenByScopeRow>(
+    "features/variables/queries:hiddenByScope"
+  ),
   listVariableRequests: fnRef<
     "query",
     { projectId: string; status?: VariableRequestStatus },
@@ -416,8 +447,11 @@ const refs = {
       description?: string;
       environments: string[];
       replaceFileId?: string;
+      request?: boolean;
+      override?: boolean;
     },
-    { fileId: string; size: number; sha256: string }
+    | { fileId: string; size: number; sha256: string }
+    | { requested: true; requestId: string }
   >("features/files/values:uploadFile"),
   removeFile: fnRef<"mutation", { fileId: string }, string>(
     "features/files/mutations:remove"
@@ -434,9 +468,72 @@ const refs = {
       environment: string;
       variables: PushVariableInput[];
       mode?: "merge" | "replace";
+      request?: boolean;
     },
     PushBulkResult
   >("features/variables/values:pushBulk"),
+  createWithValue: fnRef<
+    "action",
+    {
+      projectId: string;
+      key: string;
+      value: string;
+      environments: string[];
+      isSensitive?: boolean;
+      description?: string;
+      source?: "cli";
+    },
+    ValueWriteResult
+  >("features/variables/values:createWithValue"),
+  updateWithValue: fnRef<
+    "action",
+    {
+      variableId: string;
+      value?: string;
+      description?: string;
+      environments?: string[];
+      isSensitive?: boolean;
+      source?: "cli";
+    },
+    ValueWriteResult
+  >("features/variables/values:updateWithValue"),
+  createVariableChange: fnRef<
+    "action",
+    {
+      projectId: string;
+      kind: ChangeRequestKind;
+      variableId?: string;
+      key?: string;
+      value?: string;
+      description?: string;
+      environments?: string[];
+      isSensitive?: boolean;
+      targetVersion?: number;
+      reason?: string;
+      source: "cli";
+    },
+    { requestId: string }
+  >("features/changeRequests/actions:createVariableChange"),
+  createChangeRequest: fnRef<
+    "mutation",
+    {
+      projectId: string;
+      resourceType: "variable" | "account" | "file";
+      kind: ChangeRequestKind;
+      targetId?: string;
+      environments: string[];
+      payload: string;
+      label: string;
+      reason?: string;
+      source: "cli";
+    },
+    string
+  >("features/changeRequests/mutations:create"),
+  listChangeRequests: fnRef<
+    "query",
+    { projectId: string; status?: ChangeRequestStatus },
+    ChangeRequestRow[]
+  >("features/changeRequests/queries:listForProject"),
   createVariableRequest: fnRef<
     "action",
     {
@@ -663,14 +760,16 @@ export class APIClient {
         let assigned = isOwner;
         let environmentScope: string[] | null = null;
         if (!isOwner) {
-          const projectMembership = await convexQuery(
-            refs.getProjectMembership,
-            { projectId: project._id }
-          );
-          assigned = projectMembership !== null;
-          environmentScope = isDeveloper
-            ? (projectMembership?.environments ?? null)
-            : null;
+          // resolveLegacyRoles resolves the role's environment DEFAULT and
+          // narrows it by the member's own override (effectiveEnvironments),
+          // rather than reading the raw per-member row — a role-slug check
+          // like `isDeveloper` here would silently report `null` (unrestricted)
+          // for a scoped custom role, e.g. an env-scoped "editor".
+          const resolved = await convexQuery(refs.resolveProjectRoles, {
+            projectId: project._id,
+          });
+          assigned = resolved.assigned;
+          environmentScope = resolved.environmentScope;
         }
         return {
           _id: project._id,
@@ -748,6 +847,14 @@ export class APIClient {
       matchingCount: matching.length,
       otherEnvKeys,
     };
+  }
+
+  /**
+   * Keys hidden from the caller by environment scope (doctor-only). Keys
+   * only, never values; empty when the caller is unrestricted.
+   */
+  async getHiddenByScope(projectId: string): Promise<HiddenByScopeRow> {
+    return convexQuery(refs.hiddenByScope, { projectId });
   }
 
   /** List variable requests for a project (Convex). */
@@ -886,7 +993,15 @@ export class APIClient {
     };
   }
 
-  /** Bulk create/update variables (vault path — encrypts values server-side). */
+  /**
+   * Bulk create/update variables (vault path — encrypts values server-side).
+   *
+   * Without `request`, a push touching a protected environment throws a
+   * PROTECTED_ENVIRONMENT error before any vault write (see
+   * isProtectedEnvironmentError in lib/errors.ts). With `request: true`,
+   * every changed or new key is filed as a change request instead, and the
+   * result carries `requested`.
+   */
   async bulkUpsertVariables(data: {
     projectId: string;
     environment: string;
@@ -898,14 +1013,8 @@ export class APIClient {
     }>;
     mode: "merge" | "replace";
     organizationId?: string;
-  }): Promise<{
-    created: number;
-    updated: number;
-    deleted: number;
-    total: number;
-    skipped?: number;
-    deniedKeys?: string[];
-  }> {
+    request?: boolean;
+  }): Promise<PushBulkResult> {
     // Direct Convex action (encrypts server-side, diffs against existing) —
     // replaces the deleted POST /api/cli/variables/bulk vault route.
     return convexAction(refs.pushBulk, {
@@ -913,7 +1022,108 @@ export class APIClient {
       environment: data.environment,
       variables: data.variables,
       mode: data.mode,
+      ...(data.request ? { request: true } : {}),
     });
+  }
+
+  /**
+   * Create a single variable with its value. Auto-files a change request
+   * (no explicit flag needed) when the target environment is protected —
+   * the result carries `requested` instead of `_id` in that case.
+   */
+  async createVariableValue(
+    projectId: string,
+    environments: string[],
+    key: string,
+    value: string,
+    opts?: { description?: string; isSensitive?: boolean }
+  ): Promise<ValueWriteResult> {
+    return convexAction(refs.createWithValue, {
+      projectId,
+      key,
+      value,
+      environments,
+      isSensitive: opts?.isSensitive,
+      description: opts?.description,
+      source: "cli",
+    });
+  }
+
+  /**
+   * Update a single variable's value. Same auto-file-on-protected behavior
+   * as {@link createVariableValue}.
+   */
+  async updateVariableValue(
+    variableId: string,
+    opts: { value?: string; description?: string; isSensitive?: boolean }
+  ): Promise<ValueWriteResult> {
+    return convexAction(refs.updateWithValue, {
+      variableId,
+      value: opts.value,
+      description: opts.description,
+      isSensitive: opts.isSensitive,
+      source: "cli",
+    });
+  }
+
+  /**
+   * File a variable change request directly (delete/restore/rollback, or a
+   * create/update the caller already knows is protected). Mints a vault
+   * object itself when `value` is supplied.
+   */
+  async createVariableChange(input: {
+    projectId: string;
+    kind: ChangeRequestKind;
+    variableId?: string;
+    key?: string;
+    value?: string;
+    description?: string;
+    environments?: string[];
+    isSensitive?: boolean;
+    targetVersion?: number;
+    reason?: string;
+  }): Promise<{ requestId: string }> {
+    return convexAction(refs.createVariableChange, {
+      ...input,
+      source: "cli",
+    });
+  }
+
+  /**
+   * File a change request for a resource with no value of its own (account,
+   * file). Variables should prefer {@link createVariableChange}, which also
+   * stages a vault object when the proposal carries a value.
+   */
+  async createChangeRequest(input: {
+    projectId: string;
+    resourceType: "variable" | "account" | "file";
+    kind: ChangeRequestKind;
+    targetId?: string;
+    environments: string[];
+    payload: Record<string, unknown>;
+    label: string;
+    reason?: string;
+  }): Promise<{ requestId: string }> {
+    const requestId = await convexMutation(refs.createChangeRequest, {
+      projectId: input.projectId,
+      resourceType: input.resourceType,
+      kind: input.kind,
+      targetId: input.targetId,
+      environments: input.environments,
+      payload: JSON.stringify(input.payload),
+      label: input.label,
+      reason: input.reason,
+      source: "cli",
+    });
+    return { requestId };
+  }
+
+  /** List change requests for a project (protected-environment proposals). */
+  async listChangeRequests(
+    projectId: string,
+    status?: ChangeRequestStatus
+  ): Promise<ChangeRequestRow[]> {
+    return convexQuery(refs.listChangeRequests, { projectId, status });
   }
 
   /**
@@ -1072,7 +1282,12 @@ export class APIClient {
     return convexAction(refs.getFileContent, { fileId, source: "cli" });
   }
 
-  /** Upload a new secret file, or replace an existing one's contents. */
+  /**
+   * Upload a new secret file, or replace an existing one's contents.
+   * Without `request`, a protected environment throws PROTECTED_ENVIRONMENT
+   * before any upload. With `request: true`, the result carries `requested`
+   * instead of the file's id.
+   */
   async uploadSecretFile(input: {
     projectId: string;
     name: string;
@@ -1083,7 +1298,11 @@ export class APIClient {
     description?: string;
     environments: string[];
     replaceFileId?: string;
-  }): Promise<{ fileId: string; size: number; sha256: string }> {
+    request?: boolean;
+  }): Promise<
+    | { fileId: string; size: number; sha256: string }
+    | { requested: true; requestId: string }
+  > {
     return convexAction(refs.uploadFile, input);
   }
 
