@@ -1,0 +1,25 @@
+apps/web/src/components/changes/change-review-drawer.tsx
+  s_274796d5279c8d::t_f9a4162a9d03e2 70,72-73
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/files/page.tsx
+  s_274796d5279c8d::t_a6738c65ce2294 214-218,253
+apps/web/src/components/changes/change-request-list.tsx
+  s_274796d5279c8d::t_fcbf0751393a31 110,112-118
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/trash/page.tsx
+  s_274796d5279c8d::t_a6738c65ce2294 162,204,243,258,283
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "df726eb06a6d3e872c504ff01f2c175553c90542",
+  "prompts": {},
+  "sessions": {
+    "s_274796d5279c8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46448544-856e-4fc0-beec-74f74b2e5474",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
