@@ -12,9 +12,9 @@ complexity:
   NestedBlockDepth:
     active: false
 exceptions:
+  # Boundary catches (actions, network, UI) intentionally catch Exception and
+  # report; SwallowedException stays on because a dropped cause is a real bug.
   TooGenericExceptionCaught:
-    active: false
-  SwallowedException:
     active: false
 naming:
   FunctionNaming:

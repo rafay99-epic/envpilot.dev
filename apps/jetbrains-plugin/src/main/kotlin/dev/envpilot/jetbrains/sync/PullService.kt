@@ -21,7 +21,7 @@ import java.nio.file.attribute.PosixFilePermission
 object PullService {
     private val log = logger<PullService>()
 
-    class PullAborted(message: String) : Exception(message)
+    class PullAborted(message: String, cause: Throwable? = null) : Exception(message, cause)
 
     suspend fun pull(
         link: LinkedProject,
@@ -96,7 +96,7 @@ object PullService {
             }
         } catch (e: Exception) {
             restore(rollback)
-            throw PullAborted("Pull could not be written safely: ${e.message ?: e.javaClass.simpleName}")
+            throw PullAborted("Pull could not be written safely: ${e.message ?: e.javaClass.simpleName}", e)
         }
         if (project != null) {
             try {

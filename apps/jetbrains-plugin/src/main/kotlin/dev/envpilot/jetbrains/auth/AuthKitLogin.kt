@@ -25,7 +25,7 @@ object AuthKitLogin {
     private const val AUTHENTICATE_URL = "https://api.workos.com/user_management/authenticate"
     private const val DEVICE_CODE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
 
-    class LoginCancelled(message: String, val transient: Boolean = false) : Exception(message)
+    class LoginCancelled(message: String, val transient: Boolean = false, cause: Throwable? = null) : Exception(message, cause)
 
     private val http: HttpClient =
         HttpClient.newBuilder()
@@ -99,10 +99,10 @@ object AuthKitLogin {
             try {
                 post(DEVICE_AUTHORIZE_URL, mapOf("client_id" to BuildConfig.WORKOS_CLIENT_ID))
             } catch (e: java.io.IOException) {
-                throw LoginCancelled("Could not reach WorkOS to start authentication.", transient = true)
+                throw LoginCancelled("Could not reach WorkOS to start authentication.", transient = true, cause = e)
             } catch (e: InterruptedException) {
                 Thread.currentThread().interrupt()
-                throw LoginCancelled("Sign-in was interrupted.", transient = true)
+                throw LoginCancelled("Sign-in was interrupted.", transient = true, cause = e)
             }
         if (response.statusCode() >= 400) {
             val message = errorMessage(response.body())
@@ -154,7 +154,13 @@ object AuthKitLogin {
                         "device_code" to deviceCode,
                     ),
                 )
-            } catch (e: Exception) {
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw LoginCancelled("Sign-in was interrupted.", transient = true, cause = e)
+            } catch (
+                @Suppress("SwallowedException") e: java.io.IOException,
+            ) {
+                // Transport blip mid-poll: the caller sleeps and asks again.
                 return PollResult.Network
             }
         if (response.statusCode() < 400) {
@@ -189,7 +195,7 @@ object AuthKitLogin {
                         Thread.sleep(250L shl attempt)
                         return@repeat
                     }
-                    throw LoginCancelled("WorkOS is temporarily unreachable.", transient = true)
+                    throw LoginCancelled("WorkOS is temporarily unreachable.", transient = true, cause = e)
                 } catch (e: InterruptedException) {
                     Thread.currentThread().interrupt()
                     throw LoginCancelled("Sign-in was interrupted.", transient = true)

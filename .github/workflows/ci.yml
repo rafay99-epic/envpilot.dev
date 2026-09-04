@@ -531,15 +531,18 @@ jobs:
     if: |
       needs.changes.outputs.run_jetbrains == 'true'
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'Production' || 'development' }}
+    environment: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && 'Production' || 'development' }}
     env:
-      WORKOS_CLIENT_ID: ${{ github.event_name == 'pull_request' && 'client_ci_stub' || '' }}
-      NEXT_PUBLIC_CONVEX_URL: ${{ github.event_name == 'pull_request' && 'https://convex-ci.invalid' || '' }}
-      ENVPILOT_SERVER_URL: ${{ github.event_name == 'pull_request' && 'https://www.envpilot.dev' || '' }}
+      # Stubs everywhere except main (push or workflow_dispatch), where load-env
+      # supplies the real values. A dispatch on main used to fall between the
+      # two conditions and fail the embed check with empty values.
+      WORKOS_CLIENT_ID: ${{ (github.ref != 'refs/heads/main' || github.event_name == 'pull_request') && 'client_ci_stub' || '' }}
+      NEXT_PUBLIC_CONVEX_URL: ${{ (github.ref != 'refs/heads/main' || github.event_name == 'pull_request') && 'https://convex-ci.invalid' || '' }}
+      ENVPILOT_SERVER_URL: ${{ (github.ref != 'refs/heads/main' || github.event_name == 'pull_request') && 'https://www.envpilot.dev' || '' }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/load-env
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
           token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
           environment: production
