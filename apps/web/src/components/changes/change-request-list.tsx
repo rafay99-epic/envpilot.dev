@@ -123,9 +123,9 @@ export function ChangeRequestList({
                       <code className="font-mono text-sm text-warning">
                         {row.label}
                       </code>
-                      <p className="mt-0.5 text-xs text-ink-subtle">
+                      <span className="mt-0.5 block text-xs text-ink-subtle">
                         {row.kind} {row.resourceType}
-                      </p>
+                      </span>
                     </button>
                   </td>
                   <td className="px-5 py-3">
