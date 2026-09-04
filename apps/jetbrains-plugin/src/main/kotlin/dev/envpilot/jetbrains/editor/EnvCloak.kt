@@ -32,6 +32,19 @@ object EnvCloak {
     private const val ENV_PLACEHOLDER = "••••••••"
     private const val FILE_PLACEHOLDER = "🔒 Envpilot secret file — hidden (Reveal Values to show)"
 
+    private val KEY_REGEX = Regex("(?m)^([A-Za-z_][A-Za-z0-9_.]*)(\\s*=)(.*)$")
+
+    /** Inclusive value ranges to fold, one per managed `KEY=value` line. Pure, so it is testable. */
+    internal fun foldRanges(
+        text: CharSequence,
+        managedKeys: Set<String>,
+    ): List<IntRange> =
+        KEY_REGEX.findAll(text)
+            .filter { it.groupValues[1] in managedKeys }
+            .map { it.groups[3]!!.range }
+            .filterNot { it.isEmpty() }
+            .toList()
+
     fun refresh(
         editor: Editor,
         project: Project,
@@ -48,13 +61,8 @@ object EnvCloak {
 
         editor.foldingModel.runBatchFoldingOperation {
             if (isEnvFile) {
-                val keyRegex = Regex("(?m)^([A-Za-z_][A-Za-z0-9_.]*)(\\s*=)(.*)$")
                 val folds = mutableListOf<FoldRegion>()
-                for (match in keyRegex.findAll(text.charsSequence)) {
-                    val key = match.groupValues[1]
-                    if (key !in managed.keys) continue
-                    val range = match.groups[3]!!.range
-                    if (range.isEmpty()) continue
+                for (range in foldRanges(text.charsSequence, managed.keys)) {
                     val region = editor.foldingModel.addFoldRegion(range.first, range.last + 1, ENV_PLACEHOLDER)
                     region?.isExpanded = false
                     region?.let { folds.add(it) }

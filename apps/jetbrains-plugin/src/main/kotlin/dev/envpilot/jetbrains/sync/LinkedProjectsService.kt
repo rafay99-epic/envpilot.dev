@@ -118,12 +118,6 @@ fun targetFileFor(link: LinkedProject): String =
         dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" }
     }
 
-// Kept as a thin alias so ui/ keeps compiling; call conventionalTargetFileFor.
-fun targetFileFor(
-    environment: String,
-    selectedEnvironmentCount: Int,
-): String = conventionalTargetFileFor(environment, selectedEnvironmentCount)
-
 fun conventionalTargetFileFor(
     environment: String,
     selectedEnvironmentCount: Int,

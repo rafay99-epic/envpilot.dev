@@ -13,8 +13,10 @@ import com.intellij.psi.PsiPlainTextFile
 import com.intellij.util.ProcessingContext
 import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.convex.ConvexApi
+import dev.envpilot.jetbrains.sync.LinkedProject
 import dev.envpilot.jetbrains.sync.LinkedProjectsService
-import kotlinx.coroutines.runBlocking
+import dev.envpilot.jetbrains.sync.SyncScheduler
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Env-key autocomplete inside .env* files. Keys come from linked projects'
@@ -35,6 +37,8 @@ class EnvCompletionContributor : CompletionContributor() {
     }
 
     private object Provider : CompletionProvider<CompletionParameters>() {
+        private val warming = ConcurrentHashMap.newKeySet<String>()
+
         override fun addCompletions(
             parameters: CompletionParameters,
             context: ProcessingContext,
@@ -58,34 +62,39 @@ class EnvCompletionContributor : CompletionContributor() {
             if (links.isEmpty()) return null
 
             val cached = mutableSetOf<String>()
-            var anyUncached = false
+            val missing = mutableListOf<LinkedProject>()
             for (link in links) {
-                service.cachedKeys(link.projectId)?.let { cached.addAll(it) } ?: run { anyUncached = true }
+                service.cachedKeys(link.projectId)?.let { cached.addAll(it) } ?: missing.add(link)
             }
-            if (!anyUncached) return cached.ifEmpty { null }
+            // Never block completion on the network — warm the cache off-thread
+            // so the NEXT invocation has the keys. PullService warms it too.
+            if (missing.isNotEmpty()) warmCache(project, missing)
+            return cached.ifEmpty { null }
+        }
 
-            // Fetch missing metadata on the current thread (completion is already
-            // async); failures degrade to cached keys only.
-            return try {
-                runBlocking {
-                    if (AuthService.getInstance().getSession() == null) return@runBlocking cached.ifEmpty { null }
-                    for (link in links) {
-                        if (service.cachedKeys(link.projectId) != null) continue
+        private fun warmCache(
+            project: Project,
+            links: List<LinkedProject>,
+        ) {
+            val pending = links.filter { warming.add(it.projectId) }
+            if (pending.isEmpty()) return
+            SyncScheduler.getInstance().launch {
+                val service = EnvEditorService.getInstance(project)
+                for (link in pending) {
+                    try {
+                        if (project.isDisposed || AuthService.getInstance().getSession() == null) continue
                         val meta =
                             ConvexApi.pullValues(
                                 link.projectId,
                                 link.environment.takeIf { it.isNotBlank() },
                                 metadataOnly = true,
                             )
-                        val keys = meta.variables.map { it.key }.toSet()
-                        service.cacheKeys(link.projectId, keys)
-                        cached.addAll(keys)
+                        service.cacheKeys(link.projectId, meta.variables.map { it.key }.toSet())
+                    } catch (e: Exception) {
+                        dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "completion"))
                     }
-                    cached.ifEmpty { null }
                 }
-            } catch (e: Exception) {
-                dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "completion"))
-                cached.ifEmpty { null }
+                warming.removeAll(pending.map { it.projectId }.toSet())
             }
         }
     }

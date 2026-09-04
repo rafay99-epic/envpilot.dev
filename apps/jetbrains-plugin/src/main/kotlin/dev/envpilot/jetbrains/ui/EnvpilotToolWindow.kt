@@ -2,10 +2,11 @@ package dev.envpilot.jetbrains.ui
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.util.Disposer
@@ -14,22 +15,25 @@ import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import dev.envpilot.jetbrains.auth.AuthService
-import dev.envpilot.jetbrains.config.EnvpilotSettings
+import dev.envpilot.jetbrains.auth.AuthStateListener
 import dev.envpilot.jetbrains.convex.ConvexApi
 import dev.envpilot.jetbrains.editor.EnvEditorService
 import dev.envpilot.jetbrains.model.VALID_ENVIRONMENTS
+import dev.envpilot.jetbrains.sync.LinkWorkflow
 import dev.envpilot.jetbrains.sync.LinkedProject
 import dev.envpilot.jetbrains.sync.LinkedProjectsService
 import dev.envpilot.jetbrains.sync.SyncScheduler
+import dev.envpilot.jetbrains.sync.SyncState
+import dev.envpilot.jetbrains.sync.SyncStateListener
+import dev.envpilot.jetbrains.sync.conventionalTargetFileFor
 import dev.envpilot.jetbrains.sync.targetFileFor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import java.nio.file.Paths
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.DefaultListModel
-import javax.swing.JComboBox
 import javax.swing.JComponent
 import javax.swing.JPanel
 import dev.envpilot.jetbrains.model.Project as ApiProject
@@ -47,12 +51,15 @@ class EnvpilotToolWindowFactory : ToolWindowFactory {
     }
 }
 
+/** One tree row. Nesting is data (`depth`), not typed-in leading spaces. */
+private data class Row(val text: String, val depth: Int, val payload: Any? = null)
+
 class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
+    private val disposable = Disposer.newDisposable("EnvpilotToolWindow")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val listModel = DefaultListModel<String>()
-    private val items = mutableListOf<Any>()
+    private val listModel = DefaultListModel<Row>()
     private val accessibleProjects = java.util.concurrent.ConcurrentHashMap<String, ApiProject>()
-    private lateinit var list: JBList<String>
+    private lateinit var list: JBList<Row>
     private val errorBanner =
         javax.swing.JPanel(java.awt.BorderLayout()).apply { isVisible = false }
     private val errorLabel =
@@ -60,6 +67,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
 
     /** Fetch on IO, mutate the Swing model on the EDT. Declared before init: reload() runs from init. */
     private val reloadGeneration = java.util.concurrent.atomic.AtomicLong(0)
+    private val reloadPending = AtomicBoolean(false)
 
     init {
         layout = java.awt.BorderLayout()
@@ -71,22 +79,22 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
             null,
         )
         list.cellRenderer =
-            object : com.intellij.ui.ColoredListCellRenderer<String>() {
+            object : com.intellij.ui.ColoredListCellRenderer<Row>() {
                 override fun customizeCellRenderer(
-                    list: javax.swing.JList<out String>,
-                    value: String?,
+                    list: javax.swing.JList<out Row>,
+                    value: Row?,
                     index: Int,
                     selected: Boolean,
                     focused: Boolean,
                 ) {
                     icon =
-                        when (val item = items.getOrNull(index)) {
+                        when (val payload = value?.payload) {
                             is dev.envpilot.jetbrains.model.Org -> AllIcons.Nodes.Module
-                            is ApiProject -> projectIcon(item.id)
-                            is LinkedProject -> linkIcon(item)
+                            is ApiProject -> projectIcon(payload.id)
+                            is LinkedProject -> linkIcon(payload)
                             else -> null
                         }
-                    append(value ?: "")
+                    append("  ".repeat(value?.depth ?: 0) + (value?.text ?: ""))
                 }
             }
         add(JBScrollPane(list), java.awt.BorderLayout.CENTER)
@@ -108,7 +116,9 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         errorBanner.add(retry, java.awt.BorderLayout.EAST)
         add(errorBanner, java.awt.BorderLayout.SOUTH)
 
-        Disposer.register(project) { scope.cancel() }
+        Disposer.register(project, disposable)
+        Disposer.register(disposable) { scope.cancel() }
+        subscribeToStateChanges()
         reload()
 
         val toolbar =
@@ -128,8 +138,36 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         add(toolbar.component, java.awt.BorderLayout.NORTH)
     }
 
+    /** Sign-in/out and every sync cycle change what the tree shows — follow them. */
+    private fun subscribeToStateChanges() {
+        val connection = ApplicationManager.getApplication().messageBus.connect(disposable)
+        connection.subscribe(
+            AuthService.AUTH_TOPIC,
+            object : AuthStateListener {
+                override fun authChanged() = scheduleReload()
+            },
+        )
+        connection.subscribe(
+            SyncState.SYNC_TOPIC,
+            object : SyncStateListener {
+                override fun syncStateChanged() = scheduleReload()
+            },
+        )
+    }
+
+    /** One reload per burst: a cycle publishes start and end, realtime adds more. */
+    private fun scheduleReload() {
+        if (!reloadPending.compareAndSet(false, true)) return
+        ApplicationManager.getApplication().invokeLater {
+            reloadPending.set(false)
+            if (!project.isDisposed) reload()
+        }
+    }
+
     private fun refreshAction() =
-        object : AnAction("Refresh", "Reload orgs and projects", AllIcons.Actions.Refresh) {
+        object : DumbAwareAction("Refresh", "Reload orgs and projects", AllIcons.Actions.Refresh) {
+            override fun getActionUpdateThread() = ActionUpdateThread.BGT
+
             override fun update(e: AnActionEvent) {
                 e.presentation.isEnabled = AuthService.getInstance().email != null
             }
@@ -138,7 +176,10 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         }
 
     private fun linkAction() =
-        object : AnAction("Link Directory…", "Link a directory to a project environment", AllIcons.General.Add) {
+        object : DumbAwareAction("Link Directory…", "Link a directory to a project environment", AllIcons.General.Add) {
+            // Reads the JBList selection — EDT only.
+            override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
             override fun update(e: AnActionEvent) {
                 val selectedProject = selected() as? ApiProject
                 e.presentation.isEnabled =
@@ -160,7 +201,10 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         }
 
     private fun unlinkAction() =
-        object : AnAction("Unlink", "Remove this directory link", AllIcons.General.Remove) {
+        object : DumbAwareAction("Unlink", "Remove this directory link", AllIcons.General.Remove) {
+            // Reads the JBList selection — EDT only.
+            override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
             override fun update(e: AnActionEvent) {
                 e.presentation.isEnabled = selected() is LinkedProject
             }
@@ -172,7 +216,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                             val links = LinkedProjectsService.getInstance(project)
                             val lastProjectLink = links.all().none { it !== link && it.projectId == link.projectId }
                             if (lastProjectLink && link.deviceId.isNotBlank()) {
-                                dev.envpilot.jetbrains.convex.ConvexApi.unlinkDevice(link.projectId, link.deviceId)
+                                ConvexApi.unlinkDevice(link.projectId, link.deviceId)
                             }
                             links.remove(link)
                             notifyBalloon(
@@ -196,7 +240,9 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         }
 
     private fun pullAction() =
-        object : AnAction("Pull Now", "Sync all linked directories in this project", AllIcons.Actions.Download) {
+        object : DumbAwareAction("Pull Now", "Sync all linked directories in this project", AllIcons.Actions.Download) {
+            override fun getActionUpdateThread() = ActionUpdateThread.BGT
+
             override fun update(e: AnActionEvent) {
                 e.presentation.isEnabled = AuthService.getInstance().email != null &&
                     LinkedProjectsService.getInstance(project).all().isNotEmpty()
@@ -210,7 +256,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                         if (ok) {
                             "Pull complete — all linked directories synced."
                         } else {
-                            "Pull failed: ${dev.envpilot.jetbrains.sync.SyncState.lastError ?: "unknown error"}"
+                            "Pull failed: ${SyncState.lastError(project) ?: "unknown error"}"
                         },
                         if (ok) {
                             com.intellij.notification.NotificationType.INFORMATION
@@ -224,11 +270,13 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         }
 
     private fun revealAction() =
-        object : AnAction(
+        object : DumbAwareAction(
             "Reveal Values",
             "Show managed secret values in editors for 30 seconds",
             AllIcons.Actions.Preview,
         ) {
+            override fun getActionUpdateThread() = ActionUpdateThread.BGT
+
             override fun update(e: AnActionEvent) {
                 val projectIds = LinkedProjectsService.getInstance(project).all().map { it.projectId }.distinct()
                 e.presentation.isEnabled = AuthService.getInstance().email != null &&
@@ -241,6 +289,14 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                     val links = LinkedProjectsService.getInstance(project).all().distinctBy { it.projectId }
                     val editor = EnvEditorService.getInstance(project)
                     try {
+                        if (links.any { !SyncScheduler.getInstance().hasAccess(it.orgId) }) {
+                            notifyBalloon(
+                                project,
+                                dev.envpilot.jetbrains.errors.Errors.PLUGIN_DISABLED,
+                                com.intellij.notification.NotificationType.WARNING,
+                            )
+                            return@launch
+                        }
                         for (link in links) {
                             val result = ConvexApi.accessMeta(link.projectId)
                             editor.cacheAccessMeta(link.projectId, result)
@@ -269,11 +325,13 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         }
 
     private fun requestVariableAction() =
-        object : AnAction(
+        object : DumbAwareAction(
             "Request Variable…",
             "Submit a variable request for approval",
             AllIcons.Actions.AddFile,
         ) {
+            override fun getActionUpdateThread() = ActionUpdateThread.BGT
+
             override fun update(e: AnActionEvent) {
                 val editor = EnvEditorService.getInstance(project)
                 e.presentation.isEnabled =
@@ -288,16 +346,14 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                         .filter { editor.hasCapability(it.id, "project.requests.submit") }
                         .sortedBy { it.name.lowercase() }
                         .map {
-                            RequestProject(it.id, it.name, editor.allowedEnvironments(it.id))
+                            RequestProject(it.id, it.organizationId, it.name, editor.allowedEnvironments(it.id))
                         }
                 if (projects.isEmpty()) {
-                    com.intellij.notification.NotificationGroupManager.getInstance()
-                        .getNotificationGroup("dev.envpilot.notifications")
-                        .createNotification(
-                            "Your current project access does not allow variable requests.",
-                            com.intellij.notification.NotificationType.WARNING,
-                        )
-                        .notify(project)
+                    notifyBalloon(
+                        project,
+                        "Your current project access does not allow variable requests.",
+                        com.intellij.notification.NotificationType.WARNING,
+                    )
                     return
                 }
                 RequestVariableDialog(project, projects).show()
@@ -307,7 +363,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     private fun reload() {
         val generation = reloadGeneration.incrementAndGet()
         scope.launch {
-            var rows: List<Pair<String, Any>>? = null
+            var rows: List<Row>? = null
             var failure: String? = null
             try {
                 rows = fetchRows()
@@ -323,10 +379,8 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                     return@invokeLater
                 }
                 hideError()
-                items.clear()
-                items.addAll(rows!!.map { it.second })
                 listModel.clear()
-                rows.forEach { listModel.addElement(it.first) }
+                rows!!.forEach { listModel.addElement(it) }
                 list.emptyText.clear()
                 if (rows.isEmpty()) {
                     list.emptyText.text = "No organizations to show yet."
@@ -343,7 +397,6 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     private fun showError(message: String) {
         errorLabel.text = message
         errorBanner.isVisible = true
-        items.clear()
         listModel.clear()
         list.emptyText.clear()
         list.emptyText.text = "Couldn't load your Envpilot data."
@@ -353,33 +406,29 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         errorBanner.isVisible = false
     }
 
-    private suspend fun fetchRows(): List<Pair<String, Any>> {
+    private suspend fun fetchRows(): List<Row> {
         if (AuthService.getInstance().getSession() == null) {
-            return listOf(
-                "Not signed in — use Tools ▸ Envpilot ▸ Sign In" to Any(),
-            )
+            return listOf(Row("Not signed in — use Tools ▸ Envpilot ▸ Sign In", 0))
         }
         val editorService = EnvEditorService.getInstance(project)
         val linksByProject = LinkedProjectsService.getInstance(project).all().groupBy { it.projectId }
-        val rows = mutableListOf<Pair<String, Any>>()
+        val rows = mutableListOf<Row>()
         accessibleProjects.clear()
         for (org in ConvexApi.orgs()) {
-            rows.add("${org.name} (${org.slug})" to org)
+            rows.add(Row("${org.name} (${org.slug})", 0, org))
             // One flaky org must not blank out the whole tree.
             val projects =
                 try {
                     ConvexApi.projects(org.id)
                 } catch (e: Exception) {
-                    rows.add(
-                        "      ⚠ ${dev.envpilot.jetbrains.errors.Errors.friendly(e)} (hit Refresh)" to org,
-                    )
+                    rows.add(Row("⚠ ${dev.envpilot.jetbrains.errors.Errors.friendly(e)} (hit Refresh)", 3, org))
                     continue
                 }
             for (proj in projects) {
                 accessibleProjects[proj.id] = proj
                 runCatching { ConvexApi.accessMeta(proj.id) }
                     .onSuccess { editorService.cacheAccessMeta(proj.id, it) }
-                rows.add("  ${proj.name} (${proj.variableCount} vars)" to proj)
+                rows.add(Row("${proj.name} (${proj.variableCount} vars)", 1, proj))
                 rows.addAll(rowsForLink(editorService, linksByProject[proj.id].orEmpty()))
             }
         }
@@ -389,8 +438,8 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     private suspend fun rowsForLink(
         editorService: EnvEditorService,
         links: List<LinkedProject>,
-    ): List<Pair<String, Any>> {
-        val rows = mutableListOf<Pair<String, Any>>()
+    ): List<Row> {
+        val rows = mutableListOf<Row>()
         for (link in links) {
             val status =
                 when (linkStatus(link)) {
@@ -398,7 +447,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                     EnvEditorService.LinkStatus.DRIFTED -> "modified — next sync overwrites"
                     EnvEditorService.LinkStatus.NOT_PULLED -> "NOT PULLED"
                 }
-            rows.add("      ${link.environment} → ${link.directoryPath}  [$status]" to link)
+            rows.add(Row("${link.environment} → ${link.directoryPath}  [$status]", 3, link))
             rows.addAll(secretFileRows(editorService, link))
             rows.addAll(variableKeyRows(editorService, link))
         }
@@ -408,7 +457,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     private suspend fun secretFileRows(
         editorService: EnvEditorService,
         link: LinkedProject,
-    ): List<Pair<String, Any>> {
+    ): List<Row> {
         val fileKey = "${link.projectId}:${link.environment}"
         val metas =
             editorService.cachedFiles(fileKey) ?: run {
@@ -425,14 +474,14 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                     java.nio.file.Paths.get(link.directoryPath, f.path),
                 )
             val kb = if (f.size >= 1024) "${f.size / 1024} KB" else "${f.size} B"
-            "          file: ${f.name} ($kb)  ${if (onDisk) "→ on disk" else "[NOT PULLED]"}" to link
+            Row("file: ${f.name} ($kb)  ${if (onDisk) "→ on disk" else "[NOT PULLED]"}", 5, link)
         }
     }
 
     private suspend fun variableKeyRows(
         editorService: EnvEditorService,
         link: LinkedProject,
-    ): List<Pair<String, Any>> {
+    ): List<Row> {
         val keys =
             editorService.cachedKeys(link.projectId) ?: run {
                 try {
@@ -448,14 +497,14 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                     null
                 }
             } ?: return emptyList()
-        val rows = keys.sorted().take(10).map { "            var: $it" to link }
+        val rows = keys.sorted().take(10).map { Row("var: $it", 6, link) }
         if (keys.size > 10) {
-            return rows + ("            … +${keys.size - 10} more" to link)
+            return rows + Row("… +${keys.size - 10} more", 6, link)
         }
         return rows
     }
 
-    private fun selected(): Any? = list.selectedIndex.takeIf { it >= 0 && it < items.size }?.let { items[it] }
+    private fun selected(): Any? = list.selectedValue?.payload
 
     private fun targetPathFor(link: LinkedProject): String {
         return java.nio.file.Paths.get(link.directoryPath, targetFileFor(link)).toString()
@@ -493,17 +542,6 @@ internal fun refreshOpenEnvEditors(project: Project) {
 }
 
 private inline fun <reified T> Any?.asSafely(): T? = this as? T
-
-private fun notifyBalloon(
-    project: Project,
-    message: String,
-    type: com.intellij.notification.NotificationType,
-) {
-    com.intellij.notification.NotificationGroupManager.getInstance()
-        .getNotificationGroup("dev.envpilot.notifications")
-        .createNotification(message, type)
-        .notify(project)
-}
 
 class LinkDirectoryDialog(
     private val project: Project,
@@ -557,7 +595,7 @@ class LinkDirectoryDialog(
     private fun updatePathPreview() {
         val base = dirField.text.trim().ifBlank { "?" }
         val environments = selectedEnvironments()
-        val targets = environments.map { targetFileFor(it, environments.size) }
+        val targets = environments.map { conventionalTargetFileFor(it, environments.size) }
         pathPreview.text =
             "<html><body style=\"margin:0\">Will write " +
             targets.joinToString(", ") { "<code>${escapeHtml("$base/$it")}</code>" } +
@@ -619,7 +657,7 @@ class LinkDirectoryDialog(
                     projectId = selected.id,
                     projectName = selected.name,
                     environment = environment,
-                    targetFile = targetFileFor(environment, environments.size),
+                    targetFile = conventionalTargetFileFor(environment, environments.size),
                     includeSecretFiles = index == 0,
                     directoryPath = dir,
                     deviceId = deviceId,
@@ -628,68 +666,59 @@ class LinkDirectoryDialog(
             }
         val links = LinkedProjectsService.getInstance(project)
         if (pending.all(links::contains)) {
-            com.intellij.notification.NotificationGroupManager.getInstance()
-                .getNotificationGroup("dev.envpilot.notifications")
-                .createNotification(
-                    "This project/environment/directory is already linked.",
-                    com.intellij.notification.NotificationType.WARNING,
-                )
-                .notify(project)
+            notifyBalloon(
+                project,
+                "This project/environment/directory is already linked.",
+                com.intellij.notification.NotificationType.WARNING,
+            )
             super.doOKAction()
             return
         }
         super.doOKAction()
         pullScope.launch {
-            try {
-                if (!dev.envpilot.jetbrains.convex.ConvexApi.jetbrainsAccess(selected.organizationId)) {
-                    notifyBalloon(
-                        project,
-                        dev.envpilot.jetbrains.errors.Errors.PLUGIN_DISABLED,
-                        com.intellij.notification.NotificationType.WARNING,
-                    )
-                    return@launch
-                }
-                dev.envpilot.jetbrains.convex.ConvexApi.linkDevice(
-                    selected.id,
-                    deviceId,
-                    dev.envpilot.jetbrains.sync.JetBrainsDevice.name(),
+            report(
+                LinkWorkflow.linkAndSync(project, selected.id, selected.organizationId, deviceId, dir, pending),
+                dir,
+            )
+        }
+    }
+
+    private fun report(
+        outcome: LinkWorkflow.Outcome,
+        dir: String,
+    ) {
+        when (outcome) {
+            is LinkWorkflow.Outcome.Disabled ->
+                notifyBalloon(
+                    project,
+                    dev.envpilot.jetbrains.errors.Errors.PLUGIN_DISABLED,
+                    com.intellij.notification.NotificationType.WARNING,
                 )
-                pending.forEach(links::add)
-                dev.envpilot.jetbrains.convex.ConvexSyncService.getInstance().watchProject(selected.id)
-                val ok = SyncScheduler.getInstance().runCycle(project)
+            is LinkWorkflow.Outcome.Failed ->
+                notifyBalloon(
+                    project,
+                    "Link failed: ${outcome.message}",
+                    com.intellij.notification.NotificationType.ERROR,
+                )
+            is LinkWorkflow.Outcome.Linked -> {
                 refreshOpenEnvEditors(project)
                 notifyBalloon(
                     project,
-                    if (ok) {
-                        "Linked ${selected.name}. Pulled values into $dir."
-                    } else {
-                        "Linked ${selected.name}, but pull failed: ${dev.envpilot.jetbrains.sync.SyncState.lastError ?: "unknown error"}"
-                    },
-                    if (ok) {
+                    outcome.pullError?.let { "Linked ${selected.name}, but pull failed: $it" }
+                        ?: "Linked ${selected.name}. Pulled values into $dir.",
+                    if (outcome.pullError == null) {
                         com.intellij.notification.NotificationType.INFORMATION
                     } else {
                         com.intellij.notification.NotificationType.ERROR
                     },
                 )
-                val settings = EnvpilotSettings.getInstance().state
-                if (settings.commitGuardAutoInstall) {
-                    val installed =
-                        dev.envpilot.jetbrains.guards.CommitGuard.install(dir)
-                    if (!installed) {
-                        notifyBalloon(
-                            project,
-                            "Linked, but no Git repository was found. Commit guard was not installed.",
-                            com.intellij.notification.NotificationType.WARNING,
-                        )
-                    }
+                if (outcome.commitGuardMissing) {
+                    notifyBalloon(
+                        project,
+                        "Linked, but no Git repository was found. Commit guard was not installed.",
+                        com.intellij.notification.NotificationType.WARNING,
+                    )
                 }
-            } catch (error: Exception) {
-                dev.envpilot.jetbrains.errors.Errors.report(error, mapOf("surface" to "link"))
-                notifyBalloon(
-                    project,
-                    "Link failed: ${dev.envpilot.jetbrains.errors.Errors.friendly(error)}",
-                    com.intellij.notification.NotificationType.ERROR,
-                )
             }
         }
     }

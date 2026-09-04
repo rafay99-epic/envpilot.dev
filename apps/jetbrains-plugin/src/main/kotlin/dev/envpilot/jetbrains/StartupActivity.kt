@@ -180,11 +180,12 @@ class StartupActivity : ProjectActivity {
                     val lineText = editor.document.charsSequence.subSequence(lineStart, lineEnd).toString()
                     val column = offset - lineStart
                     val managed = service.managed(file.path)
-                    val envKey = lineText.trimStart().substringBefore('=').trim().takeIf { file.name.startsWith(".env") }
                     val key =
-                        (
-                            envKey?.takeIf { it in managed?.keys.orEmpty() }
-                                ?: dev.envpilot.jetbrains.editor.EnvKeyReferences.at(lineText, column)?.key
+                        dev.envpilot.jetbrains.editor.resolveManagedKey(
+                            lineText,
+                            column,
+                            file.name.startsWith(".env"),
+                            managed?.keys.orEmpty(),
                         ) ?: return
                     val link =
                         dev.envpilot.jetbrains.sync.LinkedProjectsService.getInstance(project).all().firstOrNull {

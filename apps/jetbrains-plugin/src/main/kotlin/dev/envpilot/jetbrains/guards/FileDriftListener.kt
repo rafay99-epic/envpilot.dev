@@ -31,7 +31,10 @@ class FileDriftListener : BulkFileListener {
                         }.getOrNull() ?: continue
                     if (currentHash != managed.syncedHash) {
                         service.markDrifted(event.file.path)
-                        SyncState.markFailure("Drift detected: ${event.file.name} changed outside Envpilot — next sync overwrites.")
+                        SyncState.markFailure(
+                            project,
+                            "Drift detected: ${event.file.name} changed outside Envpilot — next sync overwrites.",
+                        )
                         SyncState.notifyChanged()
                     }
                 }
@@ -47,7 +50,7 @@ class FileDriftListener : BulkFileListener {
                         EnvCloak.hashOf(Path.of(event.file.path))
                     }.getOrNull() ?: continue
                 if (currentHash != secretHash) {
-                    SyncState.markFailure("Drift detected: ${event.file.name} changed outside Envpilot — next sync overwrites.")
+                    SyncState.markFailure(project, "Drift detected: ${event.file.name} changed outside Envpilot — next sync overwrites.")
                     SyncState.notifyChanged()
                 }
             }

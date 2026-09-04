@@ -79,8 +79,9 @@ class EnvpilotWidget : StatusBarWidget, StatusBarWidget.TextPresentation {
     }
 
     override fun getText(): String {
-        val email = AuthService.getInstance().email ?: return "Envpilot: Sign In"
+        // Outdated wins over every other state, the way getTooltipText() reads it.
         if (AuthService.outdated) return "Envpilot: Update Required"
+        val email = AuthService.getInstance().email ?: return "Envpilot: Sign In"
         if (SyncState.syncing) return "Envpilot: ⟳ Syncing…"
         val err = SyncState.lastError
         if (err != null) return "Envpilot: Sync Error"
