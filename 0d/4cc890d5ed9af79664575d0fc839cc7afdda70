@@ -1,0 +1,83 @@
+apps/cli/src/commands/requests.ts
+  s_274796d5279c8d::t_a9624e691c7a24 343
+  s_274796d5279c8d::t_e35d4ef8801479 344-346,348-351,353-354,356-362,364
+  s_274796d5279c8d::t_7393d357fb5296 369
+  s_274796d5279c8d::t_a6b171b81b08cf 19
+  s_274796d5279c8d::t_d86484603b5d0d 210-217,219,221,223-228
+  s_274796d5279c8d::t_cc578d36c0c063 258,374
+apps/cli/src/commands/push.ts
+  s_274796d5279c8d::t_835125b22f0aff 358-367,391-396
+  s_274796d5279c8d::t_0894428335e479 357
+  s_274796d5279c8d::t_c45589c6ba6d0e 68-84
+apps/web/src/components/variables/bulk-paste-form.tsx
+  s_274796d5279c8d::t_13678028b0a168 249-251
+  s_274796d5279c8d::t_cba1183f2f62bf 343-344
+  s_274796d5279c8d::t_462b054ce45fc4 375
+convex/features/variables/queries.ts
+  s_274796d5279c8d::t_22d406006d6cef 27
+  s_274796d5279c8d::t_7650d86280364b 1299-1327
+apps/web/src/components/accounts/account-form-drawer.tsx
+  s_274796d5279c8d::t_f57d6a1e750447 408-410
+convex/features/variables/values.ts
+  s_274796d5279c8d::t_22d406006d6cef 461-462,464-471
+apps/web/src/components/variables/variable-form.tsx
+  s_274796d5279c8d::t_5ac07e2c5c3d5d 405-407
+apps/web/src/components/changes/change-review-drawer.tsx
+  s_274796d5279c8d::t_bcf2f2158f832d 57
+  s_274796d5279c8d::t_e0f208a468492f 35-37,39
+apps/web/src/lib/__tests__/change-request-visibility.test.ts
+  s_274796d5279c8d::t_5c4489be700661 1-67
+apps/cli/tests/protected-environments.test.ts
+  s_274796d5279c8d::t_bc3eec62179afd 105-111
+  s_274796d5279c8d::t_906a449201ab99 10,17-18
+  s_274796d5279c8d::t_16ea1b715fe020 100-104,112-135,144-148,150-152,155-159,162-168
+convex/features/changeRequests/authorize.ts
+  s_274796d5279c8d::t_f05649cb65831e 10,44-83,96-103,130,147,158,171-184,196
+convex/features/changeRequests/mutations.ts
+  s_274796d5279c8d::t_0b6ecf6ec0e944 29,167,169,173,176-177,307-328,332,365-387,392-396
+convex/features/variables/mutations.ts
+  s_274796d5279c8d::t_d7122d55d35c8c 36,161-171
+convex/features/changeRequests/visibility.ts
+  s_274796d5279c8d::t_70c8223cedd0b0 17-19
+  s_274796d5279c8d::t_a5d514a4d3c90c 53-58,63,67-72,74-91
+convex/features/changeRequests/apply.ts
+  s_274796d5279c8d::t_a63ec9e0030add 73-80
+apps/cli/src/lib/api.ts
+  s_274796d5279c8d::t_fe9f38f984aebe 1144-1154
+  s_274796d5279c8d::t_1e246fd2100367 537-539
+apps/web/src/components/files/file-form-drawer.tsx
+  s_274796d5279c8d::t_5d7d24f4d4b37f 370-372
+convex/lib/protection.ts
+  s_274796d5279c8d::t_a916a0ad216bab 104-107,110
+convex/features/changeRequests/queries.ts
+  s_274796d5279c8d::t_d5ca1d5d13d942 18,185-199,238-249,258-259,327-328,464,479-489,491
+convex/features/changeRequests/actions.ts
+  s_274796d5279c8d::t_a916a0ad216bab 98
+convex/features/variables/requests/actions.ts
+  s_274796d5279c8d::t_8332b1022b975d 113-115,118-119
+convex/features/variables/helpers.ts
+  s_274796d5279c8d::t_ed3431d841624e 2,4-9,40-92,99-108,112-128
+  s_274796d5279c8d::t_8332b1022b975d 93-98,109-111
+  s_274796d5279c8d::t_9dc8b4ae0eddc0 129-130
+apps/cli/src/lib/errors.ts
+  s_274796d5279c8d::t_930d06db98f47f 234-244
+  s_274796d5279c8d::t_6ce7d647249060 233
+convex/features/projects/mutations.ts
+  s_274796d5279c8d::t_d2500f8578cf5a 21-22,571,573-574,576-584,593-598
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "0d4cc890d5ed9af79664575d0fc839cc7afdda70",
+  "prompts": {},
+  "sessions": {
+    "s_274796d5279c8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46448544-856e-4fc0-beec-74f74b2e5474",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
