@@ -72,10 +72,18 @@ class SyncScheduler(private val scope: CoroutineScope) : Disposable {
         jobs.remove(project.locationHash)?.cancel()
     }
 
+    // Keyed by account too, so a reply that arrives after an account switch
+    // lands under the old key instead of repopulating the new session's cache.
+    private fun accessKey(orgId: String) = "${AuthService.getInstance().userId}:$orgId"
+
     /** Is the JetBrains plugin enabled for this org? Served from the last sync cycle; queried once when cold. */
-    suspend fun hasAccess(orgId: String): Boolean =
-        accessByOrg[orgId]
-            ?: dev.envpilot.jetbrains.convex.ConvexApi.jetbrainsAccess(orgId).also { accessByOrg[orgId] = it }
+    suspend fun hasAccess(orgId: String): Boolean = accessByOrg[accessKey(orgId)] ?: refreshAccess(orgId)
+
+    /** Ask the server and remember the answer for [hasAccess]. */
+    suspend fun refreshAccess(orgId: String): Boolean {
+        val key = accessKey(orgId)
+        return dev.envpilot.jetbrains.convex.ConvexApi.jetbrainsAccess(orgId).also { accessByOrg[key] = it }
+    }
 
     private fun isIdlePaused(): Boolean {
         val minutes = EnvpilotSettings.getInstance().state.idlePauseMinutes
@@ -97,9 +105,7 @@ class SyncScheduler(private val scope: CoroutineScope) : Disposable {
             for (link in links) {
                 try {
                     val allowed =
-                        gates.getOrPut(link.orgId) {
-                            dev.envpilot.jetbrains.convex.ConvexApi.jetbrainsAccess(link.orgId).also { accessByOrg[link.orgId] = it }
-                        }
+                        gates.getOrPut(link.orgId) { refreshAccess(link.orgId) }
                     if (!allowed) {
                         failures.add(dev.envpilot.jetbrains.errors.Errors.PLUGIN_DISABLED)
                         continue

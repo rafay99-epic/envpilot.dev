@@ -12,9 +12,8 @@ fun resolveManagedKey(
     isEnvFile: Boolean,
     managedKeys: Set<String>,
 ): String? {
-    val envKey = if (isEnvFile) envKeyOf(lineText) else null
-    return envKey?.takeIf { it in managedKeys }
-        ?: EnvKeyReferences.at(lineText, column)?.key
+    if (isEnvFile) return envKeyOf(lineText)?.takeIf { it in managedKeys }
+    return EnvKeyReferences.at(lineText, column)?.key
 }
 
 private fun envKeyOf(lineText: String): String? {

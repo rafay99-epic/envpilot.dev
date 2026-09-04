@@ -58,7 +58,8 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
     private val disposable = Disposer.newDisposable("EnvpilotToolWindow")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val listModel = DefaultListModel<Row>()
-    private val accessibleProjects = java.util.concurrent.ConcurrentHashMap<String, ApiProject>()
+
+    @Volatile private var accessibleProjects: Map<String, ApiProject> = emptyMap()
     private lateinit var list: JBList<Row>
     private val errorBanner =
         javax.swing.JPanel(java.awt.BorderLayout()).apply { isVisible = false }
@@ -364,9 +365,12 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         val generation = reloadGeneration.incrementAndGet()
         scope.launch {
             var rows: List<Row>? = null
+            var projects: Map<String, ApiProject> = emptyMap()
             var failure: String? = null
             try {
-                rows = fetchRows()
+                val (fetchedRows, fetchedProjects) = fetchRows()
+                rows = fetchedRows
+                projects = fetchedProjects
             } catch (e: Exception) {
                 dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "tool-window"))
                 failure = dev.envpilot.jetbrains.errors.Errors.friendly(e)
@@ -374,6 +378,7 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
             ApplicationManager.getApplication().invokeLater {
                 // A newer reload supersedes this one.
                 if (generation != reloadGeneration.get()) return@invokeLater
+                accessibleProjects = projects
                 if (failure != null) {
                     showError(failure)
                     return@invokeLater
@@ -406,14 +411,14 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
         errorBanner.isVisible = false
     }
 
-    private suspend fun fetchRows(): List<Row> {
+    private suspend fun fetchRows(): Pair<List<Row>, Map<String, ApiProject>> {
         if (AuthService.getInstance().getSession() == null) {
-            return listOf(Row("Not signed in — use Tools ▸ Envpilot ▸ Sign In", 0))
+            return listOf(Row("Not signed in — use Tools ▸ Envpilot ▸ Sign In", 0)) to emptyMap()
         }
         val editorService = EnvEditorService.getInstance(project)
         val linksByProject = LinkedProjectsService.getInstance(project).all().groupBy { it.projectId }
         val rows = mutableListOf<Row>()
-        accessibleProjects.clear()
+        val found = linkedMapOf<String, ApiProject>()
         for (org in ConvexApi.orgs()) {
             rows.add(Row("${org.name} (${org.slug})", 0, org))
             // One flaky org must not blank out the whole tree.
@@ -425,14 +430,14 @@ class EnvpilotToolWindowPanel(private val project: Project) : JPanel() {
                     continue
                 }
             for (proj in projects) {
-                accessibleProjects[proj.id] = proj
+                found[proj.id] = proj
                 runCatching { ConvexApi.accessMeta(proj.id) }
                     .onSuccess { editorService.cacheAccessMeta(proj.id, it) }
                 rows.add(Row("${proj.name} (${proj.variableCount} vars)", 1, proj))
                 rows.addAll(rowsForLink(editorService, linksByProject[proj.id].orEmpty()))
             }
         }
-        return rows
+        return rows to found
     }
 
     private suspend fun rowsForLink(
@@ -553,10 +558,6 @@ class LinkDirectoryDialog(
             .map { it to javax.swing.JCheckBox(it.replaceFirstChar(Char::uppercase)) }
     private val dirField = com.intellij.openapi.ui.TextFieldWithBrowseButton()
     private val pathPreview = javax.swing.JLabel()
-    private val pullScope =
-        kotlinx.coroutines.CoroutineScope(
-            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
-        )
     private var workspaceRoots: List<String> = emptyList()
 
     init {
@@ -581,7 +582,6 @@ class LinkDirectoryDialog(
         workspaceRoots = detectWorkspaceRoots()
         environmentChecks.first().second.isSelected = true
         updatePathPreview()
-        Disposer.register(myDisposable) { pullScope.cancel() }
         init()
     }
 
@@ -675,7 +675,8 @@ class LinkDirectoryDialog(
             return
         }
         super.doOKAction()
-        pullScope.launch {
+        // Plugin-lifetime scope: the dialog is already disposed by this point.
+        SyncScheduler.getInstance().launch {
             report(
                 LinkWorkflow.linkAndSync(project, selected.id, selected.organizationId, deviceId, dir, pending),
                 dir,

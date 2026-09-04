@@ -89,29 +89,34 @@ class AuthService(private val scope: CoroutineScope) {
 
         return refreshMutex.withLock {
             val sessionForRefresh = getSession() ?: return@withLock null
-            // A caller that queued behind the lock may already have a rotated token.
-            if (!needsRefresh(sessionForRefresh.accessToken, force)) return@withLock sessionForRefresh.accessToken
+            // A caller queued behind the lock finds the token someone ahead of it rotated.
+            if (sessionForRefresh.accessToken != session.accessToken) return@withLock sessionForRefresh.accessToken
             try {
                 val result = AuthKitLogin.refresh(sessionForRefresh.refreshToken)
-                // CAS: only persist when the stored refresh token is still the one we used.
-                val stored = store.load()
-                if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
-                val updated = sessionForRefresh.withRefresh(result)
-                store.save(updated)
-                cached.set(updated)
-                result.accessToken
+                // Compare-and-save under sessionMutex so a sign-out or switch that
+                // landed during the network call is not undone by the stale save.
+                sessionMutex.withLock {
+                    val stored = store.load()
+                    if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
+                    val updated = sessionForRefresh.withRefresh(result)
+                    store.save(updated)
+                    cached.set(updated)
+                    result.accessToken
+                }
             } catch (e: AuthKitLogin.LoginCancelled) {
-                val stored = store.load()
-                if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
-                if (e.transient) {
-                    log.warn("Transient session refresh failure: ${e.message}")
-                    dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "token-refresh"))
-                    null
-                } else {
-                    log.warn("Session refresh rejected — signing out.")
-                    clearSession()
-                    notifyChanged()
-                    null
+                sessionMutex.withLock {
+                    val stored = store.load()
+                    if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
+                    if (e.transient) {
+                        log.warn("Transient session refresh failure: ${e.message}")
+                        dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "token-refresh"))
+                        null
+                    } else {
+                        log.warn("Session refresh rejected — signing out.")
+                        clearSessionLocked()
+                        notifyChanged()
+                        null
+                    }
                 }
             }
         }
@@ -172,14 +177,11 @@ class AuthService(private val scope: CoroutineScope) {
         }
     }
 
-    // Only reached from getFreshToken, i.e. already under refreshMutex: nothing
-    // holding sessionMutex ever takes refreshMutex, so the order stays one-way.
-    private suspend fun clearSession() {
-        sessionMutex.withLock {
-            val safeToSwitch = purgeManagedFiles(notifyBlocked = false)
-            cached.get()?.userId?.let { store.remove(it, activateNext = safeToSwitch) }
-            cached.set(if (safeToSwitch) store.load() else null)
-        }
+    // Caller holds sessionMutex (and refreshMutex above it; the order is one-way).
+    private fun clearSessionLocked() {
+        val safeToSwitch = purgeManagedFiles(notifyBlocked = false)
+        cached.get()?.userId?.let { store.remove(it, activateNext = safeToSwitch) }
+        cached.set(if (safeToSwitch) store.load() else null)
     }
 
     private fun notifyChanged() {
@@ -224,7 +226,7 @@ internal fun AuthKitLogin.TokenResponse.toSession(): Session {
     val refresh = refreshToken?.takeIf { it.isNotBlank() } ?: throw AuthKitLogin.LoginCancelled("WorkOS returned no refresh token.")
     return Session(
         userId = identityId,
-        email = user?.email.orEmpty(),
+        email = user?.email ?: identityId,
         accessToken = accessToken,
         refreshToken = refresh,
         sessionId = Jwt.sessionId(accessToken),

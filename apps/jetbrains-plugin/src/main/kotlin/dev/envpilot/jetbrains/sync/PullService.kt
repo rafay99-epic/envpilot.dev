@@ -8,6 +8,8 @@ import dev.envpilot.jetbrains.convex.ConvexApi
 import dev.envpilot.jetbrains.editor.EnvCloak
 import dev.envpilot.jetbrains.editor.EnvEditorService
 import dev.envpilot.jetbrains.model.PullResult
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermission
@@ -25,6 +27,8 @@ object PullService {
     class PullAborted(message: String, cause: Throwable? = null) : Exception(message, cause)
 
     internal class SecretWrite(val bytes: ByteArray, val dest: Path, val mode: Int?)
+
+    private val targetLocks = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
 
     suspend fun pull(
         link: LinkedProject,
@@ -48,10 +52,7 @@ object PullService {
         val targetFile = dir.resolve(targetFileFor(link))
         val values = result.variables.associate { it.key to it.value }
         val mode = EnvFiles.ConflictMode.from(EnvpilotSettings.getInstance().state.conflictResolution)
-        val existing = EnvFiles.readIfExists(targetFile)
         val editorState = project?.let { EnvEditorService.getInstance(it) }
-        val previousManaged = editorState?.managed(targetFile.toString())
-        val merged = EnvFiles.resolve(existing, values, mode)
         val secrets =
             downloaded.map { (meta, bytes) ->
                 val dest =
@@ -60,29 +61,36 @@ object PullService {
                 SecretWrite(bytes, dest, meta.mode)
             }
 
-        // Suppress our own VFS drift events for the whole write + record window.
-        editorState?.writing = true
-        try {
-            val writtenSecrets = writeFiles(targetFile, merged, existing, mode, secrets, previousManaged?.secretFilePaths)
-            if (editorState != null) {
-                try {
-                    editorState.cacheKeys(link.projectId, values.keys)
-                    editorState.cacheAccessMeta(link.projectId, result.meta)
-                    editorState.recordSync(
-                        targetFile.toString(),
-                        values.keys,
-                        EnvCloak.hashOf(targetFile),
-                        writtenSecrets,
-                        writtenSecrets.associateWith { EnvCloak.hashOf(Path.of(it)) },
-                        envCreated = previousManaged?.envCreated ?: (existing == null),
-                        autoUnsyncOnClose = result.meta.autoUnsyncOnClose,
-                    )
-                } catch (e: Exception) {
-                    log.warn("Editor state update failed: ${e.message}")
+        // One writer per target file: two IDE projects linked to the same folder
+        // must not merge over each other's half-written file.
+        targetLocks.computeIfAbsent(targetFile.toAbsolutePath().normalize().toString()) { Mutex() }.withLock {
+            val existing = EnvFiles.readIfExists(targetFile)
+            val previousManaged = editorState?.managed(targetFile.toString())
+            val merged = EnvFiles.resolve(existing, values, mode)
+            // Suppress our own VFS drift events for exactly the files we write.
+            editorState?.writingPaths = (secrets.map { it.dest } + targetFile).map { it.toString() }.toSet()
+            try {
+                val secretHashes = writeFiles(targetFile, merged, existing, mode, secrets, previousManaged?.secretFilePaths)
+                if (editorState != null) {
+                    try {
+                        editorState.cacheKeys(link.projectId, values.keys)
+                        editorState.cacheAccessMeta(link.projectId, result.meta)
+                        editorState.recordSync(
+                            targetFile.toString(),
+                            values.keys,
+                            EnvCloak.hashOf(targetFile),
+                            secretHashes.keys.toList(),
+                            secretHashes,
+                            envCreated = previousManaged?.envCreated ?: (existing == null),
+                            autoUnsyncOnClose = result.meta.autoUnsyncOnClose,
+                        )
+                    } catch (e: Exception) {
+                        log.warn("Editor state update failed: ${e.message}")
+                    }
                 }
+            } finally {
+                editorState?.writingPaths = emptySet()
             }
-        } finally {
-            editorState?.writing = false
         }
         return result.variables.size + downloaded.size
     }
@@ -103,7 +111,9 @@ object PullService {
     /**
      * Write the env file and every secret file, rolling every touched path back
      * to its prior bytes and permissions if any single write fails.
-     * Returns the secret paths written.
+     * Returns the secret paths written with their hashes; hashing inside the
+     * rollback window means an unreadable file fails the pull instead of
+     * staying on disk unmanaged.
      */
     internal fun writeFiles(
         targetFile: Path,
@@ -112,7 +122,7 @@ object PullService {
         conflictMode: EnvFiles.ConflictMode,
         secrets: List<SecretWrite>,
         previousManagedSecrets: List<String>?,
-    ): List<String> {
+    ): Map<String, String> {
         val rollback =
             snapshot(
                 buildSet {
@@ -124,7 +134,7 @@ object PullService {
                     }
                 },
             )
-        val writtenSecrets = mutableListOf<String>()
+        val writtenSecrets = linkedMapOf<String, String>()
         try {
             if (conflictMode == EnvFiles.ConflictMode.BACKUP && existing != null && existing != merged) {
                 EnvFiles.atomicWrite(EnvFiles.backupPath(targetFile), existing)
@@ -140,7 +150,7 @@ object PullService {
                 if (secret.mode != null && isPosix(secret.dest)) {
                     Files.setPosixFilePermissions(secret.dest, posixPerms(secret.mode))
                 }
-                writtenSecrets.add(secret.dest.toString())
+                writtenSecrets[secret.dest.toString()] = EnvCloak.hashOf(secret.dest)
             }
         } catch (e: Exception) {
             restore(rollback)

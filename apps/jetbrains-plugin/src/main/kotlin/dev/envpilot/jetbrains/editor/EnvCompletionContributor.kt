@@ -76,25 +76,31 @@ class EnvCompletionContributor : CompletionContributor() {
             project: Project,
             links: List<LinkedProject>,
         ) {
-            val pending = links.filter { warming.add(it.projectId) }
+            // Caches are per IDE project, so the single-flight key must be too.
+            val keyOf = { link: LinkedProject -> "${project.locationHash}:${link.projectId}" }
+            val pending = links.filter { warming.add(keyOf(it)) }
             if (pending.isEmpty()) return
             SyncScheduler.getInstance().launch {
-                val service = EnvEditorService.getInstance(project)
-                for (link in pending) {
-                    try {
-                        if (project.isDisposed || AuthService.getInstance().getSession() == null) continue
-                        val meta =
-                            ConvexApi.pullValues(
-                                link.projectId,
-                                link.environment.takeIf { it.isNotBlank() },
-                                metadataOnly = true,
-                            )
-                        service.cacheKeys(link.projectId, meta.variables.map { it.key }.toSet())
-                    } catch (e: Exception) {
-                        dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "completion"))
+                try {
+                    if (project.isDisposed || AuthService.getInstance().getSession() == null) return@launch
+                    val service = EnvEditorService.getInstance(project)
+                    for (link in pending) {
+                        try {
+                            if (!SyncScheduler.getInstance().hasAccess(link.orgId)) continue
+                            val meta =
+                                ConvexApi.pullValues(
+                                    link.projectId,
+                                    link.environment.takeIf { it.isNotBlank() },
+                                    metadataOnly = true,
+                                )
+                            service.cacheKeys(link.projectId, meta.variables.map { it.key }.toSet())
+                        } catch (e: Exception) {
+                            dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "completion"))
+                        }
                     }
+                } finally {
+                    pending.forEach { warming.remove(keyOf(it)) }
                 }
-                warming.removeAll(pending.map { it.projectId }.toSet())
             }
         }
     }

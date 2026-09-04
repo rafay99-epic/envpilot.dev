@@ -145,8 +145,19 @@ build_extension() {
 build_jetbrains() {
   local jb_dir jdk
   jb_dir="$(cd "$CLI_DIR/../jetbrains-plugin" && pwd)"
-  jdk="${SB_JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}"
-  [[ -x "$jdk/bin/java" ]] || die "No JDK at $jdk" "Set JAVA_HOME in scripts/sandbox.env to a JDK 21."
+  jdk="${SB_JAVA_HOME:-${JAVA_HOME:-}}"
+  if [[ -z "$jdk" ]]; then
+    for candidate in \
+      "$(/usr/libexec/java_home -v 21 2>/dev/null || true)" \
+      /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
+      /usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
+      /usr/lib/jvm/java-21-openjdk-amd64 \
+      /usr/lib/jvm/java-21-openjdk; do
+      [[ -n "$candidate" && -x "$candidate/bin/java" ]] && { jdk="$candidate"; break; }
+    done
+  fi
+  [[ -n "$jdk" && -x "$jdk/bin/java" ]] ||
+    die "No JDK 21 found." "Set JAVA_HOME in scripts/sandbox.env (or export JAVA_HOME) to a JDK 21."
   note "building JetBrains plugin with sandbox values (convex: $SB_CONVEX_URL)"
   env -i \
     PATH="$PATH" \
@@ -156,7 +167,7 @@ build_jetbrains() {
     WORKOS_CLIENT_ID="$SB_CLIENT_ID" \
     NEXT_PUBLIC_CONVEX_URL="$SB_CONVEX_URL" \
     ENVPILOT_SERVER_URL="${SB_SERVER_URL:-$SB_API_URL}" \
-    bash -c "cd '$jb_dir' && ./gradlew -Porg.gradle.java.installations.paths='$jdk' buildPlugin"
+    bash -c 'cd "$1" && ./gradlew -Porg.gradle.java.installations.paths="$2" buildPlugin' _ "$jb_dir" "$jdk"
   note "built: $jb_dir/build/distributions"
 }
 

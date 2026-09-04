@@ -89,6 +89,7 @@ class StartupActivity : ProjectActivity {
 
         Disposer.register(project) {
             SyncScheduler.getInstance().stopFor(project)
+            dev.envpilot.jetbrains.sync.SyncState.clear(project)
             unsyncOnClose(project)
         }
     }
@@ -210,6 +211,8 @@ class StartupActivity : ProjectActivity {
     private fun installGlobalGuards() {
         if (!guardsInstalled.compareAndSet(false, true)) return
         ApplicationManager.getApplication().invokeLater {
+            // Unload can run restoreGlobalGuards before this deferred block; do not re-wrap then.
+            if (!guardsInstalled.get()) return@invokeLater
             try {
                 val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
                 val copyAction = actionManager.getAction(IdeActions.ACTION_COPY) as EditorAction
@@ -228,6 +231,12 @@ class StartupActivity : ProjectActivity {
 
     /** Undo [installGlobalGuards] so a dynamic reload reinstalls onto the real handlers. */
     private fun restoreGlobalGuards() {
+        val app = ApplicationManager.getApplication()
+        // Same thread as the deferred install, so the two cannot interleave.
+        if (!app.isDispatchThread) {
+            app.invokeAndWait { restoreGlobalGuards() }
+            return
+        }
         if (!guardsInstalled.getAndSet(false)) return
         try {
             val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()

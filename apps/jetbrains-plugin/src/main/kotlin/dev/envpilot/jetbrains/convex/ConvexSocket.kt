@@ -216,11 +216,14 @@ class ConvexSocket(
         scope.launch {
             try {
                 val token = tokenProvider()
+                // A reconnect may have replaced this socket while the token was fetched.
+                if (webSocket.get() !== ws) return@launch
                 if (token == null) {
                     log.warn("Convex socket has no token — auth skipped")
                 } else {
                     ws.sendText(ConvexWire.authenticateMessage(token, identityVersion.getAndIncrement()), true)
                 }
+                if (webSocket.get() !== ws) return@launch
                 connected.set(true)
                 sendFullQuerySet()
                 listener.onConnected()

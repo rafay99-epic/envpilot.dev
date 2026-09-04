@@ -31,8 +31,11 @@ object LinkWorkflow {
         pending: List<LinkedProject>,
     ): Outcome {
         val links = LinkedProjectsService.getInstance(project)
+        val other = links.all().firstOrNull { it.directoryPath == directory && it.projectId != projectId }
+        if (other != null) return Outcome.Failed("This folder is already linked to ${other.projectName}. One folder, one Envpilot project.")
         return try {
-            if (!SyncScheduler.getInstance().hasAccess(orgId)) return Outcome.Disabled
+            // Ask the server, not the cache: this is the one call that registers a device.
+            if (!SyncScheduler.getInstance().refreshAccess(orgId)) return Outcome.Disabled
             ConvexApi.linkDevice(projectId, deviceId, JetBrainsDevice.name())
             pending.forEach(links::add)
             ConvexSyncService.getInstance().watchProject(projectId)
@@ -44,6 +47,8 @@ object LinkWorkflow {
                 pullError = if (ok) null else SyncState.lastError(project) ?: "unknown error",
                 commitGuardMissing = guardMissing,
             )
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
         } catch (error: Exception) {
             Errors.report(error, mapOf("surface" to "link"))
             Outcome.Failed(Errors.friendly(error))

@@ -25,6 +25,7 @@ A full read of the JetBrains plugin turned up forty findings; this release close
 
 The rest is lifecycle and consistency work. Every coroutine scope and global editor hook now dies with the plugin, so a dynamic unload no longer leaks the copy guard or a reconnecting socket. The tool window refreshes on sign-in, sign-out and every sync instead of waiting for Refresh. The organization tier gate applies to reveal and request actions, not only to link and sync. Sync status and the sync lock are per project, so a stalled project no longer blocks or hides another. Sign-out, token refresh and account switch are serialized, and a version manifest that drops its minimum no longer leaves the plugin latched as outdated.
 
+<!-- entry -->
 ---
 title: JetBrains Plugin Respects the Tier Gate
 version: v0.1.5

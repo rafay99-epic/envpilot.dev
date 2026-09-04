@@ -30,6 +30,7 @@ object EnvFiles {
                     .replace("\"", "\\\"")
                     .replace("\n", "\\n")
                     .replace("\r", "\\r")
+                    .replace("\t", "\\t")
             "\"$escaped\""
         } else {
             value
@@ -71,6 +72,7 @@ object EnvFiles {
                     when (val next = s[i]) {
                         'n' -> '\n'
                         'r' -> '\r'
+                        't' -> '\t'
                         else -> next
                     },
                 )

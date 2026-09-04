@@ -48,7 +48,7 @@ class AuthSessionTest {
 
         val session = AuthKitLogin.TokenResponse(access, "refresh-token", null).toSession()
         assertEquals("user_9", session.userId)
-        assertEquals("", session.email)
+        assertEquals("user_9", session.email)
     }
 
     @Test

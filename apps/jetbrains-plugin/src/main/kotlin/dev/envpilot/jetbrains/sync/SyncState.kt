@@ -31,6 +31,13 @@ object SyncState {
 
     fun lastError(project: Project): String? = byProject[project.locationHash]?.error
 
+    fun syncing(project: Project): Boolean = byProject[project.locationHash]?.syncing == true
+
+    /** Drop a closed project's row so it cannot pin "Syncing…" or an old error forever. */
+    fun clear(project: Project) {
+        byProject.remove(project.locationHash)
+    }
+
     @Volatile var realtimeConnected: Boolean = false
 
     fun markStart(project: Project) = markStartFor(project.locationHash)

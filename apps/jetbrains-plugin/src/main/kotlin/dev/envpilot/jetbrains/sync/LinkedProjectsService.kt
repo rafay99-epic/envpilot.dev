@@ -45,7 +45,7 @@ class LinkedProjectsService : PersistentStateComponent<LinkedProjectsService.Sta
     /** Back-fill and de-conflict persisted rows once per change, never on every read. */
     internal fun normalize(accountId: String) {
         state.links.filter { it.accountId.isBlank() }.forEach { it.accountId = accountId }
-        normalizeDirectories(state.links)
+        normalizeDirectories(state.links.filter { it.accountId == accountId })
         normalized = true
     }
 

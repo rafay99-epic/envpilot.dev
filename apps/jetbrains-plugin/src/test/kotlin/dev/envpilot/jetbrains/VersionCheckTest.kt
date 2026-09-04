@@ -6,9 +6,13 @@ import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.version.VersionCheck
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 class VersionCheckTest {
+    @Before
+    fun resetLatch() = AuthService.markOutdated(false)
+
     private fun manifest(json: String): JsonObject = Gson().fromJson(json, JsonObject::class.java)
 
     @Test

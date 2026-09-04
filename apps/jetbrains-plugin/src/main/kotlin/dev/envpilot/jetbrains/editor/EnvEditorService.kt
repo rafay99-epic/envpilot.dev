@@ -57,8 +57,8 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
 
     @Volatile var revealUntilMs: Long = 0
 
-    /** True while a pull is writing managed files, so drift detection ignores our own writes. */
-    @Volatile var writing: Boolean = false
+    /** Paths a pull is writing right now, so drift detection ignores exactly those writes. */
+    @Volatile var writingPaths: Set<String> = emptySet()
 
     override fun getState(): State = state
 
