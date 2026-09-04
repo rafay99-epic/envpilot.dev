@@ -107,8 +107,15 @@ export function ChangeRequestList({
                 <tr
                   key={row._id}
                   data-testid="change-request-row"
+                  tabIndex={0}
                   onClick={() => setReviewing(row._id)}
-                  className="cursor-pointer align-top transition-colors hover:bg-accent-soft"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setReviewing(row._id);
+                    }
+                  }}
+                  className="cursor-pointer align-top transition-colors hover:bg-accent-soft focus-visible:bg-accent-soft focus-visible:outline-none"
                 >
                   <td className="px-5 py-3">
                     <code className="font-mono text-sm text-warning">

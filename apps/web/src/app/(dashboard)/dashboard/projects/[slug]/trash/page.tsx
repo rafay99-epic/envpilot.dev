@@ -158,9 +158,8 @@ export default function TrashPage({ params }: TrashPageProps) {
           err instanceof Error ? err.message : "Failed to restore variable"
         );
       }
-    } finally {
-      setRestoringId(null);
     }
+    setRestoringId(null);
   }
 
   async function handleRestoreAccount(account: {
@@ -201,9 +200,8 @@ export default function TrashPage({ params }: TrashPageProps) {
           err instanceof Error ? err.message : "Failed to restore account"
         );
       }
-    } finally {
-      setRestoringId(null);
     }
+    setRestoringId(null);
   }
 
   async function handleRestoreFile(file: {
@@ -241,9 +239,8 @@ export default function TrashPage({ params }: TrashPageProps) {
           err instanceof Error ? err.message : "Failed to restore file"
         );
       }
-    } finally {
-      setRestoringId(null);
     }
+    setRestoringId(null);
   }
 
   async function handleRestoreDoc(docId: Id<"docs">, title: string) {
@@ -257,9 +254,8 @@ export default function TrashPage({ params }: TrashPageProps) {
       toast.error(
         err instanceof Error ? err.message : "Failed to restore page"
       );
-    } finally {
-      setRestoringId(null);
     }
+    setRestoringId(null);
   }
 
   async function handleEmptyTrash() {
@@ -283,9 +279,8 @@ export default function TrashPage({ params }: TrashPageProps) {
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to empty trash");
-    } finally {
-      setEmptying(false);
     }
+    setEmptying(false);
   }
 
   if (project === null) {

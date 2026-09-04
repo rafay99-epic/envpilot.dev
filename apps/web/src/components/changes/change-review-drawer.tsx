@@ -64,11 +64,13 @@ export function ChangeReviewDrawer({
     setError(null);
     try {
       await action();
-      onClose();
     } catch (err) {
       setError(sanitizeConvexError(err));
       setBusy(false);
+      return;
     }
+    setBusy(false);
+    onClose();
   };
 
   const payload = request ? parsePayload(request.payload) : null;

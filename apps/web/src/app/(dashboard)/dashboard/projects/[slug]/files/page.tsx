@@ -210,13 +210,12 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
         e instanceof Error ? e.message : "Could not download the file";
       log.error("secret file download failed", { message });
       setError(message);
-    } finally {
-      setDownloadingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(file._id);
-        return next;
-      });
     }
+    setDownloadingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(file._id);
+      return next;
+    });
   };
 
   const handleDelete = async () => {
@@ -250,9 +249,8 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
       } else {
         setError(e instanceof Error ? e.message : "Could not delete the file");
       }
-    } finally {
-      setDeletingFile(null);
     }
+    setDeletingFile(null);
   };
 
   if (isLoadingProject) return <TerminalLoading fullPage />;
