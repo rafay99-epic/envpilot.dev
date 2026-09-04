@@ -90,7 +90,9 @@ class AuthService(private val scope: CoroutineScope) {
         return refreshMutex.withLock {
             val sessionForRefresh = getSession() ?: return@withLock null
             // A caller queued behind the lock finds the token someone ahead of it rotated.
-            if (sessionForRefresh.accessToken != session.accessToken) return@withLock sessionForRefresh.accessToken
+            if (sessionForRefresh.accessToken != session.accessToken && !Jwt.isExpiring(sessionForRefresh.accessToken)) {
+                return@withLock sessionForRefresh.accessToken
+            }
             try {
                 val result = AuthKitLogin.refresh(sessionForRefresh.refreshToken)
                 // Compare-and-save under sessionMutex so a sign-out or switch that

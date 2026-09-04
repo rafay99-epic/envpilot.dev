@@ -145,19 +145,24 @@ build_extension() {
 build_jetbrains() {
   local jb_dir jdk
   jb_dir="$(cd "$CLI_DIR/../jetbrains-plugin" && pwd)"
-  jdk="${SB_JAVA_HOME:-${JAVA_HOME:-}}"
-  if [[ -z "$jdk" ]]; then
-    for candidate in \
-      "$(/usr/libexec/java_home -v 21 2>/dev/null || true)" \
-      /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
-      /usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
-      /usr/lib/jvm/java-21-openjdk-amd64 \
-      /usr/lib/jvm/java-21-openjdk; do
-      [[ -n "$candidate" && -x "$candidate/bin/java" ]] && { jdk="$candidate"; break; }
-    done
-  fi
-  [[ -n "$jdk" && -x "$jdk/bin/java" ]] ||
-    die "No JDK 21 found." "Set JAVA_HOME in scripts/sandbox.env (or export JAVA_HOME) to a JDK 21."
+  # A JDK location is a toolchain path, not a build value, so the ambient
+  # JAVA_HOME may be consulted; every candidate must still prove it is 21.
+  jdk=""
+  for candidate in \
+    "$SB_JAVA_HOME" \
+    "${JAVA_HOME:-}" \
+    "$(/usr/libexec/java_home -v 21 2>/dev/null || true)" \
+    /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
+    /usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
+    /usr/lib/jvm/java-21-openjdk-amd64 \
+    /usr/lib/jvm/java-21-openjdk; do
+    [[ -n "$candidate" && -x "$candidate/bin/java" ]] || continue
+    if "$candidate/bin/java" -version 2>&1 | grep -q 'version "21'; then
+      jdk="$candidate"
+      break
+    fi
+  done
+  [[ -n "$jdk" ]] || die "No JDK 21 found." "Set JAVA_HOME in scripts/sandbox.env to a JDK 21."
   note "building JetBrains plugin with sandbox values (convex: $SB_CONVEX_URL)"
   env -i \
     PATH="$PATH" \

@@ -27,18 +27,20 @@ class LinkedProjectsService : PersistentStateComponent<LinkedProjectsService.Sta
     }
 
     private var state = State()
-    private var normalized = false
+
+    // Which account's rows were last normalized; each account de-conflicts its own.
+    private var normalizedFor: String? = null
 
     override fun getState(): State = state
 
     override fun loadState(s: State) {
         state = s
-        normalized = false
+        normalizedFor = null
     }
 
     fun all(): List<LinkedProject> {
         val accountId = dev.envpilot.jetbrains.auth.AuthService.getInstance().userId ?: return emptyList()
-        if (!normalized) normalize(accountId)
+        if (normalizedFor != accountId) normalize(accountId)
         return state.links.filter { it.accountId == accountId }
     }
 
@@ -46,7 +48,7 @@ class LinkedProjectsService : PersistentStateComponent<LinkedProjectsService.Sta
     internal fun normalize(accountId: String) {
         state.links.filter { it.accountId.isBlank() }.forEach { it.accountId = accountId }
         normalizeDirectories(state.links.filter { it.accountId == accountId })
-        normalized = true
+        normalizedFor = accountId
     }
 
     fun contains(link: LinkedProject): Boolean {
@@ -63,7 +65,7 @@ class LinkedProjectsService : PersistentStateComponent<LinkedProjectsService.Sta
         }
         if (contains(link)) return false
         state.links.add(link)
-        normalized = false
+        normalizedFor = null
         return true
     }
 
@@ -75,7 +77,7 @@ class LinkedProjectsService : PersistentStateComponent<LinkedProjectsService.Sta
                 it.projectId == link.projectId && it.directoryPath == link.directoryPath &&
                     it.environment == link.environment && it.accountId == link.accountId
             }
-        if (removed) normalized = false
+        if (removed) normalizedFor = null
         return removed
     }
 

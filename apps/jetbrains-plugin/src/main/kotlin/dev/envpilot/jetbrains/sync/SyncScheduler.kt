@@ -79,6 +79,9 @@ class SyncScheduler(private val scope: CoroutineScope) : Disposable {
     /** Is the JetBrains plugin enabled for this org? Served from the last sync cycle; queried once when cold. */
     suspend fun hasAccess(orgId: String): Boolean = accessByOrg[accessKey(orgId)] ?: refreshAccess(orgId)
 
+    /** Last known answer without a network round-trip; null when never asked this session. */
+    fun cachedAccess(orgId: String): Boolean? = accessByOrg[accessKey(orgId)]
+
     /** Ask the server and remember the answer for [hasAccess]. */
     suspend fun refreshAccess(orgId: String): Boolean {
         val key = accessKey(orgId)

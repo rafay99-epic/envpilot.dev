@@ -64,6 +64,8 @@ class EnvCompletionContributor : CompletionContributor() {
             val cached = mutableSetOf<String>()
             val missing = mutableListOf<LinkedProject>()
             for (link in links) {
+                // A known-disabled org offers nothing, cached or not.
+                if (SyncScheduler.getInstance().cachedAccess(link.orgId) == false) continue
                 service.cachedKeys(link.projectId)?.let { cached.addAll(it) } ?: missing.add(link)
             }
             // Never block completion on the network — warm the cache off-thread
