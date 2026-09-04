@@ -1,16 +1,16 @@
 package dev.envpilot.jetbrains
 
 import dev.envpilot.jetbrains.sync.EnvFiles
-import dev.envpilot.jetbrains.sync.targetFileFor
+import dev.envpilot.jetbrains.sync.conventionalTargetFileFor
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class EnvFilesTest {
     @Test
     fun `multi environment links use separate conventional files`() {
-        assertEquals(".env.local", targetFileFor("development", 2))
-        assertEquals(".env.staging", targetFileFor("staging", 2))
-        assertEquals(".env.production", targetFileFor("production", 3))
+        assertEquals(".env.local", conventionalTargetFileFor("development", 2))
+        assertEquals(".env.staging", conventionalTargetFileFor("staging", 2))
+        assertEquals(".env.production", conventionalTargetFileFor("production", 3))
     }
 
     @Test
@@ -44,7 +44,54 @@ class EnvFilesTest {
                 export C=4
                 """.trimIndent(),
             )
-        assertEquals(listOf(EnvFiles.Entry("A", "1"), EnvFiles.Entry("B", "2")), entries)
+        assertEquals(
+            listOf(EnvFiles.Entry("A", "1"), EnvFiles.Entry("B", "2"), EnvFiles.Entry("C", "4")),
+            entries,
+        )
+    }
+
+    @Test
+    fun `values needing quoting are quoted and escaped`() {
+        assertEquals("plain", EnvFiles.quote("plain"))
+        assertEquals("\"a b\"", EnvFiles.quote("a b"))
+        assertEquals("\"line1\\nline2\"", EnvFiles.quote("line1\nline2"))
+        assertEquals("\"say \\\"hi\\\"\"", EnvFiles.quote("say \"hi\""))
+        assertEquals("\"c:\\\\tmp\"", EnvFiles.quote("c:\\tmp"))
+        assertEquals("\"# not a comment\"", EnvFiles.quote("# not a comment"))
+        val bell = "\u0007"
+        assertEquals("\"$bell\"", EnvFiles.quote(bell))
+    }
+
+    @Test
+    fun `quote and parse round trip hostile values`() {
+        val values =
+            mapOf(
+                "MULTI" to "line1\nline2",
+                "HASH" to "pa#ss",
+                "QUOTED" to "say \"hi\"",
+                "BACKSLASH" to "c:\\tmp\\x",
+                "SPACED" to "  padded  ",
+                "DOLLAR" to "\$HOME`x`",
+                "CR" to "a\rb",
+            )
+        assertEquals(values.entries.map { EnvFiles.Entry(it.key, it.value) }, EnvFiles.parse(EnvFiles.merge(null, values)))
+    }
+
+    @Test
+    fun `merge in place quotes values and keeps the export prefix`() {
+        val out = EnvFiles.merge("export A=old\nB=old\n", mapOf("A" to "a b", "B" to "plain"))
+        assertEquals(listOf("export A=\"a b\"", "B=plain", ""), out.lines())
+    }
+
+    @Test
+    fun `single quoted values are read literally`() {
+        assertEquals(listOf(EnvFiles.Entry("A", "a\\nb")), EnvFiles.parse("A='a\\nb'"))
+    }
+
+    @Test
+    fun `crlf line endings survive a merge`() {
+        val out = EnvFiles.merge("A=old\r\nB=keep\r\n", mapOf("A" to "new", "C" to "3"))
+        assertEquals("A=new\r\nB=keep\r\n\r\nC=3", out)
     }
 
     @Test

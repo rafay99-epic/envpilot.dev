@@ -21,6 +21,8 @@ class FileDriftListener : BulkFileListener {
             if (event !is VFileContentChangeEvent) continue
             for (project in projects) {
                 val service = EnvEditorService.getInstance(project)
+                // A pull in progress is our own write, not drift.
+                if (service.writing) continue
                 if (event.file.path in service.managedPaths()) {
                     val managed = service.managed(event.file.path) ?: continue
                     val currentHash =

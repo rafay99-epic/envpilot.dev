@@ -41,9 +41,7 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
         val secretHashes: Map<String, String>,
         val envCreated: Boolean,
         val autoUnsyncOnClose: Boolean,
-    ) {
-        fun isDrifted(): Boolean = syncedHash.isEmpty()
-    }
+    )
 
     enum class LinkStatus { SYNCED, DRIFTED, NOT_PULLED }
 
@@ -58,6 +56,9 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
     private val metadataTtlMs = 30_000L
 
     @Volatile var revealUntilMs: Long = 0
+
+    /** True while a pull is writing managed files, so drift detection ignores our own writes. */
+    @Volatile var writing: Boolean = false
 
     override fun getState(): State = state
 
@@ -108,8 +109,6 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
         return true
     }
 
-    fun isDrifted(path: String): Boolean = state.managed[path]?.syncedHash?.isEmpty() == true
-
     /** Status of a linked directory's env file, for tree icons/labels. */
     fun statusFor(targetFile: String): LinkStatus {
         val entry = state.managed[targetFile] ?: return LinkStatus.NOT_PULLED
@@ -117,9 +116,6 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
         if (!java.nio.file.Files.exists(java.nio.file.Path.of(targetFile))) return LinkStatus.NOT_PULLED
         return LinkStatus.SYNCED
     }
-
-    /** Every secret file path Envpilot wrote, across all managed entries. */
-    fun allTrackedSecretFiles(): List<String> = state.managed.values.flatMap { it.secretFilePaths }
 
     fun cachedFiles(key: String): List<dev.envpilot.jetbrains.model.SecretFileMeta>? {
         val (at, metas) = filesCache[key] ?: return null
