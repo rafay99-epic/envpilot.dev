@@ -621,7 +621,11 @@ export const hiddenByScope = query({
       args.projectId,
       actor._id
     );
-    if (!resolved || !resolved.access.environmentScope) {
+    if (
+      !resolved ||
+      !resolved.access.assigned ||
+      !resolved.access.environmentScope
+    ) {
       return { scope: null, hiddenKeys: [] };
     }
     const { environmentScope } = resolved.access;

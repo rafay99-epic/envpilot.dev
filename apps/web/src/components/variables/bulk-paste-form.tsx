@@ -22,6 +22,7 @@ interface BulkPasteFormProps {
   onSubmittingChange?: (isSubmitting: boolean) => void;
   availableTags?: Tag[];
   onCreateTag?: (name: string, color: string) => Promise<void>;
+  protectedEnvironments?: readonly string[];
 }
 
 /** Stable identity so an omitted `availableTags` never re-renders TagSelector. */
@@ -41,6 +42,7 @@ export function BulkPasteForm({
   onSubmittingChange,
   availableTags = NO_TAGS,
   onCreateTag,
+  protectedEnvironments,
 }: BulkPasteFormProps) {
   const environmentsLabelId = useId();
   const [rawText, setRawText] = useState("");
@@ -99,6 +101,12 @@ export function BulkPasteForm({
   function handleRemoveEntry(key: string) {
     setEntries((prev) => prev.filter((e) => e.key !== key));
   }
+
+  const protectedSelected = environments.filter((env) =>
+    protectedEnvironments?.includes(env)
+  );
+  const isProposal = protectedSelected.length > 0;
+  const effectiveSubmitLabel = isProposal ? "Propose All" : submitLabel;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -233,6 +241,15 @@ export function BulkPasteForm({
             </button>
           ))}
         </div>
+        {isProposal && (
+          <p
+            data-testid="bulk-protected-note"
+            className="mt-1.5 text-xs text-warning"
+          >
+            {protectedSelected.join(", ")} is protected. These will be filed for
+            approval instead of created directly.
+          </p>
+        )}
       </div>
 
       {/* Sensitive toggle */}
@@ -354,7 +371,7 @@ export function BulkPasteForm({
         >
           {isSubmitting
             ? `Creating ${progress?.completed ?? 0}/${progress?.total ?? 0}...`
-            : `${submitLabel} (${entries.length})`}
+            : `${effectiveSubmitLabel} (${entries.length})`}
         </button>
       </div>
     </form>

@@ -223,7 +223,15 @@ function AccountForm({
     }
   };
 
-  const protectedSelected = environments.filter((env) =>
+  // The server checks the union of the account's stored environments and the
+  // proposed ones (touchedEnvironments), so removing a protected environment
+  // is still a proposal — union the two here or the UI would say "Save
+  // Changes" for a write the server turns into a request.
+  const touchedEnvironments = new Set([
+    ...((account?.environments as Environment[] | undefined) ?? []),
+    ...environments,
+  ]);
+  const protectedSelected = [...touchedEnvironments].filter((env) =>
     protectedEnvironments?.includes(env)
   );
   const isProposal = protectedSelected.length > 0;

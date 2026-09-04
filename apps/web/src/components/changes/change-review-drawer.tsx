@@ -17,10 +17,30 @@ import { sanitizeConvexError } from "@/lib/error-messages";
  * a value, credentials or file contents.
  */
 const DIFF_FIELDS: Record<string, readonly string[]> = {
-  variable: ["key", "description", "environments"],
+  variable: [
+    "key",
+    "description",
+    "environments",
+    "isSensitive",
+    "tagIds",
+    "rotationFrequencyDays",
+    "targetVersion",
+  ],
   account: ["name", "websiteUrl", "description", "environments"],
   file: ["name", "path", "mode", "description", "environments"],
 };
+
+/**
+ * Fields the current-value snapshot never carries — rollback's target
+ * version isn't a property of the resource, and isSensitive/rotation aren't
+ * captured by loadCurrent. Rendered as "not shown" rather than "not set" so
+ * an approver doesn't read it as a known-empty value.
+ */
+const NOT_IN_SNAPSHOT = new Set([
+  "isSensitive",
+  "rotationFrequencyDays",
+  "targetVersion",
+]);
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -112,8 +132,8 @@ export function ChangeReviewDrawer({
             >
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                The variable changed since this was proposed. Approving applies
-                it to the newer row.
+                The target changed after this was filed. Ask the requester to
+                file it again.
               </span>
             </div>
           )}
@@ -138,7 +158,9 @@ export function ChangeReviewDrawer({
                   <tr key={field}>
                     <td className="py-2 pr-3 text-ink-muted">{field}</td>
                     <td className="py-2 pr-3 font-mono text-ink-subtle">
-                      {render(current?.[field])}
+                      {NOT_IN_SNAPSHOT.has(field)
+                        ? "not shown"
+                        : render(current?.[field])}
                     </td>
                     <td className="py-2 font-mono text-ink">
                       {field in payload ? render(payload[field]) : "unchanged"}
@@ -193,7 +215,11 @@ export function ChangeReviewDrawer({
                   type="button"
                   variant="secondary"
                   data-testid="change-reject"
-                  disabled={busy || rejectReason.trim().length === 0}
+                  disabled={
+                    busy ||
+                    !request.canApprove ||
+                    rejectReason.trim().length === 0
+                  }
                   onClick={() =>
                     void run(() =>
                       review({
@@ -209,7 +235,7 @@ export function ChangeReviewDrawer({
                 <TerminalButton
                   type="button"
                   data-testid="change-approve"
-                  disabled={busy || !request.canApprove}
+                  disabled={busy || !request.canApprove || request.isStale}
                   onClick={() =>
                     void run(() => review({ requestId, decision: "approve" }))
                   }

@@ -21,10 +21,17 @@ const externalStageValidator = v.union(
   v.literal("accounts"),
   v.literal("files"),
   v.literal("requests"),
+  v.literal("change_requests"),
   v.literal("shares")
 );
 
-type ExternalStage = "variables" | "accounts" | "files" | "requests" | "shares";
+type ExternalStage =
+  | "variables"
+  | "accounts"
+  | "files"
+  | "requests"
+  | "change_requests"
+  | "shares";
 
 type DeletionStage =
   | ExternalStage
@@ -50,7 +57,8 @@ const NEXT_STAGE: Record<DeletionStage, DeletionStage | null> = {
   variables: "accounts",
   accounts: "files",
   files: "requests",
-  requests: "shares",
+  requests: "change_requests",
+  change_requests: "shares",
   shares: "doc_content",
   doc_content: "doc_shares",
   doc_shares: "docs",
@@ -70,6 +78,7 @@ function isExternalStage(stage: DeletionStage): stage is ExternalStage {
     stage === "accounts" ||
     stage === "files" ||
     stage === "requests" ||
+    stage === "change_requests" ||
     stage === "shares"
   );
 }
@@ -167,6 +176,21 @@ async function listExternalResources(
       id: request._id,
       kind: "root",
       vaultRefs: request.vaultRef ? [request.vaultRef] : [],
+    }));
+  }
+
+  if (stage === "change_requests") {
+    // A pending proposal stages real secret material: the vault object for a
+    // proposed value and, for files, the ciphertext blob.
+    const requests = await ctx.db
+      .query("changeRequests")
+      .withIndex("by_project_status", (q) => q.eq("projectId", projectId))
+      .take(EXTERNAL_BATCH_SIZE);
+    return requests.map((request) => ({
+      id: request._id,
+      kind: "root",
+      vaultRefs: request.vaultRef ? [request.vaultRef] : [],
+      storageId: request.storageId,
     }));
   }
 
@@ -552,6 +576,11 @@ export const finishExternalBatch = internalMutation({
         else allResourcesRemoved = false;
       } else if (args.stage === "requests") {
         const requestId = resourceId as Id<"environmentVariableRequests">;
+        const request = await ctx.db.get(requestId);
+        if (!request || request.projectId !== args.projectId) continue;
+        await ctx.db.delete(requestId);
+      } else if (args.stage === "change_requests") {
+        const requestId = resourceId as Id<"changeRequests">;
         const request = await ctx.db.get(requestId);
         if (!request || request.projectId !== args.projectId) continue;
         await ctx.db.delete(requestId);

@@ -33,7 +33,7 @@ import {
  */
 
 /** Non-secret fields a variable proposal carries. Values live in the vault. */
-type VariablePayload = {
+export type VariablePayload = {
   key?: string;
   description?: string;
   environments?: string[];
@@ -78,37 +78,94 @@ function asNumber(value: unknown): number | undefined {
   return typeof value === "number" ? value : undefined;
 }
 
-// Convex has no zod: a hand-written guard is the whole validator. Unknown
-// fields are dropped rather than trusted.
-function parseVariablePayload(raw: string): VariablePayload {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new ConvexError("This change request carries a malformed payload");
-  }
-  if (!isRecord(parsed)) {
-    throw new ConvexError("This change request carries a malformed payload");
-  }
+/** Non-secret fields an account proposal carries. */
+export type AccountPayload = {
+  name?: string;
+  websiteUrl?: string;
+  description?: string;
+  environments?: string[];
+};
+
+/** Non-secret fields a file proposal carries; the blob lives in storage. */
+export type FilePayload = {
+  name?: string;
+  path?: string;
+  mode?: string;
+  contentType?: string;
+  description?: string;
+  environments?: string[];
+  size?: number;
+  sha256?: string;
+  digestSalt?: string;
+};
+
+function asBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function asStringArray(value: unknown): string[] | undefined {
+  return isStringArray(value) ? value : undefined;
+}
+
+// Convex has no zod: these hand-written guards are the whole validator, and
+// they are also the ALLOWLIST: `create` re-serializes a proposal through
+// them before insert, so an unknown field is dropped rather than stored and
+// echoed back to every reader of the request.
+export function parseVariablePayload(raw: string): VariablePayload {
+  const parsed = parsePayload(raw);
   return {
-    key: typeof parsed.key === "string" ? parsed.key : undefined,
-    description:
-      typeof parsed.description === "string" ? parsed.description : undefined,
-    environments: isStringArray(parsed.environments)
-      ? parsed.environments
-      : undefined,
-    isSensitive:
-      typeof parsed.isSensitive === "boolean" ? parsed.isSensitive : undefined,
-    tagIds: isStringArray(parsed.tagIds) ? parsed.tagIds : undefined,
-    targetVersion:
-      typeof parsed.targetVersion === "number"
-        ? parsed.targetVersion
-        : undefined,
-    rotationFrequencyDays:
-      typeof parsed.rotationFrequencyDays === "number"
-        ? parsed.rotationFrequencyDays
-        : undefined,
+    key: asString(parsed.key),
+    description: asString(parsed.description),
+    environments: asStringArray(parsed.environments),
+    isSensitive: asBoolean(parsed.isSensitive),
+    tagIds: asStringArray(parsed.tagIds),
+    targetVersion: asNumber(parsed.targetVersion),
+    rotationFrequencyDays: asNumber(parsed.rotationFrequencyDays),
   };
+}
+
+export function parseAccountPayload(raw: string): AccountPayload {
+  const parsed = parsePayload(raw);
+  return {
+    name: asString(parsed.name),
+    websiteUrl: asString(parsed.websiteUrl),
+    description: asString(parsed.description),
+    environments: asStringArray(parsed.environments),
+  };
+}
+
+export function parseFilePayload(raw: string): FilePayload {
+  const parsed = parsePayload(raw);
+  return {
+    name: asString(parsed.name),
+    path: asString(parsed.path),
+    mode: asString(parsed.mode),
+    contentType: asString(parsed.contentType),
+    description: asString(parsed.description),
+    environments: asStringArray(parsed.environments),
+    size: asNumber(parsed.size),
+    sha256: asString(parsed.sha256),
+    digestSalt: asString(parsed.digestSalt),
+  };
+}
+
+/**
+ * The stored form of a proposal's payload: the allowlisted non-secret fields
+ * and nothing else. JSON.stringify drops the undefined ones, so a payload
+ * that arrived with a secret in an unknown key is never persisted.
+ */
+export function allowlistPayload(
+  resourceType: "variable" | "account" | "file",
+  raw: string
+): string {
+  switch (resourceType) {
+    case "account":
+      return JSON.stringify(parseAccountPayload(raw));
+    case "file":
+      return JSON.stringify(parseFilePayload(raw));
+    default:
+      return JSON.stringify(parseVariablePayload(raw));
+  }
 }
 
 export async function applyChangeRequest(
@@ -239,11 +296,9 @@ async function applyAccountChange(
   ctx: MutationCtx,
   request: Doc<"changeRequests">
 ): Promise<string> {
-  const payload = parsePayload(request.payload);
+  const payload = parseAccountPayload(request.payload);
   const author = request.requestedBy;
-  const environments = isStringArray(payload.environments)
-    ? payload.environments
-    : undefined;
+  const environments = payload.environments;
 
   const targetId =
     request.targetId !== undefined
@@ -252,7 +307,7 @@ async function applyAccountChange(
 
   switch (request.kind) {
     case "create": {
-      const name = asString(payload.name);
+      const name = payload.name;
       if (name === undefined || request.vaultRef === undefined) {
         throw new ConvexError(
           "This change request has no name or staged credentials to apply"
@@ -262,8 +317,8 @@ async function applyAccountChange(
         projectId: request.projectId,
         createdBy: author,
         name,
-        websiteUrl: asString(payload.websiteUrl),
-        description: asString(payload.description),
+        websiteUrl: payload.websiteUrl,
+        description: payload.description,
         environments: environments ?? request.environments,
         vaultRef: request.vaultRef,
         viaRequestId: request._id,
@@ -276,9 +331,9 @@ async function applyAccountChange(
       return updateAccountCore(ctx, {
         accountId: targetId,
         userId: author,
-        name: asString(payload.name),
-        websiteUrl: asString(payload.websiteUrl),
-        description: asString(payload.description),
+        name: payload.name,
+        websiteUrl: payload.websiteUrl,
+        description: payload.description,
         environments,
         credentialsChanged: request.vaultRef !== undefined,
         vaultRef: request.vaultRef,
@@ -318,11 +373,9 @@ async function applyFileChange(
   ctx: MutationCtx,
   request: Doc<"changeRequests">
 ): Promise<string> {
-  const payload = parsePayload(request.payload);
+  const payload = parseFilePayload(request.payload);
   const author = request.requestedBy;
-  const environments = isStringArray(payload.environments)
-    ? payload.environments
-    : undefined;
+  const environments = payload.environments;
 
   const targetId =
     request.targetId !== undefined
@@ -331,12 +384,7 @@ async function applyFileChange(
 
   switch (request.kind) {
     case "create": {
-      const path = asString(payload.path);
-      const name = asString(payload.name);
-      const mode = asString(payload.mode);
-      const size = asNumber(payload.size);
-      const sha256 = asString(payload.sha256);
-      const digestSalt = asString(payload.digestSalt);
+      const { path, name, mode, size, sha256, digestSalt } = payload;
       if (
         path === undefined ||
         name === undefined ||
@@ -357,8 +405,8 @@ async function applyFileChange(
         name,
         path,
         mode,
-        contentType: asString(payload.contentType),
-        description: asString(payload.description),
+        contentType: payload.contentType,
+        description: payload.description,
         environments: environments ?? request.environments,
         size,
         sha256,
@@ -375,9 +423,7 @@ async function applyFileChange(
       // A staged blob means the proposal replaces the contents; without one
       // it is a metadata-only edit.
       if (request.vaultRef !== undefined && request.storageId !== undefined) {
-        const size = asNumber(payload.size);
-        const sha256 = asString(payload.sha256);
-        const digestSalt = asString(payload.digestSalt);
+        const { size, sha256, digestSalt } = payload;
         if (
           size === undefined ||
           sha256 === undefined ||
@@ -395,7 +441,7 @@ async function applyFileChange(
           digestSalt,
           vaultRef: request.vaultRef,
           storageId: request.storageId,
-          contentType: asString(payload.contentType),
+          contentType: payload.contentType,
           viaRequestId: request._id,
         });
         // The row now points at the staged pair, so the old one is
@@ -411,10 +457,10 @@ async function applyFileChange(
       return updateFileCore(ctx, {
         fileId: targetId,
         userId: author,
-        name: asString(payload.name),
-        path: asString(payload.path),
-        mode: asString(payload.mode),
-        description: asString(payload.description),
+        name: payload.name,
+        path: payload.path,
+        mode: payload.mode,
+        description: payload.description,
         environments,
         viaRequestId: request._id,
       });

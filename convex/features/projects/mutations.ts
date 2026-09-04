@@ -15,6 +15,10 @@ import {
   bypassesAssignment,
 } from "../../lib/authz";
 import { internal } from "../../_generated/api";
+import { cancelPendingRequest } from "../changeRequests/mutations";
+
+/** Bound on the change requests one project move re-tenants in a transaction. */
+const CHANGE_REQUEST_MOVE_CAP = 500;
 
 const PROJECT_NAME_MAX = 100;
 const PROJECT_SLUG_MAX = 50;
@@ -562,6 +566,29 @@ export const move = mutation({
       canceledRequests++;
     }
 
+    // Protected-environment proposals: cancel the pending ones (their staged
+    // secrets are purged with them) and re-tenant the rest, so the source org
+    // keeps no approval metadata and the destination inbox can see its own.
+    const changeRequests = await ctx.db
+      .query("changeRequests")
+      .withIndex("by_project_status", (q) => q.eq("projectId", args.projectId))
+      .take(CHANGE_REQUEST_MOVE_CAP);
+    let canceledChangeRequests = 0;
+    for (const request of changeRequests) {
+      if (request.status === "pending") {
+        await cancelPendingRequest(
+          ctx,
+          request,
+          actor._id,
+          "Project moved to another organization"
+        );
+        canceledChangeRequests++;
+      }
+      await ctx.db.patch(request._id, {
+        organizationId: args.targetOrganizationId,
+      });
+    }
+
     // Audit log in source org
     await ctx.db.insert("auditLogs", {
       organizationId: project.organizationId,
@@ -575,6 +602,7 @@ export const move = mutation({
         revokedTokens,
         deactivatedPermissions,
         canceledRequests,
+        canceledChangeRequests,
       }),
       createdAt: now,
     });

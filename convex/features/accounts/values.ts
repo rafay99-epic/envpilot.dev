@@ -4,6 +4,7 @@ import type { ActionCtx } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import { touchedEnvironments } from "../../lib/protection";
+import { assertCanOverrideProtection } from "../changeRequests/override";
 
 const sourceValidator = v.union(
   v.literal("web"),
@@ -100,6 +101,11 @@ export const createWithCredentials = action({
       { projectId: args.projectId, environments: args.environments }
     );
     const needsRequest = protectedEnvs.length > 0 && args.override !== true;
+    // Break-glass is authorized BEFORE the vault write; the mutation checks
+    // it again, but only once the credential object already exists.
+    if (protectedEnvs.length > 0 && !needsRequest) {
+      await assertCanOverrideProtection(ctx, userId, args.projectId);
+    }
 
     // The project's own organizationId is authoritative for the vault key
     // context and the mutation — never a client-supplied value.
@@ -223,6 +229,12 @@ export const updateWithCredentials = action({
         environments: args.environments,
       }
     );
+
+    if (protectedEnvs.length > 0 && args.override === true) {
+      // Break-glass rewrites the LIVE credentials in place, so authorize it
+      // before the vault write rather than compensating afterwards.
+      await assertCanOverrideProtection(ctx, userId, account.projectId);
+    }
 
     // A pending proposal must never touch the live credentials, so the
     // protected path seals them into a NEW vault object and stages it;

@@ -68,6 +68,10 @@ export interface ProtectedWriteArgs {
   project: Doc<"projects">;
   envs: readonly string[];
   actorId: Id<"users">;
+  /** What is being written. Binds viaRequestId to this exact resource. */
+  resourceType: "variable" | "account" | "file";
+  /** The row being written; absent on a create, which has none yet. */
+  targetId?: string;
   /** The apply path: a pending change request the reviewer just approved. */
   viaRequestId?: Id<"changeRequests">;
   /** Break-glass. Caller must audit change.overridden when this is used. */
@@ -95,6 +99,19 @@ export async function assertProtectedWrite(
     ) {
       throw new ConvexError(
         "This change request is no longer pending, so it cannot be applied"
+      );
+    }
+    // Bound to the exact resource it proposes: a create names no target, and
+    // every other kind must name the row being written. Without this a
+    // misrouted request id would unlock any protected write in the project.
+    const boundTargetId =
+      request.kind === "create" ? undefined : request.targetId;
+    if (
+      request.resourceType !== args.resourceType ||
+      boundTargetId !== args.targetId
+    ) {
+      throw new ConvexError(
+        "This change request does not describe the change being applied"
       );
     }
     return;

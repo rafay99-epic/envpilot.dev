@@ -115,6 +115,7 @@ export async function createCore(
     project,
     envs: args.environments,
     actorId: args.createdBy,
+    resourceType: "account",
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
@@ -202,6 +203,7 @@ export async function createCore(
       projectId: args.projectId,
       userId: args.createdBy,
       action: "change.overridden",
+      resourceType: "account",
       details: {
         accountId,
         accountName: args.name,
@@ -323,6 +325,8 @@ export async function updateCore(
     project,
     envs: touched,
     actorId: userId,
+    resourceType: "account",
+    targetId: accountId,
     viaRequestId,
     override,
   });
@@ -391,6 +395,7 @@ export async function updateCore(
       projectId: account.projectId,
       userId,
       action: "change.overridden",
+      resourceType: "account",
       details: {
         accountId,
         accountName: account.name,
@@ -455,6 +460,8 @@ export async function removeCore(
     project,
     envs: account.environments,
     actorId: args.deletedBy,
+    resourceType: "account",
+    targetId: args.accountId,
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
@@ -515,6 +522,7 @@ export async function removeCore(
       projectId: account.projectId,
       userId: args.deletedBy,
       action: "change.overridden",
+      resourceType: "account",
       details: {
         accountId: args.accountId,
         accountName: account.name,
@@ -616,6 +624,8 @@ export async function restoreCore(
     project,
     envs: account.environments,
     actorId: args.restoredBy,
+    resourceType: "account",
+    targetId: args.accountId,
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
@@ -647,6 +657,7 @@ export async function restoreCore(
       projectId: account.projectId,
       userId: args.restoredBy,
       action: "change.overridden",
+      resourceType: "account",
       details: {
         accountId: args.accountId,
         accountName: account.name,

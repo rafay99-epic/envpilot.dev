@@ -24,7 +24,7 @@ interface VariableCreateDrawerProps {
   onCreate: (
     data: VariableFormData,
     options?: { silent?: boolean }
-  ) => Promise<void>;
+  ) => Promise<{ requested: boolean } | void>;
   organizationId?: string;
   projectId?: string;
   title?: string;
@@ -64,7 +64,11 @@ export function VariableCreateDrawer({
   const { tags } = useOrganizationTags(showTags ? organizationId : undefined);
   const createTag = useCreateTag();
 
-  const availableTags = showTags ? tags : [];
+  // The legacy request schema (the non-developer branch of useCreateVariable)
+  // has no rotation/tags fields, so a value picked here would be silently
+  // dropped when filed — hide both controls instead.
+  const requestOnly = submitLabel.includes("Request");
+  const availableTags = showTags && !requestOnly ? tags : [];
 
   const handleCreateTag = async (name: string, color: string) => {
     if (!organizationId) return;
@@ -91,6 +95,9 @@ export function VariableCreateDrawer({
 
   async function handleBulkSubmit(entries: VariableFormData[]) {
     const failures: Array<{ key: string; error: string }> = [];
+    // A protected environment turns some entries into requests rather than
+    // direct writes, so the summary can't call every success "created".
+    let requestedCount = 0;
 
     // Sequential on purpose. Firing these concurrently is what the rule
     // suggests and is exactly wrong here: each create writes to the vault and
@@ -101,7 +108,8 @@ export function VariableCreateDrawer({
     for (const entry of entries) {
       try {
         // react-doctor-disable-next-line react-doctor/async-await-in-loop
-        await onCreate(entry, { silent: true });
+        const result = await onCreate(entry, { silent: true });
+        if (result?.requested) requestedCount++;
       } catch (err) {
         failures.push({
           key: entry.key,
@@ -110,10 +118,20 @@ export function VariableCreateDrawer({
       }
     }
 
-    const created = entries.length - failures.length;
+    const succeeded = entries.length - failures.length;
+    const created = succeeded - requestedCount;
 
     if (failures.length === 0) {
-      toast.success(`${created} variable${created === 1 ? "" : "s"} created.`);
+      const summaryParts: string[] = [];
+      if (created > 0) {
+        summaryParts.push(
+          `${created} variable${created === 1 ? "" : "s"} created`
+        );
+      }
+      if (requestedCount > 0) {
+        summaryParts.push(`${requestedCount} sent for approval`);
+      }
+      toast.success(summaryParts.join(", "));
       handleClose();
       return;
     }
@@ -153,14 +171,21 @@ export function VariableCreateDrawer({
       );
     }
 
+    const succeededLabel = [
+      created > 0 ? `${created} created` : null,
+      requestedCount > 0 ? `${requestedCount} sent for approval` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
     toast.error(
-      created > 0
-        ? `${created} created, ${failures.length} skipped`
+      succeeded > 0
+        ? `${succeededLabel}, ${failures.length} skipped`
         : `No variables created (${failures.length} failed)`,
       { description: parts.join(" · "), duration: 8000 }
     );
 
-    if (created > 0) {
+    if (succeeded > 0) {
       handleClose();
     }
   }
@@ -230,9 +255,9 @@ export function VariableCreateDrawer({
             onSubmit={handleSingleSubmit}
             onCancel={handleClose}
             submitLabel={submitLabel}
-            showRotation={showRotation}
+            showRotation={showRotation && !requestOnly}
             availableTags={availableTags}
-            onCreateTag={handleCreateTag}
+            onCreateTag={requestOnly ? undefined : handleCreateTag}
             protectedEnvironments={protection?.environments}
           />
         )
@@ -250,7 +275,8 @@ export function VariableCreateDrawer({
           submitLabel={bulkSubmitLabel}
           onSubmittingChange={setIsBulkSubmitting}
           availableTags={availableTags}
-          onCreateTag={showTags ? handleCreateTag : undefined}
+          onCreateTag={requestOnly ? undefined : handleCreateTag}
+          protectedEnvironments={protection?.environments}
         />
       )}
     </DrawerPanel>

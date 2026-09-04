@@ -176,7 +176,14 @@ function FileForm({
     }
   };
 
-  const protectedSelected = environments.filter((env) =>
+  // Union with the file's stored environments — the server checks the union
+  // of current and proposed environments, so removing a protected one is
+  // still a proposal.
+  const touchedEnvironments = new Set([
+    ...((file?.environments as Environment[] | undefined) ?? []),
+    ...environments,
+  ]);
+  const protectedSelected = [...touchedEnvironments].filter((env) =>
     protectedEnvironments?.includes(env)
   );
   const isProposal = protectedSelected.length > 0;

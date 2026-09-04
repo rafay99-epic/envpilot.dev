@@ -146,14 +146,27 @@ export function VariableForm({
     }
   };
 
-  const protectedSelected = formData.environments.filter((env) =>
+  // Union with the variable's original environments — the server checks the
+  // union of current and proposed environments, so removing a protected one
+  // is still a proposal.
+  const touchedEnvironments = new Set([
+    ...(initialData?.environments ?? []),
+    ...formData.environments,
+  ]);
+  const protectedSelected = [...touchedEnvironments].filter((env) =>
     protectedEnvironments?.includes(env)
   );
   const isProposal = protectedSelected.length > 0;
   // A row spanning a protected and an unprotected environment is invisible to
   // anyone scoped to the unprotected one — the plan's approximation of scope.
+  // Judged on the environments this save actually keeps, not the touched
+  // union above.
+  const selectedProtectedCount = formData.environments.filter((env) =>
+    protectedEnvironments?.includes(env)
+  ).length;
   const spansUnprotected =
-    isProposal && protectedSelected.length < formData.environments.length;
+    selectedProtectedCount > 0 &&
+    selectedProtectedCount < formData.environments.length;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">

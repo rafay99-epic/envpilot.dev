@@ -92,16 +92,18 @@ describe("effectiveEnvironments", () => {
     ]);
   });
 
-  it("intersects when the member list is wider than the role default", () => {
+  it("uses the explicit member list even when it is wider than the role default", () => {
     const editor = profile({
       scoped: true,
       environments: ["development", "staging"],
     });
-    // A stale/legacy member list carrying "production" must never widen past
-    // the role's own ceiling.
+    // Widening is refused where the list is WRITTEN
+    // (assertEnvironmentScopeNarrows), so a stored list is a deliberate
+    // decision and re-narrowing it here would silently strip access the
+    // enable-role-environment-defaults migration granted.
     expect(
       effectiveEnvironments(editor, ["development", "production"])
-    ).toEqual(["development"]);
+    ).toEqual(["development", "production"]);
   });
 
   it("returns undefined when both the role default and member list are unrestricted", () => {

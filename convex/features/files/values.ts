@@ -18,6 +18,7 @@ import {
   PROTECTED_ENVIRONMENT_CODE,
   touchedEnvironments,
 } from "../../lib/protection";
+import { assertCanOverrideProtection } from "../changeRequests/override";
 
 const sourceValidator = v.union(
   v.literal("web"),
@@ -69,6 +70,8 @@ interface PreflightResult {
   path: string;
   mode: string;
   organizationId: Id<"organizations">;
+  protectedEnvironments: string[];
+  existingEnvironments?: string[];
 }
 
 interface UploadResult {
@@ -189,30 +192,12 @@ export const uploadFile = action({
       throw new ConvexError("File content is not valid base64");
     }
 
-    // STEP 0 — protection. Resolved before the encrypt so a refused upload
-    // costs no blob and no vault object.
-    const target = args.replaceFileId
-      ? await ctx.runQuery(
-          internal.features.changeRequests.queries._targetSnapshot,
-          { fileId: args.replaceFileId }
-        )
-      : null;
-    const protectedEnvs: string[] = await ctx.runQuery(
-      internal.features.changeRequests.queries.protectedEnvironmentsForWrite,
-      {
-        projectId: args.projectId,
-        fileId: args.replaceFileId,
-        environments: args.environments,
-      }
-    );
-    const needsRequest = protectedEnvs.length > 0 && args.override !== true;
-    if (needsRequest && args.request !== true) {
-      throw new ConvexError(protectedEnvironmentError(protectedEnvs));
-    }
-
     // STEP 1 — everything that can say no, before anything that costs money
     // or leaves a trace. Returns the normalized values so the check and the
-    // insert cannot disagree about what the path is.
+    // insert cannot disagree about what the path is, and the protected
+    // environments, reported only AFTER access is verified, so an
+    // unauthorized caller gets the ordinary access error instead of the
+    // project's protection configuration.
     const preflight: PreflightResult = await ctx.runMutation(
       internal.features.files.mutations.preflightUpload,
       {
@@ -224,10 +209,18 @@ export const uploadFile = action({
         environments: args.environments,
         size: plaintext.length,
         replaceFileId: args.replaceFileId,
-        override: args.override,
-        staging: needsRequest,
       }
     );
+
+    const protectedEnvs = preflight.protectedEnvironments;
+    const needsRequest = protectedEnvs.length > 0 && args.override !== true;
+    if (needsRequest && args.request !== true) {
+      throw new ConvexError(protectedEnvironmentError(protectedEnvs));
+    }
+    if (protectedEnvs.length > 0 && !needsRequest) {
+      // Break-glass, authorized before the encrypt and the vault write.
+      await assertCanOverrideProtection(ctx, userId, args.projectId);
+    }
 
     // STEP 2 — fresh key, fresh nonce, every time. Never an in-place
     // re-encrypt, so (key, iv) reuse is unreachable rather than guarded.
@@ -269,7 +262,7 @@ export const uploadFile = action({
             kind: args.replaceFileId ? "update" : "create",
             targetId: args.replaceFileId,
             environments: touchedEnvironments(
-              target?.environments,
+              preflight.existingEnvironments,
               args.environments
             ),
             payload: JSON.stringify({

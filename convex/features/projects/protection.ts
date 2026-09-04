@@ -5,6 +5,7 @@ import {
   assertProjectAction,
   assertProjectCapability,
   hasCapability,
+  isEnvironmentScopeAllowed,
 } from "../../lib/authz";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { createAuditLog } from "../../lib/audit";
@@ -87,12 +88,15 @@ export const setProtection = mutation({
     });
 
     if (args.environments.length > 0) {
+      // Both sets, always: narrowing from [staging, production] to [staging]
+      // unprotects production, and an audit row that only names the new set
+      // would hide that.
       await createAuditLog(ctx, {
         organizationId: project.organizationId,
         projectId: args.projectId,
         userId: actor._id,
         action: "protection.enabled",
-        details: { environments: args.environments },
+        details: { previous: current, environments: args.environments },
       });
     } else {
       const pending = await ctx.db
@@ -106,7 +110,11 @@ export const setProtection = mutation({
         projectId: args.projectId,
         userId: actor._id,
         action: "protection.disabled",
-        details: { environments: current, pendingCount: pending.length },
+        details: {
+          previous: current,
+          environments: [],
+          pendingCount: pending.length,
+        },
       });
     }
 
@@ -123,7 +131,7 @@ export const getProtection = query({
       throw new ConvexError("Project not found");
     }
 
-    const { profile } = await assertProjectAction(
+    const { profile, environmentScope } = await assertProjectAction(
       ctx,
       actor._id,
       args.projectId,
@@ -150,7 +158,11 @@ export const getProtection = query({
       canApprove: hasCapability(profile, "project.protection.approve"),
       canOverride: hasCapability(profile, "project.protection.override"),
       featureAllowed: gate.allowed,
-      pendingCount: pending.length,
+      // Counts only what this member could open: a scoped reader must not
+      // learn from a badge that a production change is in flight.
+      pendingCount: pending.filter((request) =>
+        isEnvironmentScopeAllowed(environmentScope, request.environments)
+      ).length,
     };
   },
 });

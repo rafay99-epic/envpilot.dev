@@ -129,11 +129,12 @@ export async function resolveProjectAccessContext(
       )
       .first();
     assigned = !!projectMembership;
-    // Role default narrowed by the assignment; undefined for non-scoped roles.
-    environmentScope = effectiveEnvironments(
-      profile,
-      projectMembership?.environments
-    );
+    // Only an ASSIGNMENT carries a scope. A grant-only user has no assignment,
+    // and applying the role default to them would hide variables that were
+    // shared with them explicitly.
+    environmentScope = projectMembership
+      ? effectiveEnvironments(profile, projectMembership.environments)
+      : undefined;
   }
 
   // The owner class and assigned blanket-write roles have write access

@@ -313,8 +313,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const handleCreateVariable = async (
     data: VariableFormData,
     options?: { silent?: boolean }
-  ) => {
-    if (!projectId) return;
+  ): Promise<{ requested: boolean }> => {
+    if (!projectId) return { requested: false };
     try {
       const result = await createVariable.mutateAsync({
         key: data.key,
@@ -336,6 +336,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             : "Variable created successfully."
         );
       }
+      return { requested: result.requested };
     } catch (err) {
       // Convex redacts plain Error messages to "Server Error" in production,
       // so the readable text only survives inside a ConvexError payload.

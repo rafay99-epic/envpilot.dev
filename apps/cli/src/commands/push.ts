@@ -53,6 +53,18 @@ export function formatRequestedRows(
   return (requested ?? []).map((r) => ({ key: r.key, requestId: r.requestId }));
 }
 
+/**
+ * True only when every changed key was filed as a change request — no
+ * denial, no silent skip. `pushBulk`'s propose path stops at the first
+ * denial, so a non-empty `deniedKeys`/`skipped` means keys after it were
+ * never proposed at all, not just written directly.
+ */
+export function isRequestFilingComplete(
+  result: Pick<PushBulkResult, "deniedKeys" | "skipped">
+): boolean {
+  return (result.deniedKeys?.length ?? 0) === 0 && (result.skipped ?? 0) === 0;
+}
+
 export const pushCommand = new Command("push")
   .description("Upload local .env file to cloud")
   .option(
@@ -334,6 +346,29 @@ export const pushCommand = new Command("push")
           { key: "key", header: "KEY" },
           { key: "requestId", header: "REQUEST ID" },
         ]);
+
+        if (!isRequestFilingComplete(result)) {
+          console.log();
+          const deniedKeys = result.deniedKeys ?? [];
+          if (deniedKeys.length > 0) {
+            warning(
+              `${deniedKeys.length} variable(s) were NOT proposed (access denied):`
+            );
+            for (const key of deniedKeys) {
+              console.log(chalk.red(`  ✗ ${key}`));
+            }
+          }
+          if (result.skipped) {
+            warning(
+              `${result.skipped} variable(s) were skipped and not proposed.`
+            );
+          }
+          error(
+            "Not every changed key was proposed for approval. Re-run to retry the rest."
+          );
+          process.exit(1);
+        }
+
         console.log();
         info("Waiting for a second person to approve.");
         return;

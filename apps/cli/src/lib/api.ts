@@ -534,6 +534,18 @@ const refs = {
     { projectId: string; status?: ChangeRequestStatus },
     ChangeRequestRow[]
   >("features/changeRequests/queries:listForProject"),
+  reviewChangeRequest: fnRef<
+    "mutation",
+    {
+      requestId: string;
+      decision: "approve" | "reject";
+      reason?: string;
+    },
+    "applied" | "rejected"
+  >("features/changeRequests/mutations:review"),
+  cancelChangeRequestRef: fnRef<"mutation", { requestId: string }, string>(
+    "features/changeRequests/mutations:cancel"
+  ),
   createVariableRequest: fnRef<
     "action",
     {
@@ -1124,6 +1136,24 @@ export class APIClient {
     status?: ChangeRequestStatus
   ): Promise<ChangeRequestRow[]> {
     return convexQuery(refs.listChangeRequests, { projectId, status });
+  }
+
+  /** Approve or reject a change request (protected-environment proposal). */
+  async reviewChangeRequest(
+    requestId: string,
+    decision: "approve" | "reject",
+    reason?: string
+  ): Promise<"applied" | "rejected"> {
+    return convexMutation(refs.reviewChangeRequest, {
+      requestId,
+      decision,
+      reason,
+    });
+  }
+
+  /** Cancel a pending change request (requester or a reviewer). */
+  async cancelChangeRequest(requestId: string): Promise<void> {
+    await convexMutation(refs.cancelChangeRequestRef, { requestId });
   }
 
   /**

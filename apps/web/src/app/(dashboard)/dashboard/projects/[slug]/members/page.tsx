@@ -220,11 +220,15 @@ export default function ProjectMembersPage({
     setIsSavingScope(true);
     setError(null);
 
+    // A role change since the selection was made can leave a disabled,
+    // outside-the-ceiling environment checked — drop it before it's sent.
+    const ceiling = editingScopeMember.roleEnvironments;
+    const scoped = ceiling
+      ? editEnvScope.filter((env) => ceiling.includes(env))
+      : editEnvScope;
+
     // Covering the full ceiling = unrestricted-within-role = send nothing.
-    const environments = scopeToPayload(
-      editEnvScope,
-      editingScopeMember.roleEnvironments
-    );
+    const environments = scopeToPayload(scoped, ceiling);
 
     try {
       await projectMemberActions.setEnvironments({

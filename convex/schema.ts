@@ -228,6 +228,7 @@ export default defineSchema({
         v.literal("accounts"),
         v.literal("files"),
         v.literal("requests"),
+        v.literal("change_requests"),
         v.literal("shares"),
         v.literal("doc_content"),
         v.literal("doc_shares"),

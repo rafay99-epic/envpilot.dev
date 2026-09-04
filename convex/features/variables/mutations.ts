@@ -118,6 +118,7 @@ export async function createCore(
     project,
     envs: args.environments,
     actorId: args.createdBy,
+    resourceType: "variable",
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
@@ -318,6 +319,7 @@ export async function createCore(
       variableId,
       userId: args.createdBy,
       action: "change.overridden",
+      resourceType: "variable",
       details: {
         key: args.key,
         environments: args.environments,
@@ -577,6 +579,8 @@ export async function updateCore(
     project,
     envs: touched,
     actorId: updatedBy,
+    resourceType: "variable",
+    targetId: variableId,
     viaRequestId,
     override,
   });
@@ -771,6 +775,7 @@ export async function updateCore(
       variableId,
       userId: updatedBy,
       action: "change.overridden",
+      resourceType: "variable",
       details: { key: variable.key, environments: touched, kind: "update" },
     });
   }
@@ -831,6 +836,8 @@ export async function removeCore(
     project,
     envs: variable.environments,
     actorId: args.deletedBy,
+    resourceType: "variable",
+    targetId: args.variableId,
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
@@ -893,6 +900,7 @@ export async function removeCore(
       variableId: args.variableId,
       userId: args.deletedBy,
       action: "change.overridden",
+      resourceType: "variable",
       details: {
         key: variable.key,
         environments: variable.environments,
@@ -949,6 +957,8 @@ export const removeFromEnvironment = mutation({
       project,
       envs: variable.environments,
       actorId: actor._id,
+      resourceType: "variable",
+      targetId: args.variableId,
       override: args.override,
     });
 
@@ -991,6 +1001,7 @@ export const removeFromEnvironment = mutation({
         variableId: args.variableId,
         userId: actor._id,
         action: "change.overridden",
+        resourceType: "variable",
         details: {
           key: variable.key,
           environments: variable.environments,
@@ -1087,6 +1098,8 @@ export const bulkDelete = mutation({
         project,
         envs: variable.environments,
         actorId: actor._id,
+        resourceType: "variable",
+        targetId: variableId,
         override: args.override,
       });
 
@@ -1097,6 +1110,7 @@ export const bulkDelete = mutation({
           variableId,
           userId: actor._id,
           action: "change.overridden",
+          resourceType: "variable",
           details: {
             key: variable.key,
             environments: variable.environments,
@@ -1209,6 +1223,8 @@ export async function restoreCore(
     project,
     envs: variable.environments,
     actorId: args.restoredBy,
+    resourceType: "variable",
+    targetId: args.variableId,
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
@@ -1256,6 +1272,7 @@ export async function restoreCore(
       variableId: args.variableId,
       userId: args.restoredBy,
       action: "change.overridden",
+      resourceType: "variable",
       details: {
         key: variable.key,
         environments: variable.environments,
@@ -1325,8 +1342,15 @@ export async function rollbackCore(
 
   await assertProtectedWrite(ctx, {
     project,
-    envs: variable.environments,
+    // A rollback writes the target version's environment set too, so a
+    // variable that is unprotected TODAY can still restore into production.
+    envs: touchedEnvironments(
+      variable.environments,
+      targetVersionRecord.environments
+    ),
     actorId: args.actorId,
+    resourceType: "variable",
+    targetId: args.variableId,
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
@@ -1385,6 +1409,7 @@ export async function rollbackCore(
       variableId: args.variableId,
       userId: args.actorId,
       action: "change.overridden",
+      resourceType: "variable",
       details: {
         key: variable.key,
         environments: variable.environments,

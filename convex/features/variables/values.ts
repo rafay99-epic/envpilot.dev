@@ -10,11 +10,12 @@ import {
 import { roleLevel, ROLE_LEVEL } from "../../lib/authz";
 import { pool, VAULT_POOL_WIDTH } from "../../lib/pool";
 import { vaultCreate, vaultRead } from "../vault/vault";
-import { isValidVariableKey } from "./helpers";
+import { assertValidVariableFields, isValidVariableKey } from "./helpers";
 import {
   PROTECTED_ENVIRONMENT_CODE,
   touchedEnvironments,
 } from "../../lib/protection";
+import { assertCanOverrideProtection } from "../changeRequests/override";
 
 const sourceValidator = v.union(
   v.literal("web"),
@@ -22,6 +23,23 @@ const sourceValidator = v.union(
   v.literal("mcp"),
   v.literal("extension")
 );
+
+/** Resolve the caller's convex user _id from the verified JWT. Never an arg. */
+async function requireCurrentUserId(ctx: ActionCtx): Promise<Id<"users">> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    throw new ConvexError(
+      "Unauthenticated: no verified user identity on request"
+    );
+  }
+  const user = await ctx.runQuery(api.features.users.users.getByWorkosId, {
+    workosId: identity.subject,
+  });
+  if (!user) {
+    throw new ConvexError("User not found");
+  }
+  return user._id;
+}
 
 /**
  * The payload lib/protection.ts throws. Rebuilt here because these actions
@@ -431,6 +449,18 @@ export const createWithValue = action({
       { projectId: args.projectId, environments: args.environments }
     );
     const needsRequest = protectedEnvs.length > 0 && args.override !== true;
+    if (protectedEnvs.length > 0 && !needsRequest) {
+      await assertCanOverrideProtection(
+        ctx,
+        await requireCurrentUserId(ctx),
+        args.projectId
+      );
+    }
+
+    // The create mutation validates these too, but a staged request never
+    // reaches it: an invalid key would only fail at approval time, with the
+    // secret already minted.
+    assertValidVariableFields({ key: args.key, description: args.description });
 
     const vault = await ctx.runAction(
       internal.features.vault.vault.createSecret,
@@ -611,6 +641,7 @@ export const pushBulk = action({
     }
 
     if (protectedEnvs.length > 0) {
+      assertNoProtectedDeletions(mode, existingByKey, pushedKeys);
       return proposeChanges(ctx, {
         projectId: args.projectId,
         environment: args.environment,
@@ -789,6 +820,26 @@ export const pushBulk = action({
  * refusal — typically the per-requester pending cap — stops the loop so the
  * caller gets a partial, honest result rather than a tail of failures.
  */
+/**
+ * Replace mode deletes the keys the caller did not send, and proposeChanges
+ * only proposes the ones they did. Rather than silently keeping those
+ * variables while reporting success, refuse the whole operation.
+ */
+function assertNoProtectedDeletions(
+  mode: "merge" | "replace",
+  existingByKey: ReadonlyMap<string, unknown>,
+  submittedKeys: Set<string>
+): void {
+  if (mode !== "replace") return;
+  const remoteOnly = [...existingByKey.keys()].filter(
+    (key) => !submittedKeys.has(key)
+  );
+  if (remoteOnly.length === 0) return;
+  throw new ConvexError(
+    `Replace mode would delete ${remoteOnly.length} variable(s) in a protected environment (${remoteOnly.join(", ")}). Propose each deletion individually, or use merge mode.`
+  );
+}
+
 type ExistingVariable = {
   _id: Id<"environmentVariables">;
   vaultRef: string;
@@ -981,6 +1032,13 @@ export const updateWithValue = action({
       }
     );
     const needsRequest = protectedEnvs.length > 0 && args.override !== true;
+    if (protectedEnvs.length > 0 && !needsRequest) {
+      await assertCanOverrideProtection(
+        ctx,
+        await requireCurrentUserId(ctx),
+        variable.projectId
+      );
+    }
 
     let vaultRef: string | undefined;
 
@@ -1322,6 +1380,7 @@ export const importValues = action({
       if (args.request !== true) {
         throw new ConvexError(protectedEnvironmentError(protectedEnvs));
       }
+      assertNoProtectedDeletions(args.mode, existingByKey, importedKeys);
       const proposed = await proposeChanges(ctx, {
         projectId: args.projectId,
         environment: args.environment,

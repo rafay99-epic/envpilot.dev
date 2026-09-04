@@ -60,6 +60,30 @@ export const createVariableChange = action({
   handler: async (ctx, args): Promise<{ requestId: Id<"changeRequests"> }> => {
     const userId = await requireCurrentUserId(ctx);
 
+    // Kind-specific shape, checked here rather than at approval time: a
+    // request that apply could never satisfy must not reach the inbox.
+    if (args.kind === "create") {
+      if (args.key === undefined || args.value === undefined) {
+        throw new ConvexError(
+          "A create request needs both a variable key and a value"
+        );
+      }
+    } else if (args.variableId === undefined) {
+      throw new ConvexError(`A ${args.kind} request needs a target variable`);
+    }
+    if (args.kind === "rollback" && args.targetVersion === undefined) {
+      throw new ConvexError("A rollback request needs a version to restore");
+    }
+    // Only create and update carry a value; staging one anywhere else would
+    // leave a vault object that apply never adopts and nothing ever purges.
+    if (
+      args.value !== undefined &&
+      args.kind !== "create" &&
+      args.kind !== "update"
+    ) {
+      throw new ConvexError(`A ${args.kind} request cannot carry a value`);
+    }
+
     // The full authorization the mutation applies, run BEFORE the vault
     // write: minting first would let any signed-in user leave orphaned
     // secrets in any project's key context and probe which projects exist.
@@ -105,7 +129,10 @@ export const createVariableChange = action({
     }
 
     let vaultRef: string | undefined;
-    if (typeof args.value === "string") {
+    if (
+      typeof args.value === "string" &&
+      (args.kind === "create" || args.kind === "update")
+    ) {
       const vault = await ctx.runAction(
         internal.features.vault.vault.createSecret,
         {

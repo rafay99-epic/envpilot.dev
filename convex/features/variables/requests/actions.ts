@@ -109,8 +109,13 @@ export const createWithValue = action({
       );
     }
 
-    // Owners, project managers, and team leads should create directly.
-    if (legacy.role !== "developer") {
+    // Capability, never a role slug: this flow exists for members who may
+    // PROPOSE a variable but not create one. Anyone who can create directly
+    // is sent to the direct path, whatever their role is called.
+    if (
+      legacy.capabilities["project.requests.submit"] !== true ||
+      legacy.capabilities["project.variables.create"] === true
+    ) {
       throw new ConvexError(
         "You have direct write access. Use direct variable creation instead of submitting a request."
       );

@@ -9,7 +9,7 @@ import {
   warning,
   withSpinner,
 } from "../lib/ui.js";
-import { createAPIClient } from "../lib/api.js";
+import { createAPIClient, type APIClient } from "../lib/api.js";
 import { isAuthenticated } from "../lib/config.js";
 import { readProjectConfigV2, resolveProject } from "../lib/project-config.js";
 import {
@@ -77,6 +77,7 @@ interface ListOptions {
   project?: string;
   status?: string;
   json?: boolean;
+  changes?: boolean;
 }
 
 async function runList(options: ListOptions): Promise<void> {
@@ -109,23 +110,57 @@ async function runList(options: ListOptions): Promise<void> {
   }
 
   const api = createAPIClient();
-  const changeStatus: ChangeRequestStatus | undefined =
-    status === undefined
-      ? undefined
-      : status === "approved"
-        ? "applied"
-        : status;
-  const [requests, changeRequests] = await withSpinner(
-    "Fetching requests...",
-    () =>
-      Promise.all([
-        api.listVariableRequests(project.projectId, status),
-        api.listChangeRequests(project.projectId, changeStatus),
-      ])
+
+  // `--changes` swaps the listing to the change-request queue (protected-
+  // environment proposals) instead of ordinary variable requests. Keeping
+  // the two outputs separate — rather than combining them under `--json` —
+  // preserves the pre-existing `--json` array shape for scripts.
+  if (options.changes) {
+    const changeStatus: ChangeRequestStatus | undefined =
+      status === undefined
+        ? undefined
+        : status === "approved"
+          ? "applied"
+          : status;
+    const changeRequests = await withSpinner(
+      "Fetching change requests...",
+      () => api.listChangeRequests(project.projectId, changeStatus)
+    );
+
+    if (options.json) {
+      console.log(JSON.stringify(changeRequests, null, 2));
+      return;
+    }
+
+    header(
+      formatRequestsListHeader({
+        projectName: project.projectName || project.projectId,
+        organizationName: project.organizationName || project.organizationId,
+      })
+    );
+    console.log();
+    header("Change requests (protected environments)");
+    if (changeRequests.length === 0) {
+      info("No change requests found.");
+      return;
+    }
+    table(formatChangeRequestRows(changeRequests), [
+      { key: "id", header: "ID" },
+      { key: "label", header: "LABEL" },
+      { key: "kind", header: "KIND" },
+      { key: "environments", header: "ENVIRONMENTS" },
+      { key: "status", header: "STATUS" },
+      { key: "age", header: "AGE" },
+    ]);
+    return;
+  }
+
+  const requests = await withSpinner("Fetching requests...", () =>
+    api.listVariableRequests(project.projectId, status)
   );
 
   if (options.json) {
-    console.log(JSON.stringify({ requests, changeRequests }, null, 2));
+    console.log(JSON.stringify(requests, null, 2));
     return;
   }
 
@@ -148,23 +183,6 @@ async function runList(options: ListOptions): Promise<void> {
       { key: "reason", header: "REASON" },
     ]);
   }
-
-  // Change requests are a separate queue: protected-environment proposals,
-  // filed automatically instead of a developer's ordinary request.
-  console.log();
-  header("Change requests (protected environments)");
-  if (changeRequests.length === 0) {
-    info("No change requests found.");
-    return;
-  }
-  table(formatChangeRequestRows(changeRequests), [
-    { key: "id", header: "ID" },
-    { key: "label", header: "LABEL" },
-    { key: "kind", header: "KIND" },
-    { key: "environments", header: "ENVIRONMENTS" },
-    { key: "status", header: "STATUS" },
-    { key: "age", header: "AGE" },
-  ]);
 }
 
 const listSub = new Command("list")
@@ -175,6 +193,10 @@ const listSub = new Command("list")
   )
   .option("--status <status>", "Filter: pending, approved, rejected, canceled")
   .option("--json", "Output as JSON")
+  .option(
+    "--changes",
+    "List change requests (protected-environment proposals) instead of variable requests"
+  )
   .action(async (options: ListOptions) => {
     try {
       await runList(options);
@@ -183,9 +205,42 @@ const listSub = new Command("list")
     }
   });
 
+/** Pure lookup: which row in a change-request list (if any) matches `id`. */
+export function findMatchingChangeRequest(
+  rows: ChangeRequestRow[],
+  id: string
+): ChangeRequestRow | null {
+  return rows.find((r) => r._id === id) ?? null;
+}
+
+/**
+ * Look up `id` among the linked project's change requests (protected-
+ * environment proposals) so approve/reject/cancel can route it to the
+ * change-request endpoints instead of the ordinary variable-request ones.
+ * Returns null (never throws) when no project is linked locally or the id
+ * isn't a change request — the caller then falls back to the variable-
+ * request flow, unchanged from before.
+ */
+async function findChangeRequest(
+  api: APIClient,
+  id: string,
+  projectOption?: string
+): Promise<ChangeRequestRow | null> {
+  const configV2 = readProjectConfigV2();
+  if (!configV2) return null;
+  const project = resolveProject(configV2, projectOption);
+  if (!project) return null;
+  const rows = await api.listChangeRequests(project.projectId);
+  return findMatchingChangeRequest(rows, id);
+}
+
 const approveSub = new Command("approve")
   .description("Approve a pending request")
   .argument("<id>", "Request id (from `envpilot requests`)")
+  .option(
+    "--project <name-or-id>",
+    "Project to search for a change-request id (defaults to the linked project)"
+  )
   .option(
     "--value <value>",
     "Secret value for a machine (valueless) request — CI only; interactively " +
@@ -200,11 +255,31 @@ const approveSub = new Command("approve")
   .action(
     async (
       id: string,
-      options: { value?: string; valueStdin?: boolean; reason?: string }
+      options: {
+        project?: string;
+        value?: string;
+        valueStdin?: boolean;
+        reason?: string;
+      }
     ) => {
       try {
         if (!isAuthenticated()) throw notAuthenticated();
         const api = createAPIClient();
+
+        const changeRequest = await findChangeRequest(api, id, options.project);
+        if (changeRequest) {
+          if (changeRequest.status !== "pending") {
+            error(
+              `Only pending change requests can be approved (current: ${changeRequest.status}).`
+            );
+            process.exit(1);
+          }
+          await withSpinner("Approving change request...", () =>
+            api.reviewChangeRequest(id, "approve", options.reason)
+          );
+          success(`Change request approved: ${changeRequest.label}.`);
+          return;
+        }
 
         // A machine (valueless) request needs the reviewer to supply the
         // secret at approval. Detect that up front so interactive users get a
@@ -275,27 +350,57 @@ const approveSub = new Command("approve")
 const rejectSub = new Command("reject")
   .description("Reject a pending request")
   .argument("<id>", "Request id (from `envpilot requests`)")
+  .option(
+    "--project <name-or-id>",
+    "Project to search for a change-request id (defaults to the linked project)"
+  )
   .option("--reason <text>", "Optional review note shown to the requester")
-  .action(async (id: string, options: { reason?: string }) => {
-    try {
-      if (!isAuthenticated()) throw notAuthenticated();
-      const api = createAPIClient();
-      await withSpinner("Rejecting request...", () =>
-        api.reviewRequest(id, "reject", options.reason)
-      );
-      success("Request rejected.");
-    } catch (err) {
-      await handleError(err);
+  .action(
+    async (id: string, options: { project?: string; reason?: string }) => {
+      try {
+        if (!isAuthenticated()) throw notAuthenticated();
+        const api = createAPIClient();
+
+        const changeRequest = await findChangeRequest(api, id, options.project);
+        if (changeRequest) {
+          await withSpinner("Rejecting change request...", () =>
+            api.reviewChangeRequest(id, "reject", options.reason)
+          );
+          success("Change request rejected.");
+          return;
+        }
+
+        await withSpinner("Rejecting request...", () =>
+          api.reviewRequest(id, "reject", options.reason)
+        );
+        success("Request rejected.");
+      } catch (err) {
+        await handleError(err);
+      }
     }
-  });
+  );
 
 const cancelSub = new Command("cancel")
   .description("Cancel a pending request (your own, or as a reviewer)")
   .argument("<id>", "Request id (from `envpilot requests`)")
-  .action(async (id: string) => {
+  .option(
+    "--project <name-or-id>",
+    "Project to search for a change-request id (defaults to the linked project)"
+  )
+  .action(async (id: string, options: { project?: string }) => {
     try {
       if (!isAuthenticated()) throw notAuthenticated();
       const api = createAPIClient();
+
+      const changeRequest = await findChangeRequest(api, id, options.project);
+      if (changeRequest) {
+        await withSpinner("Canceling change request...", () =>
+          api.cancelChangeRequest(id)
+        );
+        success("Change request canceled.");
+        return;
+      }
+
       await withSpinner("Canceling request...", () => api.cancelRequest(id));
       success("Request canceled.");
     } catch (err) {
@@ -312,6 +417,10 @@ export const requestsCommand = new Command("requests")
   )
   .option("--status <status>", "Filter: pending, approved, rejected, canceled")
   .option("--json", "Output as JSON")
+  .option(
+    "--changes",
+    "List change requests (protected-environment proposals) instead of variable requests"
+  )
   .action(async (options: ListOptions) => {
     try {
       await runList(options);

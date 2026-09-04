@@ -47,7 +47,9 @@ import type * as features_changeRequests_actions from "../features/changeRequest
 import type * as features_changeRequests_apply from "../features/changeRequests/apply.js";
 import type * as features_changeRequests_authorize from "../features/changeRequests/authorize.js";
 import type * as features_changeRequests_mutations from "../features/changeRequests/mutations.js";
+import type * as features_changeRequests_override from "../features/changeRequests/override.js";
 import type * as features_changeRequests_queries from "../features/changeRequests/queries.js";
+import type * as features_changeRequests_visibility from "../features/changeRequests/visibility.js";
 import type * as features_cicd_pull from "../features/cicd/pull.js";
 import type * as features_community_featureRequests_mutations from "../features/community/featureRequests/mutations.js";
 import type * as features_community_featureRequests_queries from "../features/community/featureRequests/queries.js";
@@ -136,6 +138,7 @@ import type * as lib_fileLimits from "../lib/fileLimits.js";
 import type * as lib_identity from "../lib/identity.js";
 import type * as lib_integrationLimits from "../lib/integrationLimits.js";
 import type * as lib_pool from "../lib/pool.js";
+import type * as lib_protection from "../lib/protection.js";
 import type * as lib_rateLimits from "../lib/rateLimits.js";
 import type * as lib_roleCompat from "../lib/roleCompat.js";
 import type * as lib_roleProfiles from "../lib/roleProfiles.js";
@@ -190,7 +193,9 @@ declare const fullApi: ApiFromModules<{
   "features/changeRequests/apply": typeof features_changeRequests_apply;
   "features/changeRequests/authorize": typeof features_changeRequests_authorize;
   "features/changeRequests/mutations": typeof features_changeRequests_mutations;
+  "features/changeRequests/override": typeof features_changeRequests_override;
   "features/changeRequests/queries": typeof features_changeRequests_queries;
+  "features/changeRequests/visibility": typeof features_changeRequests_visibility;
   "features/cicd/pull": typeof features_cicd_pull;
   "features/community/featureRequests/mutations": typeof features_community_featureRequests_mutations;
   "features/community/featureRequests/queries": typeof features_community_featureRequests_queries;
@@ -279,6 +284,7 @@ declare const fullApi: ApiFromModules<{
   "lib/identity": typeof lib_identity;
   "lib/integrationLimits": typeof lib_integrationLimits;
   "lib/pool": typeof lib_pool;
+  "lib/protection": typeof lib_protection;
   "lib/rateLimits": typeof lib_rateLimits;
   "lib/roleCompat": typeof lib_roleCompat;
   "lib/roleProfiles": typeof lib_roleProfiles;

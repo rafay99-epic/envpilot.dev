@@ -28,6 +28,7 @@ import {
 import {
   assertProtectedWrite,
   isProtectedWrite,
+  protectedEnvironmentsIn,
   touchedEnvironments,
 } from "../../lib/protection";
 import { cancelPendingForTarget } from "../changeRequests/mutations";
@@ -84,16 +85,20 @@ export const preflightUpload = internalMutation({
     size: v.number(),
     // Present when replacing an existing file's contents.
     replaceFileId: v.optional(v.id("projectFiles")),
-    override: v.optional(v.boolean()),
-    // Set only by uploadFile when it is staging a change request instead of
-    // writing: every other check still runs, protection alone does not refuse.
-    staging: v.optional(v.boolean()),
   },
   returns: v.object({
     name: v.string(),
     path: v.string(),
     mode: v.string(),
     organizationId: v.id("organizations"),
+    // Protection is REPORTED here, not enforced: the caller decides whether
+    // to stage a request, and createCore / replaceContentCore refuse the
+    // direct write. Reporting it from inside the authorized preflight is
+    // what keeps protected environment names off an unauthorized caller.
+    protectedEnvironments: v.array(v.string()),
+    // The replaced file's current environments, for the touched set a
+    // staged request records.
+    existingEnvironments: v.optional(v.array(v.string())),
   }),
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.projectId);
@@ -136,15 +141,6 @@ export const preflightUpload = internalMutation({
         preloadedProject: project,
       });
       assertWithinEnvironmentScope(environmentScope, args.environments);
-    }
-
-    if (!args.staging) {
-      await assertProtectedWrite(ctx, {
-        project,
-        envs: touchedEnvironments(existing?.environments, args.environments),
-        actorId: args.userId,
-        override: args.override,
-      });
     }
 
     // Resolve the shared org/tier/grace context once for all three gates.
@@ -213,7 +209,17 @@ export const preflightUpload = internalMutation({
       throw new ConvexError(filePathConflictMessage(path, clashes));
     }
 
-    return { name, path, mode, organizationId: project.organizationId };
+    return {
+      name,
+      path,
+      mode,
+      organizationId: project.organizationId,
+      protectedEnvironments: protectedEnvironmentsIn(
+        project,
+        touchedEnvironments(existing?.environments, args.environments)
+      ),
+      existingEnvironments: existing?.environments,
+    };
   },
 });
 
@@ -266,6 +272,7 @@ export async function createCore(
     project,
     envs: args.environments,
     actorId: args.createdBy,
+    resourceType: "file",
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
@@ -403,6 +410,7 @@ export async function createCore(
       projectId: args.projectId,
       userId: args.createdBy,
       action: "change.overridden",
+      resourceType: "file",
       details: {
         fileId,
         fileName: args.name,
@@ -477,6 +485,8 @@ export async function replaceContentCore(
     project,
     envs: file.environments,
     actorId: args.userId,
+    resourceType: "file",
+    targetId: args.fileId,
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
@@ -521,6 +531,7 @@ export async function replaceContentCore(
       projectId: file.projectId,
       userId: args.userId,
       action: "change.overridden",
+      resourceType: "file",
       details: {
         fileId: args.fileId,
         fileName: file.name,
@@ -594,6 +605,8 @@ export const detachEnvironment = mutation({
       project,
       envs: file.environments,
       actorId: userId,
+      resourceType: "file",
+      targetId: args.fileId,
       override: args.override,
     });
 
@@ -643,6 +656,7 @@ export const detachEnvironment = mutation({
         projectId: file.projectId,
         userId,
         action: "change.overridden",
+        resourceType: "file",
         details: {
           fileId: args.fileId,
           fileName: file.name,
@@ -737,6 +751,8 @@ export async function updateCore(
     project,
     envs: touched,
     actorId: userId,
+    resourceType: "file",
+    targetId: fileId,
     viaRequestId,
     override,
   });
@@ -804,6 +820,7 @@ export async function updateCore(
       projectId: file.projectId,
       userId,
       action: "change.overridden",
+      resourceType: "file",
       details: {
         fileId,
         fileName: updates.name ?? file.name,
@@ -870,6 +887,8 @@ export async function removeCore(
     project,
     envs: file.environments,
     actorId: deletedBy,
+    resourceType: "file",
+    targetId: args.fileId,
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
@@ -917,6 +936,7 @@ export async function removeCore(
       projectId: file.projectId,
       userId: deletedBy,
       action: "change.overridden",
+      resourceType: "file",
       details: {
         fileId: args.fileId,
         fileName: file.name,
@@ -1004,6 +1024,8 @@ export async function restoreCore(
     project,
     envs: file.environments,
     actorId: restoredBy,
+    resourceType: "file",
+    targetId: args.fileId,
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
@@ -1047,6 +1069,7 @@ export async function restoreCore(
       projectId: file.projectId,
       userId: restoredBy,
       action: "change.overridden",
+      resourceType: "file",
       details: {
         fileId: args.fileId,
         fileName: file.name,

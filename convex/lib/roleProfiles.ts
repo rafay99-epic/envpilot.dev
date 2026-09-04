@@ -268,18 +268,20 @@ export function hasCapability(
 
 /**
  * The environments a project member may see and write. Undefined = all.
- * Role default first, member list narrows it. Non-scopeable roles ignore
- * both. Pure so the parity suite and members.manage can assert on it.
+ *
+ * An explicit member list WINS over the role default; the role default only
+ * applies when the assignment stores no list. Narrowing is enforced when the
+ * list is written (assertEnvironmentScopeNarrows), so intersecting again
+ * here would only re-narrow members whose stored list a manager chose
+ * deliberately. Non-scopeable roles ignore both. Pure so the parity suite
+ * and members.manage can assert on it.
  */
 export function effectiveEnvironments(
   profile: Pick<RoleProfile, "capabilities" | "environments">,
   memberEnvironments: string[] | undefined
 ): string[] | undefined {
   if (!hasCapability(profile, "access.env_scoped")) return undefined;
-  const roleScope = profile.environments;
-  if (!memberEnvironments) return roleScope;
-  if (!roleScope) return memberEnvironments;
-  return memberEnvironments.filter((env) => roleScope.includes(env));
+  return memberEnvironments ?? profile.environments;
 }
 
 /**

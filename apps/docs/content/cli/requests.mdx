@@ -25,9 +25,10 @@ Only roles that carry the request capability (developers, and any custom role gi
 envpilot requests                        # the linked project's requests
 envpilot requests --status pending
 envpilot requests --project api --json
+envpilot requests --changes              # change requests (protected environments) instead
 ```
 
-Reviewers see every request in their projects; developers see only their own. The `ID` column is what the review subcommands take.
+Reviewers see every request in their projects; developers see only their own. The `ID` column is what the review subcommands take. `--json` always prints a plain array — the requests array by default, or the change-requests array with `--changes`.
 
 ## Review
 
@@ -36,6 +37,8 @@ envpilot requests approve k5738xq2…
 envpilot requests reject  k5738xq2… --reason "use the shared key"
 envpilot requests cancel  k5738xq2…
 ```
+
+`approve`, `reject`, and `cancel` also accept a change-request id (from `envpilot requests --changes`) — they look it up in the linked project automatically and route it to the right queue. Pass `--project` if the id belongs to a different linked project.
 
 Approving a **machine-filed** request — one with no value, because an agent may never propose secret material — prompts you, masked, for the value:
 
@@ -48,7 +51,7 @@ printf %s "$SECRET" | envpilot requests approve k5738xq2… --value-stdin
 
 ## Limits
 
-- `--status` and `--json` apply to listing only; `--value`, `--value-stdin` and `--reason` apply to review subcommands only.
+- `--status`, `--json` and `--changes` apply to listing only; `--value`, `--value-stdin` and `--reason` apply to review subcommands only.
 - Cancelling is the requester's action, on their own pending request.
 - A rejected request for a given key cannot be re-filed by the same API key for **24 hours**. A rejection is a decision, not a retry prompt.
 - Machine-filed requests are capped at 5 per hour per key with at most 5 open at once. See [Rate limits](/limits/rate-limits).

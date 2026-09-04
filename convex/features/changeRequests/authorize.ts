@@ -6,7 +6,7 @@ import {
   requireFileAccess,
   requireVariableAccess,
 } from "../../lib/authHelpers";
-import { assertProjectAction } from "../../lib/authz";
+import { assertOrgAction, assertProjectAction } from "../../lib/authz";
 
 /**
  * The authorization a change request has to pass, shared by the mutation
@@ -59,6 +59,17 @@ export async function assertCouldWriteDirectly(
   // Only variables keep a version history to roll back to.
   if (kind === "rollback" && resourceType !== "variable") {
     throw new ConvexError("Rollback is only supported for variables");
+  }
+
+  // rollbackCore requires this org-level capability on the apply path, so a
+  // requester without it could only ever file a request nobody can apply.
+  if (kind === "rollback") {
+    await assertOrgAction(
+      ctx,
+      actorId,
+      project.organizationId,
+      "org:rollback_variable"
+    );
   }
 
   if (kind === "create") {

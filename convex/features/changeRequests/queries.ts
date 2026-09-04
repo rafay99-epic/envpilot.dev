@@ -5,7 +5,8 @@ import { requireAuthedUser } from "../../lib/identity";
 import {
   assertOrgMembership,
   assertProjectAction,
-  bypassesAssignment,
+  getActiveMembership,
+  getRoleProfile,
   hasCapability,
   isEnvironmentScopeAllowed,
 } from "../../lib/authz";
@@ -14,6 +15,7 @@ import {
   touchedEnvironments,
 } from "../../lib/protection";
 import { assertCouldWriteDirectly } from "./authorize";
+import { orgRequestScopes, visibleInOrg } from "./visibility";
 
 /** Read window for every list here; the inbox is a queue, not an archive. */
 const MAX_ROWS = 200;
@@ -191,17 +193,8 @@ export const listForOrg = query({
       .order("desc")
       .take(MAX_ROWS);
 
-    if (bypassesAssignment(profile)) return withPeople(ctx, rows);
-
-    const assignments = await ctx.db
-      .query("projectMembers")
-      .withIndex("by_user", (q) => q.eq("userId", actor._id))
-      .collect();
-    const assigned = new Set(assignments.map((a) => a.projectId.toString()));
-    return withPeople(
-      ctx,
-      rows.filter((row) => assigned.has(row.projectId.toString()))
-    );
+    const scopes = await orgRequestScopes(ctx, actor._id, profile);
+    return withPeople(ctx, visibleInOrg(rows, scopes));
   },
 });
 
@@ -210,14 +203,22 @@ export const pendingCountForProject = query({
   returns: v.number(),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    await assertProjectAction(ctx, actor._id, args.projectId, "project:read");
+    const { environmentScope } = await assertProjectAction(
+      ctx,
+      actor._id,
+      args.projectId,
+      "project:read"
+    );
     const rows = await ctx.db
       .query("changeRequests")
       .withIndex("by_project_status", (q) =>
         q.eq("projectId", args.projectId).eq("status", "pending")
       )
       .take(COUNT_CAP);
-    return rows.length;
+    // The badge must count exactly what listForProject would show.
+    return rows.filter((row) =>
+      isEnvironmentScopeAllowed(environmentScope, row.environments)
+    ).length;
   },
 });
 
@@ -226,14 +227,19 @@ export const pendingCountForOrg = query({
   returns: v.number(),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    await assertOrgMembership(ctx, actor._id, args.organizationId);
+    const { profile } = await assertOrgMembership(
+      ctx,
+      actor._id,
+      args.organizationId
+    );
     const rows = await ctx.db
       .query("changeRequests")
       .withIndex("by_org_status", (q) =>
         q.eq("organizationId", args.organizationId).eq("status", "pending")
       )
       .take(COUNT_CAP);
-    return rows.length;
+    const scopes = await orgRequestScopes(ctx, actor._id, profile);
+    return visibleInOrg(rows, scopes).length;
   },
 });
 
@@ -333,12 +339,18 @@ export const getForReview = query({
       throw new ConvexError("Change request not found");
     }
 
-    const { profile } = await assertProjectAction(
+    const { profile, environmentScope } = await assertProjectAction(
       ctx,
       actor._id,
       request.projectId,
       "project:read"
     );
+
+    // Out of scope is indistinguishable from absent: a request id must not
+    // disclose target metadata listForProject hides from this member.
+    if (!isEnvironmentScopeAllowed(environmentScope, request.environments)) {
+      throw new ConvexError("Change request not found");
+    }
 
     const current = await loadCurrent(ctx, request);
 
@@ -467,6 +479,29 @@ export const canProposeVariableChange = internalQuery({
       );
     }
     return protectedEnvironmentsIn(project, environments);
+  },
+});
+
+/**
+ * Whether the actor holds break-glass. Actions call this BEFORE minting or
+ * updating a vault object for an `override` write: the mutation checks the
+ * same capability, but only once the secret already exists, so a refusal
+ * there could only be compensated for, never prevented.
+ */
+export const canOverrideProtection = internalQuery({
+  args: { userId: v.id("users"), projectId: v.id("projects") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) return false;
+    const membership = await getActiveMembership(
+      ctx,
+      project.organizationId,
+      args.userId
+    );
+    if (!membership) return false;
+    const profile = await getRoleProfile(ctx, membership.role);
+    return hasCapability(profile, "project.protection.override");
   },
 });
 

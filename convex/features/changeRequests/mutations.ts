@@ -22,7 +22,11 @@ import {
   protectedEnvironmentsIn,
   touchedEnvironments,
 } from "../../lib/protection";
-import { applyChangeRequest, payloadEnvironments } from "./apply";
+import {
+  allowlistPayload,
+  applyChangeRequest,
+  payloadEnvironments,
+} from "./apply";
 import {
   assertCouldWriteDirectly,
   type ChangeKind,
@@ -174,6 +178,43 @@ async function purgeStaged(
 }
 
 /**
+ * Cancel ONE pending proposal: mark it, destroy the secret material it
+ * staged, and record why. Callable in-transaction from any path that makes
+ * the proposal unapplyable (target deleted, project moved).
+ */
+export async function cancelPendingRequest(
+  ctx: MutationCtx,
+  request: Doc<"changeRequests">,
+  actorId: Id<"users"> | undefined,
+  reason: string
+): Promise<void> {
+  const now = Date.now();
+  await ctx.db.patch(request._id, {
+    status: "canceled",
+    reviewReason: reason,
+    reviewedBy: actorId,
+    reviewedAt: now,
+    updatedAt: now,
+  });
+  await purgeStaged(ctx, request);
+  await createAuditLog(ctx, {
+    organizationId: request.organizationId,
+    projectId: request.projectId,
+    userId: actorId ?? request.requestedBy,
+    action: "change.canceled",
+    details: {
+      requestId: request._id,
+      resourceType: request.resourceType,
+      kind: request.kind,
+      environments: request.environments,
+      label: request.label,
+      targetId: request.targetId,
+      reason,
+    },
+  });
+}
+
+/**
  * Cancel every pending proposal aimed at a resource that just went away.
  * Callable in-transaction from the resource's own delete path.
  * `exceptRequestId` skips the request currently being applied, whose status
@@ -193,35 +234,12 @@ export async function cancelPendingForTarget(
     )
     .take(SWEEP_BATCH);
 
-  const now = Date.now();
   let canceled = 0;
   for (const request of pending) {
     if (exceptRequestId !== undefined && request._id === exceptRequestId) {
       continue;
     }
-    await ctx.db.patch(request._id, {
-      status: "canceled",
-      reviewReason: reason,
-      reviewedBy: actorId,
-      reviewedAt: now,
-      updatedAt: now,
-    });
-    await purgeStaged(ctx, request);
-    await createAuditLog(ctx, {
-      organizationId: request.organizationId,
-      projectId: request.projectId,
-      userId: actorId ?? request.requestedBy,
-      action: "change.canceled",
-      details: {
-        requestId: request._id,
-        resourceType: request.resourceType,
-        kind: request.kind,
-        environments: request.environments,
-        label: request.label,
-        targetId: request.targetId,
-        reason,
-      },
-    });
+    await cancelPendingRequest(ctx, request, actorId, reason);
     canceled++;
   }
   return canceled;
@@ -282,12 +300,18 @@ async function fileChangeRequest(
   const targetId = args.targetId;
   const target = await assertCouldWriteDirectly(ctx, actor._id, project, args);
 
+  // Allowlisted, never stored raw: the payload is re-serialized down to the
+  // non-secret fields its resource type declares. `create` is a public
+  // mutation, so an arbitrary string here would otherwise be handed straight
+  // back to every reader of the request.
+  const payload = allowlistPayload(args.resourceType, args.payload);
+
   // Derived, never declared: the union of what the target spans today and
   // what the payload proposes. A client cannot describe one change and have
   // another applied.
   const environments = touchedEnvironments(
     target?.environments,
-    payloadEnvironments(args.payload)
+    payloadEnvironments(payload)
   );
   if (environments.length === 0) {
     throw new ConvexError(
@@ -381,7 +405,7 @@ async function fileChangeRequest(
     // the target has already moved past.
     expectedVersion: target?.version,
     environments,
-    payload: args.payload,
+    payload,
     vaultRef: args.vaultRef,
     storageId: args.storageId,
     label: args.label,
@@ -468,12 +492,21 @@ export const review = mutation({
       throw new ConvexError("Change request not found");
     }
 
-    await assertProjectCapability(
+    const { environmentScope } = await assertProjectCapability(
       ctx,
       actor._id,
       request.projectId,
       "project.protection.approve"
     );
+
+    // An approver scoped away from production must not decide a production
+    // change, because approving is a write into an environment they
+    // cannot touch.
+    if (!isEnvironmentScopeAllowed(environmentScope, request.environments)) {
+      throw new ConvexError(
+        `Your access is limited to these environments: ${(environmentScope ?? []).join(", ")}`
+      );
+    }
 
     if (request.status !== "pending") {
       throw new ConvexError(
