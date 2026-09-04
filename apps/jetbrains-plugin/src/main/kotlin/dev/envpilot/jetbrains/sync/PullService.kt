@@ -7,6 +7,9 @@ import dev.envpilot.jetbrains.config.EnvpilotSettings
 import dev.envpilot.jetbrains.convex.ConvexApi
 import dev.envpilot.jetbrains.editor.EnvCloak
 import dev.envpilot.jetbrains.editor.EnvEditorService
+import dev.envpilot.jetbrains.model.PullResult
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermission
@@ -21,7 +24,11 @@ import java.nio.file.attribute.PosixFilePermission
 object PullService {
     private val log = logger<PullService>()
 
-    class PullAborted(message: String) : Exception(message)
+    class PullAborted(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+    internal class SecretWrite(val bytes: ByteArray, val dest: Path, val mode: Int?)
+
+    private val targetLocks = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
 
     suspend fun pull(
         link: LinkedProject,
@@ -31,15 +38,7 @@ object PullService {
         val environment = link.environment.takeIf { it.isNotBlank() }
 
         val result = ConvexApi.pullValues(link.projectId, environment, metadataOnly = false)
-        result.meta.truncatedAt?.let {
-            throw PullAborted("Project has more than $it variables. Pull stopped to prevent an incomplete env file.")
-        }
-        val failed =
-            result.meta.decryptionFailures.orEmpty() +
-                result.variables.filter { it.value == "[DECRYPTION_FAILED]" }.map { it.key }
-        if (failed.isNotEmpty()) {
-            throw PullAborted("Decryption failed for ${failed.size} variable(s): ${failed.joinToString(", ")}")
-        }
+        abortIfIncomplete(result)
 
         // Fetch everything first so a failure mid-pull writes nothing.
         val fileMetas = if (link.includeSecretFiles) ConvexApi.listFiles(link.projectId, environment) else emptyList()
@@ -53,70 +52,111 @@ object PullService {
         val targetFile = dir.resolve(targetFileFor(link))
         val values = result.variables.associate { it.key to it.value }
         val mode = EnvFiles.ConflictMode.from(EnvpilotSettings.getInstance().state.conflictResolution)
-        val existing = EnvFiles.readIfExists(targetFile)
-        val previousManaged = project?.let { EnvEditorService.getInstance(it).managed(targetFile.toString()) }
-        val merged = EnvFiles.resolve(existing, values, mode)
-        val resolvedFiles =
+        val editorState = project?.let { EnvEditorService.getInstance(it) }
+        val secrets =
             downloaded.map { (meta, bytes) ->
                 val dest =
                     resolveWithin(dir, meta.path)
                         ?: throw PullAborted("Refusing unsafe file path from server: ${meta.path}")
-                Triple(meta, bytes, dest)
+                SecretWrite(bytes, dest, meta.mode)
             }
+
+        // One writer per target file: two IDE projects linked to the same folder
+        // must not merge over each other's half-written file.
+        targetLocks.computeIfAbsent(targetFile.toAbsolutePath().normalize().toString()) { Mutex() }.withLock {
+            val existing = EnvFiles.readIfExists(targetFile)
+            val previousManaged = editorState?.managed(targetFile.toString())
+            val merged = EnvFiles.resolve(existing, values, mode)
+            // Suppress our own VFS drift events for exactly the files we write.
+            editorState?.writingPaths = (secrets.map { it.dest } + targetFile).map { it.toString() }.toSet()
+            try {
+                val secretHashes = writeFiles(targetFile, merged, existing, mode, secrets, previousManaged?.secretFilePaths)
+                if (editorState != null) {
+                    try {
+                        editorState.cacheKeys(link.projectId, values.keys)
+                        editorState.cacheAccessMeta(link.projectId, result.meta)
+                        editorState.recordSync(
+                            targetFile.toString(),
+                            values.keys,
+                            EnvCloak.hashOf(targetFile),
+                            secretHashes.keys.toList(),
+                            secretHashes,
+                            envCreated = previousManaged?.envCreated ?: (existing == null),
+                            autoUnsyncOnClose = result.meta.autoUnsyncOnClose,
+                        )
+                    } catch (e: Exception) {
+                        log.warn("Editor state update failed: ${e.message}")
+                    }
+                }
+            } finally {
+                editorState?.writingPaths = emptySet()
+            }
+        }
+        return result.variables.size + downloaded.size
+    }
+
+    /** A truncated or partially decrypted result must never reach the disk. */
+    internal fun abortIfIncomplete(result: PullResult) {
+        result.meta.truncatedAt?.let {
+            throw PullAborted("Project has more than $it variables. Pull stopped to prevent an incomplete env file.")
+        }
+        val failed =
+            result.meta.decryptionFailures.orEmpty() +
+                result.variables.filter { it.value == "[DECRYPTION_FAILED]" }.map { it.key }
+        if (failed.isNotEmpty()) {
+            throw PullAborted("Decryption failed for ${failed.size} variable(s): ${failed.joinToString(", ")}")
+        }
+    }
+
+    /**
+     * Write the env file and every secret file, rolling every touched path back
+     * to its prior bytes and permissions if any single write fails.
+     * Returns the secret paths written with their hashes; hashing inside the
+     * rollback window means an unreadable file fails the pull instead of
+     * staying on disk unmanaged.
+     */
+    internal fun writeFiles(
+        targetFile: Path,
+        merged: String,
+        existing: String?,
+        conflictMode: EnvFiles.ConflictMode,
+        secrets: List<SecretWrite>,
+        previousManagedSecrets: List<String>?,
+    ): Map<String, String> {
         val rollback =
             snapshot(
                 buildSet {
                     add(targetFile)
                     add(EnvFiles.backupPath(targetFile))
-                    for ((_, _, dest) in resolvedFiles) {
-                        add(dest)
-                        add(secretBackupPath(dest))
+                    for (secret in secrets) {
+                        add(secret.dest)
+                        add(secretBackupPath(secret.dest))
                     }
                 },
             )
-        val writtenSecrets = mutableListOf<String>()
-        val secretHashes = mutableMapOf<String, String>()
+        val writtenSecrets = linkedMapOf<String, String>()
         try {
-            if (mode == EnvFiles.ConflictMode.BACKUP && existing != null && existing != merged) {
+            if (conflictMode == EnvFiles.ConflictMode.BACKUP && existing != null && existing != merged) {
                 EnvFiles.atomicWrite(EnvFiles.backupPath(targetFile), existing)
             }
             EnvFiles.atomicWrite(targetFile, merged)
 
-            for ((meta, bytes, dest) in resolvedFiles) {
-                Files.createDirectories(dest.parent)
-                if (Files.exists(dest)) {
-                    guardExistingFile(dest, bytes, previousManaged?.secretFilePaths)
+            for (secret in secrets) {
+                Files.createDirectories(secret.dest.parent)
+                if (Files.exists(secret.dest)) {
+                    guardExistingFile(secret.dest, secret.bytes, previousManagedSecrets)
                 }
-                Files.write(dest, bytes)
-                if (meta.mode != null && isPosix(dest)) {
-                    Files.setPosixFilePermissions(dest, posixPerms(meta.mode))
+                Files.write(secret.dest, secret.bytes)
+                if (secret.mode != null && isPosix(secret.dest)) {
+                    Files.setPosixFilePermissions(secret.dest, posixPerms(secret.mode))
                 }
-                writtenSecrets.add(dest.toString())
-                secretHashes[dest.toString()] = EnvCloak.hashOf(dest)
+                writtenSecrets[secret.dest.toString()] = EnvCloak.hashOf(secret.dest)
             }
         } catch (e: Exception) {
             restore(rollback)
-            throw PullAborted("Pull could not be written safely: ${e.message ?: e.javaClass.simpleName}")
+            throw PullAborted("Pull could not be written safely: ${e.message ?: e.javaClass.simpleName}", e)
         }
-        if (project != null) {
-            try {
-                val editorState = EnvEditorService.getInstance(project)
-                editorState.cacheKeys(link.projectId, values.keys)
-                editorState.cacheAccessMeta(link.projectId, result.meta)
-                editorState.recordSync(
-                    targetFile.toString(),
-                    values.keys,
-                    EnvCloak.hashOf(targetFile),
-                    writtenSecrets,
-                    secretHashes,
-                    envCreated = previousManaged?.envCreated ?: (existing == null),
-                    autoUnsyncOnClose = result.meta.autoUnsyncOnClose,
-                )
-            } catch (e: Exception) {
-                log.warn("Editor state update failed: ${e.message}")
-            }
-        }
-        return result.variables.size + downloaded.size
+        return writtenSecrets
     }
 
     /**

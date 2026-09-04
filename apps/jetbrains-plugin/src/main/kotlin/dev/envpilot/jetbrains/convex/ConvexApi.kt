@@ -215,7 +215,11 @@ object ConvexApi {
         return parsed.asJsonArray.map { it.asJsonObject }
     }
 
-    private fun parseObject(body: String): JsonObject = JsonParser.parseString(body).asJsonObject
+    private fun parseObject(body: String): JsonObject {
+        val parsed = JsonParser.parseString(body)
+        check(!parsed.isJsonNull && parsed.isJsonObject) { "Invalid response from Envpilot" }
+        return parsed.asJsonObject
+    }
 
     private fun JsonObject.str(key: String): String? = get(key)?.takeIf { it.isJsonPrimitive && !it.asJsonPrimitive.isNumber }?.asString
 

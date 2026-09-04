@@ -1,6 +1,5 @@
 package dev.envpilot.jetbrains.ui
 
-import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
@@ -10,7 +9,9 @@ import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.convex.ConvexApi
+import dev.envpilot.jetbrains.errors.Errors
 import dev.envpilot.jetbrains.model.VALID_ENVIRONMENTS
+import dev.envpilot.jetbrains.sync.SyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,6 +21,7 @@ import javax.swing.JComponent
 
 data class RequestProject(
     val id: String,
+    val orgId: String,
     val name: String,
     val allowedEnvironments: List<String>,
 )
@@ -35,7 +37,7 @@ class RequestVariableDialog(
     private val keyField = javax.swing.JTextField()
     private val valueField = javax.swing.JPasswordField()
     private val descriptionField = javax.swing.JTextField()
-    private val envChecks = VALID_ENVIRONMENTS.map { it to javax.swing.JCheckBox(it.capitalize()) }
+    private val envChecks = VALID_ENVIRONMENTS.map { it to javax.swing.JCheckBox(it.replaceFirstChar(Char::uppercase)) }
     private val sensitiveCheck = javax.swing.JCheckBox("Sensitive value", true)
     private val projectCombo =
         javax.swing.JComboBox(projects.map { it.name }.toTypedArray())
@@ -98,7 +100,9 @@ class RequestVariableDialog(
         val selectedProject = projects.getOrNull(projectCombo.selectedIndex) ?: return
         val projectId = selectedProject.id
         val key = keyField.text.trim()
-        val value = String(valueField.password)
+        val password = valueField.password
+        val value = String(password)
+        java.util.Arrays.fill(password, '\u0000')
         val description = descriptionField.text.trim().takeIf { it.isNotEmpty() }
         val environments = envChecks.filter { it.second.isSelected }.map { it.first }
         val sensitive = sensitiveCheck.isSelected
@@ -119,11 +123,15 @@ class RequestVariableDialog(
         scope.launch {
             try {
                 check(AuthService.getInstance().getSession() != null) { "Not signed in" }
+                if (!SyncScheduler.getInstance().hasAccess(selectedProject.orgId)) {
+                    notify(Errors.PLUGIN_DISABLED, NotificationType.WARNING)
+                    return@launch
+                }
                 ConvexApi.createVariableRequest(projectId, key, value, environments, sensitive, description)
                 notify("Variable request for $key submitted — awaiting approval.", NotificationType.INFORMATION)
             } catch (e: Exception) {
-                dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "request-variable"))
-                notify("Request failed: ${dev.envpilot.jetbrains.errors.Errors.friendly(e)}", NotificationType.ERROR)
+                Errors.report(e, mapOf("surface" to "request-variable"))
+                notify("Request failed: ${Errors.friendly(e)}", NotificationType.ERROR)
             }
         }
         super.doOKAction()
@@ -143,14 +151,5 @@ class RequestVariableDialog(
     private fun notify(
         message: String,
         type: NotificationType,
-    ) {
-        javax.swing.SwingUtilities.invokeLater {
-            NotificationGroupManager.getInstance()
-                .getNotificationGroup("dev.envpilot.notifications")
-                .createNotification(message, type)
-                .notify(project)
-        }
-    }
+    ) = notifyBalloon(project, message, type)
 }
-
-private fun String.capitalize(): String = replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }

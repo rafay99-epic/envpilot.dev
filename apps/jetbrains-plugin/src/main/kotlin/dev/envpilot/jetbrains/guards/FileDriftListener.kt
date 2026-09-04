@@ -21,6 +21,8 @@ class FileDriftListener : BulkFileListener {
             if (event !is VFileContentChangeEvent) continue
             for (project in projects) {
                 val service = EnvEditorService.getInstance(project)
+                // A pull writing this very file is our own write, not drift.
+                if (event.file.path in service.writingPaths) continue
                 if (event.file.path in service.managedPaths()) {
                     val managed = service.managed(event.file.path) ?: continue
                     val currentHash =
@@ -29,7 +31,10 @@ class FileDriftListener : BulkFileListener {
                         }.getOrNull() ?: continue
                     if (currentHash != managed.syncedHash) {
                         service.markDrifted(event.file.path)
-                        SyncState.markFailure("Drift detected: ${event.file.name} changed outside Envpilot — next sync overwrites.")
+                        SyncState.markFailure(
+                            project,
+                            "Drift detected: ${event.file.name} changed outside Envpilot — next sync overwrites.",
+                        )
                         SyncState.notifyChanged()
                     }
                 }
@@ -45,7 +50,7 @@ class FileDriftListener : BulkFileListener {
                         EnvCloak.hashOf(Path.of(event.file.path))
                     }.getOrNull() ?: continue
                 if (currentHash != secretHash) {
-                    SyncState.markFailure("Drift detected: ${event.file.name} changed outside Envpilot — next sync overwrites.")
+                    SyncState.markFailure(project, "Drift detected: ${event.file.name} changed outside Envpilot — next sync overwrites.")
                     SyncState.notifyChanged()
                 }
             }

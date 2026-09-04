@@ -41,7 +41,7 @@ export PRIVATE_KEY_PASSWORD=<password>
 ./gradlew signPlugin           # marketplace-signed zip in build/distributions
 ```
 
-Build-time values come from environment variables, never files; CI exports them from Envpilot at deploy time. Bump `pluginVersion` in `gradle.properties` for every release — the Marketplace rejects duplicate versions.
+Build-time values come from environment variables, never files; CI exports them from Envpilot at deploy time. For a local dev build use `apps/cli/scripts/sandbox.sh build-jetbrains`, which reads `sandbox.env` and nothing else. Bump `pluginVersion` in `gradle.properties` for every release — the Marketplace rejects duplicate versions.
 
 ## Platform compatibility
 

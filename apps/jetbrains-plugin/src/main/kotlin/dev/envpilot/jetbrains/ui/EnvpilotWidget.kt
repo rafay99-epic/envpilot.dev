@@ -25,14 +25,14 @@ class EnvpilotWidgetFactory : StatusBarWidgetFactory {
 
     override fun isAvailable(project: Project): Boolean = true
 
-    override fun createWidget(project: Project): StatusBarWidget = EnvpilotWidget()
+    override fun createWidget(project: Project): StatusBarWidget = EnvpilotWidget(project)
 
     override fun disposeWidget(widget: StatusBarWidget) = Disposer.dispose(widget)
 
     override fun canBeEnabledOn(statusBar: StatusBar): Boolean = true
 }
 
-class EnvpilotWidget : StatusBarWidget, StatusBarWidget.TextPresentation {
+class EnvpilotWidget(private val project: Project) : StatusBarWidget, StatusBarWidget.TextPresentation {
     companion object {
         const val ID = "dev.envpilot.widget"
     }
@@ -79,10 +79,11 @@ class EnvpilotWidget : StatusBarWidget, StatusBarWidget.TextPresentation {
     }
 
     override fun getText(): String {
-        val email = AuthService.getInstance().email ?: return "Envpilot: Sign In"
+        // Outdated wins over every other state, the way getTooltipText() reads it.
         if (AuthService.outdated) return "Envpilot: Update Required"
-        if (SyncState.syncing) return "Envpilot: ⟳ Syncing…"
-        val err = SyncState.lastError
+        val email = AuthService.getInstance().email ?: return "Envpilot: Sign In"
+        if (SyncState.syncing(project)) return "Envpilot: ⟳ Syncing…"
+        val err = SyncState.lastError(project)
         if (err != null) return "Envpilot: Sync Error"
         return "Envpilot: $email"
     }
@@ -100,7 +101,7 @@ class EnvpilotWidget : StatusBarWidget, StatusBarWidget.TextPresentation {
                         "\nReal-time: " +
                             if (SyncState.realtimeConnected) "connected" else "off (interval polling)",
                     )
-                    SyncState.lastError?.let { append("\nLast sync error: $it") }
+                    SyncState.lastError(project)?.let { append("\nLast sync error: $it") }
                 }
         }
 

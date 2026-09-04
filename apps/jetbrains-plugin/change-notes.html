@@ -1,3 +1,30 @@
+<p><b>0.1.6</b></p>
+<ul>
+  <li>
+    Pulled values are quoted on write, so newlines, hashes and quotes no longer
+    corrupt the env file or escape the editor cloak.
+  </li>
+  <li>
+    Every background scope and global editor hook is tied to the plugin's
+    lifetime; dynamic unload and reload are clean.
+  </li>
+  <li>
+    The tool window refreshes on sign-in, sign-out and every sync. Sync status
+    and the sync lock are per project.
+  </li>
+  <li>
+    The organization tier gate now covers reveal and request actions. Session
+    changes are serialized and a rotated token is never refreshed twice.
+  </li>
+</ul>
+<p><b>0.1.5</b></p>
+<ul>
+  <li>
+    The plugin now honours the organization tier gate: an owner who disables
+    JetBrains access stops new links and sync cycles, and the tool window says
+    so.
+  </li>
+</ul>
 <p><b>0.1.4</b></p>
 <ul>
   <li>

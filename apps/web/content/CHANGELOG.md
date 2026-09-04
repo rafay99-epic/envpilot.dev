@@ -15,6 +15,18 @@
 
 <!-- entry -->
 ---
+title: JetBrains Plugin Hardening
+version: v0.1.6
+date: 2026-09-04
+types: [fix, security]
+---
+
+A full read of the JetBrains plugin turned up forty findings; this release closes them. The one that mattered most: pulled values were written to `.env` files unquoted, so a value with a newline, a `#` or a quote corrupted the file and the editor cloak only hid its first line. Values are now quoted the same way the CLI and the VS Code extension quote them, and the pull path (abort on truncation, abort on a decrypt failure, roll back on a failed write) has tests.
+
+The rest is lifecycle and consistency work. Every coroutine scope and global editor hook now dies with the plugin, so a dynamic unload no longer leaks the copy guard or a reconnecting socket. The tool window refreshes on sign-in, sign-out and every sync instead of waiting for Refresh. The organization tier gate applies to reveal and request actions, not only to link and sync. Sync status and the sync lock are per project, so a stalled project no longer blocks or hides another. Sign-out, token refresh and account switch are serialized, and a version manifest that drops its minimum no longer leaves the plugin latched as outdated.
+
+<!-- entry -->
+---
 title: JetBrains Plugin Respects the Tier Gate
 version: v0.1.5
 date: 2026-09-03

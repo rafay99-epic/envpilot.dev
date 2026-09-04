@@ -1,11 +1,14 @@
 package dev.envpilot.jetbrains.actions
 
-import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.project.DumbAwareAction
 import dev.envpilot.jetbrains.auth.AuthService
 
-class SignInAction : AnAction() {
+class SignInAction : DumbAwareAction() {
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
+
     override fun actionPerformed(e: AnActionEvent) {
         val service = AuthService.getInstance()
         service.startSignIn { email, error ->

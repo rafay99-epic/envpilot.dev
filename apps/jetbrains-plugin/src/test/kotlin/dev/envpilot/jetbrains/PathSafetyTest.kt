@@ -4,6 +4,7 @@ import dev.envpilot.jetbrains.sync.PullService
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assume
 import org.junit.Test
 import java.nio.file.Files
 
@@ -24,6 +25,18 @@ class PathSafetyTest {
         assertNull(PullService.resolveWithin(dir, "../escape.txt"))
         assertNull(PullService.resolveWithin(dir, "a/../../escape.txt"))
         assertNull(PullService.resolveWithin(dir, ""))
+    }
+
+    @Test
+    fun `symlink pointing outside the directory is rejected`() {
+        val dir = tempDir()
+        val outside = Files.createTempDirectory("envpilot-outside")
+        try {
+            Files.createSymbolicLink(dir.resolve("escape"), outside)
+        } catch (e: Exception) {
+            Assume.assumeNoException("filesystem cannot create symlinks", e)
+        }
+        assertNull(PullService.resolveWithin(dir, "escape/secret.txt"))
     }
 
     @Test

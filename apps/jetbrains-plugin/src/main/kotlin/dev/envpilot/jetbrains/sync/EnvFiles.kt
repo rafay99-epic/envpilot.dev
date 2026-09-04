@@ -14,37 +14,98 @@ import java.nio.file.StandardCopyOption
 object EnvFiles {
     data class Entry(val key: String, val value: String)
 
+    private val KEY_REGEX = Regex("[A-Za-z_][A-Za-z0-9_.]*")
+
+    // Same rule as the VS Code extension's formatValue: anything that dotenv
+    // parsers would mis-read has to be double-quoted and escaped.
+    private val NEEDS_QUOTING = Regex("[\\s#\"'`\$\\\\]|[\\x00-\\x1f]")
+
+    private data class ParsedLine(val key: String, val value: String, val exported: Boolean)
+
+    fun quote(value: String): String =
+        if (NEEDS_QUOTING.containsMatchIn(value)) {
+            val escaped =
+                value
+                    .replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                    .replace("\t", "\\t")
+            "\"$escaped\""
+        } else {
+            value
+        }
+
     fun parse(content: String): List<Entry> =
-        content.lineSequence().mapNotNull { line ->
-            val trimmed = line.trimStart()
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) return@mapNotNull null
-            val eq = line.indexOfFirst { it == '=' }
-            if (eq <= 0) return@mapNotNull null
-            val key = line.substring(0, eq).trim()
-            if (!key.matches(Regex("[A-Za-z_][A-Za-z0-9_.]*"))) return@mapNotNull null
-            Entry(key, line.substring(eq + 1).trim())
-        }.toList()
+        content.lineSequence()
+            .mapNotNull { parseLine(it) }
+            .map { Entry(it.key, it.value) }
+            .toList()
+
+    private fun parseLine(line: String): ParsedLine? {
+        val trimmed = line.trim()
+        if (trimmed.isEmpty() || trimmed.startsWith("#")) return null
+        val eq = trimmed.indexOf('=')
+        if (eq <= 0) return null
+        val rawKey = trimmed.substring(0, eq).trim()
+        val exported = rawKey.startsWith("export ")
+        val key = if (exported) rawKey.removePrefix("export ").trim() else rawKey
+        if (!key.matches(KEY_REGEX)) return null
+        return ParsedLine(key, unquote(trimmed.substring(eq + 1).trim()), exported)
+    }
+
+    private fun unquote(raw: String): String =
+        when {
+            raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"') -> unescape(raw.substring(1, raw.length - 1))
+            raw.length >= 2 && raw.startsWith('\'') && raw.endsWith('\'') -> raw.substring(1, raw.length - 1)
+            else -> raw
+        }
+
+    private fun unescape(s: String): String {
+        val out = StringBuilder(s.length)
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            if (c == '\\' && i + 1 < s.length) {
+                i++
+                out.append(
+                    when (val next = s[i]) {
+                        'n' -> '\n'
+                        'r' -> '\r'
+                        't' -> '\t'
+                        else -> next
+                    },
+                )
+            } else {
+                out.append(c)
+            }
+            i++
+        }
+        return out.toString()
+    }
 
     fun merge(
         existingContent: String?,
         pulled: Map<String, String>,
     ): String {
         if (existingContent == null) {
-            return pulled.entries.joinToString("\n") { "${it.key}=${it.value}" } + "\n"
+            return pulled.entries.joinToString("\n") { "${it.key}=${quote(it.value)}" } + "\n"
         }
+        val eol = if (existingContent.contains("\r\n")) "\r\n" else "\n"
         val lines = existingContent.lines().toMutableList()
         val seen = mutableSetOf<String>()
         var i = 0
         while (i < lines.size) {
             val entry =
-                parse(lines[i]).firstOrNull() ?: run {
+                parseLine(lines[i]) ?: run {
                     i++
                     continue
                 }
             // Update every occurrence: dotenv semantics let the LAST duplicate
             // win, so leaving a stale later line would resurrect old values.
             if (entry.key in pulled) {
-                lines[i] = "${entry.key}=${pulled[entry.key]}"
+                val prefix = if (entry.exported) "export " else ""
+                lines[i] = "$prefix${entry.key}=${quote(pulled.getValue(entry.key))}"
                 seen.add(entry.key)
             }
             i++
@@ -52,9 +113,9 @@ object EnvFiles {
         val missing = pulled.filterKeys { it !in seen }
         if (missing.isNotEmpty()) {
             if (lines.lastOrNull()?.isNotBlank() == true) lines.add("")
-            missing.forEach { (k, v) -> lines.add("$k=$v") }
+            missing.forEach { (k, v) -> lines.add("$k=${quote(v)}") }
         }
-        return lines.joinToString("\n")
+        return lines.joinToString(eol)
     }
 
     enum class ConflictMode(val id: String) {
@@ -108,5 +169,5 @@ object EnvFiles {
         }
     }
 
-    fun readIfExists(path: Path): String? = if (Files.exists(path)) Files.readAllLines(path).joinToString("\n") else null
+    fun readIfExists(path: Path): String? = if (Files.exists(path)) Files.readString(path) else null
 }

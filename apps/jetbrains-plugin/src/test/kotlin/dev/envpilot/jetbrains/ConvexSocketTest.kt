@@ -2,7 +2,12 @@ package dev.envpilot.jetbrains
 
 import com.google.gson.JsonParser
 import dev.envpilot.jetbrains.convex.ConvexSocket
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.net.http.WebSocket
 import java.nio.ByteBuffer
@@ -15,6 +20,7 @@ class ConvexSocketTest {
         val webSocket = RecordingWebSocket()
 
         socket.onOpen(webSocket)
+        webSocket.awaitMessage("ModifyQuerySet")
         val first = socket.subscribe("first:path", mapOf("projectId" to "p1"))
         socket.subscribe("second:path", mapOf("projectId" to "p2"))
         socket.unsubscribe(first)
@@ -35,6 +41,41 @@ class ConvexSocketTest {
         assertEquals(listOf("Remove"), changes[3].types())
     }
 
+    @Test
+    fun `open sends connect then authenticate then the query set`() {
+        val socket = ConvexSocket("https://example.convex.cloud", { "token" }, NoopListener)
+        val webSocket = RecordingWebSocket()
+
+        socket.onOpen(webSocket)
+        webSocket.awaitMessage("ModifyQuerySet")
+        socket.stop()
+
+        assertEquals(
+            listOf("Connect", "Authenticate", "ModifyQuerySet"),
+            webSocket.messages.map { JsonParser.parseString(it).asJsonObject.get("type").asString },
+        )
+    }
+
+    @Test
+    fun `disconnect fails pending queries and actions`() =
+        runBlocking {
+            val socket = ConvexSocket("https://example.convex.cloud", { "token" }, NoopListener)
+            val webSocket = RecordingWebSocket()
+            socket.onOpen(webSocket)
+            webSocket.awaitMessage("ModifyQuerySet")
+
+            val action = async(Dispatchers.IO) { runCatching { socket.action("some:action", emptyMap()) } }
+            val query = async(Dispatchers.IO) { runCatching { socket.query("some:query", emptyMap()) } }
+            webSocket.awaitMessage("Action")
+            webSocket.awaitMessage("ModifyQuerySet", count = 2)
+            socket.onClose(webSocket, 1000, "bye")
+
+            assertTrue(action.await().exceptionOrNull()?.message.orEmpty().contains("socket disconnected"))
+            assertTrue(query.await().exceptionOrNull()?.message.orEmpty().contains("socket disconnected"))
+            assertFalse(socket.connected.get())
+            socket.stop()
+        }
+
     private fun com.google.gson.JsonObject.types(): List<String> =
         getAsJsonArray("modifications").map { it.asJsonObject.get("type").asString }
 
@@ -51,7 +92,24 @@ class ConvexSocketTest {
     }
 
     private class RecordingWebSocket : WebSocket {
-        val messages = mutableListOf<String>()
+        val messages = java.util.Collections.synchronizedList(mutableListOf<String>())
+
+        /** The open handshake finishes on a coroutine now, so tests wait for its frames. */
+        fun awaitMessage(
+            type: String,
+            count: Int = 1,
+        ) {
+            val deadline = System.currentTimeMillis() + 5_000
+            while (System.currentTimeMillis() < deadline) {
+                val seen =
+                    synchronized(messages) {
+                        messages.count { JsonParser.parseString(it).asJsonObject.get("type").asString == type }
+                    }
+                if (seen >= count) return
+                Thread.sleep(10)
+            }
+            throw AssertionError("timed out waiting for $count $type frame(s); saw $messages")
+        }
 
         override fun sendText(
             data: CharSequence,

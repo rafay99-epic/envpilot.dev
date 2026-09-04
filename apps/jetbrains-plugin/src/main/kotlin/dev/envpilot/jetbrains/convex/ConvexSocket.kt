@@ -1,6 +1,11 @@
 package dev.envpilot.jetbrains.convex
 
 import com.intellij.openapi.diagnostic.logger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.WebSocket
@@ -46,6 +51,7 @@ class ConvexSocket(
             .version(java.net.http.HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(10))
             .build()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val watchdog =
         Executors.newSingleThreadScheduledExecutor { r ->
             Thread(r, "envpilot-convex-watchdog").apply { isDaemon = true }
@@ -98,6 +104,7 @@ class ConvexSocket(
 
     fun stop() {
         stopped.set(true)
+        scope.cancel()
         watchdog.shutdownNow()
         webSocket.getAndSet(null)?.sendClose(WebSocket.NORMAL_CLOSURE, "bye")
     }
@@ -189,7 +196,6 @@ class ConvexSocket(
 
     private fun handleOpen(ws: WebSocket) {
         webSocket.set(ws)
-        connected.set(true)
         reconnectAttempt.set(0)
         querySetVersion.set(0)
         identityVersion.set(0)
@@ -204,15 +210,32 @@ class ConvexSocket(
         )
         // Authenticate before subscribing: convex-js sends Authenticate first,
         // and queries sent before auth can come back as unauthenticated
-        // failures on some deployments.
-        val token = kotlinx.coroutines.runBlocking { tokenProvider() }
-        if (token == null) {
-            log.warn("Convex socket has no token — auth skipped")
-        } else {
-            send(ConvexWire.authenticateMessage(token, identityVersion.getAndIncrement()))
+        // failures on some deployments. The token can need a network refresh,
+        // so it runs off the socket's own I/O thread; `connected` only flips
+        // once auth is out, which is what keeps other senders behind it.
+        scope.launch {
+            try {
+                val token = tokenProvider()
+                // A reconnect may have replaced this socket while the token was fetched.
+                if (webSocket.get() !== ws) return@launch
+                if (token == null) {
+                    log.warn("Convex socket has no token — auth skipped")
+                } else {
+                    ws.sendText(ConvexWire.authenticateMessage(token, identityVersion.getAndIncrement()), true)
+                }
+                if (webSocket.get() !== ws) return@launch
+                connected.set(true)
+                sendFullQuerySet()
+                listener.onConnected()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A failed handshake must not leave a half-open socket: abort so
+                // onError runs the normal disconnect + backoff path.
+                log.warn("Convex socket auth failed: ${e.message}")
+                ws.abort()
+            }
         }
-        sendFullQuerySet()
-        listener.onConnected()
         ws.request(1)
     }
 
@@ -221,7 +244,7 @@ class ConvexSocket(
         adds: List<ConvexWire.QueryAdd>,
         removes: List<Int>,
     ) {
-        val ws = webSocket.get() ?: return
+        val ws = webSocket.get()?.takeIf { connected.get() } ?: return
         val base = querySetVersion.get()
         val newVersion = base + 1
         ws.sendText(

@@ -6,7 +6,6 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.util.messages.Topic
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -32,7 +31,7 @@ data class Session(
  * [AuthKitLogin].
  */
 @Service(Service.Level.APP)
-class AuthService {
+class AuthService(private val scope: CoroutineScope) {
     companion object {
         val AUTH_TOPIC = Topic.create("EnvpilotAuthChanged", AuthStateListener::class.java)
 
@@ -47,8 +46,11 @@ class AuthService {
     }
 
     private val log = logger<AuthService>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val refreshMutex = Mutex()
+
+    // Serializes every session mutation; TokenStore's read-modify-write on
+    // PropertiesComponent is not atomic on its own.
+    private val sessionMutex = Mutex()
     private val store = TokenStore()
 
     // Cached in-memory copy of the current session; source of truth is storage.
@@ -62,7 +64,7 @@ class AuthService {
     /** Load persisted state once at startup. */
     fun initialize() {
         if (cached.get() != null) return
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             cached.set(store.load())
             notifyChanged()
         }
@@ -82,32 +84,41 @@ class AuthService {
      */
     suspend fun getFreshToken(force: Boolean = false): String? {
         val session = getSession() ?: return null
-        if (!force && !Jwt.isExpiring(session.accessToken)) return session.accessToken
+        if (!needsRefresh(session.accessToken, force)) return session.accessToken
         if (session.refreshToken.isBlank()) return null
 
         return refreshMutex.withLock {
             val sessionForRefresh = getSession() ?: return@withLock null
+            // A caller queued behind the lock finds the token someone ahead of it rotated.
+            if (sessionForRefresh.accessToken != session.accessToken && !Jwt.isExpiring(sessionForRefresh.accessToken)) {
+                return@withLock sessionForRefresh.accessToken
+            }
             try {
                 val result = AuthKitLogin.refresh(sessionForRefresh.refreshToken)
-                // CAS: only persist when the stored refresh token is still the one we used.
-                val stored = store.load()
-                if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
-                val updated = sessionForRefresh.withRefresh(result)
-                store.save(updated)
-                cached.set(updated)
-                result.accessToken
+                // Compare-and-save under sessionMutex so a sign-out or switch that
+                // landed during the network call is not undone by the stale save.
+                sessionMutex.withLock {
+                    val stored = store.load()
+                    if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
+                    val updated = sessionForRefresh.withRefresh(result)
+                    store.save(updated)
+                    cached.set(updated)
+                    result.accessToken
+                }
             } catch (e: AuthKitLogin.LoginCancelled) {
-                val stored = store.load()
-                if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
-                if (e.transient) {
-                    log.warn("Transient session refresh failure: ${e.message}")
-                    dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "token-refresh"))
-                    null
-                } else {
-                    log.warn("Session refresh rejected — signing out.")
-                    clearSession()
-                    notifyChanged()
-                    null
+                sessionMutex.withLock {
+                    val stored = store.load()
+                    if (stored?.refreshToken != sessionForRefresh.refreshToken) return@withLock null
+                    if (e.transient) {
+                        log.warn("Transient session refresh failure: ${e.message}")
+                        dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "token-refresh"))
+                        null
+                    } else {
+                        log.warn("Session refresh rejected — signing out.")
+                        clearSessionLocked()
+                        notifyChanged()
+                        null
+                    }
                 }
             }
         }
@@ -115,16 +126,18 @@ class AuthService {
 
     /** Full AuthKit browser login; runs on IO, notifies listeners when done. */
     fun startSignIn(onDone: (String?, Exception?) -> Unit) {
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             try {
                 val token = AuthKitLogin.signIn()
                 val session = token.toSession()
-                if (!purgeManagedFiles()) {
-                    throw AuthKitLogin.LoginCancelled("Save or revert managed files before changing accounts.")
+                sessionMutex.withLock {
+                    if (!purgeManagedFiles()) {
+                        throw AuthKitLogin.LoginCancelled("Save or revert managed files before changing accounts.")
+                    }
+                    store.save(session)
+                    cached.set(session)
+                    notifyChanged()
                 }
-                store.save(session)
-                cached.set(session)
-                notifyChanged()
                 onDone(session.email, null)
             } catch (e: Exception) {
                 onDone(null, e)
@@ -132,35 +145,43 @@ class AuthService {
         }
     }
 
+    /** Sign-out always completes; managed files with local changes are preserved on disk. */
     fun signOut() {
-        scope.launch {
-            val safeToSwitch = purgeManagedFiles()
-            cached.get()?.userId?.let { store.remove(it, activateNext = safeToSwitch) }
-            cached.set(if (safeToSwitch) store.load() else null)
-            notifyChanged()
+        scope.launch(Dispatchers.IO) {
+            sessionMutex.withLock {
+                val safeToSwitch = purgeManagedFiles(notifyBlocked = false)
+                cached.get()?.userId?.let { store.remove(it, activateNext = safeToSwitch) }
+                cached.set(if (safeToSwitch) store.load() else null)
+                notifyChanged()
+            }
         }
     }
 
     fun signOutAll() {
-        scope.launch {
-            purgeManagedFiles()
-            cached.set(null)
-            store.clearAll()
-            notifyChanged()
+        scope.launch(Dispatchers.IO) {
+            sessionMutex.withLock {
+                purgeManagedFiles(notifyBlocked = false)
+                cached.set(null)
+                store.clearAll()
+                notifyChanged()
+            }
         }
     }
 
     fun switchAccount(userId: String) {
-        scope.launch {
-            if (!purgeManagedFiles()) return@launch
-            val session = store.activate(userId) ?: return@launch
-            cached.set(session)
-            notifyChanged()
+        scope.launch(Dispatchers.IO) {
+            sessionMutex.withLock {
+                if (!purgeManagedFiles()) return@withLock
+                val session = store.activate(userId) ?: return@withLock
+                cached.set(session)
+                notifyChanged()
+            }
         }
     }
 
-    private suspend fun clearSession() {
-        val safeToSwitch = purgeManagedFiles()
+    // Caller holds sessionMutex (and refreshMutex above it; the order is one-way).
+    private fun clearSessionLocked() {
+        val safeToSwitch = purgeManagedFiles(notifyBlocked = false)
         cached.get()?.userId?.let { store.remove(it, activateNext = safeToSwitch) }
         cached.set(if (safeToSwitch) store.load() else null)
     }
@@ -170,12 +191,12 @@ class AuthService {
         dev.envpilot.jetbrains.convex.ConvexSyncService.getInstance().restartForAuthChange()
     }
 
-    private fun purgeManagedFiles(): Boolean {
+    private fun purgeManagedFiles(notifyBlocked: Boolean = true): Boolean {
         var preserved = 0
         for (project in com.intellij.openapi.project.ProjectManager.getInstance().openProjects) {
             preserved += dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project).purgeManagedFiles().preserved
         }
-        if (preserved > 0) {
+        if (preserved > 0 && notifyBlocked) {
             com.intellij.notification.NotificationGroupManager.getInstance()
                 .getNotificationGroup("dev.envpilot.notifications")
                 .createNotification(
@@ -188,6 +209,12 @@ class AuthService {
     }
 }
 
+/** Refresh when forced, or when the current access token is expired/near expiry. */
+internal fun needsRefresh(
+    accessToken: String,
+    force: Boolean,
+): Boolean = force || Jwt.isExpiring(accessToken)
+
 internal fun Session.withRefresh(result: AuthKitLogin.TokenResponse): Session =
     copy(
         accessToken = result.accessToken,
@@ -196,11 +223,12 @@ internal fun Session.withRefresh(result: AuthKitLogin.TokenResponse): Session =
     )
 
 internal fun AuthKitLogin.TokenResponse.toSession(): Session {
-    val identity = user ?: throw AuthKitLogin.LoginCancelled("WorkOS returned no user identity.")
+    // WorkOS sometimes omits the user object; the access token's sub claim is the same id.
+    val identityId = user?.id ?: Jwt.subject(accessToken) ?: throw AuthKitLogin.LoginCancelled("WorkOS returned no user identity.")
     val refresh = refreshToken?.takeIf { it.isNotBlank() } ?: throw AuthKitLogin.LoginCancelled("WorkOS returned no refresh token.")
     return Session(
-        userId = identity.id,
-        email = identity.email,
+        userId = identityId,
+        email = user?.email ?: identityId,
         accessToken = accessToken,
         refreshToken = refresh,
         sessionId = Jwt.sessionId(accessToken),

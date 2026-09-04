@@ -1,14 +1,16 @@
 package dev.envpilot.jetbrains.sync
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
+import dev.envpilot.jetbrains.auth.AuthService
+import dev.envpilot.jetbrains.auth.AuthStateListener
 import dev.envpilot.jetbrains.config.EnvpilotSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -16,21 +18,38 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * The injected scope is tied to the service lifetime, so it (and everything
+ * parented to this Disposable) dies with the plugin.
+ */
 @Service(Service.Level.APP)
-class SyncScheduler {
+class SyncScheduler(private val scope: CoroutineScope) : Disposable {
     private val log = logger<SyncScheduler>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = ConcurrentHashMap<String, Job>()
 
     // Timer, realtime pushes, IDE activation and manual pulls can all fire at
-    // once — single-flight keeps file writes from interleaving.
-    private val cycleMutex = Mutex()
+    // once — single-flight keeps file writes from interleaving. Per project, so
+    // one project stalled on the network cannot block Pull Now in another.
+    private val cycleMutexes = ConcurrentHashMap<String, Mutex>()
+
+    private val accessByOrg = ConcurrentHashMap<String, Boolean>()
+
+    init {
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            AuthService.AUTH_TOPIC,
+            object : AuthStateListener {
+                override fun authChanged() {
+                    accessByOrg.clear()
+                }
+            },
+        )
+    }
 
     /** Start (or restart) the auto-sync loop for one open IDE project. */
     fun startFor(project: Project) {
         stopFor(project)
         jobs[project.locationHash] =
-            scope.launch {
+            scope.launch(Dispatchers.IO) {
                 delay(5_000)
                 while (isActive) {
                     // Read fresh every cycle: settings changes must apply
@@ -46,8 +65,27 @@ class SyncScheduler {
             }
     }
 
+    /** Plugin-lifetime launcher for callers with no scope of their own (actions, gutter, startup). */
+    fun launch(block: suspend () -> Unit): Job = scope.launch(Dispatchers.IO) { block() }
+
     fun stopFor(project: Project) {
         jobs.remove(project.locationHash)?.cancel()
+    }
+
+    // Keyed by account too, so a reply that arrives after an account switch
+    // lands under the old key instead of repopulating the new session's cache.
+    private fun accessKey(orgId: String) = "${AuthService.getInstance().userId}:$orgId"
+
+    /** Is the JetBrains plugin enabled for this org? Served from the last sync cycle; queried once when cold. */
+    suspend fun hasAccess(orgId: String): Boolean = accessByOrg[accessKey(orgId)] ?: refreshAccess(orgId)
+
+    /** Last known answer without a network round-trip; null when never asked this session. */
+    fun cachedAccess(orgId: String): Boolean? = accessByOrg[accessKey(orgId)]
+
+    /** Ask the server and remember the answer for [hasAccess]. */
+    suspend fun refreshAccess(orgId: String): Boolean {
+        val key = accessKey(orgId)
+        return dev.envpilot.jetbrains.convex.ConvexApi.jetbrainsAccess(orgId).also { accessByOrg[key] = it }
     }
 
     private fun isIdlePaused(): Boolean {
@@ -58,22 +96,21 @@ class SyncScheduler {
     }
 
     suspend fun runCycle(project: Project): Boolean =
-        cycleMutex.withLock {
+        cycleMutexes.computeIfAbsent(project.locationHash) { Mutex() }.withLock {
             val links = LinkedProjectsService.getInstance(project).all()
             if (links.isEmpty()) return@withLock false
-            SyncState.markStart()
+            SyncState.markStart(project)
             SyncState.notifyChanged()
-            var allOk = true
+            val failures = mutableListOf<String>()
+            // Ask the server once per org per cycle so an owner flipping the gate
+            // takes effect on the next sync; the cache only serves actions between cycles.
             val gates = mutableMapOf<String, Boolean>()
             for (link in links) {
                 try {
                     val allowed =
-                        gates[link.orgId]
-                            ?: dev.envpilot.jetbrains.convex.ConvexApi.jetbrainsAccess(link.orgId)
-                                .also { gates[link.orgId] = it }
+                        gates.getOrPut(link.orgId) { refreshAccess(link.orgId) }
                     if (!allowed) {
-                        SyncState.markFailure(dev.envpilot.jetbrains.errors.Errors.PLUGIN_DISABLED)
-                        allOk = false
+                        failures.add(dev.envpilot.jetbrains.errors.Errors.PLUGIN_DISABLED)
                         continue
                     }
                     if (link.deviceId.isBlank()) {
@@ -89,15 +126,21 @@ class SyncScheduler {
                 } catch (e: Exception) {
                     log.warn("Pull failed for ${link.projectName}/${link.environment}: ${e.message}")
                     dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "sync", "project" to link.projectName))
-                    SyncState.markFailure("${link.projectName}: ${dev.envpilot.jetbrains.errors.Errors.friendly(e)}")
+                    failures.add("${link.projectName}: ${dev.envpilot.jetbrains.errors.Errors.friendly(e)}")
                     // One broken project must not block syncing the rest.
-                    allOk = false
                 }
             }
-            if (allOk) SyncState.markSuccess()
+            // Aggregate: last-write-wins would hide every failure but the last.
+            if (failures.isEmpty()) {
+                SyncState.markSuccess(project)
+            } else {
+                SyncState.markFailure(project, failures.distinct().joinToString(" · "))
+            }
             SyncState.notifyChanged()
-            allOk
+            failures.isEmpty()
         }
+
+    override fun dispose() = Unit
 
     companion object {
         fun getInstance(): SyncScheduler = ApplicationManager.getApplication().getService(SyncScheduler::class.java)

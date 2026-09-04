@@ -55,6 +55,7 @@ local CLI or extension. It enforces what used to be a convention:
 cp apps/cli/scripts/sandbox.env.example apps/cli/scripts/sandbox.env  # once
 apps/cli/scripts/sandbox.sh build             # CLI
 apps/cli/scripts/sandbox.sh build-extension   # VS Code extension
+apps/cli/scripts/sandbox.sh build-jetbrains   # JetBrains plugin
 apps/cli/scripts/sandbox.sh doctor            # run any command
 apps/cli/scripts/sandbox.sh reset             # wipe the sandbox home
 ```

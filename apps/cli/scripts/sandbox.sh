@@ -21,6 +21,7 @@
 # USAGE
 #   scripts/sandbox.sh build              build the CLI
 #   scripts/sandbox.sh build-extension    build the VS Code extension
+#   scripts/sandbox.sh build-jetbrains    build the JetBrains plugin zip
 #   scripts/sandbox.sh doctor             build if needed, then run
 #   scripts/sandbox.sh run -- bun dev     any envpilot command
 #   scripts/sandbox.sh shell              a subshell with the sandbox HOME
@@ -84,6 +85,7 @@ SB_CONVEX_URL="$(read_key NEXT_PUBLIC_CONVEX_URL)"
 SB_HOME="$(read_key ENVPILOT_SANDBOX_HOME)"
 SB_API_URL="$(read_key ENVPILOT_SANDBOX_API_URL)"
 SB_SERVER_URL="$(read_key ENVPILOT_SERVER_URL)"
+SB_JAVA_HOME="$(read_key JAVA_HOME)"
 SB_HOME="${SB_HOME:-/tmp/envpilot-sandbox}"
 
 [[ -n "$SB_CLIENT_ID" && "$SB_CLIENT_ID" != "client_replace_me" ]] ||
@@ -137,6 +139,43 @@ build_extension() {
   note "built: $ext_dir/dist"
 }
 
+# The JetBrains plugin bakes the same values through generateBuildConfig. Gradle
+# keeps its dependency cache in the real ~/.gradle (not production data), and
+# needs a JDK 21; java_home finds none on this machine, so the path is explicit.
+build_jetbrains() {
+  local jb_dir jdk
+  jb_dir="$(cd "$CLI_DIR/../jetbrains-plugin" && pwd)"
+  # A JDK location is a toolchain path, not a build value, so the ambient
+  # JAVA_HOME may be consulted; every candidate must still prove it is 21.
+  jdk=""
+  for candidate in \
+    "$SB_JAVA_HOME" \
+    "${JAVA_HOME:-}" \
+    "$(/usr/libexec/java_home -v 21 2>/dev/null || true)" \
+    /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
+    /usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
+    /usr/lib/jvm/java-21-openjdk-amd64 \
+    /usr/lib/jvm/java-21-openjdk; do
+    [[ -n "$candidate" && -x "$candidate/bin/java" ]] || continue
+    if "$candidate/bin/java" -version 2>&1 | grep -q 'version "21'; then
+      jdk="$candidate"
+      break
+    fi
+  done
+  [[ -n "$jdk" ]] || die "No JDK 21 found." "Set JAVA_HOME in scripts/sandbox.env to a JDK 21."
+  note "building JetBrains plugin with sandbox values (convex: $SB_CONVEX_URL)"
+  env -i \
+    PATH="$PATH" \
+    HOME="$SB_HOME" \
+    JAVA_HOME="$jdk" \
+    GRADLE_USER_HOME="$REAL_HOME/.gradle" \
+    WORKOS_CLIENT_ID="$SB_CLIENT_ID" \
+    NEXT_PUBLIC_CONVEX_URL="$SB_CONVEX_URL" \
+    ENVPILOT_SERVER_URL="${SB_SERVER_URL:-$SB_API_URL}" \
+    bash -c 'cd "$1" && ./gradlew -Porg.gradle.java.installations.paths="$2" buildPlugin' _ "$jb_dir" "$jdk"
+  note "built: $jb_dir/build/distributions"
+}
+
 run_cli() {
   [[ -f "$CLI_DIR/dist/index.js" ]] || build
   note "sandbox config=$SB_HOME/config (production config untouched)"
@@ -155,6 +194,7 @@ run_cli() {
 case "${1-}" in
   build) build ;;
   build-extension) build_extension ;;
+  build-jetbrains) build_jetbrains ;;
   reset)
     [[ "$SB_HOME" == /tmp/* ]] || die "Refusing to delete $SB_HOME (not under /tmp)"
     rm -rf "$SB_HOME"
