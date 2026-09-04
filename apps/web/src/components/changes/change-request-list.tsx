@@ -107,23 +107,26 @@ export function ChangeRequestList({
                 <tr
                   key={row._id}
                   data-testid="change-request-row"
-                  tabIndex={0}
                   onClick={() => setReviewing(row._id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      setReviewing(row._id);
-                    }
-                  }}
-                  className="cursor-pointer align-top transition-colors hover:bg-accent-soft focus-visible:bg-accent-soft focus-visible:outline-none"
+                  className="cursor-pointer align-top transition-colors hover:bg-accent-soft focus-within:bg-accent-soft"
                 >
                   <td className="px-5 py-3">
-                    <code className="font-mono text-sm text-warning">
-                      {row.label}
-                    </code>
-                    <p className="mt-0.5 text-xs text-ink-subtle">
-                      {row.kind} {row.resourceType}
-                    </p>
+                    <button
+                      type="button"
+                      aria-label={`Review ${row.label}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setReviewing(row._id);
+                      }}
+                      className="text-left focus-visible:outline-none"
+                    >
+                      <code className="font-mono text-sm text-warning">
+                        {row.label}
+                      </code>
+                      <p className="mt-0.5 text-xs text-ink-subtle">
+                        {row.kind} {row.resourceType}
+                      </p>
+                    </button>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-1.5">
