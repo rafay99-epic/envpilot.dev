@@ -54,6 +54,15 @@ const SWEEP_BATCH = 100;
 const MAX_APPROVER_RECIPIENTS = 25;
 /** Rows read per table when resolving approvers. */
 const MAX_APPROVER_SCAN = 200;
+/** Rows re-tenanted per pass after a project moves organization. */
+const RETENANT_BATCH = 200;
+const RETENANT_STATUSES = [
+  "pending",
+  "applied",
+  "rejected",
+  "canceled",
+  "expired",
+] as const;
 
 const resourceTypeValidator = v.union(
   v.literal("variable"),
@@ -383,7 +392,14 @@ async function fileChangeRequest(
             )
           )
           .first();
-  if (duplicate) {
+  // by_target_status is not project- or type-scoped, and the create branch
+  // dedupes on label alone, so only a same-project, same-resource row is the
+  // proposal this call would have filed.
+  if (
+    duplicate &&
+    duplicate.projectId === args.projectId &&
+    duplicate.resourceType === args.resourceType
+  ) {
     if (duplicate.requestedBy !== actor._id) {
       throw new ConvexError(
         `There is already a pending ${args.kind} request for ${args.label}. Wait for it to be reviewed, or cancel it first.`
@@ -706,6 +722,52 @@ export const cancelForTarget = internalMutation({
   returns: v.number(),
   handler: async (ctx, args) =>
     cancelPendingForTarget(ctx, args.targetId, undefined, args.reason),
+});
+
+/**
+ * Move a project's change-request history to the project's new organization,
+ * a batch at a time. The move mutation schedules this instead of patching an
+ * unbounded inbox inside its own transaction; each pass patches only rows
+ * still carrying the old org, so it reschedules itself until none remain.
+ */
+export const retenantChangeRequests = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    organizationId: v.id("organizations"),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    // A later move already superseded this pass; its own chain owns the rows.
+    if (!project || project.organizationId !== args.organizationId) return 0;
+
+    let patched = 0;
+    for (const status of RETENANT_STATUSES) {
+      if (patched >= RETENANT_BATCH) break;
+      const stale = await ctx.db
+        .query("changeRequests")
+        .withIndex("by_project_status", (q) =>
+          q.eq("projectId", args.projectId).eq("status", status)
+        )
+        .filter((q) => q.neq(q.field("organizationId"), args.organizationId))
+        .take(RETENANT_BATCH - patched);
+      for (const request of stale) {
+        await ctx.db.patch(request._id, {
+          organizationId: args.organizationId,
+        });
+        patched++;
+      }
+    }
+    // A short pass means every status range was exhausted: nothing is left.
+    if (patched >= RETENANT_BATCH) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.changeRequests.mutations.retenantChangeRequests,
+        args
+      );
+    }
+    return patched;
+  },
 });
 
 /**

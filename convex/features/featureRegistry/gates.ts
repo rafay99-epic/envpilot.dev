@@ -314,6 +314,9 @@ export async function countMembersAndPendingInvites(
   return members.length + pendingInvites.length;
 }
 
+/** Active rows one project contributes to a rotation count before the read stops. */
+const ROTATION_SCAN_PER_PROJECT = 500;
+
 /**
  * Count rotation-enabled (non-deleted) variables across every live project
  * of an organization.
@@ -335,29 +338,33 @@ export async function countRotationEnabledVariables(
     .collect();
   const projects = allProjects.filter((p) => p.deletedAt === undefined);
 
-  const isRotationEnabled = (v: {
-    deletedAt?: number;
-    rotationFrequencyDays?: number;
-    _id: Id<"environmentVariables">;
-  }) =>
-    v.deletedAt === undefined &&
-    v.rotationFrequencyDays !== undefined &&
-    v.rotationFrequencyDays > 0 &&
-    !(excludeVariableId !== undefined && v._id === excludeVariableId);
-
   let count = 0;
   for (const project of projects) {
     if (limit !== undefined && count >= limit) break; // capacity provably full — no need to scan remaining projects
 
-    const remaining = limit === undefined ? undefined : limit - count;
-    count += await countMatchingUpTo(
-      () =>
-        db
-          .query("environmentVariables")
-          .withIndex("by_project", (q) => q.eq("projectId", project._id)),
-      isRotationEnabled,
-      remaining
-    );
+    // ACTIVE rows only, through the index: trash accumulates without bound
+    // and cannot hold a rotation slot, so reading by_project and filtering in
+    // memory grew the scan with deleted history. Rotation is not an indexed
+    // field, so the active range itself still has to be read, capped per
+    // project. A project that large sits on an unlimited tier, which
+    // short-circuits in checkCountedLimit and never runs this count.
+    const active = await db
+      .query("environmentVariables")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", project._id).eq("deletedAt", undefined)
+      )
+      .take(ROTATION_SCAN_PER_PROJECT);
+
+    for (const variable of active) {
+      if (limit !== undefined && count >= limit) break;
+      if (
+        variable.rotationFrequencyDays !== undefined &&
+        variable.rotationFrequencyDays > 0 &&
+        variable._id !== excludeVariableId
+      ) {
+        count++;
+      }
+    }
   }
   return count;
 }

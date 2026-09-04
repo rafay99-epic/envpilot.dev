@@ -17,9 +17,10 @@ import {
 import { internal } from "../../_generated/api";
 import { cancelPendingRequest } from "../changeRequests/mutations";
 
-/** Bound on the change requests one project move re-tenants in a transaction. */
 /** Rows per batch while draining a moved project's pending inbox. */
 const CHANGE_REQUEST_MOVE_BATCH = 100;
+/** Pending proposals one move may cancel inside its own transaction. */
+const MAX_PENDING_CHANGE_REQUESTS_PER_MOVE = 500;
 
 const PROJECT_NAME_MAX = 100;
 const PROJECT_SLUG_MAX = 50;
@@ -568,10 +569,10 @@ export const move = mutation({
     }
 
     // Protected-environment proposals: cancel the pending ones (their staged
-    // secrets are purged with them) and re-tenant every row, so the source org
-    // keeps no approval metadata and the destination inbox can see its own.
-    // Canceling takes a row out of the pending range, so the batched read
-    // drains it: no proposal is left behind however deep the inbox is.
+    // secrets are purged with them), so the source org keeps no live approval
+    // work. Canceling takes a row out of the pending range, so the batched
+    // read drains it, but the transaction still has to fit: past the cap the
+    // move is refused rather than half-applied.
     let canceledChangeRequests = 0;
     for (;;) {
       const pendingChangeRequests = await ctx.db
@@ -581,6 +582,14 @@ export const move = mutation({
         )
         .take(CHANGE_REQUEST_MOVE_BATCH);
       if (pendingChangeRequests.length === 0) break;
+      if (
+        canceledChangeRequests + pendingChangeRequests.length >
+        MAX_PENDING_CHANGE_REQUESTS_PER_MOVE
+      ) {
+        throw new ConvexError(
+          `Drain the change request inbox below ${MAX_PENDING_CHANGE_REQUESTS_PER_MOVE} pending requests before moving this project`
+        );
+      }
       for (const request of pendingChangeRequests) {
         await cancelPendingRequest(
           ctx,
@@ -591,15 +600,16 @@ export const move = mutation({
         canceledChangeRequests++;
       }
     }
-    const changeRequests = await ctx.db
-      .query("changeRequests")
-      .withIndex("by_project_status", (q) => q.eq("projectId", args.projectId))
-      .collect();
-    for (const request of changeRequests) {
-      await ctx.db.patch(request._id, {
+    // Reviewed history moves with the project, but a long-lived inbox has no
+    // cap: re-tenant it in scheduled batches instead of in this transaction.
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.changeRequests.mutations.retenantChangeRequests,
+      {
+        projectId: args.projectId,
         organizationId: args.targetOrganizationId,
-      });
-    }
+      }
+    );
 
     // Audit log in source org
     await ctx.db.insert("auditLogs", {
