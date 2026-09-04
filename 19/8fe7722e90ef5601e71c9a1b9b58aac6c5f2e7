@@ -1,0 +1,166 @@
+apps/web/src/components/variables/variable-create-drawer.tsx
+  s_274796d5279c8d::t_ae12b8c6607dfb 125,127-129,132,134
+  s_274796d5279c8d::t_641b7f38ddaf86 258,260
+  s_274796d5279c8d::t_38b42b6192e33d 278
+  s_274796d5279c8d::t_028e2d7f37f7cf 174-180,182-183,188
+  s_274796d5279c8d::t_a2ef6e9becdabc 67-71
+  s_274796d5279c8d::t_a8cd584a7f8a4b 98-100,111-112,121-122,126,130-131,133
+  s_274796d5279c8d::t_6af656c5f1bcfa 279
+  s_274796d5279c8d::t_e8e8de2d6362d5 27
+convex/features/projects/mutations.ts
+  s_274796d5279c8d::t_d690dc71adeead 20-21
+  s_274796d5279c8d::t_c40ab6c0fb25fc 569-578,580-591,605
+  s_274796d5279c8d::t_59631e127d10be 18,579
+  s_274796d5279c8d::t_75afb1f1b5ee1e 19
+apps/web/src/components/accounts/account-form-drawer.tsx
+  s_274796d5279c8d::t_a9d8f89725704a 226-234
+convex/features/files/values.ts
+  s_274796d5279c8d::t_7ea7ffaa6ead5d 21
+  s_274796d5279c8d::t_d77c2fd8c87b48 198
+  s_274796d5279c8d::t_4ddd0e4bb4b845 73-74,197,199-200,215-224,265
+convex/features/variables/requests/actions.ts
+  s_274796d5279c8d::t_c2f1e1c6e2a041 112-118
+apps/web/src/components/variables/bulk-paste-form.tsx
+  s_274796d5279c8d::t_e13d41cb425b73 244-248,251-252
+  s_274796d5279c8d::t_35e95582be86b7 249-250
+  s_274796d5279c8d::t_9e96ded3b53678 25
+  s_274796d5279c8d::t_03c073fb8494eb 105-110
+  s_274796d5279c8d::t_8c556096cef5d6 45
+  s_274796d5279c8d::t_fd0af1af9a862f 374
+convex/features/changeRequests/apply.ts
+  s_274796d5279c8d::t_d77c2fd8c87b48 111
+  s_274796d5279c8d::t_eaec5fe674e7b8 299,301
+  s_274796d5279c8d::t_d6094317bde06d 36
+  s_274796d5279c8d::t_b6144b0421a4dc 310,320-321,334-336,387,408-409,426,444,460-463
+  s_274796d5279c8d::t_04b0e34ee68912 81-110,112-115,117-123,127-169
+  s_274796d5279c8d::t_44f3f0fbff5a66 376,378
+  s_274796d5279c8d::t_4951b116ee8297 170
+convex/features/changeRequests/visibility.ts
+  s_274796d5279c8d::t_dcc24bb7ea997a 24-28
+  s_274796d5279c8d::t_d37048a3ac6891 1-23,29-67
+apps/web/src/lib/__tests__/environment-scope-authz.test.ts
+  s_274796d5279c8d::t_4611eaa6887dc6 95,100-103,106
+convex/features/changeRequests/override.ts
+  s_274796d5279c8d::t_95693309ad7f16 1-26
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_274796d5279c8d::t_d967f327815ba4 316-317,339
+convex/lib/protection.ts
+  s_274796d5279c8d::t_fa3281eb3362ce 71-74
+  s_274796d5279c8d::t_242e41729ceaa5 104-116
+convex/features/changeRequests/mutations.ts
+  s_274796d5279c8d::t_d77c2fd8c87b48 503-504
+  s_274796d5279c8d::t_dd72a6a27792c9 25-29
+  s_274796d5279c8d::t_57273f4ed99c68 303-308,314,408
+  s_274796d5279c8d::t_d2111b8b259bcb 495,502,505-509
+  s_274796d5279c8d::t_59631e127d10be 181-216,242
+  s_274796d5279c8d::t_1cfb3fc3f95147 180,510
+convex/features/variables/values.ts
+  s_274796d5279c8d::t_216e31cf95e3c2 830
+  s_274796d5279c8d::t_161c26219ec342 13,18,27-43,452-463,644,823-829,831-842,1035-1041,1383
+apps/cli/src/commands/requests.ts
+  s_274796d5279c8d::t_cccd1a72d1a964 12
+  s_274796d5279c8d::t_c70b00df60fae1 208-215,234
+  s_274796d5279c8d::t_4d2915532f75ac 216-233,235-236,240-243
+  s_274796d5279c8d::t_ad94340dab5c9f 125-127,358-374,376-378,381
+  s_274796d5279c8d::t_d46671fc418cd0 113-124,128-159,163
+  s_274796d5279c8d::t_9f62f66e47f630 196-199
+  s_274796d5279c8d::t_61ab3dec2693ef 353-356,375,379,386-390,394-403
+  s_274796d5279c8d::t_8f6dc4c8ec7000 420-423
+  s_274796d5279c8d::t_6e4df84db8bfdf 80
+  s_274796d5279c8d::t_b090e6bfd08ae3 258-263,269-282
+  s_274796d5279c8d::t_5294d3115b7ffd 283
+apps/cli/tests/protected-environments.test.ts
+  s_274796d5279c8d::t_9c4349223b701c 84-126
+  s_274796d5279c8d::t_b1c56f29150c23 9,16-17
+apps/web/src/components/changes/change-review-drawer.tsx
+  s_274796d5279c8d::t_07096f790f6838 161-163
+  s_274796d5279c8d::t_7fc939c7519bf6 135-136
+  s_274796d5279c8d::t_93662e2a13f87d 20-28,33-43
+  s_274796d5279c8d::t_cbdbd7dcbc29b5 218-222
+  s_274796d5279c8d::t_cd9689a1099931 238
+  s_0bf18b61f048c5::t_b44da92ba11cab 44
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/members/page.tsx
+  s_274796d5279c8d::t_fb1391495fcde7 223-229,231
+convex/features/accounts/values.ts
+  s_274796d5279c8d::t_b368dc5405b5fd 7,104-108,233-237
+  s_274796d5279c8d::t_f8180aee79551f 238
+apps/web/src/components/files/file-form-drawer.tsx
+  s_274796d5279c8d::t_569bde3bbff822 179-186
+convex/features/changeRequests/authorize.ts
+  s_274796d5279c8d::t_d820c631439ac4 9,64-72
+  s_274796d5279c8d::t_48c25766efdc3f 73-74
+convex/_generated/api.d.ts
+  s_274796d5279c8d::t_7dea7cb22daab6 141,196,198,287
+  s_0bf18b61f048c5::t_cf98244da602f0 50,52
+convex/features/variables/queries.ts
+  s_274796d5279c8d::t_c4e64aa92e52a3 624-628
+convex/features/variables/helpers.ts
+  s_274796d5279c8d::t_06e9b1728cced5 132-137
+apps/cli/src/lib/api.ts
+  s_274796d5279c8d::t_679d54ebb9fcaa 537-548
+  s_274796d5279c8d::t_cf12d3d00e6231 1141-1158
+convex/features/changeRequests/queries.ts
+  s_274796d5279c8d::t_f4b621dec91839 8-9,18
+  s_274796d5279c8d::t_b4fa99baa530e5 196-197,206-211,218-221,230-234,241-242
+  s_274796d5279c8d::t_063720906814bb 486-507
+  s_274796d5279c8d::t_180eb177a5065f 342,349-353
+  s_0bf18b61f048c5::t_deb5e1e80b1ef6 354,485
+convex/features/changeRequests/actions.ts
+  s_274796d5279c8d::t_58dcea27c0ed0c 63-86
+  s_274796d5279c8d::t_796d41995611ff 132-135
+apps/web/src/app/(dashboard)/dashboard/variables/page.tsx
+  s_274796d5279c8d::t_35e95582be86b7 233-235
+  s_274796d5279c8d::t_30517dfb855e51 218,232,236
+convex/features/variables/mutations.ts
+  s_274796d5279c8d::t_5a81fff1edf7c7 322,778,903,1004,1113,1275,1412
+  s_274796d5279c8d::t_210a0b5ddcda63 121,582-583,839-840,960-961,1101-1102,1226-1227,1345-1350,1352-1353
+apps/cli/src/commands/push.ts
+  s_274796d5279c8d::t_0e104c7b31010d 56-67
+  s_274796d5279c8d::t_b1af228b405fb5 349-371
+convex/features/projects/protection.ts
+  s_274796d5279c8d::t_1c58fe543f14f1 8,91-93,99,113-117,134,161-165
+apps/docs/content/cli/requests.mdx
+  s_274796d5279c8d::t_6cc3bc40195ddb 54
+  s_274796d5279c8d::t_d68770895ee43b 28,31,41
+  s_0bf18b61f048c5::t_1f7fd4898a826f 42
+apps/web/src/components/variables/variable-form.tsx
+  s_274796d5279c8d::t_a7871f60589794 149-156
+  s_274796d5279c8d::t_4c4843c6ec2716 162-166,168-169
+convex/lib/roleProfiles.ts
+  s_274796d5279c8d::t_fae4e243a513cf 271-277,284
+convex/features/accounts/mutations.ts
+  s_274796d5279c8d::t_210a0b5ddcda63 118,328-329,463-464,627-628
+  s_274796d5279c8d::t_5a81fff1edf7c7 206,398,525,660
+convex/features/files/mutations.ts
+  s_274796d5279c8d::t_5a81fff1edf7c7 413,534,659,823,939,1072
+  s_274796d5279c8d::t_f12744398e2cc2 31,94-101,212-222
+  s_274796d5279c8d::t_210a0b5ddcda63 275,488-489,608-609,754-755,890-891,1027-1028
+convex/features/projects/deletion.ts
+  s_274796d5279c8d::t_709f7d031dff58 24,28-34,60-61,81,182-196,582-586
+convex/schema.ts
+  s_274796d5279c8d::t_1671cddea7b3b7 231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "198fe7722e90ef5601e71c9a1b9b58aac6c5f2e7",
+  "prompts": {},
+  "sessions": {
+    "s_0bf18b61f048c5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "481d3ef6-4403-452b-b07d-4eb957425447",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_274796d5279c8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46448544-856e-4fc0-beec-74f74b2e5474",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
