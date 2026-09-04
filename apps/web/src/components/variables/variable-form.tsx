@@ -402,8 +402,9 @@ export function VariableForm({
           data-testid="variable-protected-note"
           className="text-xs text-warning"
         >
-          {protectedSelected.join(", ")} is protected. A second person applies
-          this change.
+          {protectedSelected.join(", ")}{" "}
+          {protectedSelected.length > 1 ? "are" : "is"} protected. A second
+          person applies this change.
         </p>
       )}
 

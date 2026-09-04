@@ -15,7 +15,7 @@ import {
   touchedEnvironments,
 } from "../../lib/protection";
 import { assertCouldWriteDirectly } from "./authorize";
-import { orgRequestScopes, visibleInOrg } from "./visibility";
+import { collectVisibleInOrg, orgRequestScopes } from "./visibility";
 
 /** Read window for every list here; the inbox is a queue, not an archive. */
 const MAX_ROWS = 200;
@@ -181,20 +181,22 @@ export const listForOrg = query({
       args.organizationId
     );
 
-    const rows = await ctx.db
-      .query("changeRequests")
-      .withIndex("by_org_status", (q) =>
-        args.status
-          ? q
-              .eq("organizationId", args.organizationId)
-              .eq("status", args.status)
-          : q.eq("organizationId", args.organizationId)
-      )
-      .order("desc")
-      .take(MAX_ROWS);
-
     const scopes = await orgRequestScopes(ctx, actor._id, profile);
-    return withPeople(ctx, visibleInOrg(rows, scopes));
+    const rows = await collectVisibleInOrg(
+      ctx.db
+        .query("changeRequests")
+        .withIndex("by_org_status", (q) =>
+          args.status
+            ? q
+                .eq("organizationId", args.organizationId)
+                .eq("status", args.status)
+            : q.eq("organizationId", args.organizationId)
+        )
+        .order("desc"),
+      scopes,
+      MAX_ROWS
+    );
+    return withPeople(ctx, rows);
   },
 });
 
@@ -232,14 +234,19 @@ export const pendingCountForOrg = query({
       actor._id,
       args.organizationId
     );
-    const rows = await ctx.db
-      .query("changeRequests")
-      .withIndex("by_org_status", (q) =>
-        q.eq("organizationId", args.organizationId).eq("status", "pending")
-      )
-      .take(COUNT_CAP);
     const scopes = await orgRequestScopes(ctx, actor._id, profile);
-    return visibleInOrg(rows, scopes).length;
+    // The badge counts what listForOrg would show, so it filters as it scans:
+    // capping first drops rows this actor can see behind ones they cannot.
+    const rows = await collectVisibleInOrg(
+      ctx.db
+        .query("changeRequests")
+        .withIndex("by_org_status", (q) =>
+          q.eq("organizationId", args.organizationId).eq("status", "pending")
+        ),
+      scopes,
+      COUNT_CAP
+    );
+    return rows.length;
   },
 });
 
@@ -248,6 +255,8 @@ const currentValidator = v.union(
     key: v.string(),
     description: v.optional(v.string()),
     environments: v.array(v.string()),
+    isSensitive: v.boolean(),
+    rotationFrequencyDays: v.optional(v.number()),
     tagIds: v.optional(v.array(v.id("variableTags"))),
     version: v.number(),
   }),
@@ -315,6 +324,8 @@ async function loadCurrent(ctx: QueryCtx, request: Doc<"changeRequests">) {
         key: variable.key,
         description: variable.description,
         environments: variable.environments,
+        isSensitive: variable.isSensitive,
+        rotationFrequencyDays: variable.rotationFrequencyDays,
         tagIds: variable.tagIds,
         version: variable.version,
       }
@@ -450,6 +461,7 @@ export const canProposeVariableChange = internalQuery({
     kind: kindValidator,
     variableId: v.optional(v.id("environmentVariables")),
     environments: v.optional(v.array(v.string())),
+    targetVersion: v.optional(v.number()),
   },
   returns: v.array(v.string()),
   handler: async (ctx, args) => {
@@ -464,13 +476,19 @@ export const canProposeVariableChange = internalQuery({
       "project:read",
       project
     );
-    const target = await assertCouldWriteDirectly(ctx, args.userId, project, {
-      resourceType: "variable",
-      kind: args.kind,
-      targetId: args.variableId,
-    });
+    const { currentEnvironments } = await assertCouldWriteDirectly(
+      ctx,
+      args.userId,
+      project,
+      {
+        resourceType: "variable",
+        kind: args.kind,
+        targetId: args.variableId,
+        targetVersion: args.targetVersion,
+      }
+    );
     const environments = touchedEnvironments(
-      target?.environments,
+      currentEnvironments,
       args.environments
     );
     if (!isEnvironmentScopeAllowed(environmentScope, environments)) {

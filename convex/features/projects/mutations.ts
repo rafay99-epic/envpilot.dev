@@ -18,7 +18,8 @@ import { internal } from "../../_generated/api";
 import { cancelPendingRequest } from "../changeRequests/mutations";
 
 /** Bound on the change requests one project move re-tenants in a transaction. */
-const CHANGE_REQUEST_MOVE_CAP = 500;
+/** Rows per batch while draining a moved project's pending inbox. */
+const CHANGE_REQUEST_MOVE_BATCH = 100;
 
 const PROJECT_NAME_MAX = 100;
 const PROJECT_SLUG_MAX = 50;
@@ -567,15 +568,20 @@ export const move = mutation({
     }
 
     // Protected-environment proposals: cancel the pending ones (their staged
-    // secrets are purged with them) and re-tenant the rest, so the source org
+    // secrets are purged with them) and re-tenant every row, so the source org
     // keeps no approval metadata and the destination inbox can see its own.
-    const changeRequests = await ctx.db
-      .query("changeRequests")
-      .withIndex("by_project_status", (q) => q.eq("projectId", args.projectId))
-      .take(CHANGE_REQUEST_MOVE_CAP);
+    // Canceling takes a row out of the pending range, so the batched read
+    // drains it: no proposal is left behind however deep the inbox is.
     let canceledChangeRequests = 0;
-    for (const request of changeRequests) {
-      if (request.status === "pending") {
+    for (;;) {
+      const pendingChangeRequests = await ctx.db
+        .query("changeRequests")
+        .withIndex("by_project_status", (q) =>
+          q.eq("projectId", args.projectId).eq("status", "pending")
+        )
+        .take(CHANGE_REQUEST_MOVE_BATCH);
+      if (pendingChangeRequests.length === 0) break;
+      for (const request of pendingChangeRequests) {
         await cancelPendingRequest(
           ctx,
           request,
@@ -584,6 +590,12 @@ export const move = mutation({
         );
         canceledChangeRequests++;
       }
+    }
+    const changeRequests = await ctx.db
+      .query("changeRequests")
+      .withIndex("by_project_status", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const request of changeRequests) {
       await ctx.db.patch(request._id, {
         organizationId: args.targetOrganizationId,
       });

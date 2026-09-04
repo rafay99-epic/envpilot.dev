@@ -26,6 +26,7 @@ import {
   allowlistPayload,
   applyChangeRequest,
   payloadEnvironments,
+  payloadTargetVersion,
 } from "./apply";
 import {
   assertCouldWriteDirectly,
@@ -163,17 +164,17 @@ async function resolveApprovers(
  */
 async function purgeStaged(
   ctx: MutationCtx,
-  request: Doc<"changeRequests">
+  staged: { vaultRef?: string; storageId?: Id<"_storage"> }
 ): Promise<void> {
-  if (request.vaultRef !== undefined) {
+  if (staged.vaultRef !== undefined) {
     await ctx.scheduler.runAfter(
       0,
       internal.features.vault.vault.deleteSecret,
-      { vaultRef: request.vaultRef }
+      { vaultRef: staged.vaultRef }
     );
   }
-  if (request.storageId !== undefined) {
-    await ctx.storage.delete(request.storageId).catch(() => {});
+  if (staged.storageId !== undefined) {
+    await ctx.storage.delete(staged.storageId).catch(() => {});
   }
 }
 
@@ -297,20 +298,38 @@ async function fileChangeRequest(
     project
   );
 
-  const targetId = args.targetId;
-  const target = await assertCouldWriteDirectly(ctx, actor._id, project, args);
-
   // Allowlisted, never stored raw: the payload is re-serialized down to the
   // non-secret fields its resource type declares. `create` is a public
   // mutation, so an arbitrary string here would otherwise be handed straight
   // back to every reader of the request.
   const payload = allowlistPayload(args.resourceType, args.payload);
 
-  // Derived, never declared: the union of what the target spans today and
+  const targetId = args.targetId;
+
+  // A create names no row yet, and lib/protection.ts binds the applied write
+  // to the id the request stores: a create carrying one would describe a
+  // change it does not authorize.
+  if (args.kind === "create" && targetId !== undefined) {
+    throw new ConvexError("A create request cannot name a target");
+  }
+
+  const { target, currentEnvironments } = await assertCouldWriteDirectly(
+    ctx,
+    actor._id,
+    project,
+    {
+      resourceType: args.resourceType,
+      kind: args.kind,
+      targetId,
+      targetVersion: payloadTargetVersion(payload),
+    }
+  );
+
+  // Derived, never declared: the union of what the write starts from and
   // what the payload proposes. A client cannot describe one change and have
   // another applied.
   const environments = touchedEnvironments(
-    target?.environments,
+    currentEnvironments,
     payloadEnvironments(payload)
   );
   if (environments.length === 0) {
@@ -343,37 +362,38 @@ async function fileChangeRequest(
 
   // Dedupe: one pending proposal per target+kind, and one per label+kind
   // for creates (which have no target yet).
-  if (targetId !== undefined) {
-    const duplicate = await ctx.db
-      .query("changeRequests")
-      .withIndex("by_target_status", (q) =>
-        q.eq("targetId", targetId).eq("status", "pending")
-      )
-      .filter((q) => q.eq(q.field("kind"), args.kind))
-      .first();
-    if (duplicate) {
+  const duplicate =
+    targetId !== undefined
+      ? await ctx.db
+          .query("changeRequests")
+          .withIndex("by_target_status", (q) =>
+            q.eq("targetId", targetId).eq("status", "pending")
+          )
+          .filter((q) => q.eq(q.field("kind"), args.kind))
+          .first()
+      : await ctx.db
+          .query("changeRequests")
+          .withIndex("by_project_status", (q) =>
+            q.eq("projectId", args.projectId).eq("status", "pending")
+          )
+          .filter((q) =>
+            q.and(
+              q.eq(q.field("label"), args.label),
+              q.eq(q.field("kind"), args.kind)
+            )
+          )
+          .first();
+  if (duplicate) {
+    if (duplicate.requestedBy !== actor._id) {
       throw new ConvexError(
         `There is already a pending ${args.kind} request for ${args.label}. Wait for it to be reviewed, or cancel it first.`
       );
     }
-  } else {
-    const duplicate = await ctx.db
-      .query("changeRequests")
-      .withIndex("by_project_status", (q) =>
-        q.eq("projectId", args.projectId).eq("status", "pending")
-      )
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("label"), args.label),
-          q.eq(q.field("kind"), args.kind)
-        )
-      )
-      .first();
-    if (duplicate) {
-      throw new ConvexError(
-        `There is already a pending ${args.kind} request for ${args.label}. Wait for it to be reviewed, or cancel it first.`
-      );
-    }
+    // The requester's own refile is idempotent, so a partially filed CLI push
+    // can be rerun: the standing proposal wins and the material this call
+    // staged for it is destroyed rather than orphaned.
+    await purgeStaged(ctx, args);
+    return duplicate._id;
   }
 
   const openForRequester = await ctx.db

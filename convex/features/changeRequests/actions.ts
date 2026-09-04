@@ -95,6 +95,7 @@ export const createVariableChange = action({
         kind: args.kind,
         variableId: args.variableId,
         environments: args.environments,
+        targetVersion: args.targetVersion,
       }
     );
 

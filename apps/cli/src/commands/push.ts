@@ -65,6 +65,23 @@ export function isRequestFilingComplete(
   return (result.deniedKeys?.length ?? 0) === 0 && (result.skipped ?? 0) === 0;
 }
 
+/**
+ * True when `result` came from the propose (protected-environment) path —
+ * `pushBulk` always sets `requested` there, even to an empty array. That
+ * empty case is real: a rerun where every changed key was already filed in
+ * an earlier partial run, or a run where the very first key was denied
+ * before any could be filed. Checking `requested.length > 0` instead routes
+ * both straight to the direct-write success message, reporting a push that
+ * never happened.
+ */
+export function isProposedResult(
+  result: PushBulkResult
+): result is PushBulkResult & {
+  requested: NonNullable<PushBulkResult["requested"]>;
+} {
+  return result.requested !== undefined;
+}
+
 export const pushCommand = new Command("push")
   .description("Upload local .env file to cloud")
   .option(
@@ -337,15 +354,17 @@ export const pushCommand = new Command("push")
         throw err;
       }
 
-      if (result.requested && result.requested.length > 0) {
-        success(
-          `Filed ${result.requested.length} change request(s) for ${chalk.bold(environment)}.`
-        );
-        console.log();
-        table(formatRequestedRows(result.requested), [
-          { key: "key", header: "KEY" },
-          { key: "requestId", header: "REQUEST ID" },
-        ]);
+      if (isProposedResult(result)) {
+        if (result.requested.length > 0) {
+          success(
+            `Filed ${result.requested.length} change request(s) for ${chalk.bold(environment)}.`
+          );
+          console.log();
+          table(formatRequestedRows(result.requested), [
+            { key: "key", header: "KEY" },
+            { key: "requestId", header: "REQUEST ID" },
+          ]);
+        }
 
         if (!isRequestFilingComplete(result)) {
           console.log();
@@ -369,8 +388,12 @@ export const pushCommand = new Command("push")
           process.exit(1);
         }
 
-        console.log();
-        info("Waiting for a second person to approve.");
+        if (result.requested.length > 0) {
+          console.log();
+          info("Waiting for a second person to approve.");
+        } else {
+          success("Remote is up to date.");
+        }
         return;
       }
 

@@ -110,11 +110,13 @@ export const createWithValue = action({
     }
 
     // Capability, never a role slug: this flow exists for members who may
-    // PROPOSE a variable but not create one. Anyone who can create directly
-    // is sent to the direct path, whatever their role is called.
+    // PROPOSE a variable but not write one. Anyone holding create or blanket
+    // write is sent to the direct path before a secret is minted, because the
+    // mutation refuses both anyway.
     if (
       legacy.capabilities["project.requests.submit"] !== true ||
-      legacy.capabilities["project.variables.create"] === true
+      legacy.capabilities["project.variables.create"] === true ||
+      legacy.capabilities["project.variables.update"] === true
     ) {
       throw new ConvexError(
         "You have direct write access. Use direct variable creation instead of submitting a request."

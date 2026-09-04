@@ -246,8 +246,9 @@ export function BulkPasteForm({
             data-testid="bulk-protected-note"
             className="mt-1.5 text-xs text-warning"
           >
-            {protectedSelected.join(", ")} is protected. These will be filed for
-            approval instead of created directly.
+            {protectedSelected.join(", ")}{" "}
+            {protectedSelected.length > 1 ? "are" : "is"} protected. These will
+            be filed for approval instead of created directly.
           </p>
         )}
       </div>
@@ -339,7 +340,8 @@ export function BulkPasteForm({
           <div className="flex items-center gap-2">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-line" />
             <span className="text-sm text-ink-muted">
-              Creating {progress.completed}/{progress.total}...
+              {isProposal ? "Proposing" : "Creating"} {progress.completed}/
+              {progress.total}...
             </span>
           </div>
           {progress.failures.length > 0 && (
@@ -370,7 +372,7 @@ export function BulkPasteForm({
           className="rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
         >
           {isSubmitting
-            ? `Creating ${progress?.completed ?? 0}/${progress?.total ?? 0}...`
+            ? `${isProposal ? "Proposing" : "Creating"} ${progress?.completed ?? 0}/${progress?.total ?? 0}...`
             : `${effectiveSubmitLabel} (${entries.length})`}
         </button>
       </div>

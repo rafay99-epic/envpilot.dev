@@ -1,6 +1,12 @@
 import { ConvexError } from "convex/values";
-import type { QueryCtx } from "../../_generated/server";
+import type { DatabaseReader, QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
+import {
+  checkBooleanFeature,
+  checkCountedLimit,
+  countRotationEnabledVariables,
+} from "../featureRegistry/gates";
+import type { OrgGateContext } from "../featureRegistry/resolver";
 import {
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
@@ -29,6 +35,97 @@ export function assertWithinEnvironmentScope(
   if (isEnvironmentScopeAllowed(scope, environments)) return;
   const blocked = environments.find((env) => !(scope ?? []).includes(env))!;
   throw new ConvexError(environmentAccessMessage(blocked));
+}
+
+/** Widest rotation window a variable may carry, in days. */
+const MAX_ROTATION_DAYS = 3650;
+/** Tags one variable may carry. */
+const MAX_TAGS_PER_VARIABLE = 10;
+
+/**
+ * Everything createCore validates about a create's non-secret fields:
+ * rotation bounds and gating, and tag ownership. The protected-create path
+ * runs it BEFORE minting a vault object and filing a proposal, so an
+ * out-of-range rotation window or a foreign tag is refused immediately
+ * instead of at approval time, with the request stuck and its secret staged.
+ * Returns the deduplicated tag ids to store.
+ */
+export async function validateVariableCreateFields(
+  db: DatabaseReader,
+  args: {
+    organizationId: Id<"organizations">;
+    rotationFrequencyDays?: number;
+    tagIds?: Id<"variableTags">[];
+  },
+  gate?: OrgGateContext
+): Promise<Id<"variableTags">[] | undefined> {
+  const rotationDays = args.rotationFrequencyDays;
+  if (
+    rotationDays !== undefined &&
+    (rotationDays < 0 || rotationDays > MAX_ROTATION_DAYS)
+  ) {
+    throw new ConvexError(
+      `Rotation frequency must be between 0 and ${MAX_ROTATION_DAYS} days`
+    );
+  }
+
+  // Dual gate: rotation is a boolean feature with a per-org cap on how many
+  // variables may schedule it.
+  if (rotationDays !== undefined && rotationDays > 0) {
+    const rotationCheck = await checkBooleanFeature(
+      db,
+      args.organizationId,
+      "secret_rotation",
+      gate
+    );
+    if (!rotationCheck.allowed) {
+      throw new ConvexError(
+        "Secret rotation requires a higher tier. Upgrade to enable rotation schedules."
+      );
+    }
+
+    // Limit-first: skips the org-wide fan-out when rotation is unlimited.
+    const limitCheck = await checkCountedLimit(
+      db,
+      args.organizationId,
+      "secret_rotation_limit",
+      (limit) =>
+        countRotationEnabledVariables(
+          db,
+          args.organizationId,
+          undefined,
+          limit
+        ),
+      gate
+    );
+    if (!limitCheck.allowed) {
+      throw new ConvexError(
+        `Rotation-enabled variable limit reached (${limitCheck.current}/${limitCheck.limit}). Upgrade your tier for more.`
+      );
+    }
+  }
+
+  const tagIds =
+    args.tagIds && args.tagIds.length > 0
+      ? [...new Set(args.tagIds)]
+      : undefined;
+  if (tagIds === undefined) return undefined;
+
+  if (tagIds.length > MAX_TAGS_PER_VARIABLE) {
+    throw new ConvexError(
+      `A variable can have at most ${MAX_TAGS_PER_VARIABLE} tags`
+    );
+  }
+  for (const tagId of tagIds) {
+    const tag = await db.get(tagId);
+    if (!tag || tag.deletedAt) {
+      throw new ConvexError(`Tag not found: ${tagId}`);
+    }
+    if (tag.organizationId !== args.organizationId) {
+      throw new ConvexError("Tag does not belong to this organization");
+    }
+  }
+  return tagIds;
 }
 
 /**

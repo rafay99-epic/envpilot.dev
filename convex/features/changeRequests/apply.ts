@@ -70,6 +70,14 @@ export function payloadEnvironments(raw: string): string[] | undefined {
   return isStringArray(parsed.environments) ? parsed.environments : undefined;
 }
 
+/** The version a rollback payload names, when it names one. */
+export function payloadTargetVersion(raw: string): number | undefined {
+  const parsed = parsePayload(raw);
+  return typeof parsed.targetVersion === "number"
+    ? parsed.targetVersion
+    : undefined;
+}
+
 function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }

@@ -7,6 +7,7 @@ import {
   requireVariableAccess,
 } from "../../lib/authHelpers";
 import { assertOrgAction, assertProjectAction } from "../../lib/authz";
+import { touchedEnvironments } from "../../lib/protection";
 
 /**
  * The authorization a change request has to pass, shared by the mutation
@@ -40,6 +41,46 @@ const DELETE_ACTIONS = {
   file: "project:delete_file",
 } as const;
 
+/** What the proposal is allowed to write, as the server derives it. */
+export type AuthorizedChange = {
+  /** The row being written. Null for a create, which has none yet. */
+  target: ChangeTarget | null;
+  /**
+   * What the write touches before the payload's own environments are added:
+   * the target's current set, plus for a rollback the historical version's,
+   * which rollbackCore restores.
+   */
+  currentEnvironments: string[];
+};
+
+/**
+ * The environments the named version spans, and proof that it exists. A
+ * rollback restores them, so a proposal that omits them would file a
+ * production rollback as an unprotected change; a version that is missing
+ * would only fail at approval, leaving the request stuck as pending.
+ */
+async function rollbackVersionEnvironments(
+  ctx: QueryCtx,
+  variableId: Id<"environmentVariables">,
+  targetVersion: number | undefined
+): Promise<string[]> {
+  if (targetVersion === undefined) {
+    throw new ConvexError("A rollback request needs a version to restore");
+  }
+  const version = await ctx.db
+    .query("variableVersions")
+    .withIndex("by_variable_and_version", (q) =>
+      q.eq("variableId", variableId).eq("version", targetVersion)
+    )
+    .first();
+  if (!version) {
+    throw new ConvexError(
+      `Version ${targetVersion} does not exist for this variable`
+    );
+  }
+  return version.environments;
+}
+
 /**
  * The proposal must be one the requester could have made directly if the
  * environment were not protected — protection adds a second approver, it
@@ -52,8 +93,14 @@ export async function assertCouldWriteDirectly(
   ctx: QueryCtx,
   actorId: Id<"users">,
   project: Doc<"projects">,
-  args: { resourceType: ResourceType; kind: ChangeKind; targetId?: string }
-): Promise<ChangeTarget | null> {
+  args: {
+    resourceType: ResourceType;
+    kind: ChangeKind;
+    targetId?: string;
+    /** The version a rollback restores; required for that kind. */
+    targetVersion?: number;
+  }
+): Promise<AuthorizedChange> {
   const { resourceType, kind, targetId } = args;
 
   // Only variables keep a version history to roll back to.
@@ -80,7 +127,7 @@ export async function assertCouldWriteDirectly(
       CREATE_ACTIONS[resourceType],
       project
     );
-    return null;
+    return { target: null, currentEnvironments: [] };
   }
 
   const isWrite = kind === "update" || kind === "rollback";
@@ -97,7 +144,7 @@ export async function assertCouldWriteDirectly(
     }
     if (isWrite) {
       await requireAccountAccess(ctx, actorId, account, "write", project);
-      return account;
+      return { target: account, currentEnvironments: account.environments };
     }
     target = account;
   } else if (resourceType === "file") {
@@ -108,7 +155,7 @@ export async function assertCouldWriteDirectly(
     }
     if (isWrite) {
       await requireFileAccess(ctx, actorId, file, "write", project);
-      return file;
+      return { target: file, currentEnvironments: file.environments };
     }
     target = file;
   } else {
@@ -121,7 +168,20 @@ export async function assertCouldWriteDirectly(
     }
     if (isWrite) {
       await requireVariableAccess(ctx, actorId, variable, "write", project);
-      return variable;
+      return {
+        target: variable,
+        currentEnvironments:
+          kind === "rollback"
+            ? touchedEnvironments(
+                variable.environments,
+                await rollbackVersionEnvironments(
+                  ctx,
+                  variable._id,
+                  args.targetVersion
+                )
+              )
+            : variable.environments,
+      };
     }
     target = variable;
   }
@@ -133,5 +193,5 @@ export async function assertCouldWriteDirectly(
     DELETE_ACTIONS[resourceType],
     project
   );
-  return target;
+  return { target, currentEnvironments: target.environments };
 }

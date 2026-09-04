@@ -33,6 +33,7 @@ import { revokeSharesForResource } from "../sharing/helpers";
 import {
   assertWithinEnvironmentScope,
   assertValidVariableFields,
+  validateVariableCreateFields,
   findEnvironmentConflicts,
   findBatchInternalConflicts,
   environmentConflictMessage,
@@ -157,70 +158,17 @@ export async function createCore(
     }
   }
 
-  // Validate rotation frequency bounds
-  if (args.rotationFrequencyDays !== undefined) {
-    if (args.rotationFrequencyDays < 0 || args.rotationFrequencyDays > 3650) {
-      throw new Error("Rotation frequency must be between 0 and 3650 days");
-    }
-  }
-
-  // If rotation is requested, check boolean gate + numeric limit
-  if (args.rotationFrequencyDays && args.rotationFrequencyDays > 0) {
-    const rotationCheck = await checkBooleanFeature(
-      ctx.db,
-      project.organizationId,
-      "secret_rotation",
-      gate
-    );
-    if (!rotationCheck.allowed) {
-      throw new Error(
-        "Secret rotation requires a higher tier. Upgrade to enable rotation schedules."
-      );
-    }
-
-    // Check rotation-enabled variable limit. Limit-first: skips the
-    // org-wide fan-out entirely when rotation is unlimited for this tier.
-    const limitCheck = await checkCountedLimit(
-      ctx.db,
-      project.organizationId,
-      "secret_rotation_limit",
-      (limit) =>
-        countRotationEnabledVariables(
-          ctx.db,
-          project.organizationId,
-          undefined,
-          limit
-        ),
-      gate
-    );
-    if (!limitCheck.allowed) {
-      throw new Error(
-        `Rotation-enabled variable limit reached (${limitCheck.current}/${limitCheck.limit}). Upgrade your tier for more.`
-      );
-    }
-  }
-
-  // Validate and deduplicate tagIds
-  const validatedTagIds =
-    args.tagIds && args.tagIds.length > 0
-      ? [...new Set(args.tagIds)]
-      : undefined;
-
-  if (validatedTagIds && validatedTagIds.length > 0) {
-    if (validatedTagIds.length > 10) {
-      throw new Error("A variable can have at most 10 tags");
-    }
-
-    for (const tagId of validatedTagIds) {
-      const tag = await ctx.db.get(tagId);
-      if (!tag || tag.deletedAt) {
-        throw new Error(`Tag not found: ${tagId}`);
-      }
-      if (tag.organizationId !== project.organizationId) {
-        throw new Error("Tag does not belong to this organization");
-      }
-    }
-  }
+  // Rotation bounds and gating, and tag ownership. Shared with the
+  // protected-create path, which runs it before it stages a secret.
+  const validatedTagIds = await validateVariableCreateFields(
+    ctx.db,
+    {
+      organizationId: project.organizationId,
+      rotationFrequencyDays: args.rotationFrequencyDays,
+      tagIds: args.tagIds,
+    },
+    gate
+  );
 
   // Per-environment uniqueness: same key allowed across DISJOINT environment
   // sets (dev/staging/prod copies of the same key are separate variables).

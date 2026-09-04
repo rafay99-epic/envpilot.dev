@@ -534,6 +534,9 @@ const refs = {
     { projectId: string; status?: ChangeRequestStatus },
     ChangeRequestRow[]
   >("features/changeRequests/queries:listForProject"),
+  getChangeRequest: fnRef<"query", { requestId: string }, ChangeRequestRow>(
+    "features/changeRequests/queries:getForReview"
+  ),
   reviewChangeRequest: fnRef<
     "mutation",
     {
@@ -1136,6 +1139,17 @@ export class APIClient {
     status?: ChangeRequestStatus
   ): Promise<ChangeRequestRow[]> {
     return convexQuery(refs.listChangeRequests, { projectId, status });
+  }
+
+  /**
+   * Fetch a single change request by id, regardless of which project it
+   * belongs to. Throws "Change request not found" (see
+   * isChangeRequestNotFoundError in lib/errors.ts) when the id doesn't exist
+   * or is out of the caller's scope — including when it is actually an
+   * ordinary variable request id.
+   */
+  async getChangeRequest(requestId: string): Promise<ChangeRequestRow> {
+    return convexQuery(refs.getChangeRequest, { requestId });
   }
 
   /** Approve or reject a change request (protected-environment proposal). */

@@ -458,9 +458,17 @@ export const createWithValue = action({
     }
 
     // The create mutation validates these too, but a staged request never
-    // reaches it: an invalid key would only fail at approval time, with the
-    // secret already minted.
+    // reaches it: an invalid key, rotation window or tag would only fail at
+    // approval time, with the secret already minted.
     assertValidVariableFields({ key: args.key, description: args.description });
+    await ctx.runQuery(
+      internal.features.variables.queries.validateCreateFieldsInternal,
+      {
+        projectId: args.projectId,
+        rotationFrequencyDays: args.rotationFrequencyDays,
+        tagIds: args.tagIds,
+      }
+    );
 
     const vault = await ctx.runAction(
       internal.features.vault.vault.createSecret,

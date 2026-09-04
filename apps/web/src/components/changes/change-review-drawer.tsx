@@ -32,15 +32,11 @@ const DIFF_FIELDS: Record<string, readonly string[]> = {
 
 /**
  * Fields the current-value snapshot never carries — rollback's target
- * version isn't a property of the resource, and isSensitive/rotation aren't
- * captured by loadCurrent. Rendered as "not shown" rather than "not set" so
- * an approver doesn't read it as a known-empty value.
+ * version isn't a property of the resource, it's an instruction. Rendered
+ * as "not shown" rather than "not set" so an approver doesn't read it as a
+ * known-empty value.
  */
-const NOT_IN_SNAPSHOT = new Set([
-  "isSensitive",
-  "rotationFrequencyDays",
-  "targetVersion",
-]);
+const NOT_IN_SNAPSHOT = new Set(["targetVersion"]);
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -58,6 +54,7 @@ function parsePayload(payload: string): Record<string, unknown> | null {
 
 function render(value: unknown): string {
   if (value === undefined || value === null || value === "") return "not set";
+  if (typeof value === "boolean") return value ? "yes" : "no";
   if (Array.isArray(value)) return value.map(String).join(", ");
   return String(value);
 }

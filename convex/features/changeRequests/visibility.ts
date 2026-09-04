@@ -14,6 +14,9 @@ import {
  * production change is itself information.
  */
 
+/** Rows an org-wide read may scan while collecting the ones it may show. */
+const MAX_ORG_SCAN = 1000;
+
 /** The actor's standing on one project: assignment plus environment scope. */
 export type ProjectRequestScope = {
   assigned: boolean;
@@ -47,21 +50,43 @@ export async function orgRequestScopes(
   return scopes;
 }
 
-/** Whether a request row is visible under the actor's standing. */
+/**
+ * Whether a request row is visible under the actor's standing. An ABSENT
+ * scope is a project the actor is not assigned to; `assigned: false` from
+ * assertProjectAction is the owner class, which bypasses assignment and
+ * sees everything.
+ */
 export function canSeeRequest(
   scope: ProjectRequestScope | undefined,
   environments: string[]
 ): boolean {
-  if (!scope?.assigned) return false;
+  if (scope === undefined) return false;
   return isEnvironmentScopeAllowed(scope.environmentScope, environments);
 }
 
-/** Rows an actor with this org-wide standing may see. */
-export function visibleInOrg<
+/**
+ * The first `limit` rows this actor may see, taken from the index lazily.
+ * Filtering AFTER a take() drops accessible rows once inaccessible ones
+ * fill the window, so the scan is bounded separately from the result.
+ */
+export async function collectVisibleInOrg<
   T extends { projectId: Id<"projects">; environments: string[] },
->(rows: T[], scopes: Map<string, ProjectRequestScope> | null): T[] {
-  if (scopes === null) return rows;
-  return rows.filter((row) =>
-    canSeeRequest(scopes.get(row.projectId.toString()), row.environments)
-  );
+>(
+  rows: AsyncIterable<T>,
+  scopes: Map<string, ProjectRequestScope> | null,
+  limit: number
+): Promise<T[]> {
+  const visible: T[] = [];
+  let scanned = 0;
+  for await (const row of rows) {
+    if (
+      scopes === null ||
+      canSeeRequest(scopes.get(row.projectId.toString()), row.environments)
+    ) {
+      visible.push(row);
+      if (visible.length >= limit) break;
+    }
+    if (++scanned >= MAX_ORG_SCAN) break;
+  }
+  return visible;
 }

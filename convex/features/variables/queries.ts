@@ -24,6 +24,7 @@ import {
   mapVariableRow,
   resolveProjectAccessContext,
   findEnvironmentConflicts,
+  validateVariableCreateFields,
 } from "./helpers";
 
 /**
@@ -1295,6 +1296,35 @@ export const getDeleted = query({
  * Empty array = the create is allowed (same key across disjoint
  * environments is legal).
  */
+/**
+ * Internal: everything the create mutation validates about a create's
+ * non-secret fields (rotation window and gating, tag ownership), run by
+ * createWithValue BEFORE it mints a vault object. A protected create files a
+ * change request instead of reaching the mutation, so without this an
+ * invalid rotation window or a foreign tag would only fail at approval,
+ * leaving a stuck proposal with a staged secret.
+ */
+export const validateCreateFieldsInternal = internalQuery({
+  args: {
+    projectId: v.id("projects"),
+    rotationFrequencyDays: v.optional(v.number()),
+    tagIds: v.optional(v.array(v.id("variableTags"))),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) {
+      throw new ConvexError("Project not found");
+    }
+    await validateVariableCreateFields(ctx.db, {
+      organizationId: project.organizationId,
+      rotationFrequencyDays: args.rotationFrequencyDays,
+      tagIds: args.tagIds,
+    });
+    return null;
+  },
+});
+
 export const getEnvironmentConflictsInternal = internalQuery({
   args: {
     projectId: v.id("projects"),

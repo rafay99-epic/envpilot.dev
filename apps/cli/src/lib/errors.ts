@@ -231,6 +231,18 @@ export function formatProtectedEnvironments(environments: string[]): string {
 }
 
 /**
+ * True when a change-request lookup failed because the id isn't a change
+ * request at all (an ordinary variable request, or unknown). Thrown verbatim
+ * by getForReview/review/cancel in convex/features/changeRequests — see
+ * queries.ts and mutations.ts. Distinguishes "not a change request" (fall
+ * back to the variable-request flow) from every other denial, which must
+ * propagate instead of being silently swallowed.
+ */
+export function isChangeRequestNotFoundError(err: unknown): boolean {
+  return sanitizeConvexError(err) === "Change request not found";
+}
+
+/**
  * True when an error is a CONNECTIVITY failure (offline, DNS, timeout) as
  * opposed to a server-side response (denial, 4xx/5xx). Used to decide
  * fail-open vs fail-closed: offline caches may be served on connectivity

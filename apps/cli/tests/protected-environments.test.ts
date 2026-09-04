@@ -7,14 +7,15 @@ import {
   protectedPushRefusalMessage,
   formatRequestedRows,
   isRequestFilingComplete,
+  isProposedResult,
 } from "../src/commands/push.js";
 import {
   requestedSuccessMessage,
   protectedDeletePrompt,
   PROTECTED_DELETE_HINT,
 } from "../src/commands/secrets.js";
-import { findMatchingChangeRequest } from "../src/commands/requests.js";
-import type { ChangeRequestRow } from "../src/lib/api.js";
+import { findChangeRequest } from "../src/commands/requests.js";
+import type { APIClient, ChangeRequestRow } from "../src/lib/api.js";
 
 describe("isProtectedEnvironmentError", () => {
   it("recognizes the PROTECTED_ENVIRONMENT payload", () => {
@@ -96,8 +97,42 @@ describe("push: isRequestFilingComplete", () => {
   });
 });
 
-describe("requests: findMatchingChangeRequest", () => {
-  const row = (overrides: Partial<ChangeRequestRow>): ChangeRequestRow => ({
+describe("push: isProposedResult", () => {
+  it("is true on a rerun where every key was already filed (empty requested)", () => {
+    // Previously checked `requested.length > 0`, which fell through to the
+    // direct-write success message for exactly this shape.
+    expect(
+      isProposedResult({
+        created: 0,
+        updated: 0,
+        deleted: 0,
+        total: 2,
+        requested: [],
+      })
+    ).toBe(true);
+  });
+
+  it("is true when keys were newly filed", () => {
+    expect(
+      isProposedResult({
+        created: 0,
+        updated: 0,
+        deleted: 0,
+        total: 1,
+        requested: [{ key: "API_KEY", requestId: "req1" }],
+      })
+    ).toBe(true);
+  });
+
+  it("is false for a direct write with no requested field", () => {
+    expect(
+      isProposedResult({ created: 1, updated: 0, deleted: 0, total: 1 })
+    ).toBe(false);
+  });
+});
+
+describe("requests: findChangeRequest", () => {
+  const row: ChangeRequestRow = {
     _id: "cr1",
     resourceType: "variable",
     kind: "update",
@@ -106,21 +141,31 @@ describe("requests: findMatchingChangeRequest", () => {
     status: "pending",
     createdAt: Date.now(),
     requester: null,
-    ...overrides,
+  };
+
+  function apiWith(getChangeRequest: APIClient["getChangeRequest"]): APIClient {
+    return { getChangeRequest } as unknown as APIClient;
+  }
+
+  it("returns the row when the id is a change request", async () => {
+    const api = apiWith(async () => row);
+    expect(await findChangeRequest(api, "cr1")).toEqual(row);
   });
 
-  it("finds the row whose id matches", () => {
-    const rows = [row({ _id: "cr1" }), row({ _id: "cr2" })];
-    expect(findMatchingChangeRequest(rows, "cr2")?._id).toBe("cr2");
+  it("returns null when the backend reports the id is not a change request", async () => {
+    const api = apiWith(async () => {
+      throw { data: "Change request not found" };
+    });
+    expect(await findChangeRequest(api, "vr1")).toBeNull();
   });
 
-  it("returns null when no row matches — the id is an ordinary variable request", () => {
-    const rows = [row({ _id: "cr1" })];
-    expect(findMatchingChangeRequest(rows, "vr1")).toBeNull();
-  });
-
-  it("returns null for an empty list", () => {
-    expect(findMatchingChangeRequest([], "cr1")).toBeNull();
+  it("propagates any other error instead of silently falling back", async () => {
+    const api = apiWith(async () => {
+      throw {
+        data: "Your access is limited to these environments: staging",
+      };
+    });
+    await expect(findChangeRequest(api, "cr1")).rejects.toBeTruthy();
   });
 });
 

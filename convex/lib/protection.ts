@@ -101,14 +101,13 @@ export async function assertProtectedWrite(
         "This change request is no longer pending, so it cannot be applied"
       );
     }
-    // Bound to the exact resource it proposes: a create names no target, and
-    // every other kind must name the row being written. Without this a
-    // misrouted request id would unlock any protected write in the project.
-    const boundTargetId =
-      request.kind === "create" ? undefined : request.targetId;
+    // Bound to the exact resource it proposes: a create names no target (the
+    // filing mutation refuses one), and every other kind must name the row
+    // being written. Without this a misrouted request id would unlock any
+    // protected write in the project.
     if (
       request.resourceType !== args.resourceType ||
-      boundTargetId !== args.targetId
+      request.targetId !== args.targetId
     ) {
       throw new ConvexError(
         "This change request does not describe the change being applied"

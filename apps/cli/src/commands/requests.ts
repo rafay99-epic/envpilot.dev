@@ -16,6 +16,7 @@ import {
   notAuthenticated,
   notInitialized,
   handleError,
+  isChangeRequestNotFoundError,
 } from "../lib/errors.js";
 import {
   formatRequestRows,
@@ -205,42 +206,31 @@ const listSub = new Command("list")
     }
   });
 
-/** Pure lookup: which row in a change-request list (if any) matches `id`. */
-export function findMatchingChangeRequest(
-  rows: ChangeRequestRow[],
-  id: string
-): ChangeRequestRow | null {
-  return rows.find((r) => r._id === id) ?? null;
-}
-
 /**
- * Look up `id` among the linked project's change requests (protected-
- * environment proposals) so approve/reject/cancel can route it to the
- * change-request endpoints instead of the ordinary variable-request ones.
- * Returns null (never throws) when no project is linked locally or the id
- * isn't a change request — the caller then falls back to the variable-
- * request flow, unchanged from before.
+ * Look up `id` as a change request (protected-environment proposal) directly
+ * by id, so approve/reject/cancel can route it to the change-request
+ * endpoints instead of the ordinary variable-request ones. Queries by id
+ * rather than scanning a project's list — a list page has a bounded size and
+ * would miss an older request. Returns null (never throws) when the backend
+ * reports the id isn't a change request; the caller then falls back to the
+ * variable-request flow, unchanged from before. Any other error (denied,
+ * network) propagates.
  */
-async function findChangeRequest(
+export async function findChangeRequest(
   api: APIClient,
-  id: string,
-  projectOption?: string
+  id: string
 ): Promise<ChangeRequestRow | null> {
-  const configV2 = readProjectConfigV2();
-  if (!configV2) return null;
-  const project = resolveProject(configV2, projectOption);
-  if (!project) return null;
-  const rows = await api.listChangeRequests(project.projectId);
-  return findMatchingChangeRequest(rows, id);
+  try {
+    return await api.getChangeRequest(id);
+  } catch (err) {
+    if (isChangeRequestNotFoundError(err)) return null;
+    throw err;
+  }
 }
 
 const approveSub = new Command("approve")
   .description("Approve a pending request")
   .argument("<id>", "Request id (from `envpilot requests`)")
-  .option(
-    "--project <name-or-id>",
-    "Project to search for a change-request id (defaults to the linked project)"
-  )
   .option(
     "--value <value>",
     "Secret value for a machine (valueless) request — CI only; interactively " +
@@ -256,7 +246,6 @@ const approveSub = new Command("approve")
     async (
       id: string,
       options: {
-        project?: string;
         value?: string;
         valueStdin?: boolean;
         reason?: string;
@@ -266,7 +255,7 @@ const approveSub = new Command("approve")
         if (!isAuthenticated()) throw notAuthenticated();
         const api = createAPIClient();
 
-        const changeRequest = await findChangeRequest(api, id, options.project);
+        const changeRequest = await findChangeRequest(api, id);
         if (changeRequest) {
           if (changeRequest.status !== "pending") {
             error(
@@ -350,49 +339,39 @@ const approveSub = new Command("approve")
 const rejectSub = new Command("reject")
   .description("Reject a pending request")
   .argument("<id>", "Request id (from `envpilot requests`)")
-  .option(
-    "--project <name-or-id>",
-    "Project to search for a change-request id (defaults to the linked project)"
-  )
   .option("--reason <text>", "Optional review note shown to the requester")
-  .action(
-    async (id: string, options: { project?: string; reason?: string }) => {
-      try {
-        if (!isAuthenticated()) throw notAuthenticated();
-        const api = createAPIClient();
-
-        const changeRequest = await findChangeRequest(api, id, options.project);
-        if (changeRequest) {
-          await withSpinner("Rejecting change request...", () =>
-            api.reviewChangeRequest(id, "reject", options.reason)
-          );
-          success("Change request rejected.");
-          return;
-        }
-
-        await withSpinner("Rejecting request...", () =>
-          api.reviewRequest(id, "reject", options.reason)
-        );
-        success("Request rejected.");
-      } catch (err) {
-        await handleError(err);
-      }
-    }
-  );
-
-const cancelSub = new Command("cancel")
-  .description("Cancel a pending request (your own, or as a reviewer)")
-  .argument("<id>", "Request id (from `envpilot requests`)")
-  .option(
-    "--project <name-or-id>",
-    "Project to search for a change-request id (defaults to the linked project)"
-  )
-  .action(async (id: string, options: { project?: string }) => {
+  .action(async (id: string, options: { reason?: string }) => {
     try {
       if (!isAuthenticated()) throw notAuthenticated();
       const api = createAPIClient();
 
-      const changeRequest = await findChangeRequest(api, id, options.project);
+      const changeRequest = await findChangeRequest(api, id);
+      if (changeRequest) {
+        await withSpinner("Rejecting change request...", () =>
+          api.reviewChangeRequest(id, "reject", options.reason)
+        );
+        success("Change request rejected.");
+        return;
+      }
+
+      await withSpinner("Rejecting request...", () =>
+        api.reviewRequest(id, "reject", options.reason)
+      );
+      success("Request rejected.");
+    } catch (err) {
+      await handleError(err);
+    }
+  });
+
+const cancelSub = new Command("cancel")
+  .description("Cancel a pending request (your own, or as a reviewer)")
+  .argument("<id>", "Request id (from `envpilot requests`)")
+  .action(async (id: string) => {
+    try {
+      if (!isAuthenticated()) throw notAuthenticated();
+      const api = createAPIClient();
+
+      const changeRequest = await findChangeRequest(api, id);
       if (changeRequest) {
         await withSpinner("Canceling change request...", () =>
           api.cancelChangeRequest(id)
