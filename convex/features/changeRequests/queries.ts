@@ -183,6 +183,8 @@ export const listForOrg = query({
 
     const scopes = await orgRequestScopes(ctx, actor._id, profile);
     const rows = await collectVisibleInOrg(
+      ctx,
+      args.organizationId,
       ctx.db
         .query("changeRequests")
         .withIndex("by_org_status", (q) =>
@@ -238,6 +240,8 @@ export const pendingCountForOrg = query({
     // The badge counts what listForOrg would show, so it filters as it scans:
     // capping first drops rows this actor can see behind ones they cannot.
     const rows = await collectVisibleInOrg(
+      ctx,
+      args.organizationId,
       ctx.db
         .query("changeRequests")
         .withIndex("by_org_status", (q) =>

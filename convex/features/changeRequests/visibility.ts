@@ -72,16 +72,28 @@ export function canSeeRequest(
 export async function collectVisibleInOrg<
   T extends { projectId: Id<"projects">; environments: string[] },
 >(
+  ctx: QueryCtx,
+  organizationId: Id<"organizations">,
   rows: AsyncIterable<T>,
   scopes: Map<string, ProjectRequestScope> | null,
   limit: number
 ): Promise<T[]> {
   const visible: T[] = [];
+  // A project move re-tenants reviewed history in the background, so a row's
+  // stored organizationId can lag. The project's CURRENT organization decides.
+  const projectOrg = new Map<string, boolean>();
   let scanned = 0;
   for await (const row of rows) {
+    const key = row.projectId.toString();
+    let inOrg = projectOrg.get(key);
+    if (inOrg === undefined) {
+      const project = await ctx.db.get(row.projectId);
+      inOrg = project?.organizationId === organizationId;
+      projectOrg.set(key, inOrg);
+    }
     if (
-      scopes === null ||
-      canSeeRequest(scopes.get(row.projectId.toString()), row.environments)
+      inOrg &&
+      (scopes === null || canSeeRequest(scopes.get(key), row.environments))
     ) {
       visible.push(row);
       if (visible.length >= limit) break;

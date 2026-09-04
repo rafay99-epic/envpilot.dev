@@ -16,6 +16,18 @@ const row = (project: string, environments: string[]) => ({
   environments,
 });
 
+// Every project in these tests belongs to the org being read; the org
+// check is exercised by the "hides rows whose project moved" case below.
+const orgId = "org1" as Id<"organizations">;
+const ctx = {
+  db: {
+    get: async (id: Id<"projects">) => ({
+      _id: id,
+      organizationId: id === projectId("moved") ? "org2" : orgId,
+    }),
+  },
+} as unknown as Parameters<typeof collectVisibleInOrg>[0];
+
 async function* stream<T>(rows: T[]): AsyncIterable<T> {
   for (const item of rows) yield item;
 }
@@ -48,7 +60,9 @@ describe("collectVisibleInOrg", () => {
 
   it("returns everything for an unrestricted actor, up to the limit", async () => {
     const rows = [row("a", ["production"]), row("b", ["staging"])];
-    expect(await collectVisibleInOrg(stream(rows), null, 1)).toHaveLength(1);
+    expect(
+      await collectVisibleInOrg(ctx, orgId, stream(rows), null, 1)
+    ).toHaveLength(1);
   });
 
   it("keeps collecting past inaccessible rows instead of capping first", async () => {
@@ -56,12 +70,32 @@ describe("collectVisibleInOrg", () => {
       ...Array.from({ length: 50 }, () => row("theirs", ["production"])),
       row("mine", ["production"]),
     ];
-    const visible = await collectVisibleInOrg(stream(rows), scopes, 10);
+    const visible = await collectVisibleInOrg(
+      ctx,
+      orgId,
+      stream(rows),
+      scopes,
+      10
+    );
     expect(visible).toEqual([row("mine", ["production"])]);
+  });
+
+  it("hides rows whose project now belongs to another organization", async () => {
+    const rows = [row("moved", ["staging"]), row("mine", ["staging"])];
+    const visible = await collectVisibleInOrg(
+      ctx,
+      orgId,
+      stream(rows),
+      null,
+      10
+    );
+    expect(visible.map((r) => r.projectId)).toEqual([projectId("mine")]);
   });
 
   it("stops at the limit once enough visible rows are collected", async () => {
     const rows = Array.from({ length: 5 }, () => row("mine", ["staging"]));
-    expect(await collectVisibleInOrg(stream(rows), scopes, 3)).toHaveLength(3);
+    expect(
+      await collectVisibleInOrg(ctx, orgId, stream(rows), scopes, 3)
+    ).toHaveLength(3);
   });
 });
