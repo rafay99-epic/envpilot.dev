@@ -68,20 +68,26 @@ object VersionCheck {
                     .build()
             val response = http.send(request, HttpResponse.BodyHandlers.ofString())
             if (response.statusCode() == 200) {
-                val body = gson.fromJson(response.body(), JsonObject::class.java)
-                body?.str("jetbrains")?.let { latestKnown = it }
-                val min = body?.str("minJetbrains")
-                if (min != null) {
-                    // Latch BEFORE anything else so synchronous command dispatch can gate on it.
-                    AuthService.markOutdated(compareVersions(currentVersion, min) < 0)
-                    return compareVersions(currentVersion, min) >= 0
-                }
+                return evaluate(gson.fromJson(response.body(), JsonObject::class.java), currentVersion)
             }
         } catch (e: Exception) {
             log.warn("Version manifest refresh failed: ${e.message}")
             dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "version-check"))
         }
         return true
+    }
+
+    /** Applies a manifest: records the latest version and (re)sets the outdated latch. */
+    internal fun evaluate(
+        body: JsonObject?,
+        currentVersion: String,
+    ): Boolean {
+        body?.str("jetbrains")?.let { latestKnown = it }
+        val min = body?.str("minJetbrains")
+        val supported = min == null || compareVersions(currentVersion, min) >= 0
+        // Latch BEFORE anything else so synchronous command dispatch can gate on it.
+        AuthService.markOutdated(!supported)
+        return supported
     }
 
     private fun JsonObject.str(key: String): String? = get(key)?.takeIf { it.isJsonPrimitive }?.asString
