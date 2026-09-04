@@ -1,0 +1,19 @@
+apps/web/src/components/changes/change-request-list.tsx
+  s_274796d5279c8d::t_dbb77ca62afb10 111,114-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "c0933d6725aaec01332c47cdc8f150d7da9e7cc0",
+  "prompts": {},
+  "sessions": {
+    "s_274796d5279c8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46448544-856e-4fc0-beec-74f74b2e5474",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
