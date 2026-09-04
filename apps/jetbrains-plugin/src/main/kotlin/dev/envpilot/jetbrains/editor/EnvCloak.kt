@@ -5,6 +5,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.FoldRegion
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
+import com.intellij.openapi.editor.ex.util.EditorUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
@@ -117,10 +118,11 @@ object EnvCloak {
                     }
                 }
             }
-        // Two-arg overload removes the listener when the disposable is disposed.
+        // Documents outlive editors: tie the listener to THIS editor, or reopening
+        // the same file stacks a listener per open until the project closes.
         val disposable = Disposer.newDisposable()
         editor.document.addDocumentListener(listener, disposable)
         editor.putUserData(FOLD_LISTENER, listener)
-        Disposer.register(project, disposable)
+        EditorUtil.disposeWithEditor(editor, disposable)
     }
 }

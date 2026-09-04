@@ -1,5 +1,6 @@
 package dev.envpilot.jetbrains.sync
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
@@ -8,7 +9,6 @@ import dev.envpilot.jetbrains.config.EnvpilotSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -16,10 +16,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * The injected scope is tied to the service lifetime, so it (and everything
+ * parented to this Disposable) dies with the plugin.
+ */
 @Service(Service.Level.APP)
-class SyncScheduler {
+class SyncScheduler(private val scope: CoroutineScope) : Disposable {
     private val log = logger<SyncScheduler>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = ConcurrentHashMap<String, Job>()
 
     // Timer, realtime pushes, IDE activation and manual pulls can all fire at
@@ -30,7 +33,7 @@ class SyncScheduler {
     fun startFor(project: Project) {
         stopFor(project)
         jobs[project.locationHash] =
-            scope.launch {
+            scope.launch(Dispatchers.IO) {
                 delay(5_000)
                 while (isActive) {
                     // Read fresh every cycle: settings changes must apply
@@ -45,6 +48,9 @@ class SyncScheduler {
                 }
             }
     }
+
+    /** Plugin-lifetime launcher for callers with no scope of their own (actions, gutter, startup). */
+    fun launch(block: suspend () -> Unit): Job = scope.launch(Dispatchers.IO) { block() }
 
     fun stopFor(project: Project) {
         jobs.remove(project.locationHash)?.cancel()
@@ -98,6 +104,8 @@ class SyncScheduler {
             SyncState.notifyChanged()
             allOk
         }
+
+    override fun dispose() = Unit
 
     companion object {
         fun getInstance(): SyncScheduler = ApplicationManager.getApplication().getService(SyncScheduler::class.java)

@@ -16,19 +16,13 @@ import dev.envpilot.jetbrains.sync.LinkedProjectsService
 import dev.envpilot.jetbrains.sync.SyncScheduler
 import dev.envpilot.jetbrains.sync.SyncState
 import dev.envpilot.jetbrains.ui.refreshOpenEnvEditors
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.nio.file.Path
-
-private val actionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 class PullNowAction : DumbAwareAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        actionScope.launch {
+        SyncScheduler.getInstance().launch {
             val ok = SyncScheduler.getInstance().runCycle(project)
             notify(
                 project,
@@ -76,7 +70,7 @@ class ToggleCloakingAction : DumbAwareAction() {
             notify(project, "Secret values cloaked.", NotificationType.INFORMATION)
             return
         }
-        actionScope.launch {
+        SyncScheduler.getInstance().launch {
             if (!refreshRevealAccess(project)) {
                 notify(project, "Your role does not allow unmasking secret values.", NotificationType.WARNING)
                 return@launch
@@ -91,7 +85,7 @@ class ToggleCloakingAction : DumbAwareAction() {
 class RevealValuesAction : DumbAwareAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        actionScope.launch {
+        SyncScheduler.getInstance().launch {
             if (!refreshRevealAccess(project)) {
                 notify(project, "Your role does not allow revealing secret values.", NotificationType.WARNING)
                 return@launch
@@ -112,7 +106,7 @@ class RevealValueAtCaretAction : DumbAwareAction() {
             notify(project, "Place the caret on an Envpilot-managed env key.", NotificationType.WARNING)
             return
         }
-        actionScope.launch {
+        SyncScheduler.getInstance().launch {
             try {
                 val editor = EnvEditorService.getInstance(project)
                 val metadata = ConvexApi.accessMeta(match.link.projectId)

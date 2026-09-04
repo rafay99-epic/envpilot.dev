@@ -4,13 +4,9 @@ import com.intellij.codeInsight.daemon.LineMarkerInfo
 import com.intellij.codeInsight.daemon.LineMarkerProvider
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.editor.markup.GutterIconRenderer
-import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiPlainTextFile
 import dev.envpilot.jetbrains.sync.SyncScheduler
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import javax.swing.Icon
 
 /**
@@ -29,11 +25,7 @@ class EnvLineMarkerProvider : LineMarkerProvider {
             ICON,
             { "Envpilot-managed env file — click to sync now" },
             { _, psiElement ->
-                (psiElement.project as? Project)?.let { project ->
-                    CoroutineScope(Dispatchers.IO).launch {
-                        SyncScheduler.getInstance().runCycle(project)
-                    }
-                }
+                SyncScheduler.getInstance().launch { SyncScheduler.getInstance().runCycle(psiElement.project) }
             },
             GutterIconRenderer.Alignment.LEFT,
         ) { "Envpilot env file" }

@@ -6,7 +6,6 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.util.messages.Topic
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -32,7 +31,7 @@ data class Session(
  * [AuthKitLogin].
  */
 @Service(Service.Level.APP)
-class AuthService {
+class AuthService(private val scope: CoroutineScope) {
     companion object {
         val AUTH_TOPIC = Topic.create("EnvpilotAuthChanged", AuthStateListener::class.java)
 
@@ -47,7 +46,6 @@ class AuthService {
     }
 
     private val log = logger<AuthService>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val refreshMutex = Mutex()
     private val store = TokenStore()
 
@@ -62,7 +60,7 @@ class AuthService {
     /** Load persisted state once at startup. */
     fun initialize() {
         if (cached.get() != null) return
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             cached.set(store.load())
             notifyChanged()
         }
@@ -115,7 +113,7 @@ class AuthService {
 
     /** Full AuthKit browser login; runs on IO, notifies listeners when done. */
     fun startSignIn(onDone: (String?, Exception?) -> Unit) {
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             try {
                 val token = AuthKitLogin.signIn()
                 val session = token.toSession()
@@ -133,7 +131,7 @@ class AuthService {
     }
 
     fun signOut() {
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             val safeToSwitch = purgeManagedFiles()
             cached.get()?.userId?.let { store.remove(it, activateNext = safeToSwitch) }
             cached.set(if (safeToSwitch) store.load() else null)
@@ -142,7 +140,7 @@ class AuthService {
     }
 
     fun signOutAll() {
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             purgeManagedFiles()
             cached.set(null)
             store.clearAll()
@@ -151,7 +149,7 @@ class AuthService {
     }
 
     fun switchAccount(userId: String) {
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             if (!purgeManagedFiles()) return@launch
             val session = store.activate(userId) ?: return@launch
             cached.set(session)

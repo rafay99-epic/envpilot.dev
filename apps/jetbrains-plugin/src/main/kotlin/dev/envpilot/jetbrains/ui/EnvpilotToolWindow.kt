@@ -543,6 +543,7 @@ class LinkDirectoryDialog(
         workspaceRoots = detectWorkspaceRoots()
         environmentChecks.first().second.isSelected = true
         updatePathPreview()
+        Disposer.register(myDisposable) { pullScope.cancel() }
         init()
     }
 

@@ -9,7 +9,6 @@ import dev.envpilot.jetbrains.sync.SyncScheduler
 import dev.envpilot.jetbrains.sync.SyncState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicReference
 
@@ -19,7 +18,7 @@ import java.util.concurrent.atomic.AtomicReference
  * a sync cycle. Falls back to interval polling when the socket is down.
  */
 @Service(Service.Level.APP)
-class ConvexSyncService {
+class ConvexSyncService(private val scope: CoroutineScope) {
     companion object {
         private val log = logger<ConvexSyncService>()
         private const val VERSION_QUERY = "features/ide/queries:projectVersion"
@@ -27,7 +26,6 @@ class ConvexSyncService {
         fun getInstance(): ConvexSyncService = ApplicationManager.getApplication().getService(ConvexSyncService::class.java)
     }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val socket = AtomicReference<ConvexSocket?>(null)
 
     // queryId → projectId, so transitions map back to the right project.
@@ -36,13 +34,10 @@ class ConvexSyncService {
     // projectId → queryId; makes watch idempotent across reconnects.
     private val queryIdByProject = AtomicReference<Map<String, Int>>(emptyMap())
 
-    // Projects requested before the socket connected — flushed on connect.
-    private val pendingProjects = AtomicReference<Set<String>>(emptySet())
-
     @Synchronized
     fun ensureStarted() {
         if (socket.get() != null) return
-        scope.launch { start() }
+        start()
     }
 
     fun socketOrNull(): ConvexSocket? = socket.get()
@@ -57,7 +52,6 @@ class ConvexSyncService {
         stop()
         projectByQueryId.set(emptyMap())
         queryIdByProject.set(emptyMap())
-        pendingProjects.set(emptySet())
         ensureStarted()
         for (project in com.intellij.openapi.project.ProjectManager.getInstance().openProjects) {
             dev.envpilot.jetbrains.sync.LinkedProjectsService.getInstance(project).all()
@@ -65,20 +59,17 @@ class ConvexSyncService {
         }
     }
 
-    /** Idempotent: one version query per Envpilot project, buffered until connected. */
+    /** Idempotent: one version query per Envpilot project. The socket replays its set on connect. */
+    @Synchronized
     fun watchProject(projectId: String) {
         if (queryIdByProject.get().containsKey(projectId)) return
-        val s =
-            socket.get() ?: run {
-                pendingProjects.updateAndGet { it + projectId }
-                return
-            }
+        val s = socket.get() ?: return
         val queryId = s.subscribe(VERSION_QUERY, mapOf("projectId" to projectId))
         projectByQueryId.updateAndGet { it + (queryId to projectId) }
         queryIdByProject.updateAndGet { it + (projectId to queryId) }
     }
 
-    private suspend fun start() {
+    private fun start() {
         val deploymentUrl =
             EnvpilotSettings.getInstance().state.convexUrl.ifBlank {
                 dev.envpilot.jetbrains.BuildConfig.CONVEX_URL
@@ -96,7 +87,7 @@ class ConvexSyncService {
         object : ConvexSocket.Listener {
             override fun onQueryUpdated(queryId: Int) {
                 val projectId = projectByQueryId.get()[queryId] ?: return
-                scope.launch {
+                scope.launch(Dispatchers.IO) {
                     for (project in com.intellij.openapi.project.ProjectManager.getInstance().openProjects) {
                         val links =
                             dev.envpilot.jetbrains.sync.LinkedProjectsService
@@ -115,7 +106,7 @@ class ConvexSyncService {
 
             override fun onAuthError(error: String) {
                 log.warn("Convex socket auth error: $error — forcing token refresh")
-                scope.launch {
+                scope.launch(Dispatchers.IO) {
                     AuthService.getInstance().getFreshToken(force = true)?.let { token ->
                         socket.get()?.reauthenticate(token)
                     }
@@ -126,9 +117,6 @@ class ConvexSyncService {
                 // The socket replays its own subscription set on reconnect.
                 SyncState.realtimeConnected = true
                 SyncState.notifyChanged()
-                for (projectId in pendingProjects.getAndSet(emptySet())) {
-                    watchProject(projectId)
-                }
             }
 
             override fun onDisconnected() {
