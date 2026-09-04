@@ -15,7 +15,10 @@ import {
   bypassesAssignment,
 } from "../../lib/authz";
 import { internal } from "../../_generated/api";
-import { cancelPendingRequest } from "../changeRequests/mutations";
+import {
+  cancelPendingRequest,
+  retenantChangeRequestsBatch,
+} from "../changeRequests/mutations";
 
 /** Rows per batch while draining a moved project's pending inbox. */
 const CHANGE_REQUEST_MOVE_BATCH = 100;
@@ -600,16 +603,26 @@ export const move = mutation({
         canceledChangeRequests++;
       }
     }
-    // Reviewed history moves with the project, but a long-lived inbox has no
-    // cap: re-tenant it in scheduled batches instead of in this transaction.
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.changeRequests.mutations.retenantChangeRequests,
-      {
-        projectId: args.projectId,
-        organizationId: args.targetOrganizationId,
-      }
+    // Reviewed history moves with the project. Up to one batch moves in this
+    // transaction so an ordinary inbox is consistent the moment the move
+    // commits; only a larger history is finished by scheduled batches, during
+    // which those rows are visible to neither organization.
+    const retenanted = await retenantChangeRequestsBatch(
+      ctx,
+      args.projectId,
+      args.targetOrganizationId,
+      MAX_PENDING_CHANGE_REQUESTS_PER_MOVE
     );
+    if (retenanted >= MAX_PENDING_CHANGE_REQUESTS_PER_MOVE) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.changeRequests.mutations.retenantChangeRequests,
+        {
+          projectId: args.projectId,
+          organizationId: args.targetOrganizationId,
+        }
+      );
+    }
 
     // Audit log in source org
     await ctx.db.insert("auditLogs", {

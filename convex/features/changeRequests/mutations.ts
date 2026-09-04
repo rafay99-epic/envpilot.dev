@@ -730,6 +730,35 @@ export const cancelForTarget = internalMutation({
  * unbounded inbox inside its own transaction; each pass patches only rows
  * still carrying the old org, so it reschedules itself until none remain.
  */
+/**
+ * Patch organizationId onto up to `max` rows of a moved project that still
+ * carry the source organization. Returns how many were patched; a full batch
+ * means more may remain.
+ */
+export async function retenantChangeRequestsBatch(
+  ctx: MutationCtx,
+  projectId: Id<"projects">,
+  organizationId: Id<"organizations">,
+  max: number
+): Promise<number> {
+  let patched = 0;
+  for (const status of RETENANT_STATUSES) {
+    if (patched >= max) break;
+    const stale = await ctx.db
+      .query("changeRequests")
+      .withIndex("by_project_status", (q) =>
+        q.eq("projectId", projectId).eq("status", status)
+      )
+      .filter((q) => q.neq(q.field("organizationId"), organizationId))
+      .take(max - patched);
+    for (const request of stale) {
+      await ctx.db.patch(request._id, { organizationId });
+      patched++;
+    }
+  }
+  return patched;
+}
+
 export const retenantChangeRequests = internalMutation({
   args: {
     projectId: v.id("projects"),
@@ -741,23 +770,12 @@ export const retenantChangeRequests = internalMutation({
     // A later move already superseded this pass; its own chain owns the rows.
     if (!project || project.organizationId !== args.organizationId) return 0;
 
-    let patched = 0;
-    for (const status of RETENANT_STATUSES) {
-      if (patched >= RETENANT_BATCH) break;
-      const stale = await ctx.db
-        .query("changeRequests")
-        .withIndex("by_project_status", (q) =>
-          q.eq("projectId", args.projectId).eq("status", status)
-        )
-        .filter((q) => q.neq(q.field("organizationId"), args.organizationId))
-        .take(RETENANT_BATCH - patched);
-      for (const request of stale) {
-        await ctx.db.patch(request._id, {
-          organizationId: args.organizationId,
-        });
-        patched++;
-      }
-    }
+    const patched = await retenantChangeRequestsBatch(
+      ctx,
+      args.projectId,
+      args.organizationId,
+      RETENANT_BATCH
+    );
     // A short pass means every status range was exhausted: nothing is left.
     if (patched >= RETENANT_BATCH) {
       await ctx.scheduler.runAfter(

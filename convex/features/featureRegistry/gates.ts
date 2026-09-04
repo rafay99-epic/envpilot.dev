@@ -314,9 +314,6 @@ export async function countMembersAndPendingInvites(
   return members.length + pendingInvites.length;
 }
 
-/** Active rows one project contributes to a rotation count before the read stops. */
-const ROTATION_SCAN_PER_PROJECT = 500;
-
 /**
  * Count rotation-enabled (non-deleted) variables across every live project
  * of an organization.
@@ -345,20 +342,16 @@ export async function countRotationEnabledVariables(
     // ACTIVE rows only, through the index: trash accumulates without bound
     // and cannot hold a rotation slot, so reading by_project and filtering in
     // memory grew the scan with deleted history. Rotation is not an indexed
-    // field, so the active range itself still has to be read. Enforcement
-    // (finite limit) caps it per project: a project that large sits on an
-    // unlimited tier, which short-circuits in checkCountedLimit and never
-    // runs this count. Display (no limit) reads the whole active range so
-    // the usage page never under-reports.
-    const activeRange = db
+    // field, so the whole active range is read: a raw-row cap would let
+    // rotation-enabled rows past the cap slip under a finite limit. The
+    // active range is itself bounded by max_variables_per_project on every
+    // finite tier, and unlimited tiers never reach this count.
+    const active = await db
       .query("environmentVariables")
       .withIndex("by_project_deleted", (q) =>
         q.eq("projectId", project._id).eq("deletedAt", undefined)
-      );
-    const active =
-      limit === undefined
-        ? await activeRange.collect()
-        : await activeRange.take(ROTATION_SCAN_PER_PROJECT);
+      )
+      .collect();
 
     for (const variable of active) {
       if (limit !== undefined && count >= limit) break;
