@@ -123,15 +123,16 @@ export function ChangeReviewDrawer({
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
+    // Reset on both paths without a finally: a finally would make the React
+    // Compiler skip this component.
     try {
       await action();
+      setBusy(false);
+      onClose();
     } catch (err) {
       setError(sanitizeConvexError(err));
       setBusy(false);
-      return;
     }
-    setBusy(false);
-    onClose();
   };
 
   const payload = request ? parsePayload(request.payload) : null;
