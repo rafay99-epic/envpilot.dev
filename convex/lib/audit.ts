@@ -28,7 +28,8 @@ export type AuditResourceType =
   | "security"
   | "account"
   | "file"
-  | "doc";
+  | "doc"
+  | "change_request";
 
 // Severity mapping for different action types
 const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
@@ -115,6 +116,18 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "doc.share_revoked": "info",
   // A page leaving the organization is the event worth finding later.
   "doc.share_viewed": "warning",
+
+  // Protected environments. Disabling and overriding are the two ways a
+  // production write skips a second person, so both are critical.
+  "protection.enabled": "warning",
+  "protection.disabled": "critical",
+  "change.requested": "info",
+  "change.applied": "warning",
+  "change.rejected": "info",
+  "change.canceled": "info",
+  "change.expired": "info",
+  "change.overridden": "critical",
+  "change.reminder_sent": "info",
 };
 
 // Resource type mapping for different action types
@@ -236,6 +249,16 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "doc.shared": "doc",
   "doc.share_revoked": "doc",
   "doc.share_viewed": "doc",
+
+  "protection.enabled": "project",
+  "protection.disabled": "project",
+  "change.requested": "change_request",
+  "change.applied": "change_request",
+  "change.rejected": "change_request",
+  "change.canceled": "change_request",
+  "change.expired": "change_request",
+  "change.overridden": "change_request",
+  "change.reminder_sent": "change_request",
 };
 
 export interface AuditLogInput {

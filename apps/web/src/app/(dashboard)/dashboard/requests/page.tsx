@@ -15,6 +15,7 @@ import {
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
 import { ConfirmDialog } from "@/components/ui";
+import { ChangeRequestList } from "@/components/changes";
 import { ENVIRONMENTS } from "@/constants/project";
 import {
   Check,
@@ -115,6 +116,7 @@ export default function RequestsPage() {
     (roleMeta?.level ?? roleLevel(normalizeOrgRole(organization?.role))) >=
     ROLE_LEVEL.team_lead;
 
+  const [surface, setSurface] = useState<"variables" | "changes">("variables");
   const [status, setStatus] = useState<RequestStatus>("pending");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -272,14 +274,44 @@ export default function RequestsPage() {
     <PageHeader
       icon={GitPullRequest}
       title="Variable Requests"
-      description="Review and approve developer-submitted variables"
+      description="Review developer-submitted variables and protected-environment changes"
     />
   );
+
+  const surfaceTabs = (
+    <div className="flex flex-wrap gap-2">
+      {(["variables", "changes"] as const).map((value) => (
+        <button
+          key={value}
+          onClick={() => setSurface(value)}
+          data-testid={`requests-surface-${value}`}
+          className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+            surface === value
+              ? "border-accent-line bg-accent-soft text-accent"
+              : "border-line text-ink-muted hover:border-line-strong hover:text-ink-muted"
+          }`}
+        >
+          {value === "variables" ? "Variables" : "Changes"}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (surface === "changes") {
+    return (
+      <div className="space-y-6" data-testid="requests-page">
+        {header}
+        {surfaceTabs}
+        <ChangeRequestList organizationId={activeOrganizationId} />
+      </div>
+    );
+  }
 
   if (!canReview) {
     return (
       <div className="space-y-6" data-testid="requests-page">
         {header}
+        {surfaceTabs}
         <TerminalWindow title="requests">
           <TerminalEmptyState
             command="envpilot request review"
@@ -295,6 +327,7 @@ export default function RequestsPage() {
   return (
     <div className="space-y-6" data-testid="requests-page">
       {header}
+      {surfaceTabs}
 
       {/* Notices */}
       {notice && (

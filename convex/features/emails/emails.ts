@@ -819,6 +819,157 @@ export const sendVariableRequestReviewedEmail = internalAction({
   },
 });
 
+// ============================================================
+// Protected environments: change requests
+// ============================================================
+
+function changeRequestLink(): string {
+  const appUrl = getEmailConfig()?.appUrl || "https://www.envpilot.dev";
+  return `${appUrl}/dashboard/requests`;
+}
+
+export const sendChangeRequestCreatedEmail = internalAction({
+  args: {
+    recipients: v.array(v.string()),
+    projectName: v.string(),
+    requesterName: v.string(),
+    label: v.string(),
+    kind: v.string(),
+    environments: v.array(v.string()),
+  },
+  handler: async (_ctx, args) => {
+    if (args.recipients.length === 0) return;
+
+    const link = changeRequestLink();
+    const envText = args.environments.join(", ");
+    const subject = `Change request: ${args.kind} ${args.label} in ${args.projectName} (${envText})`;
+
+    const html = emailWrapper(
+      "New Change Request",
+      [
+        iconRow(args.projectName.charAt(0).toUpperCase()),
+        headingRow("New Change Request"),
+        paragraphRow(
+          `<strong>${escapeHtml(args.requesterName)}</strong> proposed to ${escapeHtml(args.kind)} <code style="${CODE_STYLE}">${escapeHtml(args.label)}</code> in <strong>${escapeHtml(envText)}</strong> for <strong>${escapeHtml(args.projectName)}</strong>. It needs a second person to apply it.`
+        ),
+        buttonRow(link, "Review Change"),
+        footerRow(
+          `You received this because you can approve changes to protected environments in this project.<br><br>Link not working? Copy this:<br><a href="${link}" style="color: #22c55e; word-break: break-all;">${link}</a>`
+        ),
+      ].join(""),
+      `${args.requesterName} proposed to ${args.kind} ${args.label} in ${envText}.`
+    );
+
+    const text = `New Change Request\n\n${args.requesterName} proposed to ${args.kind} ${args.label} in ${envText} for ${args.projectName}.\n\nReview it: ${link}`;
+
+    for (const recipient of args.recipients) {
+      await sendEmail(recipient, subject, html, text).catch((err) =>
+        console.error("emails.sendChangeRequestCreatedEmail.sendFailed", {
+          label: args.label,
+          recipient,
+          error: String(err),
+        })
+      );
+    }
+  },
+});
+
+export const sendChangeRequestReviewedEmail = internalAction({
+  args: {
+    to: v.string(),
+    label: v.string(),
+    projectName: v.string(),
+    verdict: v.union(v.literal("applied"), v.literal("rejected")),
+    reviewerName: v.string(),
+    reason: v.optional(v.string()),
+  },
+  handler: async (_ctx, args) => {
+    const applied = args.verdict === "applied";
+    const heading = applied
+      ? "Change Request Applied"
+      : "Change Request Rejected";
+    const subject = `Your change request for ${args.label} was ${args.verdict}`;
+
+    const verdictLine = applied
+      ? `Your change to <code style="${CODE_STYLE}">${escapeHtml(args.label)}</code> in <strong>${escapeHtml(args.projectName)}</strong> was <strong style="color:#4ade80;">applied</strong> by ${escapeHtml(args.reviewerName)}.`
+      : `Your change to <code style="${CODE_STYLE}">${escapeHtml(args.label)}</code> in <strong>${escapeHtml(args.projectName)}</strong> was <strong style="color:#f87171;">rejected</strong> by ${escapeHtml(args.reviewerName)}.`;
+
+    const rows = [
+      iconRow(
+        args.projectName.charAt(0).toUpperCase(),
+        applied ? undefined : "#dc2626"
+      ),
+      headingRow(heading),
+      paragraphRow(verdictLine),
+    ];
+    if (args.reason) {
+      rows.push(
+        paragraphRow(
+          `Note: ${escapeHtml(args.reason)}`,
+          "font-size: 14px; line-height: 1.5; color: #71717a;"
+        )
+      );
+    }
+    rows.push(
+      footerRow("You received this because you filed this change request.")
+    );
+
+    const text = `${heading}\n\nYour change to ${args.label} in ${args.projectName} was ${args.verdict} by ${args.reviewerName}.${
+      args.reason ? `\n\nNote: ${args.reason}` : ""
+    }`;
+
+    return sendEmail(
+      args.to,
+      subject,
+      emailWrapper(heading, rows.join("")),
+      text
+    );
+  },
+});
+
+export const sendChangeRequestReminderEmail = internalAction({
+  args: {
+    recipients: v.array(v.string()),
+    projectName: v.string(),
+    label: v.string(),
+    ageHours: v.number(),
+  },
+  handler: async (_ctx, args) => {
+    if (args.recipients.length === 0) return;
+
+    const link = changeRequestLink();
+    const subject = `Still waiting: change request for ${args.label} in ${args.projectName}`;
+
+    const html = emailWrapper(
+      "Change Request Waiting",
+      [
+        iconRow(args.projectName.charAt(0).toUpperCase()),
+        headingRow("Change Request Waiting"),
+        paragraphRow(
+          `The change to <code style="${CODE_STYLE}">${escapeHtml(args.label)}</code> in <strong>${escapeHtml(args.projectName)}</strong> has been waiting ${args.ageHours} hours for a second person.`
+        ),
+        buttonRow(link, "Review Change"),
+        footerRow(
+          "You received this because you can approve changes to protected environments in this project."
+        ),
+      ].join(""),
+      `${args.label} in ${args.projectName} has been waiting ${args.ageHours} hours.`
+    );
+
+    const text = `Change Request Waiting\n\n${args.label} in ${args.projectName} has been waiting ${args.ageHours} hours for a second person.\n\nReview it: ${link}`;
+
+    for (const recipient of args.recipients) {
+      await sendEmail(recipient, subject, html, text).catch((err) =>
+        console.error("emails.sendChangeRequestReminderEmail.sendFailed", {
+          label: args.label,
+          recipient,
+          error: String(err),
+        })
+      );
+    }
+  },
+});
+
 /**
  * "X shared a documentation page with you" — the internal audience.
  *

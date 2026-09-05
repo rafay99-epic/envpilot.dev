@@ -16,6 +16,7 @@ import {
   getRoleProfile,
   bypassesAssignment,
   hasCapability,
+  effectiveEnvironments,
   profileToLegacyProjectRole,
 } from "../../lib/authz";
 import {
@@ -23,6 +24,7 @@ import {
   mapVariableRow,
   resolveProjectAccessContext,
   findEnvironmentConflicts,
+  validateVariableCreateFields,
 } from "./helpers";
 
 /**
@@ -175,9 +177,10 @@ export const listOrgVariablesWithAccess = query({
     > = [];
 
     for (const project of accessibleProjects) {
-      const environmentScope = hasCapability(profile, "access.env_scoped")
-        ? scopeByProject.get(project._id as string)
-        : undefined;
+      const environmentScope = effectiveEnvironments(
+        profile,
+        scopeByProject.get(project._id as string)
+      );
 
       const allVariables = await ctx.db
         .query("environmentVariables")
@@ -391,9 +394,10 @@ export const listOrgVariablesWithAccessPaginated = query({
       isDone = true;
     } else {
       const project = accessibleProjects[pi];
-      const environmentScope = hasCapability(profile, "access.env_scoped")
-        ? scopeByProject.get(project._id as string)
-        : undefined;
+      const environmentScope = effectiveEnvironments(
+        profile,
+        scopeByProject.get(project._id as string)
+      );
 
       const inner = await ctx.db
         .query("environmentVariables")
@@ -596,6 +600,52 @@ export const listWithAccess = query({
       userId: actor._id,
     });
     return variables;
+  },
+});
+
+/**
+ * Keys invisible to the caller because they fall outside their environment
+ * scope — variables listWithAccess silently omits. KEYS ONLY, never values;
+ * a doctor-style visibility aid, bounded to 100 so a large project never
+ * turns this into an unbounded scan result.
+ */
+export const hiddenByScope = query({
+  args: { projectId: v.id("projects") },
+  returns: v.object({
+    scope: v.union(v.array(v.string()), v.null()),
+    hiddenKeys: v.array(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const resolved = await resolveProjectAccessContext(
+      ctx,
+      args.projectId,
+      actor._id
+    );
+    if (
+      !resolved ||
+      !resolved.access.assigned ||
+      !resolved.access.environmentScope
+    ) {
+      return { scope: null, hiddenKeys: [] };
+    }
+    const { environmentScope } = resolved.access;
+
+    const variables = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+      )
+      .take(LIST_READ_CAP);
+
+    const hiddenKeys: string[] = [];
+    for (const variable of variables) {
+      if (hiddenKeys.length >= 100) break;
+      if (!isEnvironmentScopeAllowed(environmentScope, variable.environments)) {
+        hiddenKeys.push(variable.key);
+      }
+    }
+    return { scope: environmentScope, hiddenKeys };
   },
 });
 
@@ -1086,12 +1136,10 @@ export const globalSearchWithAccess = query({
 
         // Scoped developers never receive out-of-scope variables at all —
         // not even their metadata/keys
-        const environmentScope = hasCapability(
+        const environmentScope = effectiveEnvironments(
           searchProfile,
-          "access.env_scoped"
-        )
-          ? scopeByProject.get(project._id as string)
-          : undefined;
+          scopeByProject.get(project._id as string)
+        );
 
         const matches = variables.filter(
           (variable) =>
@@ -1248,6 +1296,35 @@ export const getDeleted = query({
  * Empty array = the create is allowed (same key across disjoint
  * environments is legal).
  */
+/**
+ * Internal: everything the create mutation validates about a create's
+ * non-secret fields (rotation window and gating, tag ownership), run by
+ * createWithValue BEFORE it mints a vault object. A protected create files a
+ * change request instead of reaching the mutation, so without this an
+ * invalid rotation window or a foreign tag would only fail at approval,
+ * leaving a stuck proposal with a staged secret.
+ */
+export const validateCreateFieldsInternal = internalQuery({
+  args: {
+    projectId: v.id("projects"),
+    rotationFrequencyDays: v.optional(v.number()),
+    tagIds: v.optional(v.array(v.id("variableTags"))),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) {
+      throw new ConvexError("Project not found");
+    }
+    await validateVariableCreateFields(ctx.db, {
+      organizationId: project.organizationId,
+      rotationFrequencyDays: args.rotationFrequencyDays,
+      tagIds: args.tagIds,
+    });
+    return null;
+  },
+});
+
 export const getEnvironmentConflictsInternal = internalQuery({
   args: {
     projectId: v.id("projects"),

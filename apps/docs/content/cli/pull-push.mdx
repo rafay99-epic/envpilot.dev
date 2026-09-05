@@ -65,13 +65,26 @@ envpilot push
 #   ✗ STRIPE_SECRET_KEY
 ```
 
-<Callout type="danger" title="Push never files approval requests">
-  Denied keys are reported and skipped. To propose a brand-new variable for
-  review, use [`envpilot request`](/cli/requests) — that is the path a reviewer
-  can act on.
+<Callout
+  type="info"
+  title="Denied keys are not the same as a protected environment"
+>
+  Denied keys are reported and skipped — that is an access problem, not
+  something `--request` fixes. To propose a brand-new variable outside a
+  protected environment, use [`envpilot request`](/cli/requests) instead.
 </Callout>
 
 Pulling as a scope-limited role is symmetric: you receive the variables you are allowed to see, and nothing else appears in the file. Nothing signals that other keys exist.
+
+## Protected environments
+
+If the target environment is marked protected (Settings → Protection), a
+push touching it is refused outright — nothing is written, remote or vault.
+Re-run with `--request` to file one change request per changed or new key
+instead; each prints its key and request id, and a second person with the
+approve capability has to accept it before anything changes. `--replace`
+deletions are never proposed this way — narrow the diff or push without
+`--replace` first.
 
 ## Limits
 

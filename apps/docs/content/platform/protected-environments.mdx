@@ -1,0 +1,75 @@
+---
+title: Protected environments
+description: Every write into a protected environment becomes a change request that a second person applies. Covers variables, shared accounts, and secret files across the dashboard, CLI, MCP, and IDE plugins.
+icon: shield
+---
+
+# Protected environments
+
+Mark an environment as protected and nobody writes to it directly. Not the owner, not a lead, not an agent. A write becomes a change request: the new secret is encrypted at once, the request waits in the inbox, and a second person applies it. Production stays exactly as it was until then.
+
+Protection is enforced in one place, the backend mutations that write variables, accounts, and files. Every client calls those same mutations, so a new client cannot route around it.
+
+## Turning it on
+
+Project Settings, Protection. Pick the environments to protect. Needs the `project.protection.manage` capability (owner, project manager, team lead by default) and the Pro plan.
+
+Turning it off never needs the plan. An organization that lost the feature can always remove protection on purpose. Doing so is audited as critical and sent to your security notification channel.
+
+## Who does what
+
+| Role            | Sees            | Writes dev and staging | Writes production | Proposes a production change | Approves       | Configures | Override                 |
+| --------------- | --------------- | ---------------------- | ----------------- | ---------------------------- | -------------- | ---------- | ------------------------ |
+| Owner           | all             | yes                    | via approval      | yes                          | yes, never own | yes        | yes, audited as critical |
+| Project manager | all             | yes                    | via approval      | yes                          | yes, never own | yes        | no                       |
+| Team lead       | all             | yes                    | via approval      | yes                          | yes, never own | yes        | no                       |
+| Editor          | dev and staging | yes                    | never, cannot see | no                           | no             | no         | no                       |
+| Developer       | dev             | yes                    | never, cannot see | no                           | no             | no         | no                       |
+| Viewer          | all             | no                     | no                | no                           | no             | no         | no                       |
+
+Three rules hold this together.
+
+1. Nobody writes directly into a protected environment. The only live-write path is override, and every use is audited as critical.
+2. The person who proposed a change never approves it. Two people, always.
+3. Proposing needs no new permission. If you could edit the resource before protection, you can propose the edit after.
+
+## Role environment defaults
+
+Each role carries a default environment scope. Developers get development. Editors get development and staging. Leads, owners, and viewers see everything. Admins change these per role in the admin panel, and a project member's scope can narrow the role default but never widen it.
+
+Out-of-scope resources are hidden, not refused. A developer never sees a production variable, so there is nothing to click. The refusal only appears when someone reaches for it blind, for example `envpilot push --env production`.
+
+<Callout type="warning">
+  A variable that spans environments holds one value for all of them. If
+  `DATABASE_URL` is one row covering development and production, a
+  development-only developer cannot be shown it without leaking the production
+  value, so it is hidden entirely. Keep one row per environment for secrets. The
+  variable drawer warns when a new variable spans a scoped and an unscoped
+  environment.
+</Callout>
+
+## The flow
+
+1. A lead edits `DATABASE_URL` in production and saves.
+2. The backend checks the normal write capability and environment scope, then sees production is protected. It encrypts the new value into the vault, stores a pending change request, and returns "sent for approval". Production is untouched.
+3. Approvers get an email and, if configured, a Slack or Discord message. After 48 hours idle, one reminder goes out.
+4. A second lead opens the request, sees the current and proposed metadata (never plaintext), and approves with a reason. The backend re-checks that the approver is not the requester, that the resource did not change since the request was filed, and that no key conflict appeared, then applies the write in the same transaction.
+5. On reject, cancel, or expiry (30 days idle), the staged secret is deleted from the vault.
+
+## What counts as a protected write
+
+Any write that touches a protected environment, before or after the change: create, update, delete, restore from trash, rollback to an older version, and adding or removing a protected environment from a resource's list. Reads, exports, tags, share links, and rotation reminders are unaffected.
+
+## Every client
+
+| Surface                        | Protected write                                                                                                   |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| Dashboard                      | Save becomes "Propose change". The request appears in the Requests page.                                          |
+| CLI `push`                     | Refuses and lists the protected environments. `envpilot push --request` files one change request per changed key. |
+| CLI `secrets set`, `files add` | Offers to file a change request.                                                                                  |
+| MCP, VS Code, JetBrains        | Already request-only. Unchanged.                                                                                  |
+| GitHub Action, REST API        | Read-only. Unchanged.                                                                                             |
+
+## Activity log
+
+Every step writes an audit row: `protection.enabled`, `protection.disabled`, `change.requested`, `change.applied`, `change.rejected`, `change.canceled`, `change.expired`, `change.overridden`, `change.reminder_sent`. Each carries the environments it touched, so searching the audit log for "production" finds them.

@@ -17,6 +17,7 @@ import {
   getRoleProfile,
   bypassesAssignment,
   hasCapability,
+  effectiveEnvironments,
 } from "../../lib/authz";
 
 /**
@@ -113,10 +114,9 @@ export const list = query({
     // Unassigned members without assignment bypass can still hold per-file
     // grants (the "viewer sharing" path), so we do not bail out here.
     const assignmentBypassed = bypassesAssignment(profile);
-    const envScope =
-      hasCapability(profile, "access.env_scoped") && assignment
-        ? assignment.environments
-        : undefined;
+    const envScope = assignment
+      ? effectiveEnvironments(profile, assignment.environments)
+      : undefined;
 
     const rows = await ctx.db
       .query("projectFiles")

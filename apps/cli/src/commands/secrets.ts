@@ -10,8 +10,23 @@ import {
   notInitialized,
   invalidInput,
   handleError,
+  isProtectedEnvironmentError,
+  formatProtectedEnvironments,
 } from "../lib/errors.js";
 import { resolveEnvironment, ENVIRONMENTS } from "../lib/validators.js";
+
+/** Printed once a create/update-with-value action auto-files a proposal. */
+export function requestedSuccessMessage(requestId: string): string {
+  return `Sent for approval (request ${requestId}).`;
+}
+
+/** The confirm prompt / non-interactive message before proposing a delete. */
+export function protectedDeletePrompt(environments: string[]): string {
+  return `${formatProtectedEnvironments(environments)}. File a change request to delete it?`;
+}
+
+export const PROTECTED_DELETE_HINT =
+  "Re-run with --yes to file a change request.";
 
 const KEY_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
@@ -282,21 +297,32 @@ const setCommand = new Command("set")
 
         if (route.canWrite) {
           // Direct write — plan/tier limits enforced server-side; a tier
-          // denial arrives as a readable ConvexError via handleError.
+          // denial arrives as a readable ConvexError via handleError. A
+          // protected environment is not an error here: create/update-with-
+          // value auto-files a change request instead of writing, and the
+          // result carries `requested` rather than `_id`.
           const result = await withSpinner(
             `Setting ${key} in ${environment}...`,
             () =>
-              api.setVariable(projectId, environment, key, value, {
-                description: options.description,
-                isSensitive,
-              })
+              existing
+                ? api.updateVariableValue(existing._id, {
+                    value,
+                    description: options.description,
+                    isSensitive,
+                  })
+                : api.createVariableValue(
+                    projectId,
+                    [environment],
+                    key,
+                    value,
+                    { description: options.description, isSensitive }
+                  )
           );
-          if (result.unchanged) {
-            success(
-              `${chalk.bold(key)} already has this value in ${projectName}/${environment} — nothing to change.`
-            );
+          if ("requested" in result) {
+            success(requestedSuccessMessage(result.requestId));
+            info("Waiting for a second person to approve.");
           } else {
-            const verb = result.created > 0 ? "Created" : "Updated";
+            const verb = existing ? "Updated" : "Created";
             success(
               `${verb} ${chalk.bold(key)} in ${projectName}/${environment}.`
             );
@@ -409,21 +435,67 @@ const rmCommand = new Command("rm")
         }
       }
 
-      if (shared) {
-        await withSpinner(`Removing ${key} from ${environment}...`, () =>
-          api.removeVariableFromEnvironment(found._id, environment)
-        );
-        success(
-          `Removed ${chalk.bold(key)} from ${environment} — still live in: ${found.environments.filter((e) => e !== environment).join(", ")}.`
-        );
-      } else {
-        await withSpinner(`Deleting ${key}...`, () =>
-          api.removeVariable(found._id)
-        );
-        success(
-          `Deleted ${chalk.bold(key)} from ${projectName}/${environment}.`
-        );
-        info("Recover it from the dashboard trash if this was a mistake.");
+      try {
+        if (shared) {
+          await withSpinner(`Removing ${key} from ${environment}...`, () =>
+            api.removeVariableFromEnvironment(found._id, environment)
+          );
+          success(
+            `Removed ${chalk.bold(key)} from ${environment} — still live in: ${found.environments.filter((e) => e !== environment).join(", ")}.`
+          );
+        } else {
+          await withSpinner(`Deleting ${key}...`, () =>
+            api.removeVariable(found._id)
+          );
+          success(
+            `Deleted ${chalk.bold(key)} from ${projectName}/${environment}.`
+          );
+          info("Recover it from the dashboard trash if this was a mistake.");
+        }
+      } catch (err) {
+        if (!isProtectedEnvironmentError(err)) throw err;
+
+        const prompt = protectedDeletePrompt(err.data.environments);
+        if (!options.yes) {
+          if (!process.stdin.isTTY) {
+            error(prompt);
+            info(PROTECTED_DELETE_HINT);
+            process.exit(1);
+          }
+          const { proceed } = await inquirer.prompt<{ proceed: boolean }>([
+            {
+              type: "confirm",
+              name: "proceed",
+              message: prompt,
+              default: true,
+            },
+          ]);
+          if (!proceed) {
+            info("Nothing deleted.");
+            return;
+          }
+        }
+
+        const { requestId } = shared
+          ? await withSpinner("Filing change request...", () =>
+              api.createVariableChange({
+                projectId,
+                kind: "update",
+                variableId: found._id,
+                environments: found.environments.filter(
+                  (e) => e !== environment
+                ),
+              })
+            )
+          : await withSpinner("Filing change request...", () =>
+              api.createVariableChange({
+                projectId,
+                kind: "delete",
+                variableId: found._id,
+              })
+            );
+        success(requestedSuccessMessage(requestId));
+        info("Waiting for a second person to approve.");
       }
     } catch (err) {
       await handleError(err);

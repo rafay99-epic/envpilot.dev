@@ -113,6 +113,9 @@ export default defineSchema({
     sortOrder: v.number(),
     // capabilityKey -> granted. Missing key = false (fail closed).
     capabilities: v.record(v.string(), v.boolean()),
+    // Default environment scope for env-scopeable roles. Absent = all.
+    // A projectMembers.environments list may only narrow this.
+    environments: v.optional(v.array(v.string())),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -200,6 +203,17 @@ export default defineSchema({
     // (vscode_unsync_customization); pullValues re-checks the gate at read
     // time, so free/downgraded orgs always resolve to true.
     vscodeAutoUnsyncOnClose: v.optional(v.boolean()),
+    // Protected environments: every write touching one of these environments
+    // becomes a changeRequests row that a second person applies. Absent =
+    // nothing protected. Enforced in lib/protection.ts regardless of tier,
+    // so a downgrade never silently unprotects production.
+    protection: v.optional(
+      v.object({
+        environments: v.array(v.string()),
+        updatedBy: v.id("users"),
+        updatedAt: v.number(),
+      })
+    ),
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -214,6 +228,7 @@ export default defineSchema({
         v.literal("accounts"),
         v.literal("files"),
         v.literal("requests"),
+        v.literal("change_requests"),
         v.literal("shares"),
         v.literal("doc_content"),
         v.literal("doc_shares"),
@@ -420,6 +435,74 @@ export default defineSchema({
     .index("by_project_and_key", ["projectId", "key"])
     // Per-key open-pendings cap + revoke-time visibility for machine requests
     .index("by_requested_key_and_status", ["requestedByKeyId", "status"]),
+
+  // ==========================================
+  // CHANGE REQUESTS (protected environments)
+  // ==========================================
+  // A write into a protected environment lands here instead of on the
+  // resource. The secret is already encrypted (vaultRef / storageId are
+  // staged), so the reviewer never handles plaintext. Approve applies in the
+  // same mutation through the resource's own core write with viaRequestId.
+  changeRequests: defineTable({
+    organizationId: v.id("organizations"),
+    projectId: v.id("projects"),
+    resourceType: v.union(
+      v.literal("variable"),
+      v.literal("account"),
+      v.literal("file")
+    ),
+    kind: v.union(
+      v.literal("create"),
+      v.literal("update"),
+      v.literal("delete"),
+      v.literal("restore"),
+      v.literal("rollback")
+    ),
+    // Existing resource id; absent on create
+    targetId: v.optional(v.string()),
+    // resource.version at request time; approve refuses on mismatch
+    expectedVersion: v.optional(v.number()),
+    // Union of before and after environment sets: what the write touches
+    environments: v.array(v.string()),
+    // JSON of non-secret fields (key, description, environments, tags, path,
+    // mode, name, websiteUrl, versionId...). Never a value.
+    payload: v.string(),
+    // Staged secret for variable/account values, minted before the request
+    vaultRef: v.optional(v.string()),
+    // Staged ciphertext blob for files
+    storageId: v.optional(v.id("_storage")),
+    // Human-readable summary for lists and notifications (key, name, or path)
+    label: v.string(),
+    reason: v.optional(v.string()),
+    requestedBy: v.id("users"),
+    requestedByKeyId: v.optional(v.id("apiKeys")),
+    source: v.union(
+      v.literal("web"),
+      v.literal("cli"),
+      v.literal("mcp"),
+      v.literal("extension")
+    ),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("applied"),
+      v.literal("rejected"),
+      v.literal("canceled"),
+      v.literal("expired")
+    ),
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    reviewReason: v.optional(v.string()),
+    appliedResourceId: v.optional(v.string()),
+    // Set once the 48h idle reminder went out, so it goes out once
+    reminderSentAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project_status", ["projectId", "status"])
+    .index("by_org_status", ["organizationId", "status"])
+    .index("by_target_status", ["targetId", "status"])
+    .index("by_requester_status", ["requestedBy", "status"])
+    .index("by_status_created", ["status", "createdAt"]),
 
   // ==========================================
   // VARIABLE VERSIONS (History)
@@ -1297,7 +1380,17 @@ export default defineSchema({
       // The viewer's context travels in `details`, matching share.viewed.
       v.literal("doc.shared"),
       v.literal("doc.share_revoked"),
-      v.literal("doc.share_viewed")
+      v.literal("doc.share_viewed"),
+      // Protected environments and change requests
+      v.literal("protection.enabled"),
+      v.literal("protection.disabled"),
+      v.literal("change.requested"),
+      v.literal("change.applied"),
+      v.literal("change.rejected"),
+      v.literal("change.canceled"),
+      v.literal("change.expired"),
+      v.literal("change.overridden"),
+      v.literal("change.reminder_sent")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),
@@ -1327,7 +1420,8 @@ export default defineSchema({
         v.literal("security"),
         v.literal("account"),
         v.literal("file"),
-        v.literal("doc")
+        v.literal("doc"),
+        v.literal("change_request")
       )
     ),
     // Whether this action involved sensitive data

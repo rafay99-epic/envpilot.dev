@@ -110,6 +110,15 @@ const actionLabels: Record<string, string> = {
   "security.token_validation_failed": "Token validation failed",
   "security.rate_limit_exceeded": "Rate limit exceeded",
   "security.suspicious_activity": "Suspicious activity",
+  "protection.enabled": "Protection enabled",
+  "protection.disabled": "Protection disabled",
+  "change.requested": "Change requested",
+  "change.applied": "Change applied",
+  "change.rejected": "Change rejected",
+  "change.canceled": "Change canceled",
+  "change.expired": "Change expired",
+  "change.overridden": "Protection overridden",
+  "change.reminder_sent": "Change reminder sent",
 };
 
 const actionCategories = [
@@ -128,7 +137,17 @@ const actionCategories = [
   { value: "audit", label: "Audit" },
   { value: "system", label: "System" },
   { value: "security", label: "Security" },
+  { value: "protection", label: "Protection" },
+  { value: "change", label: "Change requests" },
 ];
+
+const ENVIRONMENT_FILTERS = ["development", "staging", "production"] as const;
+
+const ENV_CHIP: Record<string, string> = {
+  development: "border-accent-line bg-accent-soft text-accent",
+  staging: "border-warning-line bg-warning-soft text-warning",
+  production: "border-danger-line bg-danger-soft text-danger",
+};
 
 const severityColors: Record<string, string> = {
   info: "text-info",
@@ -198,6 +217,11 @@ function AuditPageContent() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  // Which environment an event touched, read from the audit row's own details
+  // (protection.* and change.* both record `environments`).
+  const [selectedEnvironment, setSelectedEnvironment] = useState<string | null>(
+    null
+  );
   const [dateRange, setDateRange] = useState("30d");
   const [isExporting, setIsExporting] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -234,7 +258,20 @@ function AuditPageContent() {
       selectedCategory === "all" ||
       log.action.startsWith(selectedCategory + ".");
 
-    return matchesSearch && matchesCategory;
+    // parsedDetails is JSON.parse output (any); narrow before reading it.
+    const details: unknown = log.parsedDetails;
+    const environments =
+      typeof details === "object" &&
+      details !== null &&
+      "environments" in details
+        ? details.environments
+        : undefined;
+    const matchesEnvironment =
+      selectedEnvironment === null ||
+      (Array.isArray(environments) &&
+        environments.includes(selectedEnvironment));
+
+    return matchesSearch && matchesCategory && matchesEnvironment;
   });
 
   // The export is a one-shot read, not a subscription: fetching it from the
@@ -387,6 +424,27 @@ function AuditPageContent() {
             </option>
           ))}
         </TerminalSelect>
+        <div className="flex flex-wrap gap-2">
+          {ENVIRONMENT_FILTERS.map((env) => {
+            const active = selectedEnvironment === env;
+            return (
+              <button
+                key={env}
+                type="button"
+                data-testid={`audit-env-${env}`}
+                aria-pressed={active}
+                onClick={() => setSelectedEnvironment(active ? null : env)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                  active
+                    ? ENV_CHIP[env]
+                    : "border-line text-ink-subtle hover:text-ink-muted"
+                }`}
+              >
+                {env}
+              </button>
+            );
+          })}
+        </div>
         <TerminalSelect
           value={dateRange}
           onChange={(e) => setDateRange(e.target.value)}

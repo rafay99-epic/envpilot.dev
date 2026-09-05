@@ -58,6 +58,20 @@ crons.interval(
   internal.features.variables.rotation.processRotationExpiry
 );
 
+// Change requests: expire 30-day-idle rows (purging staged vault objects)
+// and send the once-only 48h idle reminder to approvers. Daily is enough:
+// the read gate refuses stale rows regardless of when the sweep runs.
+crons.daily(
+  "expire stale change requests",
+  { hourUTC: 3, minuteUTC: 20 },
+  internal.features.changeRequests.mutations.expireStale
+);
+crons.daily(
+  "remind approvers of idle change requests",
+  { hourUTC: 9, minuteUTC: 0 },
+  internal.features.changeRequests.mutations.sendIdleReminders
+);
+
 // Clean up expired shared secrets every hour
 crons.interval(
   "cleanup expired shared secrets",

@@ -1,5 +1,7 @@
 import { ENVIRONMENTS } from "@/constants/project";
 
+const KNOWN: ReadonlySet<string> = new Set(ENVIRONMENTS);
+
 // Pure scope helpers, kept out of the component module so that file
 // exports only its component and Fast Refresh has a boundary it can
 // preserve state across.
@@ -9,16 +11,30 @@ export function allEnvironments(): string[] {
   return [...ENVIRONMENTS];
 }
 
-export function isUnrestrictedScope(selected: string[]): boolean {
-  return ENVIRONMENTS.every((env) => selected.includes(env));
+/**
+ * Whether `selected` covers every environment available to the member —
+ * every environment when the role default is unrestricted, or every
+ * environment in the role's ceiling otherwise.
+ */
+export function isUnrestrictedScope(
+  selected: string[],
+  ceiling?: string[]
+): boolean {
+  const universe = ceiling ?? ENVIRONMENTS;
+  const chosen = new Set(selected);
+  return universe.every((env) => chosen.has(env));
 }
 
 /**
- * Convert the UI selection to the API payload. All environments checked means
- * unrestricted — send nothing so the backend stores no scope.
+ * Convert the UI selection to the API payload. Covering the full ceiling
+ * (or all environments, when unrestricted) means unrestricted-within-role —
+ * send nothing so the assignment always inherits the role's current default.
  */
-export function scopeToPayload(selected: string[]): string[] | undefined {
-  return isUnrestrictedScope(selected) ? undefined : selected;
+export function scopeToPayload(
+  selected: string[],
+  ceiling?: string[]
+): string[] | undefined {
+  return isUnrestrictedScope(selected, ceiling) ? undefined : selected;
 }
 
 /** Human-readable scope for badges: "development, staging" or "All environments". */
@@ -27,9 +43,8 @@ export function formatEnvironmentScope(environments?: string[] | null): string {
   // rejects it on write, but a legacy row could carry it — show the truth).
   if (environments == null) return "All environments";
   if (environments.length === 0) return "No environments";
-  const known = ENVIRONMENTS.filter((env) => environments.includes(env));
-  const extras = environments.filter(
-    (env) => !(ENVIRONMENTS as readonly string[]).includes(env)
-  );
+  const scoped = new Set(environments);
+  const known = ENVIRONMENTS.filter((env) => scoped.has(env));
+  const extras = environments.filter((env) => !KNOWN.has(env));
   return [...known, ...extras].join(", ");
 }

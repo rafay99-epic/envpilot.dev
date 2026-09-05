@@ -31,6 +31,8 @@ import {
   notAuthenticated,
   notInitialized,
   handleError,
+  isProtectedEnvironmentError,
+  formatProtectedEnvironments,
 } from "../lib/errors.js";
 
 /**
@@ -339,6 +341,10 @@ const addCommand = new Command("add")
   .option("--mode <mode>", "File mode: 0600 (default) or 0400")
   .option("-d, --description <text>", "Optional description")
   .option("--project <name-or-id>", "Use a specific linked project")
+  .option(
+    "--request",
+    "Propose the upload for approval instead of failing when the target environment is protected"
+  )
   .action(async (localPath, options) => {
     try {
       if (!isAuthenticated()) throw notAuthenticated();
@@ -387,17 +393,38 @@ const addCommand = new Command("add")
           : localPath.replace(/^\.\//, ""));
       const name = options.name ?? basename(localPath);
 
-      const result = await withSpinner(`Uploading ${name}...`, () =>
-        createAPIClient().uploadSecretFile({
-          projectId,
-          name,
-          path: destination,
-          content: contents.toString("base64"),
-          mode: options.mode,
-          description: options.description,
-          environments,
-        })
-      );
+      let result:
+        | { fileId: string; size: number; sha256: string }
+        | { requested: true; requestId: string };
+      try {
+        result = await withSpinner(`Uploading ${name}...`, () =>
+          createAPIClient().uploadSecretFile({
+            projectId,
+            name,
+            path: destination,
+            content: contents.toString("base64"),
+            mode: options.mode,
+            description: options.description,
+            environments,
+            request: options.request === true,
+          })
+        );
+      } catch (err) {
+        if (isProtectedEnvironmentError(err) && options.request !== true) {
+          error(
+            `${formatProtectedEnvironments(err.data.environments)}. Nothing was uploaded. Re-run with --request to propose this for approval.`
+          );
+          process.exitCode = 1;
+          return;
+        }
+        throw err;
+      }
+
+      if ("requested" in result) {
+        success(`Sent for approval (request ${result.requestId}).`);
+        info("Waiting for a second person to approve.");
+        return;
+      }
 
       success(
         `Uploaded ${name} to ${projectName}  ${formatBytes(result.size)}  sha ${result.sha256.slice(0, 12)}…`
@@ -537,23 +564,108 @@ const rmCommand = new Command("rm")
         }
       }
 
-      if (detachOnly) {
-        // The server derives the surviving set itself — sending a computed
-        // array would overwrite an environment change another user made
-        // between the listing above and this call.
-        const result = await withSpinner(`Removing from ${env}...`, () =>
-          client.detachSecretFileEnvironment(match._id, env)
+      try {
+        if (detachOnly) {
+          // The server derives the surviving set itself — sending a computed
+          // array would overwrite an environment change another user made
+          // between the listing above and this call.
+          const result = await withSpinner(`Removing from ${env}...`, () =>
+            client.detachSecretFileEnvironment(match._id, env)
+          );
+          success(
+            `${match.name} removed from ${env}. Still in ${result.remaining.join(", ")}.`
+          );
+          return;
+        }
+      } catch (err) {
+        if (!isProtectedEnvironmentError(err)) throw err;
+
+        const prompt = `${formatProtectedEnvironments(err.data.environments)}. File a change request to remove it from ${env}?`;
+        if (!options.yes) {
+          if (!process.stdin.isTTY) {
+            error(prompt);
+            info("Re-run with --yes to file a change request.");
+            process.exitCode = 1;
+            return;
+          }
+          const { proceed } = await inquirer.prompt<{ proceed: boolean }>([
+            {
+              type: "confirm",
+              name: "proceed",
+              message: prompt,
+              default: true,
+            },
+          ]);
+          if (!proceed) {
+            info("Nothing changed.");
+            return;
+          }
+        }
+
+        const { requestId } = await withSpinner(
+          "Filing change request...",
+          () =>
+            client.createChangeRequest({
+              projectId,
+              resourceType: "file",
+              kind: "update",
+              targetId: match._id,
+              environments: match.environments,
+              payload: { environments: remaining },
+              label: match.name,
+            })
         );
-        success(
-          `${match.name} removed from ${env}. Still in ${result.remaining.join(", ")}.`
-        );
+        success(`Sent for approval (request ${requestId}).`);
+        info("Waiting for a second person to approve.");
         return;
       }
 
-      await withSpinner("Deleting...", () =>
-        client.removeSecretFile(match._id)
-      );
-      success(`Moved ${match.name} to trash. Restore it from the dashboard.`);
+      try {
+        await withSpinner("Deleting...", () =>
+          client.removeSecretFile(match._id)
+        );
+        success(`Moved ${match.name} to trash. Restore it from the dashboard.`);
+      } catch (err) {
+        if (!isProtectedEnvironmentError(err)) throw err;
+
+        const prompt = `${formatProtectedEnvironments(err.data.environments)}. File a change request to delete it?`;
+        if (!options.yes) {
+          if (!process.stdin.isTTY) {
+            error(prompt);
+            info("Re-run with --yes to file a change request.");
+            process.exitCode = 1;
+            return;
+          }
+          const { proceed } = await inquirer.prompt<{ proceed: boolean }>([
+            {
+              type: "confirm",
+              name: "proceed",
+              message: prompt,
+              default: true,
+            },
+          ]);
+          if (!proceed) {
+            info("Nothing deleted.");
+            return;
+          }
+        }
+
+        const { requestId } = await withSpinner(
+          "Filing change request...",
+          () =>
+            client.createChangeRequest({
+              projectId,
+              resourceType: "file",
+              kind: "delete",
+              targetId: match._id,
+              environments: match.environments,
+              payload: {},
+              label: match.name,
+            })
+        );
+        success(`Sent for approval (request ${requestId}).`);
+        info("Waiting for a second person to approve.");
+      }
     } catch (err) {
       handleError(err);
     }

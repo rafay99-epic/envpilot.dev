@@ -8,6 +8,7 @@ import {
   warning,
   withSpinner,
   diff as showDiff,
+  table,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import { isAuthenticated } from "../lib/config.js";
@@ -34,8 +35,52 @@ import {
   notInitialized,
   fileNotFound,
   handleError,
+  isProtectedEnvironmentError,
+  formatProtectedEnvironments,
 } from "../lib/errors.js";
+import type { PushBulkResult } from "../lib/api.js";
 import type { VariablesMeta } from "../types/index.js";
+
+/** The refusal shown when a push is denied outright (no `--request`). */
+export function protectedPushRefusalMessage(environments: string[]): string {
+  return `${formatProtectedEnvironments(environments)}. Nothing was pushed. Re-run with --request to propose these changes for approval.`;
+}
+
+/** Rows for the `--request` result table: key + the filed request's id. */
+export function formatRequestedRows(
+  requested: PushBulkResult["requested"]
+): Array<{ key: string; requestId: string }> {
+  return (requested ?? []).map((r) => ({ key: r.key, requestId: r.requestId }));
+}
+
+/**
+ * True only when every changed key was filed as a change request — no
+ * denial, no silent skip. `pushBulk`'s propose path stops at the first
+ * denial, so a non-empty `deniedKeys`/`skipped` means keys after it were
+ * never proposed at all, not just written directly.
+ */
+export function isRequestFilingComplete(
+  result: Pick<PushBulkResult, "deniedKeys" | "skipped">
+): boolean {
+  return (result.deniedKeys?.length ?? 0) === 0 && (result.skipped ?? 0) === 0;
+}
+
+/**
+ * True when `result` came from the propose (protected-environment) path —
+ * `pushBulk` always sets `requested` there, even to an empty array. That
+ * empty case is real: a rerun where every changed key was already filed in
+ * an earlier partial run, or a run where the very first key was denied
+ * before any could be filed. Checking `requested.length > 0` instead routes
+ * both straight to the direct-write success message, reporting a push that
+ * never happened.
+ */
+export function isProposedResult(
+  result: PushBulkResult
+): result is PushBulkResult & {
+  requested: NonNullable<PushBulkResult["requested"]>;
+} {
+  return result.requested !== undefined;
+}
 
 export const pushCommand = new Command("push")
   .description("Upload local .env file to cloud")
@@ -58,6 +103,10 @@ export const pushCommand = new Command("push")
   .option("--dry-run", "Show what would be uploaded without making changes")
   .option("--force", "Skip confirmation")
   .option("--project <name-or-id>", "Push to a specific linked project")
+  .option(
+    "--request",
+    "Propose changes for approval instead of failing when the target environment is protected"
+  )
   .action(async (options) => {
     try {
       if (!isAuthenticated()) {
@@ -279,21 +328,74 @@ export const pushCommand = new Command("push")
       }
 
       // Push variables
-      const result = await withSpinner(
-        `Pushing variables to ${chalk.bold(environment)}...`,
-        async () => {
-          return api.bulkUpsertVariables({
-            projectId,
-            environment,
-            variables: Object.entries(valid).map(([key, value]) => ({
-              key,
-              value,
-            })),
-            mode,
-            ...(organizationId && { organizationId }),
-          });
+      let result: PushBulkResult;
+      try {
+        result = await withSpinner(
+          `Pushing variables to ${chalk.bold(environment)}...`,
+          async () => {
+            return api.bulkUpsertVariables({
+              projectId,
+              environment,
+              variables: Object.entries(valid).map(([key, value]) => ({
+                key,
+                value,
+              })),
+              mode,
+              request: options.request === true,
+              ...(organizationId && { organizationId }),
+            });
+          }
+        );
+      } catch (err) {
+        if (isProtectedEnvironmentError(err) && options.request !== true) {
+          error(protectedPushRefusalMessage(err.data.environments));
+          process.exit(1);
         }
-      );
+        throw err;
+      }
+
+      if (isProposedResult(result)) {
+        if (result.requested.length > 0) {
+          success(
+            `Filed ${result.requested.length} change request(s) for ${chalk.bold(environment)}.`
+          );
+          console.log();
+          table(formatRequestedRows(result.requested), [
+            { key: "key", header: "KEY" },
+            { key: "requestId", header: "REQUEST ID" },
+          ]);
+        }
+
+        if (!isRequestFilingComplete(result)) {
+          console.log();
+          const deniedKeys = result.deniedKeys ?? [];
+          if (deniedKeys.length > 0) {
+            warning(
+              `${deniedKeys.length} variable(s) were NOT proposed (access denied):`
+            );
+            for (const key of deniedKeys) {
+              console.log(chalk.red(`  ✗ ${key}`));
+            }
+          }
+          if (result.skipped) {
+            warning(
+              `${result.skipped} variable(s) were skipped and not proposed.`
+            );
+          }
+          error(
+            "Not every changed key was proposed for approval. Re-run to retry the rest."
+          );
+          process.exit(1);
+        }
+
+        if (result.requested.length > 0) {
+          console.log();
+          info("Waiting for a second person to approve.");
+        } else {
+          success("Remote is up to date.");
+        }
+        return;
+      }
 
       success(
         `Pushed ${result?.total || Object.keys(valid).length} variables to ${chalk.bold(environment)}`

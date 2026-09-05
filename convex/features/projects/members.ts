@@ -4,6 +4,7 @@ import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import {
   assertCanManageUserAsync,
+  assertEnvironmentScopeNarrows,
   assertProjectAction,
   bypassesAssignment,
   getRoleProfile,
@@ -35,7 +36,10 @@ const LEGACY_PROJECT_ROLE_VALIDATOR = v.union(
 // ==========================================
 
 /**
- * List all members of a project with user details
+ * List all members of a project with user details, their resolved
+ * organization role, and roleEnvironments — the role's default environment
+ * scope (undefined = unrestricted), the ceiling a member's own scope may
+ * only narrow. The members page greys out environments outside this ceiling.
  */
 export const listByProject = query({
   args: { projectId: v.id("projects") },
@@ -45,12 +49,46 @@ export const listByProject = query({
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
 
+    const project = await ctx.db.get(args.projectId);
+    const profileMemo = new Map<
+      string,
+      Awaited<ReturnType<typeof getRoleProfile>>
+    >();
+
     const membersWithUsers = await Promise.all(
       members.map(async (member) => {
         const user = await ctx.db.get(member.userId);
         const addedByUser = await ctx.db.get(member.addedBy);
+
+        let orgRole: string | undefined;
+        let isOrgAdmin = false;
+        let roleEnvironments: string[] | undefined;
+        if (project) {
+          const orgMembership = await ctx.db
+            .query("organizationMembers")
+            .withIndex("by_org_and_user", (q) =>
+              q
+                .eq("organizationId", project.organizationId)
+                .eq("userId", member.userId)
+            )
+            .first();
+          if (orgMembership) {
+            orgRole = normalizeOrgRole(orgMembership.role);
+            let profile = profileMemo.get(orgRole);
+            if (!profile) {
+              profile = await getRoleProfile(ctx, orgRole);
+              profileMemo.set(orgRole, profile);
+            }
+            isOrgAdmin = bypassesAssignment(profile);
+            roleEnvironments = profile.environments;
+          }
+        }
+
         return {
           ...member,
+          orgRole,
+          isOrgAdmin,
+          roleEnvironments,
           user: user
             ? {
                 _id: user._id,
@@ -157,6 +195,7 @@ export const getAssignableOrgMembers = query({
     const requesterBypasses = bypassesAssignment(requesterProfile);
     const levelMemo = new Map<string, number>();
     const bypassMemo = new Map<string, boolean>();
+    const envMemo = new Map<string, string[] | undefined>();
     const prefiltered: typeof allOrgMembers = [];
     for (const member of allOrgMembers) {
       const slug = normalizeOrgRole(member.role);
@@ -164,6 +203,7 @@ export const getAssignableOrgMembers = query({
         const p = await getRoleProfile(ctx, slug);
         levelMemo.set(slug, p.level);
         bypassMemo.set(slug, bypassesAssignment(p));
+        envMemo.set(slug, p.environments);
       }
       if (bypassMemo.get(slug)) continue;
       if (assignedUserIds.has(member.userId.toString())) continue;
@@ -180,13 +220,15 @@ export const getAssignableOrgMembers = query({
     const assignable = await Promise.all(
       prefiltered.map(async (member) => {
         const user = await ctx.db.get(member.userId);
+        const slug = normalizeOrgRole(member.role);
         return user
           ? {
               _id: user._id,
               email: user.email,
               name: user.name,
               avatarUrl: user.avatarUrl,
-              orgRole: normalizeOrgRole(member.role),
+              orgRole: slug,
+              roleEnvironments: envMemo.get(slug),
             }
           : null;
       })
@@ -282,6 +324,7 @@ export const addMember = mutation({
     // Environment scope only constrains developers — owners, PMs, and team
     // leads are always unrestricted, so a scope on their assignment is ignored
     const targetProfile = await getRoleProfile(ctx, targetOrgMembership.role);
+    assertEnvironmentScopeNarrows(targetProfile, args.environments);
     const environmentScope = hasCapability(targetProfile, "access.env_scoped")
       ? args.environments
       : undefined;
@@ -514,6 +557,7 @@ export const setMemberEnvironments = mutation({
         "Environment scopes only apply to environment-scopeable roles — this role always has access to all environments"
       );
     }
+    assertEnvironmentScopeNarrows(scopeTargetProfile, args.environments);
 
     // Hierarchy: can only modify users whose org role is strictly below your own
     await assertCanManageUserAsync(

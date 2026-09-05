@@ -31,6 +31,24 @@ function validateCapabilityKeys(capabilities: Record<string, boolean>) {
   }
 }
 
+const VALID_ENVIRONMENTS = new Set(["development", "staging", "production"]);
+
+/** Validate a role's environment default: non-empty, unique, known values. */
+function validateEnvironments(environments: string[]) {
+  if (environments.length === 0) {
+    throw new ConvexError(
+      "Environment scope cannot be empty — omit it to allow all environments"
+    );
+  }
+  if (new Set(environments).size !== environments.length) {
+    throw new ConvexError("Environment scope cannot contain duplicates");
+  }
+  const unknown = environments.filter((env) => !VALID_ENVIRONMENTS.has(env));
+  if (unknown.length > 0) {
+    throw new ConvexError(`Unknown environment(s): ${unknown.join(", ")}`);
+  }
+}
+
 /** All roles sorted by sortOrder, with member + pending invitation counts */
 export const listRoles = query({
   args: {},
@@ -84,6 +102,8 @@ export const createRole = mutation({
     color: v.string(),
     level: v.number(),
     capabilities: v.record(v.string(), v.boolean()),
+    // Environment default for env-scopeable roles. Omit = unrestricted.
+    environments: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
@@ -115,6 +135,9 @@ export const createRole = mutation({
       throw new ConvexError(`A role with slug "${args.slug}" already exists`);
     }
     validateCapabilityKeys(args.capabilities);
+    if (args.environments !== undefined) {
+      validateEnvironments(args.environments);
+    }
 
     const roles = await ctx.db.query("roleRegistry").collect();
     const now = Date.now();
@@ -128,6 +151,7 @@ export const createRole = mutation({
       isActive: true,
       sortOrder: Math.max(0, ...roles.map((r) => r.sortOrder + 1)),
       capabilities: args.capabilities,
+      environments: args.environments,
       createdAt: now,
       updatedAt: now,
     });
@@ -145,6 +169,9 @@ export const updateRoleMeta = mutation({
     color: v.optional(v.string()),
     sortOrder: v.optional(v.number()),
     level: v.optional(v.number()),
+    // Environment default — a policy value, not identity, so it is editable
+    // for system roles too. null clears it (unrestricted); omit = no change.
+    environments: v.optional(v.union(v.array(v.string()), v.null())),
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
@@ -152,11 +179,17 @@ export const updateRoleMeta = mutation({
     if (!targetRole) throw new ConvexError("Role not found");
     // System-role identity (name, description, color, level, sort) is
     // code-defined and re-synced by every seed — accepting an edit here
-    // would silently revert on the next deploy. Capabilities are the only
-    // editable surface for system roles (via the matrix).
-    if (targetRole.isSystem) {
+    // would silently revert on the next deploy. Capabilities and the
+    // environment default are the editable surface for system roles.
+    const identitySupplied =
+      args.displayName !== undefined ||
+      args.description !== undefined ||
+      args.color !== undefined ||
+      args.sortOrder !== undefined ||
+      args.level !== undefined;
+    if (targetRole.isSystem && identitySupplied) {
       throw new ConvexError(
-        "System role identity is code-defined. Only capabilities are editable."
+        "System role identity is code-defined. Only capabilities and environment scope are editable."
       );
     }
     if (
@@ -169,12 +202,19 @@ export const updateRoleMeta = mutation({
         `Role level must be an integer between ${MIN_CUSTOM_LEVEL} and ${MAX_CUSTOM_LEVEL} (owner is always 100).`
       );
     }
+    if (args.environments !== undefined && args.environments !== null) {
+      validateEnvironments(args.environments);
+    }
     await ctx.db.patch(args.roleId, {
       ...(args.displayName !== undefined && { displayName: args.displayName }),
       ...(args.description !== undefined && { description: args.description }),
       ...(args.color !== undefined && { color: args.color }),
       ...(args.sortOrder !== undefined && { sortOrder: args.sortOrder }),
       ...(args.level !== undefined && { level: args.level }),
+      ...(args.environments !== undefined && {
+        environments:
+          args.environments === null ? undefined : args.environments,
+      }),
       updatedAt: Date.now(),
     });
     console.log(`[admin] role meta updated: ${targetRole.slug}`);

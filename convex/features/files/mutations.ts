@@ -1,7 +1,12 @@
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { MAX_PROJECT_FILES } from "../../lib/fileLimits";
-import { mutation, internalMutation } from "../../_generated/server";
+import {
+  mutation,
+  internalMutation,
+  type MutationCtx,
+} from "../../_generated/server";
+import type { Id } from "../../_generated/dataModel";
 import {
   checkBooleanFeature,
   checkCountedLimit,
@@ -17,7 +22,16 @@ import {
   isEnvironmentScopeAllowed,
   getRoleProfile,
   hasCapability,
+  effectiveEnvironments,
+  environmentAccessMessage,
 } from "../../lib/authz";
+import {
+  assertProtectedWrite,
+  isProtectedWrite,
+  protectedEnvironmentsIn,
+  touchedEnvironments,
+} from "../../lib/protection";
+import { cancelPendingForTarget } from "../changeRequests/mutations";
 import {
   findFilePathConflicts,
   filePathConflictMessage,
@@ -47,11 +61,9 @@ function assertWithinEnvironmentScope(
   scope: string[] | undefined,
   environments: string[]
 ): void {
-  if (!isEnvironmentScopeAllowed(scope, environments)) {
-    throw new ConvexError(
-      `Your access is limited to these environments: ${(scope ?? []).join(", ")}`
-    );
-  }
+  if (isEnvironmentScopeAllowed(scope, environments)) return;
+  const blocked = environments.find((env) => !(scope ?? []).includes(env))!;
+  throw new ConvexError(environmentAccessMessage(blocked));
 }
 
 /**
@@ -79,6 +91,14 @@ export const preflightUpload = internalMutation({
     path: v.string(),
     mode: v.string(),
     organizationId: v.id("organizations"),
+    // Protection is REPORTED here, not enforced: the caller decides whether
+    // to stage a request, and createCore / replaceContentCore refuse the
+    // direct write. Reporting it from inside the authorized preflight is
+    // what keeps protected environment names off an unauthorized caller.
+    protectedEnvironments: v.array(v.string()),
+    // The replaced file's current environments, for the touched set a
+    // staged request records.
+    existingEnvironments: v.optional(v.array(v.string())),
   }),
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.projectId);
@@ -97,8 +117,9 @@ export const preflightUpload = internalMutation({
       throw new ConvexError("File is empty");
     }
 
+    let existing = null;
     if (args.replaceFileId) {
-      const existing = await ctx.db.get(args.replaceFileId);
+      existing = await ctx.db.get(args.replaceFileId);
       if (!existing || existing.deletedAt) {
         throw new ConvexError("File not found");
       }
@@ -188,7 +209,17 @@ export const preflightUpload = internalMutation({
       throw new ConvexError(filePathConflictMessage(path, clashes));
     }
 
-    return { name, path, mode, organizationId: project.organizationId };
+    return {
+      name,
+      path,
+      mode,
+      organizationId: project.organizationId,
+      protectedEnvironments: protectedEnvironmentsIn(
+        project,
+        touchedEnvironments(existing?.environments, args.environments)
+      ),
+      existingEnvironments: existing?.environments,
+    };
   },
 });
 
@@ -199,6 +230,200 @@ export const preflightUpload = internalMutation({
  * Re-runs the path-conflict check: preflight ran before the (slow) encrypt,
  * so a concurrent upload could have taken the path in between.
  */
+export async function createCore(
+  ctx: MutationCtx,
+  args: {
+    projectId: Id<"projects">;
+    createdBy: Id<"users">;
+    name: string;
+    path: string;
+    mode: string;
+    contentType?: string;
+    description?: string;
+    environments: string[];
+    size: number;
+    sha256: string;
+    digestSalt: string;
+    vaultRef: string;
+    storageId: Id<"_storage">;
+    // Set ONLY by changeRequests/apply.ts. Never a client-supplied argument:
+    // it is what lets a write into a protected environment through.
+    viaRequestId?: Id<"changeRequests">;
+    override?: boolean;
+  }
+) {
+  const now = Date.now();
+
+  const project = await ctx.db.get(args.projectId);
+  if (!project || project.deletedAt) {
+    throw new ConvexError("Project not found");
+  }
+
+  const { environmentScope, profile: creatorProfile } =
+    await authorizeFileAccess(ctx, {
+      userId: args.createdBy,
+      projectId: args.projectId,
+      action: "project:create_file",
+      preloadedProject: project,
+    });
+  assertWithinEnvironmentScope(environmentScope, args.environments);
+
+  await assertProtectedWrite(ctx, {
+    project,
+    envs: args.environments,
+    actorId: args.createdBy,
+    resourceType: "file",
+    viaRequestId: args.viaRequestId,
+    override: args.override,
+  });
+
+  const clashes = await findFilePathConflicts(ctx, {
+    projectId: args.projectId,
+    path: args.path,
+    environments: args.environments,
+  });
+  if (clashes.length > 0) {
+    throw new ConvexError(filePathConflictMessage(args.path, clashes));
+  }
+
+  // Re-check the tier gates INSIDE the transaction. preflight runs before
+  // the (slow) encrypt, so the tier can be downgraded, the feature can be
+  // switched off, or a concurrent upload can consume the last slot while
+  // the bytes are in flight. The action already destroys the blob and
+  // vault object when this mutation rejects, so refusing here is free.
+  const insertGate = await resolveOrgGateContext(
+    ctx.db,
+    project.organizationId
+  );
+
+  const insertBoolGate = await checkBooleanFeature(
+    ctx.db,
+    project.organizationId,
+    "secret_files",
+    insertGate
+  );
+  if (!insertBoolGate.allowed) {
+    throw new ConvexError(
+      insertBoolGate.reason ?? "Secret files are not enabled for your tier."
+    );
+  }
+
+  const insertByteGate = await checkNumericLimit(
+    ctx.db,
+    project.organizationId,
+    "secret_files_max_bytes",
+    0,
+    insertGate
+  );
+  if (insertByteGate.limit !== null && args.size > insertByteGate.limit) {
+    throw new ConvexError(
+      `File is too large (${Math.ceil(args.size / 1024)} KB). Your plan allows up to ${Math.floor(
+        insertByteGate.limit / 1024
+      )} KB per file.`
+    );
+  }
+
+  const countGate = await checkCountedLimit(
+    ctx.db,
+    project.organizationId,
+    "secret_files_limit",
+    (limit) => countActiveFiles(ctx.db, project.organizationId, limit),
+    insertGate
+  );
+  if (!countGate.allowed) {
+    throw new ConvexError(
+      countGate.reason ??
+        `Secret file limit reached (${countGate.current}/${countGate.limit}). Upgrade your tier for more.`
+    );
+  }
+
+  // STRUCTURAL ceiling, separate from the tier limit (which Pro leaves
+  // unlimited). Enforced HERE rather than inferred from the collision
+  // scan: that scan only rejects a project already over the bound, so it
+  // permitted the write that took a project to 1001 — one row past every
+  // reader's cap, leaving the project unlistable and unpullable, and past
+  // the download burst sized to the same number.
+  const activeInProject = await ctx.db
+    .query("projectFiles")
+    .withIndex("by_project_deleted", (q) =>
+      q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+    )
+    .take(MAX_PROJECT_FILES);
+  if (activeInProject.length >= MAX_PROJECT_FILES) {
+    throw new ConvexError(
+      `This project already holds the maximum of ${MAX_PROJECT_FILES} secret files. Delete one, or contact support to raise the limit.`
+    );
+  }
+
+  const fileId = await ctx.db.insert("projectFiles", {
+    name: args.name,
+    path: args.path,
+    mode: args.mode,
+    contentType: args.contentType,
+    size: args.size,
+    sha256: args.sha256,
+    digestSalt: args.digestSalt,
+    vaultRef: args.vaultRef,
+    storageId: args.storageId,
+    description: args.description,
+    environments: args.environments,
+    projectId: args.projectId,
+    createdBy: args.createdBy,
+    lastModifiedBy: args.createdBy,
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  // Uploaders WITHOUT blanket write get an automatic write grant, so a
+  // developer can manage the file they just added (parity with accounts).
+  if (!hasCapability(creatorProfile, "project.files.update")) {
+    await ctx.db.insert("filePermissions", {
+      fileId,
+      userId: args.createdBy,
+      permission: "write",
+      grantedBy: args.createdBy,
+      grantedAt: now,
+      isActive: true,
+    });
+  }
+
+  await createAuditLog(ctx, {
+    organizationId: project.organizationId,
+    projectId: args.projectId,
+    userId: args.createdBy,
+    action: "file.created",
+    details: {
+      fileId,
+      fileName: args.name,
+      path: args.path,
+      size: args.size,
+      environments: args.environments,
+    },
+    involvesSensitiveData: true,
+    resourceType: "file",
+  });
+
+  if (args.override && isProtectedWrite(project, args.environments)) {
+    await createAuditLog(ctx, {
+      organizationId: project.organizationId,
+      projectId: args.projectId,
+      userId: args.createdBy,
+      action: "change.overridden",
+      resourceType: "file",
+      details: {
+        fileId,
+        fileName: args.name,
+        path: args.path,
+        environments: args.environments,
+        kind: "create",
+      },
+    });
+  }
+
+  return fileId;
+}
+
 export const create = internalMutation({
   args: {
     projectId: v.id("projects"),
@@ -214,154 +439,10 @@ export const create = internalMutation({
     digestSalt: v.string(),
     vaultRef: v.string(),
     storageId: v.id("_storage"),
+    override: v.optional(v.boolean()),
   },
   returns: v.id("projectFiles"),
-  handler: async (ctx, args) => {
-    const now = Date.now();
-
-    const project = await ctx.db.get(args.projectId);
-    if (!project || project.deletedAt) {
-      throw new ConvexError("Project not found");
-    }
-
-    const { environmentScope, profile: creatorProfile } =
-      await authorizeFileAccess(ctx, {
-        userId: args.createdBy,
-        projectId: args.projectId,
-        action: "project:create_file",
-        preloadedProject: project,
-      });
-    assertWithinEnvironmentScope(environmentScope, args.environments);
-
-    const clashes = await findFilePathConflicts(ctx, {
-      projectId: args.projectId,
-      path: args.path,
-      environments: args.environments,
-    });
-    if (clashes.length > 0) {
-      throw new ConvexError(filePathConflictMessage(args.path, clashes));
-    }
-
-    // Re-check the tier gates INSIDE the transaction. preflight runs before
-    // the (slow) encrypt, so the tier can be downgraded, the feature can be
-    // switched off, or a concurrent upload can consume the last slot while
-    // the bytes are in flight. The action already destroys the blob and
-    // vault object when this mutation rejects, so refusing here is free.
-    const insertGate = await resolveOrgGateContext(
-      ctx.db,
-      project.organizationId
-    );
-
-    const insertBoolGate = await checkBooleanFeature(
-      ctx.db,
-      project.organizationId,
-      "secret_files",
-      insertGate
-    );
-    if (!insertBoolGate.allowed) {
-      throw new ConvexError(
-        insertBoolGate.reason ?? "Secret files are not enabled for your tier."
-      );
-    }
-
-    const insertByteGate = await checkNumericLimit(
-      ctx.db,
-      project.organizationId,
-      "secret_files_max_bytes",
-      0,
-      insertGate
-    );
-    if (insertByteGate.limit !== null && args.size > insertByteGate.limit) {
-      throw new ConvexError(
-        `File is too large (${Math.ceil(args.size / 1024)} KB). Your plan allows up to ${Math.floor(
-          insertByteGate.limit / 1024
-        )} KB per file.`
-      );
-    }
-
-    const countGate = await checkCountedLimit(
-      ctx.db,
-      project.organizationId,
-      "secret_files_limit",
-      (limit) => countActiveFiles(ctx.db, project.organizationId, limit),
-      insertGate
-    );
-    if (!countGate.allowed) {
-      throw new ConvexError(
-        countGate.reason ??
-          `Secret file limit reached (${countGate.current}/${countGate.limit}). Upgrade your tier for more.`
-      );
-    }
-
-    // STRUCTURAL ceiling, separate from the tier limit (which Pro leaves
-    // unlimited). Enforced HERE rather than inferred from the collision
-    // scan: that scan only rejects a project already over the bound, so it
-    // permitted the write that took a project to 1001 — one row past every
-    // reader's cap, leaving the project unlistable and unpullable, and past
-    // the download burst sized to the same number.
-    const activeInProject = await ctx.db
-      .query("projectFiles")
-      .withIndex("by_project_deleted", (q) =>
-        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
-      )
-      .take(MAX_PROJECT_FILES);
-    if (activeInProject.length >= MAX_PROJECT_FILES) {
-      throw new ConvexError(
-        `This project already holds the maximum of ${MAX_PROJECT_FILES} secret files. Delete one, or contact support to raise the limit.`
-      );
-    }
-
-    const fileId = await ctx.db.insert("projectFiles", {
-      name: args.name,
-      path: args.path,
-      mode: args.mode,
-      contentType: args.contentType,
-      size: args.size,
-      sha256: args.sha256,
-      digestSalt: args.digestSalt,
-      vaultRef: args.vaultRef,
-      storageId: args.storageId,
-      description: args.description,
-      environments: args.environments,
-      projectId: args.projectId,
-      createdBy: args.createdBy,
-      lastModifiedBy: args.createdBy,
-      version: 1,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    // Uploaders WITHOUT blanket write get an automatic write grant, so a
-    // developer can manage the file they just added (parity with accounts).
-    if (!hasCapability(creatorProfile, "project.files.update")) {
-      await ctx.db.insert("filePermissions", {
-        fileId,
-        userId: args.createdBy,
-        permission: "write",
-        grantedBy: args.createdBy,
-        grantedAt: now,
-        isActive: true,
-      });
-    }
-
-    await createAuditLog(ctx, {
-      organizationId: project.organizationId,
-      projectId: args.projectId,
-      userId: args.createdBy,
-      action: "file.created",
-      details: {
-        fileId,
-        fileName: args.name,
-        path: args.path,
-        size: args.size,
-        environments: args.environments,
-      },
-      involvesSensitiveData: true,
-      resourceType: "file",
-    });
-
-    return fileId;
-  },
+  handler: async (ctx, args) => createCore(ctx, args),
 });
 
 /**
@@ -372,6 +453,98 @@ export const create = internalMutation({
  * key material into a fresh blob, and only then does this swap the pointers.
  * That is what makes nonce reuse unreachable.
  */
+export async function replaceContentCore(
+  ctx: MutationCtx,
+  args: {
+    fileId: Id<"projectFiles">;
+    userId: Id<"users">;
+    size: number;
+    sha256: string;
+    digestSalt: string;
+    vaultRef: string;
+    storageId: Id<"_storage">;
+    contentType?: string;
+    viaRequestId?: Id<"changeRequests">;
+    override?: boolean;
+  }
+) {
+  const now = Date.now();
+
+  const file = await ctx.db.get(args.fileId);
+  if (!file || file.deletedAt) {
+    throw new ConvexError("File not found");
+  }
+  const project = await ctx.db.get(file.projectId);
+  if (!project) {
+    throw new ConvexError("Project not found");
+  }
+
+  await requireFileAccess(ctx, args.userId, file, "write", project);
+
+  await assertProtectedWrite(ctx, {
+    project,
+    envs: file.environments,
+    actorId: args.userId,
+    resourceType: "file",
+    targetId: args.fileId,
+    viaRequestId: args.viaRequestId,
+    override: args.override,
+  });
+
+  const previousVaultRef = file.vaultRef;
+  const previousStorageId = file.storageId;
+  const newVersion = file.version + 1;
+
+  await ctx.db.patch(args.fileId, {
+    size: args.size,
+    sha256: args.sha256,
+    digestSalt: args.digestSalt,
+    vaultRef: args.vaultRef,
+    storageId: args.storageId,
+    contentType: args.contentType ?? file.contentType,
+    version: newVersion,
+    lastModifiedBy: args.userId,
+    updatedAt: now,
+  });
+
+  await createAuditLog(ctx, {
+    organizationId: project.organizationId,
+    projectId: file.projectId,
+    userId: args.userId,
+    action: "file.updated",
+    details: {
+      fileId: args.fileId,
+      fileName: file.name,
+      path: file.path,
+      newVersion,
+      previousVersion: file.version,
+      contentReplaced: true,
+      size: args.size,
+    },
+    involvesSensitiveData: true,
+    resourceType: "file",
+  });
+
+  if (args.override && isProtectedWrite(project, file.environments)) {
+    await createAuditLog(ctx, {
+      organizationId: project.organizationId,
+      projectId: file.projectId,
+      userId: args.userId,
+      action: "change.overridden",
+      resourceType: "file",
+      details: {
+        fileId: args.fileId,
+        fileName: file.name,
+        path: file.path,
+        environments: file.environments,
+        kind: "update",
+      },
+    });
+  }
+
+  return { previousVaultRef, previousStorageId };
+}
+
 export const replaceContent = internalMutation({
   args: {
     fileId: v.id("projectFiles"),
@@ -382,61 +555,13 @@ export const replaceContent = internalMutation({
     vaultRef: v.string(),
     storageId: v.id("_storage"),
     contentType: v.optional(v.string()),
+    override: v.optional(v.boolean()),
   },
   returns: v.object({
     previousVaultRef: v.string(),
     previousStorageId: v.id("_storage"),
   }),
-  handler: async (ctx, args) => {
-    const now = Date.now();
-
-    const file = await ctx.db.get(args.fileId);
-    if (!file || file.deletedAt) {
-      throw new ConvexError("File not found");
-    }
-    const project = await ctx.db.get(file.projectId);
-    if (!project) {
-      throw new ConvexError("Project not found");
-    }
-
-    await requireFileAccess(ctx, args.userId, file, "write", project);
-
-    const previousVaultRef = file.vaultRef;
-    const previousStorageId = file.storageId;
-    const newVersion = file.version + 1;
-
-    await ctx.db.patch(args.fileId, {
-      size: args.size,
-      sha256: args.sha256,
-      digestSalt: args.digestSalt,
-      vaultRef: args.vaultRef,
-      storageId: args.storageId,
-      contentType: args.contentType ?? file.contentType,
-      version: newVersion,
-      lastModifiedBy: args.userId,
-      updatedAt: now,
-    });
-
-    await createAuditLog(ctx, {
-      organizationId: project.organizationId,
-      projectId: file.projectId,
-      userId: args.userId,
-      action: "file.updated",
-      details: {
-        fileId: args.fileId,
-        fileName: file.name,
-        path: file.path,
-        newVersion,
-        previousVersion: file.version,
-        contentReplaced: true,
-        size: args.size,
-      },
-      involvesSensitiveData: true,
-      resourceType: "file",
-    });
-
-    return { previousVaultRef, previousStorageId };
-  },
+  handler: async (ctx, args) => replaceContentCore(ctx, args),
 });
 
 /**
@@ -456,6 +581,7 @@ export const detachEnvironment = mutation({
   args: {
     fileId: v.id("projectFiles"),
     environment: v.string(),
+    override: v.optional(v.boolean()),
   },
   returns: v.object({
     remaining: v.array(v.string()),
@@ -474,6 +600,15 @@ export const detachEnvironment = mutation({
     }
 
     await requireFileAccess(ctx, userId, file, "write", project);
+
+    await assertProtectedWrite(ctx, {
+      project,
+      envs: file.environments,
+      actorId: userId,
+      resourceType: "file",
+      targetId: args.fileId,
+      override: args.override,
+    });
 
     if (!file.environments.includes(args.environment)) {
       throw new ConvexError(
@@ -515,11 +650,190 @@ export const detachEnvironment = mutation({
       resourceType: "file",
     });
 
+    if (args.override && isProtectedWrite(project, file.environments)) {
+      await createAuditLog(ctx, {
+        organizationId: project.organizationId,
+        projectId: file.projectId,
+        userId,
+        action: "change.overridden",
+        resourceType: "file",
+        details: {
+          fileId: args.fileId,
+          fileName: file.name,
+          path: file.path,
+          environments: file.environments,
+          kind: "update",
+        },
+      });
+    }
+
+    // The file survives, but proposals written against the detached
+    // environment no longer describe a write anyone can apply.
+    await cancelPendingForTarget(
+      ctx,
+      args.fileId,
+      userId,
+      "target environment detached"
+    );
+
     return { remaining };
   },
 });
 
 /** Metadata-only edit. Never touches the blob or the vault object. */
+export async function updateCore(
+  ctx: MutationCtx,
+  args: {
+    fileId: Id<"projectFiles">;
+    userId: Id<"users">;
+    name?: string;
+    path?: string;
+    mode?: string;
+    description?: string;
+    environments?: string[];
+    viaRequestId?: Id<"changeRequests">;
+    override?: boolean;
+  }
+) {
+  const now = Date.now();
+  const { fileId, userId, viaRequestId, override, ...updates } = args;
+
+  const file = await ctx.db.get(fileId);
+  if (!file || file.deletedAt) {
+    throw new ConvexError("File not found");
+  }
+  const project = await ctx.db.get(file.projectId);
+  if (!project) {
+    throw new ConvexError("Project not found");
+  }
+
+  await requireFileAccess(ctx, userId, file, "write", project);
+
+  const nextEnvironments = updates.environments ?? file.environments;
+  const nextPath =
+    updates.path !== undefined ? normalizeFilePath(updates.path) : file.path;
+
+  if (updates.environments !== undefined) {
+    if (updates.environments.length === 0) {
+      throw new ConvexError("A file must have at least one environment");
+    }
+
+    // A scoped developer must not move a file INTO an out-of-scope
+    // environment, even though getFileAccess already blocked out-of-scope
+    // files from reaching here (mirror of accounts.update).
+    const editorMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", project.organizationId).eq("userId", userId)
+      )
+      .first();
+
+    const updaterProfile = editorMembership
+      ? await getRoleProfile(ctx, editorMembership.role)
+      : null;
+    if (updaterProfile) {
+      const editorAssignment = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_project_and_user", (q) =>
+          q.eq("projectId", file.projectId).eq("userId", userId)
+        )
+        .first();
+
+      assertWithinEnvironmentScope(
+        effectiveEnvironments(updaterProfile, editorAssignment?.environments),
+        updates.environments
+      );
+    }
+  }
+
+  const touched = touchedEnvironments(file.environments, updates.environments);
+  await assertProtectedWrite(ctx, {
+    project,
+    envs: touched,
+    actorId: userId,
+    resourceType: "file",
+    targetId: fileId,
+    viaRequestId,
+    override,
+  });
+
+  // Re-check uniqueness whenever the (path, environments) pair moves.
+  if (updates.path !== undefined || updates.environments !== undefined) {
+    const clashes = await findFilePathConflicts(ctx, {
+      projectId: file.projectId,
+      path: nextPath,
+      environments: nextEnvironments,
+      excludeFileId: fileId,
+    });
+    if (clashes.length > 0) {
+      throw new ConvexError(filePathConflictMessage(nextPath, clashes));
+    }
+  }
+
+  const newVersion = file.version + 1;
+  const updateData: Record<string, unknown> = {
+    updatedAt: now,
+    lastModifiedBy: userId,
+    version: newVersion,
+  };
+
+  if (updates.name !== undefined)
+    updateData.name = normalizeFileName(updates.name);
+  if (updates.path !== undefined) updateData.path = nextPath;
+  if (updates.mode !== undefined)
+    updateData.mode = normalizeFileMode(updates.mode);
+  // An empty string clears the optional field: Convex treats an explicit
+  // `undefined` in a patch as field removal.
+  if (updates.description !== undefined)
+    updateData.description =
+      updates.description === "" ? undefined : updates.description;
+  if (updates.environments !== undefined)
+    updateData.environments = updates.environments;
+
+  await ctx.db.patch(fileId, updateData);
+
+  const fieldsUpdated = Object.keys(updates).filter(
+    (k) => updates[k as keyof typeof updates] !== undefined
+  );
+
+  await createAuditLog(ctx, {
+    organizationId: project.organizationId,
+    projectId: file.projectId,
+    userId,
+    action: "file.updated",
+    details: {
+      fileId,
+      fileName: updates.name ?? file.name,
+      path: nextPath,
+      newVersion,
+      previousVersion: file.version,
+      fieldsUpdated,
+      contentReplaced: false,
+    },
+    involvesSensitiveData: true,
+    resourceType: "file",
+  });
+
+  if (override && isProtectedWrite(project, touched)) {
+    await createAuditLog(ctx, {
+      organizationId: project.organizationId,
+      projectId: file.projectId,
+      userId,
+      action: "change.overridden",
+      resourceType: "file",
+      details: {
+        fileId,
+        fileName: updates.name ?? file.name,
+        path: nextPath,
+        environments: touched,
+        kind: "update",
+      },
+    });
+  }
+
+  return fileId;
+}
+
 export const update = mutation({
   args: {
     fileId: v.id("projectFiles"),
@@ -528,192 +842,132 @@ export const update = mutation({
     mode: v.optional(v.string()),
     description: v.optional(v.string()),
     environments: v.optional(v.array(v.string())),
+    override: v.optional(v.boolean()),
   },
   returns: v.id("projectFiles"),
   handler: async (ctx, args) => {
-    const now = Date.now();
     // Actor comes from the verified JWT, NEVER from an argument: this
     // mutation is callable directly by the browser, so a client-supplied
     // userId would let any member act as anyone else.
     const userId = (await requireAuthedUser(ctx))._id;
-    const { fileId, ...updates } = args;
-
-    const file = await ctx.db.get(fileId);
-    if (!file || file.deletedAt) {
-      throw new ConvexError("File not found");
-    }
-    const project = await ctx.db.get(file.projectId);
-    if (!project) {
-      throw new ConvexError("Project not found");
-    }
-
-    await requireFileAccess(ctx, userId, file, "write", project);
-
-    const nextEnvironments = updates.environments ?? file.environments;
-    const nextPath =
-      updates.path !== undefined ? normalizeFilePath(updates.path) : file.path;
-
-    if (updates.environments !== undefined) {
-      if (updates.environments.length === 0) {
-        throw new ConvexError("A file must have at least one environment");
-      }
-
-      // A scoped developer must not move a file INTO an out-of-scope
-      // environment, even though getFileAccess already blocked out-of-scope
-      // files from reaching here (mirror of accounts.update).
-      const editorMembership = await ctx.db
-        .query("organizationMembers")
-        .withIndex("by_org_and_user", (q) =>
-          q.eq("organizationId", project.organizationId).eq("userId", userId)
-        )
-        .first();
-
-      const updaterProfile = editorMembership
-        ? await getRoleProfile(ctx, editorMembership.role)
-        : null;
-      if (
-        updaterProfile &&
-        hasCapability(updaterProfile, "access.env_scoped")
-      ) {
-        const editorAssignment = await ctx.db
-          .query("projectMembers")
-          .withIndex("by_project_and_user", (q) =>
-            q.eq("projectId", file.projectId).eq("userId", userId)
-          )
-          .first();
-
-        assertWithinEnvironmentScope(
-          editorAssignment?.environments,
-          updates.environments
-        );
-      }
-    }
-
-    // Re-check uniqueness whenever the (path, environments) pair moves.
-    if (updates.path !== undefined || updates.environments !== undefined) {
-      const clashes = await findFilePathConflicts(ctx, {
-        projectId: file.projectId,
-        path: nextPath,
-        environments: nextEnvironments,
-        excludeFileId: fileId,
-      });
-      if (clashes.length > 0) {
-        throw new ConvexError(filePathConflictMessage(nextPath, clashes));
-      }
-    }
-
-    const newVersion = file.version + 1;
-    const updateData: Record<string, unknown> = {
-      updatedAt: now,
-      lastModifiedBy: userId,
-      version: newVersion,
-    };
-
-    if (updates.name !== undefined)
-      updateData.name = normalizeFileName(updates.name);
-    if (updates.path !== undefined) updateData.path = nextPath;
-    if (updates.mode !== undefined)
-      updateData.mode = normalizeFileMode(updates.mode);
-    // An empty string clears the optional field: Convex treats an explicit
-    // `undefined` in a patch as field removal.
-    if (updates.description !== undefined)
-      updateData.description =
-        updates.description === "" ? undefined : updates.description;
-    if (updates.environments !== undefined)
-      updateData.environments = updates.environments;
-
-    await ctx.db.patch(fileId, updateData);
-
-    const fieldsUpdated = Object.keys(updates).filter(
-      (k) => updates[k as keyof typeof updates] !== undefined
-    );
-
-    await createAuditLog(ctx, {
-      organizationId: project.organizationId,
-      projectId: file.projectId,
-      userId,
-      action: "file.updated",
-      details: {
-        fileId,
-        fileName: updates.name ?? file.name,
-        path: nextPath,
-        newVersion,
-        previousVersion: file.version,
-        fieldsUpdated,
-        contentReplaced: false,
-      },
-      involvesSensitiveData: true,
-      resourceType: "file",
-    });
-
-    return fileId;
+    return updateCore(ctx, { ...args, userId });
   },
 });
 
-export const remove = mutation({
+export async function removeCore(
+  ctx: MutationCtx,
   args: {
-    fileId: v.id("projectFiles"),
-  },
-  returns: v.id("projectFiles"),
-  handler: async (ctx, args) => {
-    const now = Date.now();
-    const deletedBy = (await requireAuthedUser(ctx))._id;
+    fileId: Id<"projectFiles">;
+    deletedBy: Id<"users">;
+    viaRequestId?: Id<"changeRequests">;
+    override?: boolean;
+  }
+) {
+  const now = Date.now();
+  const deletedBy = args.deletedBy;
 
-    const file = await ctx.db.get(args.fileId);
-    if (!file) {
-      throw new ConvexError("File not found");
-    }
-    const project = await ctx.db.get(file.projectId);
-    if (!project) {
-      throw new ConvexError("Project not found");
-    }
+  const file = await ctx.db.get(args.fileId);
+  if (!file) {
+    throw new ConvexError("File not found");
+  }
+  const project = await ctx.db.get(file.projectId);
+  if (!project) {
+    throw new ConvexError("Project not found");
+  }
 
-    // Role-only, no grant fallback — parity with accounts.remove.
-    await authorizeFileAccess(ctx, {
-      userId: deletedBy,
-      projectId: file.projectId,
-      action: "project:delete_file",
-      preloadedProject: project,
+  // Role-only, no grant fallback — parity with accounts.remove.
+  await authorizeFileAccess(ctx, {
+    userId: deletedBy,
+    projectId: file.projectId,
+    action: "project:delete_file",
+    preloadedProject: project,
+  });
+
+  await assertProtectedWrite(ctx, {
+    project,
+    envs: file.environments,
+    actorId: deletedBy,
+    resourceType: "file",
+    targetId: args.fileId,
+    viaRequestId: args.viaRequestId,
+    override: args.override,
+  });
+
+  // Idempotent: a retried delete must not clobber the original deletedAt
+  // (which would restart the retention clock) or emit a second audit row.
+  if (file.deletedAt !== undefined) {
+    return args.fileId;
+  }
+
+  await ctx.db.patch(args.fileId, { deletedAt: now, updatedAt: now });
+
+  const allPermissions = await ctx.db
+    .query("filePermissions")
+    .withIndex("by_file", (q) => q.eq("fileId", args.fileId))
+    .collect();
+  const permissions = allPermissions.filter((perm) => perm.isActive);
+  for (const perm of permissions) {
+    await ctx.db.patch(perm._id, {
+      isActive: false,
+      revokedAt: now,
+      revokedBy: deletedBy,
     });
+  }
 
-    // Idempotent: a retried delete must not clobber the original deletedAt
-    // (which would restart the retention clock) or emit a second audit row.
-    if (file.deletedAt !== undefined) {
-      return args.fileId;
-    }
+  await createAuditLog(ctx, {
+    organizationId: project.organizationId,
+    projectId: file.projectId,
+    userId: deletedBy,
+    action: "file.deleted",
+    details: {
+      fileId: args.fileId,
+      fileName: file.name,
+      path: file.path,
+      environments: file.environments,
+      permissionsRevoked: permissions.length,
+    },
+    involvesSensitiveData: true,
+    resourceType: "file",
+  });
 
-    await ctx.db.patch(args.fileId, { deletedAt: now, updatedAt: now });
-
-    const allPermissions = await ctx.db
-      .query("filePermissions")
-      .withIndex("by_file", (q) => q.eq("fileId", args.fileId))
-      .collect();
-    const permissions = allPermissions.filter((perm) => perm.isActive);
-    for (const perm of permissions) {
-      await ctx.db.patch(perm._id, {
-        isActive: false,
-        revokedAt: now,
-        revokedBy: deletedBy,
-      });
-    }
-
+  if (args.override && isProtectedWrite(project, file.environments)) {
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
       projectId: file.projectId,
       userId: deletedBy,
-      action: "file.deleted",
+      action: "change.overridden",
+      resourceType: "file",
       details: {
         fileId: args.fileId,
         fileName: file.name,
         path: file.path,
         environments: file.environments,
-        permissionsRevoked: permissions.length,
+        kind: "delete",
       },
-      involvesSensitiveData: true,
-      resourceType: "file",
     });
+  }
 
-    return args.fileId;
+  // Proposals aimed at a resource that no longer exists can never be applied.
+  await cancelPendingForTarget(
+    ctx,
+    args.fileId,
+    deletedBy,
+    "target deleted",
+    args.viaRequestId
+  );
+
+  return args.fileId;
+}
+
+export const remove = mutation({
+  args: {
+    fileId: v.id("projectFiles"),
+    override: v.optional(v.boolean()),
+  },
+  returns: v.id("projectFiles"),
+  handler: async (ctx, args) => {
+    const deletedBy = (await requireAuthedUser(ctx))._id;
+    return removeCore(ctx, { ...args, deletedBy });
   },
 });
 
@@ -724,79 +978,120 @@ export const remove = mutation({
  * one sat in the trash, and restoring blindly would break the invariant that
  * every (path, environment) pair resolves to at most one active file.
  */
-export const restore = mutation({
+export async function restoreCore(
+  ctx: MutationCtx,
   args: {
-    fileId: v.id("projectFiles"),
-  },
-  returns: v.id("projectFiles"),
-  handler: async (ctx, args) => {
-    const now = Date.now();
-    const restoredBy = (await requireAuthedUser(ctx))._id;
+    fileId: Id<"projectFiles">;
+    restoredBy: Id<"users">;
+    viaRequestId?: Id<"changeRequests">;
+    override?: boolean;
+  }
+) {
+  const now = Date.now();
+  const restoredBy = args.restoredBy;
 
-    const file = await ctx.db.get(args.fileId);
-    if (!file) {
-      throw new ConvexError(
-        `File not found — it may have been permanently deleted after the ${PURGE_RETENTION_DAYS}-day retention period.`
-      );
-    }
-    if (!file.deletedAt) {
-      throw new ConvexError("File is not deleted");
-    }
-    // Past the window the file is purge-eligible: its blob and key may be
-    // destroyed at any moment, so restoring would race the GC and could
-    // resurrect a row whose contents no longer exist.
-    if (file.deletedAt < now - PURGE_RETENTION_DAYS * 24 * 60 * 60 * 1000) {
-      throw new ConvexError(
-        `File can no longer be restored — the ${PURGE_RETENTION_DAYS}-day retention window has passed and it is scheduled for permanent deletion.`
-      );
-    }
+  const file = await ctx.db.get(args.fileId);
+  if (!file) {
+    throw new ConvexError(
+      `File not found — it may have been permanently deleted after the ${PURGE_RETENTION_DAYS}-day retention period.`
+    );
+  }
+  if (!file.deletedAt) {
+    throw new ConvexError("File is not deleted");
+  }
+  // Past the window the file is purge-eligible: its blob and key may be
+  // destroyed at any moment, so restoring would race the GC and could
+  // resurrect a row whose contents no longer exist.
+  if (file.deletedAt < now - PURGE_RETENTION_DAYS * 24 * 60 * 60 * 1000) {
+    throw new ConvexError(
+      `File can no longer be restored — the ${PURGE_RETENTION_DAYS}-day retention window has passed and it is scheduled for permanent deletion.`
+    );
+  }
 
-    const project = await ctx.db.get(file.projectId);
-    if (!project) {
-      throw new ConvexError("Project not found");
-    }
+  const project = await ctx.db.get(file.projectId);
+  if (!project) {
+    throw new ConvexError("Project not found");
+  }
 
-    await authorizeFileAccess(ctx, {
-      userId: restoredBy,
-      projectId: file.projectId,
-      action: "project:delete_file",
-      preloadedProject: project,
-    });
+  await authorizeFileAccess(ctx, {
+    userId: restoredBy,
+    projectId: file.projectId,
+    action: "project:delete_file",
+    preloadedProject: project,
+  });
 
-    const clashes = await findFilePathConflicts(ctx, {
-      projectId: file.projectId,
+  await assertProtectedWrite(ctx, {
+    project,
+    envs: file.environments,
+    actorId: restoredBy,
+    resourceType: "file",
+    targetId: args.fileId,
+    viaRequestId: args.viaRequestId,
+    override: args.override,
+  });
+
+  const clashes = await findFilePathConflicts(ctx, {
+    projectId: file.projectId,
+    path: file.path,
+    environments: file.environments,
+    excludeFileId: args.fileId,
+  });
+  if (clashes.length > 0) {
+    throw new ConvexError(
+      `Cannot restore "${file.name}": ${filePathConflictMessage(
+        file.path,
+        clashes
+      )}`
+    );
+  }
+
+  await ctx.db.patch(args.fileId, { deletedAt: undefined, updatedAt: now });
+
+  await createAuditLog(ctx, {
+    organizationId: project.organizationId,
+    projectId: file.projectId,
+    userId: restoredBy,
+    action: "file.restored",
+    details: {
+      fileId: args.fileId,
+      fileName: file.name,
       path: file.path,
-      environments: file.environments,
-      excludeFileId: args.fileId,
-    });
-    if (clashes.length > 0) {
-      throw new ConvexError(
-        `Cannot restore "${file.name}": ${filePathConflictMessage(
-          file.path,
-          clashes
-        )}`
-      );
-    }
+      deletedAt: file.deletedAt,
+      restoredAt: now,
+    },
+    involvesSensitiveData: true,
+    resourceType: "file",
+  });
 
-    await ctx.db.patch(args.fileId, { deletedAt: undefined, updatedAt: now });
-
+  if (args.override && isProtectedWrite(project, file.environments)) {
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
       projectId: file.projectId,
       userId: restoredBy,
-      action: "file.restored",
+      action: "change.overridden",
+      resourceType: "file",
       details: {
         fileId: args.fileId,
         fileName: file.name,
         path: file.path,
-        deletedAt: file.deletedAt,
-        restoredAt: now,
+        environments: file.environments,
+        kind: "restore",
       },
-      involvesSensitiveData: true,
-      resourceType: "file",
     });
+  }
 
-    return args.fileId;
+  return args.fileId;
+}
+
+export const restore = mutation({
+  args: {
+    fileId: v.id("projectFiles"),
+    override: v.optional(v.boolean()),
+  },
+  returns: v.id("projectFiles"),
+  handler: async (ctx, args) => {
+    const restoredBy = (await requireAuthedUser(ctx))._id;
+    return restoreCore(ctx, { ...args, restoredBy });
   },
 });
 

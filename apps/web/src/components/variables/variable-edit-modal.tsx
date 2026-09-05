@@ -27,6 +27,10 @@ interface VariableEditModalProps {
   showRotation?: boolean;
   availableTags?: Tag[];
   onCreateTag?: (name: string, color: string) => Promise<void>;
+  /** Environments this project protects; selecting one turns save into a proposal. */
+  protectedEnvironments?: readonly string[];
+  /** Environments the caller may write to. Defaults to all of them. */
+  allowedEnvironments?: readonly string[];
 }
 
 export function VariableEditModal({
@@ -37,6 +41,8 @@ export function VariableEditModal({
   showRotation = false,
   availableTags,
   onCreateTag,
+  protectedEnvironments,
+  allowedEnvironments,
 }: VariableEditModalProps) {
   const initialData: Partial<VariableFormData> | undefined = variable
     ? {
@@ -59,7 +65,10 @@ export function VariableEditModal({
   return (
     <DrawerPanel isOpen={isOpen} onClose={onClose} title="Edit Variable">
       {initialData && (
+        // Keyed by the variable so switching rows remounts the form with the
+        // new initial data instead of syncing it through an effect.
         <VariableForm
+          key={variable?._id}
           initialData={initialData}
           onSubmit={handleSubmit}
           onCancel={onClose}
@@ -68,6 +77,8 @@ export function VariableEditModal({
           showRotation={showRotation}
           availableTags={availableTags}
           onCreateTag={onCreateTag}
+          protectedEnvironments={protectedEnvironments}
+          allowedEnvironments={allowedEnvironments}
         />
       )}
     </DrawerPanel>

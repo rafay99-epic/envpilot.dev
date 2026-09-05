@@ -3,7 +3,11 @@ import { ConvexError } from "convex/values";
 import { query, mutation, internalMutation } from "../../_generated/server";
 import type { MutationCtx } from "../../_generated/server";
 import { SEED_FEATURES, SEED_ROLES } from "../../lib/seedData";
-import { mergeSystemRoleCapabilities } from "../../lib/roleProfiles";
+import {
+  hasCapability,
+  mergeSystemRoleCapabilities,
+} from "../../lib/roleProfiles";
+import { getRoleProfile } from "../../lib/authz";
 import { requireAdmin } from "./auth";
 
 export const listMigrations = query({
@@ -72,6 +76,15 @@ export const listMigrations = query({
       // ── Destructive / Reset ──
 
       // ── One-Time Migrations ──
+      {
+        name: "enable-role-environment-defaults",
+        description:
+          "Two steps in one idempotent migration. First it writes an explicit all-environments scope onto every env-scopeable project member that has none (500 members per run, resumes from a stored cursor; re-run until hadMore is false). Only when that scan has finished does it fill the role environment defaults (developer: development, editor: development + staging) onto role rows that have none. Existing members keep exactly the access they had; new assignments get the role default.",
+        category: "Migrations",
+        priority: 10,
+        destructive: false,
+        runOnce: false,
+      },
     ] as Array<{
       name: string;
       description: string;
@@ -159,6 +172,7 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
     secret_rotation_limit: "7",
     secret_sharing: "false",
     security_hold: "false",
+    protected_environments: "false",
     max_active_shares: "0",
     shared_accounts: "true",
     shared_accounts_limit: "5",
@@ -206,6 +220,7 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
     secret_rotation_limit: "null",
     secret_sharing: "true",
     security_hold: "true",
+    protected_environments: "true",
     max_active_shares: "null",
     shared_accounts: "true",
     shared_accounts_limit: "null",
@@ -491,11 +506,19 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         isActive: true,
         sortOrder: role.sortOrder,
         capabilities: role.capabilities as Record<string, boolean>,
+        ...(role.environments ? { environments: role.environments } : {}),
         createdAt: now,
         updatedAt: now,
       });
       created++;
     }
+
+    // Role environment defaults are NOT filled onto existing rows here. A
+    // deploy runs this seed automatically, and narrowing developer rows
+    // before their member assignments carry an explicit scope would hide
+    // staging and production from every existing developer. Fresh rows get
+    // the default on insert above; existing deployments enable it once via
+    // enable-role-environment-defaults, which backfills members first.
 
     return {
       success: true,
@@ -629,6 +652,85 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
     }
 
     return { success: true, created, skipped };
+  }
+
+  if (args.name === "enable-role-environment-defaults") {
+    const PAGE = 500;
+    const CURSOR_KEY = "roleEnvironmentDefaultsCursor";
+    const ALL_ENVIRONMENTS = ["development", "staging", "production"];
+    const now = Date.now();
+
+    // Resumable scan: the cursor lives in adminSettings so each run reads one
+    // bounded page instead of the whole table.
+    const cursorRow = await ctx.db
+      .query("adminSettings")
+      .withIndex("by_key", (q) => q.eq("key", CURSOR_KEY))
+      .first();
+    const page = await ctx.db
+      .query("projectMembers")
+      .paginate({ numItems: PAGE, cursor: cursorRow?.value ?? null });
+
+    const profileCache = new Map<string, boolean>();
+    let patched = 0;
+    for (const member of page.page) {
+      if (member.environments !== undefined) continue;
+      const project = await ctx.db.get(member.projectId);
+      if (!project) continue;
+      const orgMembership = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_org_and_user", (q) =>
+          q
+            .eq("organizationId", project.organizationId)
+            .eq("userId", member.userId)
+        )
+        .first();
+      if (!orgMembership) continue;
+      let scoped = profileCache.get(orgMembership.role);
+      if (scoped === undefined) {
+        const profile = await getRoleProfile(ctx, orgMembership.role);
+        scoped = hasCapability(profile, "access.env_scoped");
+        profileCache.set(orgMembership.role, scoped);
+      }
+      if (!scoped) continue;
+      await ctx.db.patch(member._id, { environments: ALL_ENVIRONMENTS });
+      patched++;
+    }
+
+    if (!page.isDone) {
+      if (cursorRow) {
+        await ctx.db.patch(cursorRow._id, {
+          value: page.continueCursor,
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.insert("adminSettings", {
+          key: CURSOR_KEY,
+          value: page.continueCursor,
+          updatedAt: now,
+        });
+      }
+      return { success: true, patched, rolesFilled: 0, hadMore: true };
+    }
+
+    // Members are all explicit now: the role defaults can take effect.
+    if (cursorRow) await ctx.db.delete(cursorRow._id);
+    let rolesFilled = 0;
+    for (const role of SEED_ROLES) {
+      if (!role.environments) continue;
+      const row = await ctx.db
+        .query("roleRegistry")
+        .withIndex("by_slug", (q) => q.eq("slug", role.slug))
+        .first();
+      if (row && row.environments === undefined) {
+        await ctx.db.patch(row._id, {
+          environments: role.environments,
+          updatedAt: now,
+        });
+        rolesFilled++;
+      }
+    }
+
+    return { success: true, patched, rolesFilled, hadMore: false };
   }
 
   // Drains legacy/dead data so the corresponding schema declarations can be

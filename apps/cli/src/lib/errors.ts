@@ -204,6 +204,45 @@ export function invalidInput(message: string): CLIError {
 }
 
 /**
+ * Payload Convex throws when a write touches a protected environment (see
+ * convex/lib/protection.ts::ProtectedEnvironmentError). Mirrored here rather
+ * than imported so the CLI never pulls in Convex server code.
+ */
+export type ProtectedEnvironmentErrorData = {
+  code: "PROTECTED_ENVIRONMENT";
+  message: string;
+  environments: string[];
+};
+
+export function isProtectedEnvironmentError(
+  err: unknown
+): err is { data: ProtectedEnvironmentErrorData } {
+  const data = (err as { data?: unknown })?.data;
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    (data as { code?: unknown }).code === "PROTECTED_ENVIRONMENT"
+  );
+}
+
+/** "production is protected" / "staging, production are protected". */
+export function formatProtectedEnvironments(environments: string[]): string {
+  return `${environments.join(", ")} ${environments.length === 1 ? "is" : "are"} protected`;
+}
+
+/**
+ * True when a change-request lookup failed because the id isn't a change
+ * request at all (an ordinary variable request, or unknown). Thrown verbatim
+ * by getForReview/review/cancel in convex/features/changeRequests — see
+ * queries.ts and mutations.ts. Distinguishes "not a change request" (fall
+ * back to the variable-request flow) from every other denial, which must
+ * propagate instead of being silently swallowed.
+ */
+export function isChangeRequestNotFoundError(err: unknown): boolean {
+  return sanitizeConvexError(err) === "Change request not found";
+}
+
+/**
  * True when an error is a CONNECTIVITY failure (offline, DNS, timeout) as
  * opposed to a server-side response (denial, 4xx/5xx). Used to decide
  * fail-open vs fail-closed: offline caches may be served on connectivity

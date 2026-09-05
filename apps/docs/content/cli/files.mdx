@@ -53,14 +53,15 @@ envpilot files add ./upload.jks \
   --description "Signing key for release builds"
 ```
 
-| Flag                     | Default                | Meaning                         |
-| ------------------------ | ---------------------- | ------------------------------- |
-| `--path <path>`          | the file's own path    | Where clients will write it     |
-| `-n, --name <name>`      | the filename           | Display name                    |
-| `-e, --env <list>`       | the linked environment | Comma-separated environments    |
-| `--mode <mode>`          | `0600`                 | `0600` or `0400` — nothing else |
-| `-d, --description <t>`  | —                      | Optional note                   |
-| `--project <name-or-id>` | active link            | Use a specific linked project   |
+| Flag                     | Default                | Meaning                                   |
+| ------------------------ | ---------------------- | ----------------------------------------- |
+| `--path <path>`          | the file's own path    | Where clients will write it               |
+| `-n, --name <name>`      | the filename           | Display name                              |
+| `-e, --env <list>`       | the linked environment | Comma-separated environments              |
+| `--mode <mode>`          | `0600`                 | `0600` or `0400` — nothing else           |
+| `-d, --description <t>`  | —                      | Optional note                             |
+| `--project <name-or-id>` | active link            | Use a specific linked project             |
+| `--request`              | off                    | Propose instead of failing when protected |
 
 ## Remove
 
@@ -71,6 +72,16 @@ envpilot files rm android/app/upload.jks --all-envs
 ```
 
 Like variables, removal is environment-aware: by default only the selected environment is detached, and the file stays live in the others. `--all-envs` trashes it everywhere.
+
+## Protected environments
+
+If the target environment is marked protected (Settings → Protection), a
+plain `files add` is refused outright — re-run with `--request` to file a
+change request per upload instead. `files rm` asks first ("File a change
+request to delete it?" / "...remove it from `<env>`?"); non-interactively,
+without `--yes`, it fails with the same message and a hint to re-run with
+`--yes`. Either way a second person with the approve capability has to
+accept the request before the file actually changes.
 
 ## Limits
 

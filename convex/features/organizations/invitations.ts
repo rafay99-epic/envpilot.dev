@@ -9,6 +9,7 @@ import { isCronPaused } from "../billing/tierLimits";
 import { batchGetUsers } from "../../lib/users";
 import {
   assertCanAssignRoleAsync,
+  assertEnvironmentScopeNarrows,
   assertOrgAction,
   assertOrgMembership,
   bypassesAssignment,
@@ -141,6 +142,7 @@ export const create = mutation({
         "Environment scope cannot be empty — omit it to allow all environments"
       );
     }
+    assertEnvironmentScopeNarrows(invitedRoleProfile, args.environments);
 
     // Rate limit: prevent invitation spam
     await rateLimiter.limit(ctx, "invitationCreate", {

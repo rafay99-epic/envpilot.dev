@@ -14,6 +14,32 @@ import {
 } from "./crypto";
 import * as blobStore from "./blobStore";
 import { rateLimiter } from "../../lib/rateLimits";
+import {
+  PROTECTED_ENVIRONMENT_CODE,
+  touchedEnvironments,
+} from "../../lib/protection";
+import { assertCanOverrideProtection } from "../changeRequests/override";
+
+const sourceValidator = v.union(
+  v.literal("web"),
+  v.literal("cli"),
+  v.literal("mcp"),
+  v.literal("extension")
+);
+
+/**
+ * The payload lib/protection.ts throws. Rebuilt here because this action
+ * detects protection BEFORE anything is encrypted or stored, so a refused
+ * upload leaves no blob and no vault object behind.
+ */
+function protectedEnvironmentError(environments: string[]) {
+  const list = environments.join(", ");
+  return {
+    code: PROTECTED_ENVIRONMENT_CODE,
+    message: `${list} ${environments.length === 1 ? "is a protected environment" : "are protected environments"}. Propose this change and a second person will apply it.`,
+    environments,
+  };
+}
 
 /**
  * Composed secret-file actions — the ONLY place plaintext and key material
@@ -44,6 +70,8 @@ interface PreflightResult {
   path: string;
   mode: string;
   organizationId: Id<"organizations">;
+  protectedEnvironments: string[];
+  existingEnvironments?: string[];
 }
 
 interface UploadResult {
@@ -51,6 +79,11 @@ interface UploadResult {
   size: number;
   sha256: string;
 }
+
+/** Either the file was written, or a proposal was filed for it. */
+type UploadOutcome =
+  | UploadResult
+  | { requested: true; requestId: Id<"changeRequests"> };
 
 interface FileContentRefs {
   vaultRef: string;
@@ -128,15 +161,22 @@ export const uploadFile = action({
     environments: v.array(v.string()),
     // Present to replace an existing file's contents in place.
     replaceFileId: v.optional(v.id("projectFiles")),
+    // File a change request instead of failing when the write is protected.
+    request: v.optional(v.boolean()),
+    override: v.optional(v.boolean()),
+    source: v.optional(sourceValidator),
   },
-  returns: v.object({
-    fileId: v.id("projectFiles"),
-    size: v.number(),
-    sha256: v.string(),
-  }),
+  returns: v.union(
+    v.object({
+      fileId: v.id("projectFiles"),
+      size: v.number(),
+      sha256: v.string(),
+    }),
+    v.object({ requested: v.literal(true), requestId: v.id("changeRequests") })
+  ),
   // Explicit return type: the handler calls api.features.files.* — which
   // includes this action — so inference would be circular (TS7022).
-  handler: async (ctx, args): Promise<UploadResult> => {
+  handler: async (ctx, args): Promise<UploadOutcome> => {
     const userId = await requireCurrentUserId(ctx);
     // Throttle BEFORE the encrypt/blob/vault work, not after — the point is
     // to stop a loop consuming storage and WorkOS calls at all.
@@ -154,7 +194,10 @@ export const uploadFile = action({
 
     // STEP 1 — everything that can say no, before anything that costs money
     // or leaves a trace. Returns the normalized values so the check and the
-    // insert cannot disagree about what the path is.
+    // insert cannot disagree about what the path is, and the protected
+    // environments, reported only AFTER access is verified, so an
+    // unauthorized caller gets the ordinary access error instead of the
+    // project's protection configuration.
     const preflight: PreflightResult = await ctx.runMutation(
       internal.features.files.mutations.preflightUpload,
       {
@@ -168,6 +211,16 @@ export const uploadFile = action({
         replaceFileId: args.replaceFileId,
       }
     );
+
+    const protectedEnvs = preflight.protectedEnvironments;
+    const needsRequest = protectedEnvs.length > 0 && args.override !== true;
+    if (needsRequest && args.request !== true) {
+      throw new ConvexError(protectedEnvironmentError(protectedEnvs));
+    }
+    if (protectedEnvs.length > 0 && !needsRequest) {
+      // Break-glass, authorized before the encrypt and the vault write.
+      await assertCanOverrideProtection(ctx, userId, args.projectId);
+    }
 
     // STEP 2 — fresh key, fresh nonce, every time. Never an in-place
     // re-encrypt, so (key, iv) reuse is unreachable rather than guarded.
@@ -197,8 +250,41 @@ export const uploadFile = action({
       throw vaultError;
     }
 
-    // STEP 5 — pointers into Convex.
+    // STEP 5 — pointers into Convex, or a proposal that stages both refs
+    // until a second person approves it.
     try {
+      if (needsRequest) {
+        const requestId: Id<"changeRequests"> = await ctx.runMutation(
+          internal.features.changeRequests.mutations.createStaged,
+          {
+            projectId: args.projectId,
+            resourceType: "file",
+            kind: args.replaceFileId ? "update" : "create",
+            targetId: args.replaceFileId,
+            environments: touchedEnvironments(
+              preflight.existingEnvironments,
+              args.environments
+            ),
+            payload: JSON.stringify({
+              name: preflight.name,
+              path: preflight.path,
+              mode: preflight.mode,
+              contentType: args.contentType,
+              size: plaintext.length,
+              sha256,
+              digestSalt,
+              description: args.description,
+              environments: args.environments,
+            }),
+            vaultRef,
+            storageId,
+            label: preflight.path,
+            source: args.source ?? "web",
+          }
+        );
+        return { requested: true as const, requestId };
+      }
+
       if (args.replaceFileId) {
         const previous: {
           previousVaultRef: string;
@@ -214,6 +300,7 @@ export const uploadFile = action({
             vaultRef,
             storageId,
             contentType: args.contentType,
+            override: args.override,
           }
         );
         // The row now points at the new pair, so the old one is unreachable
@@ -242,6 +329,7 @@ export const uploadFile = action({
           digestSalt,
           vaultRef,
           storageId,
+          override: args.override,
         }
       );
       return { fileId, size: plaintext.length, sha256 };

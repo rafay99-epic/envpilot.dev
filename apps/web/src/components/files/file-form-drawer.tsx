@@ -4,10 +4,14 @@ import { useRef, useState } from "react";
 import { Loader2, Upload } from "lucide-react";
 import { DrawerPanel } from "@/components/ui/drawer-panel";
 import {
-  ENVIRONMENTS,
-  type Environment,
-  envToggleClasses,
-} from "@/constants/project";
+  EnvironmentPicker,
+  ProtectionNote,
+} from "@/components/environments/environment-picker";
+import {
+  protectionState,
+  resolveEnvironments,
+} from "@/components/environments/selection";
+import { ENVIRONMENTS, type Environment } from "@/constants/project";
 import { formatBytes, type SecretFile } from "@/hooks/useSecretFiles";
 
 export interface FileFormData {
@@ -27,6 +31,10 @@ interface FileFormDrawerProps {
   file?: SecretFile | null;
   /** Replace-contents mode: a new file is required, metadata is locked. */
   replaceMode?: boolean;
+  /** Environments this project protects; selecting one turns save into a proposal. */
+  protectedEnvironments?: readonly string[];
+  /** Environments the caller may write to. Defaults to all of them. */
+  allowedEnvironments?: readonly string[];
 }
 
 const MODES = [
@@ -43,6 +51,8 @@ export function FileFormDrawer({
   onSubmit,
   file,
   replaceMode = false,
+  protectedEnvironments,
+  allowedEnvironments,
 }: FileFormDrawerProps) {
   const isEditing = !!file;
 
@@ -83,6 +93,8 @@ export function FileFormDrawer({
         onSubmit={handleSubmit}
         onCancel={onClose}
         isSubmitting={isSubmitting}
+        protectedEnvironments={protectedEnvironments}
+        allowedEnvironments={allowedEnvironments}
       />
     </DrawerPanel>
   );
@@ -94,6 +106,8 @@ interface FileFormProps {
   onSubmit: (data: FileFormData) => Promise<void>;
   onCancel: () => void;
   isSubmitting: boolean;
+  protectedEnvironments?: readonly string[];
+  allowedEnvironments?: readonly string[];
 }
 
 function FileForm({
@@ -102,6 +116,8 @@ function FileForm({
   onSubmit,
   onCancel,
   isSubmitting,
+  protectedEnvironments,
+  allowedEnvironments = ENVIRONMENTS,
 }: FileFormProps) {
   const isEditing = !!file;
   const needsUpload = !isEditing || replaceMode;
@@ -110,13 +126,11 @@ function FileForm({
   const [path, setPath] = useState(file?.path ?? "");
   const [mode, setMode] = useState(file?.mode ?? "0600");
   const [description, setDescription] = useState(file?.description ?? "");
-  const [environments, setEnvironments] = useState<Environment[]>(
-    (file?.environments as Environment[] | undefined) ?? ["development"]
+  const [environments, setEnvironments] = useState<string[]>(
+    () => file?.environments ?? ["development"]
   );
   const [picked, setPicked] = useState<File | null>(null);
-  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   /**
    * Picking a file seeds name and path from the filename — a starting point
@@ -129,9 +143,28 @@ function FileForm({
     setPath((current) => current || next.name);
   };
 
+  // Replace-contents hides the picker and promises the environments stay as
+  // they are, so the file's own list is what ships. Elsewhere the selection
+  // is resolved from state: a scope that narrowed after mount must not leave
+  // an unwritable environment in the submitted set, and a stored environment
+  // outside the caller's scope stays locked rather than being dropped.
+  const stored = file?.environments;
+  const { options, locked, selected } = resolveEnvironments(
+    replaceMode && stored ? stored : environments,
+    allowedEnvironments,
+    stored
+  );
+  const { proposing } = protectionState(
+    selected,
+    stored,
+    protectedEnvironments
+  );
+
   const toggleEnvironment = (env: Environment) => {
-    setEnvironments((prev) =>
-      prev.includes(env) ? prev.filter((e) => e !== env) : [...prev, env]
+    setEnvironments(
+      selected.includes(env)
+        ? selected.filter((e) => e !== env)
+        : [...selected, env]
     );
   };
 
@@ -151,7 +184,7 @@ function FileForm({
       setError("Destination path is required");
       return;
     }
-    if (environments.length === 0) {
+    if (selected.length === 0) {
       setError("At least one environment is required");
       return;
     }
@@ -162,7 +195,7 @@ function FileForm({
         path: path.trim(),
         mode,
         description: description.trim(),
-        environments,
+        environments: selected,
         file: picked,
       });
     } catch (err) {
@@ -178,173 +211,52 @@ function FileForm({
         </div>
       )}
 
-      {needsUpload && (
-        <div>
-          <label
-            htmlFor="secret-file-input"
-            className="block text-sm font-medium text-ink-muted"
-          >
-            File <span className="text-danger">*</span>
-          </label>
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragging(false);
-              const dropped = e.dataTransfer.files?.[0];
-              if (dropped) acceptFile(dropped);
-            }}
-            className={`mt-1 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-              dragging ? "border-line-strong bg-surface-raised" : "border-line"
-            }`}
-          >
-            <Upload className="mx-auto h-6 w-6 text-ink-muted" />
-            <p className="mt-2 text-sm text-ink-muted">
-              {picked ? (
-                <span className="font-mono text-xs">
-                  {picked.name} · {formatBytes(picked.size)}
-                </span>
-              ) : (
-                "Drop a keystore, key, or certificate here"
-              )}
-            </p>
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="mt-2 text-sm font-medium underline-offset-2 hover:underline text-ink"
-            >
-              {picked ? "Choose a different file" : "Browse files"}
-            </button>
-            <input
-              id="secret-file-input"
-              ref={inputRef}
-              type="file"
-              className="hidden"
-              onChange={(e) => {
-                const next = e.target.files?.[0];
-                if (next) acceptFile(next);
-              }}
-            />
-          </div>
-        </div>
-      )}
+      {needsUpload && <FilePicker picked={picked} onPick={acceptFile} />}
 
       {!replaceMode && (
         <>
-          <div>
-            <label
-              htmlFor="secret-file-name"
-              className="block text-sm font-medium text-ink-muted"
-            >
-              Name <span className="text-danger">*</span>
-            </label>
-            <input
-              id="secret-file-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Android Upload Keystore"
-              className={inputClasses}
-            />
-          </div>
+          <FileMetadataFields
+            name={name}
+            path={path}
+            mode={mode}
+            description={description}
+            onNameChange={setName}
+            onPathChange={setPath}
+            onModeChange={setMode}
+            onDescriptionChange={setDescription}
+          />
 
-          <div>
-            <label
-              htmlFor="secret-file-path"
-              className="block text-sm font-medium text-ink-muted"
-            >
-              Destination path <span className="text-danger">*</span>
-            </label>
-            <input
-              id="secret-file-path"
-              type="text"
-              value={path}
-              onChange={(e) => setPath(e.target.value)}
-              placeholder="android/app/upload.jks"
-              className={`${inputClasses} font-mono`}
-            />
-            <p className="mt-1 text-xs text-ink-muted">
-              Relative to the project root — where{" "}
-              <code className="font-mono">envpilot pull</code>, the extension,
-              and CI will write it.
-            </p>
-          </div>
-
-          <div>
-            <label
-              htmlFor="secret-file-mode"
-              className="block text-sm font-medium text-ink-muted"
-            >
-              File permissions
-            </label>
-            <select
-              id="secret-file-mode"
-              value={mode}
-              onChange={(e) => setMode(e.target.value)}
-              className={inputClasses}
-            >
-              {MODES.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label
-              htmlFor="secret-file-description"
-              className="block text-sm font-medium text-ink-muted"
-            >
-              Description <span className="text-ink-muted">(optional)</span>
-            </label>
-            <textarea
-              id="secret-file-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What this file is used for…"
-              rows={2}
-              className={inputClasses}
-            />
-          </div>
-
-          <fieldset>
-            <legend className="block text-sm font-medium text-ink-muted">
-              Environments <span className="text-danger">*</span>
-            </legend>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {ENVIRONMENTS.map((env) => (
-                <button
-                  key={env}
-                  type="button"
-                  onClick={() => toggleEnvironment(env as Environment)}
-                  aria-pressed={environments.includes(env as Environment)}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${envToggleClasses(
-                    env as Environment,
-                    environments.includes(env as Environment)
-                  )}`}
-                >
-                  {env}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1 text-xs text-ink-muted">
-              The same path may exist in other environments, as long as they do
-              not overlap with these.
-            </p>
-          </fieldset>
+          <EnvironmentPicker
+            allowedEnvironments={options}
+            lockedEnvironments={locked}
+            selected={selected}
+            onToggle={toggleEnvironment}
+            protectedEnvironments={protectedEnvironments}
+            existingEnvironments={stored}
+            testIdPrefix="file"
+            hint={
+              <p className="mt-1 text-xs text-ink-muted">
+                The same path may exist in other environments, as long as they
+                do not overlap with these.
+              </p>
+            }
+          />
         </>
       )}
 
       {replaceMode && (
-        <p className="text-xs text-ink-muted">
-          Replacing contents only. The name, path, and environments stay as they
-          are.
-        </p>
+        <div>
+          <p className="text-xs text-ink-muted">
+            Replacing contents only. The name, path, and environments stay as
+            they are.
+          </p>
+          <ProtectionNote
+            selected={selected}
+            existingEnvironments={stored}
+            protectedEnvironments={protectedEnvironments}
+            testIdPrefix="file"
+          />
+        </div>
       )}
 
       <div className="flex justify-end gap-3 pt-4">
@@ -358,19 +270,201 @@ function FileForm({
         </button>
         <button
           type="submit"
+          data-testid="file-submit"
           disabled={isSubmitting}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
         >
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          {isSubmitting
-            ? "Saving…"
-            : replaceMode
-              ? "Replace Contents"
-              : isEditing
-                ? "Save Changes"
-                : "Upload File"}
+          {submitLabel({ isSubmitting, proposing, replaceMode, isEditing })}
         </button>
       </div>
     </form>
+  );
+}
+
+/** Drop zone and file input for the uploaded secret. */
+function FilePicker({
+  picked,
+  onPick,
+}: {
+  picked: File | null;
+  onPick: (file: File) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div>
+      <label
+        htmlFor="secret-file-input"
+        className="block text-sm font-medium text-ink-muted"
+      >
+        File <span className="text-danger">*</span>
+      </label>
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          const dropped = e.dataTransfer.files?.[0];
+          if (dropped) onPick(dropped);
+        }}
+        className={`mt-1 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+          dragging ? "border-line-strong bg-surface-raised" : "border-line"
+        }`}
+      >
+        <Upload className="mx-auto h-6 w-6 text-ink-muted" />
+        <p className="mt-2 text-sm text-ink-muted">
+          {picked ? (
+            <span className="font-mono text-xs">
+              {picked.name} · {formatBytes(picked.size)}
+            </span>
+          ) : (
+            "Drop a keystore, key, or certificate here"
+          )}
+        </p>
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="mt-2 text-sm font-medium underline-offset-2 hover:underline text-ink"
+        >
+          {picked ? "Choose a different file" : "Browse files"}
+        </button>
+        <input
+          id="secret-file-input"
+          ref={inputRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => {
+            const next = e.target.files?.[0];
+            if (next) onPick(next);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** The submit button's wording, which turns on four independent modes. */
+function submitLabel({
+  isSubmitting,
+  proposing,
+  replaceMode,
+  isEditing,
+}: {
+  isSubmitting: boolean;
+  proposing: boolean;
+  replaceMode: boolean;
+  isEditing: boolean;
+}): string {
+  if (isSubmitting) return "Saving…";
+  if (proposing) return "Propose change";
+  if (replaceMode) return "Replace Contents";
+  return isEditing ? "Save Changes" : "Upload File";
+}
+
+/** Name, destination path, permissions and description for a secret file. */
+function FileMetadataFields({
+  name,
+  path,
+  mode,
+  description,
+  onNameChange,
+  onPathChange,
+  onModeChange,
+  onDescriptionChange,
+}: {
+  name: string;
+  path: string;
+  mode: string;
+  description: string;
+  onNameChange: (value: string) => void;
+  onPathChange: (value: string) => void;
+  onModeChange: (value: string) => void;
+  onDescriptionChange: (value: string) => void;
+}) {
+  return (
+    <>
+      <div>
+        <label
+          htmlFor="secret-file-name"
+          className="block text-sm font-medium text-ink-muted"
+        >
+          Name <span className="text-danger">*</span>
+        </label>
+        <input
+          id="secret-file-name"
+          type="text"
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+          placeholder="Android Upload Keystore"
+          className={inputClasses}
+        />
+      </div>
+
+      <div>
+        <label
+          htmlFor="secret-file-path"
+          className="block text-sm font-medium text-ink-muted"
+        >
+          Destination path <span className="text-danger">*</span>
+        </label>
+        <input
+          id="secret-file-path"
+          type="text"
+          value={path}
+          onChange={(e) => onPathChange(e.target.value)}
+          placeholder="android/app/upload.jks"
+          className={`${inputClasses} font-mono`}
+        />
+        <p className="mt-1 text-xs text-ink-muted">
+          Relative to the project root — where{" "}
+          <code className="font-mono">envpilot pull</code>, the extension, and
+          CI will write it.
+        </p>
+      </div>
+
+      <div>
+        <label
+          htmlFor="secret-file-mode"
+          className="block text-sm font-medium text-ink-muted"
+        >
+          File permissions
+        </label>
+        <select
+          id="secret-file-mode"
+          value={mode}
+          onChange={(e) => onModeChange(e.target.value)}
+          className={inputClasses}
+        >
+          {MODES.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label
+          htmlFor="secret-file-description"
+          className="block text-sm font-medium text-ink-muted"
+        >
+          Description <span className="text-ink-muted">(optional)</span>
+        </label>
+        <textarea
+          id="secret-file-description"
+          value={description}
+          onChange={(e) => onDescriptionChange(e.target.value)}
+          placeholder="What this file is used for…"
+          rows={2}
+          className={inputClasses}
+        />
+      </div>
+    </>
   );
 }

@@ -105,6 +105,8 @@ export {
   useVariableRequests,
   useResolveVariableRequest,
   usePendingRequestCount,
+  usePendingChangeCount,
+  usePendingOrgChangeCount,
 } from "./useVariableRequests";
 
 // Audit log hooks
@@ -163,3 +165,5 @@ export { useUnsavedChanges } from "./useUnsavedChanges";
 export { useSettingsProvenance } from "./useSettingsProvenance";
 
 export { useNow } from "./useNow";
+
+export { useProtection, wasRequested } from "./useProtection";

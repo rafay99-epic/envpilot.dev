@@ -12,7 +12,7 @@ import {
   getActiveMembership,
   getRoleProfile,
   bypassesAssignment,
-  hasCapability,
+  effectiveEnvironments,
 } from "../../lib/authz";
 
 /**
@@ -116,12 +116,10 @@ export const listExpiringVariables = query({
       if (!project) continue;
 
       // Scoped developers never receive out-of-scope variables.
-      const environmentScope = hasCapability(
+      const environmentScope = effectiveEnvironments(
         rotationProfile,
-        "access.env_scoped"
-      )
-        ? scopeByProject.get(variable.projectId as string)
-        : undefined;
+        scopeByProject.get(variable.projectId as string)
+      );
       if (!isEnvironmentScopeAllowed(environmentScope, variable.environments)) {
         continue;
       }

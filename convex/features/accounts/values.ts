@@ -3,6 +3,25 @@ import { action } from "../../_generated/server";
 import type { ActionCtx } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
+import { touchedEnvironments } from "../../lib/protection";
+import { assertCanOverrideProtection } from "../changeRequests/override";
+
+const sourceValidator = v.union(
+  v.literal("web"),
+  v.literal("cli"),
+  v.literal("mcp"),
+  v.literal("extension")
+);
+
+/** Either the account was written, or a proposal was filed for it. */
+type AccountWriteResult =
+  | { accountId: Id<"projectAccounts"> }
+  | { requested: true; requestId: Id<"changeRequests"> };
+
+const accountWriteResultValidator = v.union(
+  v.object({ accountId: v.id("projectAccounts") }),
+  v.object({ requested: v.literal(true), requestId: v.id("changeRequests") })
+);
 
 /**
  * Composed shared-account credential actions — Stage 3, Phase 3.
@@ -58,9 +77,11 @@ export const createWithCredentials = action({
     password: v.string(),
     description: v.optional(v.string()),
     environments: v.array(v.string()),
+    override: v.optional(v.boolean()),
+    source: v.optional(sourceValidator),
   },
-  returns: v.object({ accountId: v.id("projectAccounts") }),
-  handler: async (ctx, args): Promise<{ accountId: Id<"projectAccounts"> }> => {
+  returns: accountWriteResultValidator,
+  handler: async (ctx, args): Promise<AccountWriteResult> => {
     const userId = await requireCurrentUserId(ctx);
 
     const project = await ctx.runQuery(
@@ -71,6 +92,19 @@ export const createWithCredentials = action({
     );
     if (!project) {
       throw new Error("Project not found");
+    }
+
+    // Protection is resolved before the vault write so a proposal and a
+    // direct create mint exactly one object either way.
+    const protectedEnvs: string[] = await ctx.runQuery(
+      internal.features.changeRequests.queries.protectedEnvironmentsForWrite,
+      { projectId: args.projectId, environments: args.environments }
+    );
+    const needsRequest = protectedEnvs.length > 0 && args.override !== true;
+    // Break-glass is authorized BEFORE the vault write; the mutation checks
+    // it again, but only once the credential object already exists.
+    if (protectedEnvs.length > 0 && !needsRequest) {
+      await assertCanOverrideProtection(ctx, userId, args.projectId);
     }
 
     // The project's own organizationId is authoritative for the vault key
@@ -86,6 +120,37 @@ export const createWithCredentials = action({
       }
     );
 
+    if (needsRequest) {
+      try {
+        const requestId: Id<"changeRequests"> = await ctx.runMutation(
+          internal.features.changeRequests.mutations.createStaged,
+          {
+            projectId: args.projectId,
+            resourceType: "account",
+            kind: "create",
+            environments: args.environments,
+            payload: JSON.stringify({
+              name: args.name,
+              websiteUrl: args.websiteUrl,
+              description: args.description,
+              environments: args.environments,
+            }),
+            vaultRef: vault.id,
+            label: args.name,
+            source: args.source ?? "web",
+          }
+        );
+        return { requested: true as const, requestId };
+      } catch (error) {
+        await ctx
+          .runAction(internal.features.vault.vault.deleteSecret, {
+            vaultRef: vault.id,
+          })
+          .catch(() => {});
+        throw error;
+      }
+    }
+
     let accountId: Id<"projectAccounts">;
     try {
       accountId = await ctx.runMutation(
@@ -98,6 +163,7 @@ export const createWithCredentials = action({
           description: args.description,
           environments: args.environments,
           vaultRef: vault.id,
+          override: args.override,
         }
       );
     } catch (mutationError) {
@@ -135,9 +201,11 @@ export const updateWithCredentials = action({
     password: v.optional(v.string()),
     description: v.optional(v.string()),
     environments: v.optional(v.array(v.string())),
+    override: v.optional(v.boolean()),
+    source: v.optional(sourceValidator),
   },
-  returns: v.object({ accountId: v.id("projectAccounts") }),
-  handler: async (ctx, args): Promise<{ accountId: Id<"projectAccounts"> }> => {
+  returns: accountWriteResultValidator,
+  handler: async (ctx, args): Promise<AccountWriteResult> => {
     const userId = await requireCurrentUserId(ctx);
 
     const credentialsChanged =
@@ -152,6 +220,83 @@ export const updateWithCredentials = action({
       userId,
       minimumAccess: credentialsChanged ? "write" : "read",
     });
+
+    const protectedEnvs: string[] = await ctx.runQuery(
+      internal.features.changeRequests.queries.protectedEnvironmentsForWrite,
+      {
+        projectId: account.projectId,
+        accountId: args.accountId,
+        environments: args.environments,
+      }
+    );
+
+    if (protectedEnvs.length > 0 && args.override === true) {
+      // Break-glass rewrites the LIVE credentials in place, so authorize it
+      // before the vault write rather than compensating afterwards.
+      await assertCanOverrideProtection(ctx, userId, account.projectId);
+    }
+
+    // A pending proposal must never touch the live credentials, so the
+    // protected path seals them into a NEW vault object and stages it;
+    // apply swaps the pointer and destroys the old object.
+    if (protectedEnvs.length > 0 && args.override !== true) {
+      let stagedVaultRef: string | undefined;
+      if (credentialsChanged) {
+        const project = await ctx.runQuery(
+          internal.features.projects.queries._getById,
+          { projectId: account.projectId }
+        );
+        if (!project) {
+          throw new Error("Project not found");
+        }
+        const staged = await ctx.runAction(
+          internal.features.vault.vault.createSecret,
+          {
+            name: `account:${args.name ?? account.name}:${Date.now()}`,
+            value: serializeAccountVault(args.username!, args.password!),
+            organizationId: project.organizationId,
+            projectId: account.projectId,
+            environment: "account",
+          }
+        );
+        stagedVaultRef = staged.id;
+      }
+
+      try {
+        const requestId: Id<"changeRequests"> = await ctx.runMutation(
+          internal.features.changeRequests.mutations.createStaged,
+          {
+            projectId: account.projectId,
+            resourceType: "account",
+            kind: "update",
+            targetId: args.accountId,
+            environments: touchedEnvironments(
+              account.environments,
+              args.environments
+            ),
+            payload: JSON.stringify({
+              name: args.name,
+              websiteUrl: args.websiteUrl,
+              description: args.description,
+              environments: args.environments,
+            }),
+            vaultRef: stagedVaultRef,
+            label: args.name ?? account.name,
+            source: args.source ?? "web",
+          }
+        );
+        return { requested: true as const, requestId };
+      } catch (error) {
+        if (stagedVaultRef) {
+          await ctx
+            .runAction(internal.features.vault.vault.deleteSecret, {
+              vaultRef: stagedVaultRef,
+            })
+            .catch(() => {});
+        }
+        throw error;
+      }
+    }
 
     let previousVaultValue: string | null = null;
     let updatedVersionId: string | undefined;
@@ -181,6 +326,7 @@ export const updateWithCredentials = action({
         description: args.description,
         environments: args.environments,
         credentialsChanged,
+        override: args.override,
       });
     } catch (mutationError) {
       // Compensating rollback: restore the prior credentials so a failed

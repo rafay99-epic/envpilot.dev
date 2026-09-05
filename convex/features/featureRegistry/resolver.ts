@@ -28,6 +28,30 @@ import {
 /**
  * Parse a JSON string value into its typed form.
  */
+type ResolvedFeature = {
+  value: boolean | number | null;
+  tierName: string;
+  valueType: "boolean" | "numeric";
+};
+
+// Denied is typed by the feature: a numeric feature denies as a 0 limit, so a
+// boolean never reaches a limit comparison.
+function deniedValue(valueType: "boolean" | "numeric"): ResolvedFeature {
+  return {
+    value: valueType === "numeric" ? 0 : false,
+    tierName: "unknown",
+    valueType,
+  };
+}
+
+function unlimitedValue(valueType: "boolean" | "numeric"): ResolvedFeature {
+  return {
+    value: valueType === "numeric" ? null : true,
+    tierName: "unlimited",
+    valueType,
+  };
+}
+
 export function parseFeatureValue(
   raw: string,
   valueType: "boolean" | "numeric"
@@ -187,29 +211,20 @@ export async function resolveFeatureValue(
 }> {
   const gate = context ?? (await resolveOrgGateContext(db, organizationId));
 
-  if (!gate.enforced) {
-    // When enforcement is off, look up the feature type for a sensible unlimited value
-    const feature = await db
-      .query("featureRegistry")
-      .withIndex("by_key", (q) => q.eq("key", featureKey))
-      .first();
-    const vt = feature?.valueType ?? "boolean";
-    return {
-      value: vt === "boolean" ? true : null,
-      tierName: "unlimited",
-      valueType: vt,
-    };
-  }
-
-  // Look up the feature definition
+  // Load the feature row first: the admin kill switch (isActive false) denies
+  // even when tier enforcement is off. A MISSING row keeps the pre-alpha
+  // bypass when enforcement is off, and denies once it is on.
   const feature = await db
     .query("featureRegistry")
     .withIndex("by_key", (q) => q.eq("key", featureKey))
     .first();
-  if (!feature || !feature.isActive) {
-    // Unknown or inactive feature — deny by default (secure default)
-    return { value: false, tierName: "unknown", valueType: "boolean" };
+  if (feature && !feature.isActive) return deniedValue(feature.valueType);
+
+  if (!gate.enforced) {
+    return unlimitedValue(feature?.valueType ?? "boolean");
   }
+
+  if (!feature) return deniedValue("boolean");
 
   // Look up tier-specific override for the (grace-period-adjusted) effective tier
   const override = await db
@@ -243,27 +258,20 @@ export async function resolveFeatureForUser(
   tierName: string;
   valueType: "boolean" | "numeric";
 }> {
-  const enforced = await isEnforcementEnabledFromDb(db);
-  if (!enforced) {
-    const feature = await db
-      .query("featureRegistry")
-      .withIndex("by_key", (q) => q.eq("key", featureKey))
-      .first();
-    const vt = feature?.valueType ?? "boolean";
-    return {
-      value: vt === "boolean" ? true : null,
-      tierName: "unlimited",
-      valueType: vt,
-    };
-  }
-
+  // Same ordering as resolveFeatureValue: kill switch, then pre-alpha bypass,
+  // then unknown-key denial.
   const feature = await db
     .query("featureRegistry")
     .withIndex("by_key", (q) => q.eq("key", featureKey))
     .first();
-  if (!feature || !feature.isActive) {
-    return { value: false, tierName: "unknown", valueType: "boolean" };
+  if (feature && !feature.isActive) return deniedValue(feature.valueType);
+
+  const enforced = await isEnforcementEnabledFromDb(db);
+  if (!enforced) {
+    return unlimitedValue(feature?.valueType ?? "boolean");
   }
+
+  if (!feature) return deniedValue("boolean");
 
   const tierName = await getUserTier(db, userId);
 

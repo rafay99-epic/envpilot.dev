@@ -14,6 +14,7 @@ import {
   getRoleProfile,
   bypassesAssignment,
   hasCapability,
+  effectiveEnvironments,
   profileToLegacyProjectRole,
 } from "../../lib/authz";
 
@@ -108,10 +109,11 @@ export const listWithAccess = query({
         )
         .first();
       assigned = !!projectMembership;
-      // Environment scope constrains env-scopeable roles
-      if (hasCapability(profile, "access.env_scoped")) {
-        environmentScope = projectMembership?.environments;
-      }
+      // Role default narrowed by the assignment; undefined for non-scoped roles.
+      environmentScope = effectiveEnvironments(
+        profile,
+        projectMembership?.environments
+      );
     }
 
     // The owner class and assigned blanket-write roles have write access
@@ -278,6 +280,7 @@ export const getDeleted = query({
     return deletedAccounts.map((account) => ({
       _id: account._id,
       name: account.name,
+      environments: account.environments,
       deletedAt: account.deletedAt as number,
     }));
   },

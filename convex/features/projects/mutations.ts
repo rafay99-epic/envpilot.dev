@@ -15,6 +15,15 @@ import {
   bypassesAssignment,
 } from "../../lib/authz";
 import { internal } from "../../_generated/api";
+import {
+  cancelPendingRequest,
+  retenantChangeRequestsBatch,
+} from "../changeRequests/mutations";
+
+/** Rows per batch while draining a moved project's pending inbox. */
+const CHANGE_REQUEST_MOVE_BATCH = 100;
+/** Pending proposals one move may cancel inside its own transaction. */
+const MAX_PENDING_CHANGE_REQUESTS_PER_MOVE = 500;
 
 const PROJECT_NAME_MAX = 100;
 const PROJECT_SLUG_MAX = 50;
@@ -562,6 +571,59 @@ export const move = mutation({
       canceledRequests++;
     }
 
+    // Protected-environment proposals: cancel the pending ones (their staged
+    // secrets are purged with them), so the source org keeps no live approval
+    // work. Canceling takes a row out of the pending range, so the batched
+    // read drains it, but the transaction still has to fit: past the cap the
+    // move is refused rather than half-applied.
+    let canceledChangeRequests = 0;
+    for (;;) {
+      const pendingChangeRequests = await ctx.db
+        .query("changeRequests")
+        .withIndex("by_project_status", (q) =>
+          q.eq("projectId", args.projectId).eq("status", "pending")
+        )
+        .take(CHANGE_REQUEST_MOVE_BATCH);
+      if (pendingChangeRequests.length === 0) break;
+      if (
+        canceledChangeRequests + pendingChangeRequests.length >
+        MAX_PENDING_CHANGE_REQUESTS_PER_MOVE
+      ) {
+        throw new ConvexError(
+          `Drain the change request inbox below ${MAX_PENDING_CHANGE_REQUESTS_PER_MOVE} pending requests before moving this project`
+        );
+      }
+      for (const request of pendingChangeRequests) {
+        await cancelPendingRequest(
+          ctx,
+          request,
+          actor._id,
+          "Project moved to another organization"
+        );
+        canceledChangeRequests++;
+      }
+    }
+    // Reviewed history moves with the project. Up to one batch moves in this
+    // transaction so an ordinary inbox is consistent the moment the move
+    // commits; only a larger history is finished by scheduled batches, during
+    // which those rows are visible to neither organization.
+    const retenanted = await retenantChangeRequestsBatch(
+      ctx,
+      args.projectId,
+      args.targetOrganizationId,
+      MAX_PENDING_CHANGE_REQUESTS_PER_MOVE
+    );
+    if (retenanted >= MAX_PENDING_CHANGE_REQUESTS_PER_MOVE) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.changeRequests.mutations.retenantChangeRequests,
+        {
+          projectId: args.projectId,
+          organizationId: args.targetOrganizationId,
+        }
+      );
+    }
+
     // Audit log in source org
     await ctx.db.insert("auditLogs", {
       organizationId: project.organizationId,
@@ -575,6 +637,7 @@ export const move = mutation({
         revokedTokens,
         deactivatedPermissions,
         canceledRequests,
+        canceledChangeRequests,
       }),
       createdAt: now,
     });

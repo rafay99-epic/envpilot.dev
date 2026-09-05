@@ -1,6 +1,9 @@
 "use client";
 
 import { useId, useState, use } from "react";
+import { toast } from "sonner";
+import { useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
 import Link from "next/link";
 import { KeyRound } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
@@ -10,6 +13,8 @@ import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { ConfirmDialog } from "@/components/ui";
 import { FeatureGate } from "@/components/tier/FeatureGate";
+import { fileProposal } from "@/components/changes";
+import { getProtectedEnvironmentError } from "@/lib/error-messages";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import {
   useProjectBySlug,
@@ -19,6 +24,8 @@ import {
   useUpdateAccount,
   useDeleteAccount,
   useRevealAccount,
+  useProtection,
+  wasRequested,
   type Account,
 } from "@/hooks";
 import {
@@ -61,6 +68,10 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
   const accounts = useAccounts(projectId, convexUserId);
   const isLoadingAccounts = accounts === undefined;
 
+  const protection = useProtection(projectId);
+  const createChangeRequest = useMutation(
+    api.features.changeRequests.mutations.create
+  );
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
   const deleteAccount = useDeleteAccount();
@@ -132,7 +143,9 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
     setNotice(null);
     setError(null);
     try {
-      await createAccount.mutateAsync({
+      // A protected environment may turn this into a proposal. The union is
+      // read structurally so this keeps working once the backend adds it.
+      const result: unknown = await createAccount.mutateAsync({
         organizationId: orgId,
         projectId,
         name: data.name,
@@ -142,7 +155,11 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
         description: data.description || undefined,
         environments: data.environments,
       });
-      setNotice("Account created successfully.");
+      setNotice(
+        wasRequested(result)
+          ? "Sent for approval."
+          : "Account created successfully."
+      );
       setShowCreateDrawer(false);
     } catch (err) {
       const message =
@@ -170,7 +187,7 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
     setNotice(null);
     setError(null);
     try {
-      await updateAccount.mutateAsync({
+      const result: unknown = await updateAccount.mutateAsync({
         id: editingAccount._id,
         name: data.name,
         // Send "" through (not undefined) so cleared optional fields are
@@ -187,7 +204,11 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
         delete next[editingAccount._id];
         return next;
       });
-      setNotice("Account updated successfully.");
+      setNotice(
+        wasRequested(result)
+          ? "Sent for approval."
+          : "Account updated successfully."
+      );
       setEditingAccount(null);
     } catch (err) {
       log.error(
@@ -217,6 +238,29 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
         { projectId, accountId: deletingAccount._id, organizationId: orgId },
         err
       );
+      const blocked = getProtectedEnvironmentError(err);
+      if (blocked && projectId) {
+        const account = deletingAccount;
+        setDeletingAccount(null);
+        toast.error(blocked.message, {
+          action: {
+            label: "Propose deletion",
+            onClick: () => {
+              void fileProposal(createChangeRequest, {
+                projectId,
+                resourceType: "account",
+                kind: "delete",
+                targetId: account._id,
+                environments: account.environments,
+                payload: "{}",
+                label: account.name,
+                source: "web",
+              });
+            },
+          },
+        });
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to delete account");
       throw err;
     }
@@ -417,6 +461,8 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
           onSubmit={handleCreate}
           title="Add Account"
           submitLabel="Create Account"
+          protectedEnvironments={protection?.environments}
+          allowedEnvironments={protection?.allowedEnvironments}
         />
 
         {/* Edit drawer */}
@@ -428,6 +474,8 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
           onRevealCredentials={
             editingAccount ? () => revealCredentials(editingAccount) : undefined
           }
+          protectedEnvironments={protection?.environments}
+          allowedEnvironments={protection?.allowedEnvironments}
         />
 
         {/* Delete confirm */}

@@ -11,7 +11,7 @@ import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import type { Id } from "@convex/_generated/dataModel";
-import { useOrganizationTags, useCreateTag } from "@/hooks";
+import { useOrganizationTags, useCreateTag, useProtection } from "@/hooks";
 
 interface VariableCreateDrawerProps {
   isOpen: boolean;
@@ -24,7 +24,7 @@ interface VariableCreateDrawerProps {
   onCreate: (
     data: VariableFormData,
     options?: { silent?: boolean }
-  ) => Promise<void>;
+  ) => Promise<{ requested: boolean } | void>;
   organizationId?: string;
   projectId?: string;
   title?: string;
@@ -59,10 +59,16 @@ export function VariableCreateDrawer({
   const bulkCheck = useTierLimitCheck(orgId, "bulk_import");
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
   const { allowed: showTags } = useFeatureGate(orgId, "variable_tags");
+  // Same open-only gating as the tier checks above: no idle subscription.
+  const protection = useProtection(isOpen ? projId : undefined);
   const { tags } = useOrganizationTags(showTags ? organizationId : undefined);
   const createTag = useCreateTag();
 
-  const availableTags = showTags ? tags : [];
+  // The legacy request schema (the non-developer branch of useCreateVariable)
+  // has no rotation/tags fields, so a value picked here would be silently
+  // dropped when filed — hide both controls instead.
+  const requestOnly = submitLabel.includes("Request");
+  const availableTags = showTags && !requestOnly ? tags : [];
 
   const handleCreateTag = async (name: string, color: string) => {
     if (!organizationId) return;
@@ -88,77 +94,8 @@ export function VariableCreateDrawer({
   }
 
   async function handleBulkSubmit(entries: VariableFormData[]) {
-    const failures: Array<{ key: string; error: string }> = [];
-
-    // Sequential on purpose. Firing these concurrently is what the rule
-    // suggests and is exactly wrong here: each create writes to the vault and
-    // spends from the per-variable rate bucket, so a parallel fan-out of a
-    // pasted 48-key block is the throttle this whole change exists to remove.
-    // The pooled server paths serialize their first write for the same reason
-    // (vault key derivation races on a cold project).
-    for (const entry of entries) {
-      try {
-        // react-doctor-disable-next-line react-doctor/async-await-in-loop
-        await onCreate(entry, { silent: true });
-      } catch (err) {
-        failures.push({
-          key: entry.key,
-          error: err instanceof Error ? err.message : "Failed to create",
-        });
-      }
-    }
-
-    const created = entries.length - failures.length;
-
-    if (failures.length === 0) {
-      toast.success(`${created} variable${created === 1 ? "" : "s"} created.`);
-      handleClose();
-      return;
-    }
-
-    // Summarize failures in user terms — duplicate keys are the common,
-    // user-correctable case and get their own line instead of raw errors.
-    // Partitioned in one pass. The chain walked `failures` three times and
-    // ran the same test twice per entry to answer both halves of it.
-    const isDuplicate = /already exists/i;
-    const duplicateKeys: string[] = [];
-    // Group the rest BY MESSAGE. Pasting 48 variables and hitting one server
-    // condition used to print that same condition 48 times, joined with " · ",
-    // which is how a single throttle became an unreadable wall of identical
-    // text. One line per distinct cause, with the keys it hit.
-    const byMessage = new Map<string, string[]>();
-    for (const failure of failures) {
-      if (isDuplicate.test(failure.error)) {
-        duplicateKeys.push(failure.key);
-        continue;
-      }
-      const keys = byMessage.get(failure.error);
-      if (keys) keys.push(failure.key);
-      else byMessage.set(failure.error, [failure.key]);
-    }
-
-    const parts: string[] = [];
-    if (duplicateKeys.length > 0) {
-      parts.push(
-        `Already exist in the selected environment(s): ${summarizeKeys(duplicateKeys)} — the same key is allowed in a different environment`
-      );
-    }
-    for (const [message, keys] of byMessage) {
-      parts.push(
-        keys.length === 1
-          ? `${keys[0]}: ${message}`
-          : `${message} (${keys.length} variables: ${summarizeKeys(keys)})`
-      );
-    }
-
-    toast.error(
-      created > 0
-        ? `${created} created, ${failures.length} skipped`
-        : `No variables created (${failures.length} failed)`,
-      { description: parts.join(" · "), duration: 8000 }
-    );
-
-    if (created > 0) {
+    const { failures, requested } = await createSequentially(entries, onCreate);
+    if (reportBulkResult(entries.length, requested, failures)) {
       handleClose();
     }
   }
@@ -174,18 +111,12 @@ export function VariableCreateDrawer({
       title={title}
       preventClose={isBulkSubmitting}
     >
-      {/* Variable limit warning */}
-      {enforcing &&
-        varCheck.current !== undefined &&
-        varCheck.limit !== undefined && (
-          <div className="mb-4">
-            <LimitWarning
-              current={varCheck.current}
-              limit={varCheck.limit}
-              resourceName="variables"
-            />
-          </div>
-        )}
+      {enforcing && (
+        <VariableLimitWarning
+          current={varCheck.current}
+          limit={varCheck.limit}
+        />
+      )}
 
       {/* Tab switcher */}
       <div className="mb-4 flex gap-1 rounded-lg p-1 bg-surface-raised">
@@ -228,9 +159,11 @@ export function VariableCreateDrawer({
             onSubmit={handleSingleSubmit}
             onCancel={handleClose}
             submitLabel={submitLabel}
-            showRotation={showRotation}
+            showRotation={showRotation && !requestOnly}
             availableTags={availableTags}
-            onCreateTag={handleCreateTag}
+            onCreateTag={requestOnly ? undefined : handleCreateTag}
+            protectedEnvironments={protection?.environments}
+            allowedEnvironments={protection?.allowedEnvironments}
           />
         )
       ) : bulkBlocked ? (
@@ -247,11 +180,142 @@ export function VariableCreateDrawer({
           submitLabel={bulkSubmitLabel}
           onSubmittingChange={setIsBulkSubmitting}
           availableTags={availableTags}
-          onCreateTag={showTags ? handleCreateTag : undefined}
+          onCreateTag={requestOnly ? undefined : handleCreateTag}
+          protectedEnvironments={protection?.environments}
+          allowedEnvironments={protection?.allowedEnvironments}
         />
       )}
     </DrawerPanel>
   );
+}
+
+/**
+ * Creates the pasted entries one at a time.
+ *
+ * Sequential on purpose. Firing these concurrently is what the rule suggests
+ * and is exactly wrong here: each create writes to the vault and spends from
+ * the per-variable rate bucket, so a parallel fan-out of a pasted 48-key
+ * block is the throttle this whole change exists to remove. The pooled
+ * server paths serialize their first write for the same reason (vault key
+ * derivation races on a cold project).
+ */
+async function createSequentially(
+  entries: readonly VariableFormData[],
+  onCreate: VariableCreateDrawerProps["onCreate"]
+): Promise<{
+  failures: Array<{ key: string; error: string }>;
+  requested: number;
+}> {
+  const failures: Array<{ key: string; error: string }> = [];
+  // A protected environment turns some entries into requests rather than
+  // direct writes, so the summary can't call every success "created".
+  let requested = 0;
+
+  for (const entry of entries) {
+    try {
+      // react-doctor-disable-next-line react-doctor/async-await-in-loop
+      const result = await onCreate(entry, { silent: true });
+      if (result?.requested) requested++;
+    } catch (err) {
+      failures.push({
+        key: entry.key,
+        error: err instanceof Error ? err.message : "Failed to create",
+      });
+    }
+  }
+
+  return { failures, requested };
+}
+
+/** The free-tier variable counter, shown only while enforcement is on. */
+function VariableLimitWarning({
+  current,
+  limit,
+}: {
+  current?: number;
+  limit?: number | null;
+}) {
+  if (current === undefined || limit === undefined) return null;
+  return (
+    <div className="mb-4">
+      <LimitWarning current={current} limit={limit} resourceName="variables" />
+    </div>
+  );
+}
+
+/**
+ * One toast for a finished bulk paste. Returns whether the drawer should
+ * close: it stays open only when nothing landed, so the paste can be fixed
+ * without retyping it.
+ */
+function reportBulkResult(
+  total: number,
+  requested: number,
+  failures: ReadonlyArray<{ key: string; error: string }>
+): boolean {
+  const succeeded = total - failures.length;
+  const created = succeeded - requested;
+  const landed = [
+    created > 0
+      ? `${created} variable${created === 1 ? "" : "s"} created`
+      : null,
+    requested > 0 ? `${requested} sent for approval` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  if (failures.length === 0) {
+    toast.success(landed);
+    return true;
+  }
+
+  toast.error(
+    succeeded > 0
+      ? `${landed}, ${failures.length} skipped`
+      : `No variables created (${failures.length} failed)`,
+    { description: summarizeFailures(failures).join(" · "), duration: 8000 }
+  );
+  return succeeded > 0;
+}
+
+/**
+ * Failures in user terms, one line per distinct cause.
+ *
+ * Duplicate keys are the common, user-correctable case and get their own
+ * line. The rest are grouped BY MESSAGE: pasting 48 variables and hitting
+ * one server condition used to print that condition 48 times joined with
+ * " · ", which is how a single throttle became an unreadable wall.
+ */
+function summarizeFailures(
+  failures: ReadonlyArray<{ key: string; error: string }>
+): string[] {
+  const isDuplicate = /already exists/i;
+  const duplicateKeys: string[] = [];
+  const byMessage = new Map<string, string[]>();
+  for (const failure of failures) {
+    if (isDuplicate.test(failure.error)) {
+      duplicateKeys.push(failure.key);
+      continue;
+    }
+    const keys = byMessage.get(failure.error);
+    if (keys) keys.push(failure.key);
+    else byMessage.set(failure.error, [failure.key]);
+  }
+
+  const parts: string[] = [];
+  if (duplicateKeys.length > 0) {
+    parts.push(
+      `Already exist in the selected environment(s): ${summarizeKeys(duplicateKeys)} — the same key is allowed in a different environment`
+    );
+  }
+  for (const [message, keys] of byMessage) {
+    parts.push(
+      keys.length === 1
+        ? `${keys[0]}: ${message}`
+        : `${message} (${keys.length} variables: ${summarizeKeys(keys)})`
+    );
+  }
+  return parts;
 }
 
 /**

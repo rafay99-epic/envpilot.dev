@@ -3,6 +3,15 @@ import { Id } from "../../_generated/dataModel";
 import { resolveFeatureValue, type OrgGateContext } from "./resolver";
 import type { Surface } from "../../lib/surfaces";
 
+// A limit is a number or null (unlimited). The resolver types denials by
+// feature, so a boolean here means a boolean-typed row was read as a limit:
+// true is unlimited, false is 0.
+function asLimit(value: boolean | number | null): number | null {
+  if (value === null || value === true) return null;
+  if (value === false) return 0;
+  return value;
+}
+
 // ==========================================
 // PAGINATION SHAPE (structural — matches Convex's query builder return type)
 // ==========================================
@@ -79,7 +88,7 @@ export async function checkNumericLimit(
     featureKey,
     context
   );
-  const limit = resolved.value as number | null;
+  const limit = asLimit(resolved.value);
 
   if (limit === null) {
     // Unlimited
@@ -146,7 +155,7 @@ export async function checkCountedLimit(
     featureKey,
     context
   );
-  const limit = resolved.value as number | null;
+  const limit = asLimit(resolved.value);
 
   if (limit === null) {
     // Unlimited (or enforcement disabled) — never count.
@@ -326,29 +335,34 @@ export async function countRotationEnabledVariables(
     .collect();
   const projects = allProjects.filter((p) => p.deletedAt === undefined);
 
-  const isRotationEnabled = (v: {
-    deletedAt?: number;
-    rotationFrequencyDays?: number;
-    _id: Id<"environmentVariables">;
-  }) =>
-    v.deletedAt === undefined &&
-    v.rotationFrequencyDays !== undefined &&
-    v.rotationFrequencyDays > 0 &&
-    !(excludeVariableId !== undefined && v._id === excludeVariableId);
-
   let count = 0;
   for (const project of projects) {
     if (limit !== undefined && count >= limit) break; // capacity provably full — no need to scan remaining projects
 
-    const remaining = limit === undefined ? undefined : limit - count;
-    count += await countMatchingUpTo(
-      () =>
-        db
-          .query("environmentVariables")
-          .withIndex("by_project", (q) => q.eq("projectId", project._id)),
-      isRotationEnabled,
-      remaining
-    );
+    // ACTIVE rows only, through the index: trash accumulates without bound
+    // and cannot hold a rotation slot, so reading by_project and filtering in
+    // memory grew the scan with deleted history. Rotation is not an indexed
+    // field, so the whole active range is read: a raw-row cap would let
+    // rotation-enabled rows past the cap slip under a finite limit. The
+    // active range is itself bounded by max_variables_per_project on every
+    // finite tier, and unlimited tiers never reach this count.
+    const active = await db
+      .query("environmentVariables")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", project._id).eq("deletedAt", undefined)
+      )
+      .collect();
+
+    for (const variable of active) {
+      if (limit !== undefined && count >= limit) break;
+      if (
+        variable.rotationFrequencyDays !== undefined &&
+        variable.rotationFrequencyDays > 0 &&
+        variable._id !== excludeVariableId
+      ) {
+        count++;
+      }
+    }
   }
   return count;
 }

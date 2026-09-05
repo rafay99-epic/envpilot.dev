@@ -215,7 +215,7 @@ export default function VariablesPage() {
     data: VariableFormData
   ) => {
     try {
-      await updateVariable.mutateAsync({
+      const result = await updateVariable.mutateAsync({
         variableId,
         projectId: editingVariable?.projectId ?? "",
         value: data.value || undefined,
@@ -229,7 +229,11 @@ export default function VariablesPage() {
         changeReason: "Updated via dashboard",
       });
 
-      toast.success("Variable updated successfully.");
+      toast.success(
+        result.requested
+          ? "Sent for approval."
+          : "Variable updated successfully."
+      );
       setTimeout(() => toast.success(null), 3000);
       // Clear cached revealed value since it may have changed
       setRevealedValues((prev) => {
