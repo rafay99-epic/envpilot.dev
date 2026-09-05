@@ -15,7 +15,6 @@ export { useOrganizationProjects, useProjectBySlug } from "./useProjects";
 export {
   useWorkspaces,
   useWorkspaceBySlug,
-  useProjectWorkspaces,
   useInheritedVariables,
   useWorkspaceActions,
 } from "./useWorkspaces";

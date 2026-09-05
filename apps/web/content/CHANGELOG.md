@@ -15,6 +15,19 @@
 
 <!-- entry -->
 ---
+title: Workspaces Share One Variable Across Projects
+version: v1.70.0
+date: 2026-09-05
+types: [feature]
+---
+
+A workspace holds one copy of a variable and every linked project reads that row. Rotate it once and each project picks up the new value on its next pull, so the same credential no longer lives in six places that drift apart.
+
+Workspaces get their own entry in the sidebar. Create one, link the projects that should read it, and add variables the way you would in a project. Each linked project shows what it inherits in a read-only "From workspace" group on its variables page, with reveal working as it does for the project's own rows. A per-variable scope picker narrows a row to some of the linked projects, and a duplicate scan finds keys the linked projects already copy and moves one copy up.
+
+The CLI, the VS Code and JetBrains extensions, the REST API, the MCP server, the GitHub Action and the Docker image all receive inherited variables without an update, because resolution happens on the server. Free organizations get one workspace with three projects and ten variables.
+
+---
 title: Envpilot vs Phase, and a Refreshed Infisical Page
 version: v1.69.0
 date: 2026-09-05

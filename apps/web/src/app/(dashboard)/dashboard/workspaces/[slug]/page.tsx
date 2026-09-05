@@ -1,9 +1,8 @@
 "use client";
 
 import { use, useState } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
-import { Boxes, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Boxes, Loader2, Plus } from "lucide-react";
 import { PageHeader } from "@envpilot/ui";
 import type { Id } from "@convex/_generated/dataModel";
 import {
@@ -20,7 +19,9 @@ import { useAuthContext } from "@/components/auth";
 import { ConfirmDialog } from "@/components/ui";
 import {
   AdoptDuplicates,
+  LinkedProjects,
   ScopeDialog,
+  SharedVariables,
   type ScopeTarget,
 } from "@/components/workspaces";
 import {
@@ -48,13 +49,15 @@ interface WorkspacePageProps {
  */
 export default function WorkspacePage({ params }: WorkspacePageProps) {
   const { slug } = use(params);
-  const { organization } = useAuthContext();
+  const { organization, capabilities } = useAuthContext();
   const orgId = organization?.id as Id<"organizations"> | undefined;
+  // Workspace rows are ordinary variables, so the same registry gate applies.
+  const canCreateVariable = capabilities["project.variables.create"] === true;
 
   const data = useWorkspaceBySlug(orgId, slug);
   const allProjects = useOrganizationProjects(orgId);
   const { addProject, removeProject } = useWorkspaceActions();
-  const createVariable = useCreateVariable();
+  const createVariable = useCreateVariable(canCreateVariable);
   const deleteVariable = useDeleteVariable();
   const updateVariable = useUpdateVariable();
 
@@ -215,169 +218,37 @@ export default function WorkspacePage({ params }: WorkspacePageProps) {
         }
       />
 
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-4">
-          <h2 className="font-mono text-sm text-ink">Shared variables</h2>
-          <span className="font-mono text-xs text-ink-muted">
-            {variables.length} shared with {members.length}{" "}
-            {members.length === 1 ? "project" : "projects"}
-          </span>
-        </div>
+      <SharedVariables
+        variables={variables}
+        memberCount={members.length}
+        onAdd={() => setIsDrawerOpen(true)}
+        onEdit={(variable) =>
+          setEditing({
+            _id: variable._id,
+            key: variable.key,
+            environments: variable.environments,
+            isSensitive: variable.isSensitive,
+          })
+        }
+        onScope={setScoping}
+        onDelete={setDeleting}
+      />
 
-        {variables.length === 0 ? (
-          <div className="space-y-3 border border-line px-4 py-6">
-            <p className="text-sm text-ink-muted">No shared variables yet.</p>
-            <button
-              type="button"
-              onClick={() => setIsDrawerOpen(true)}
-              className="inline-flex items-center gap-2 border border-line px-3 py-2 font-mono text-xs text-ink-muted hover:border-accent hover:text-accent"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add your first shared variable
-            </button>
-          </div>
-        ) : (
-          <ul className="divide-y divide-line border border-line">
-            {variables.map((variable) => (
-              <li
-                key={variable._id}
-                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-              >
-                <button
-                  type="button"
-                  onClick={() =>
-                    setEditing({
-                      _id: variable._id,
-                      key: variable.key,
-                      environments: variable.environments,
-                      isSensitive: variable.isSensitive,
-                    })
-                  }
-                  className="font-mono text-sm text-ink hover:text-accent"
-                >
-                  {variable.key}
-                </button>
-                <span className="flex items-center gap-4 font-mono text-xs text-ink-muted">
-                  <span>{variable.environments.join(" ")}</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setScoping({
-                        variableId: variable._id,
-                        key: variable.key,
-                        appliesTo: variable.appliesTo,
-                      })
-                    }
-                    className="underline decoration-dotted underline-offset-4 hover:text-accent"
-                  >
-                    {variable.appliesToCount === undefined
-                      ? `read by all ${members.length}`
-                      : `read by ${variable.appliesToCount} of ${members.length}`}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDeleting({
-                        variableId: variable._id,
-                        key: variable.key,
-                      })
-                    }
-                    className="text-ink-muted hover:text-danger"
-                    aria-label={`Delete ${variable.key}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-4">
-          <h2 className="font-mono text-sm text-ink">Linked projects</h2>
-          <span className="font-mono text-xs text-ink-muted">
-            {members.length} linked
-          </span>
-        </div>
-
-        {members.length === 0 ? (
-          <p className="border border-line px-4 py-6 text-sm text-ink-muted">
-            No project reads these values yet. Link one below and every variable
-            above appears on its variables page, read only.
-          </p>
-        ) : (
-          <ul className="divide-y divide-line border border-line">
-            {members.map((member) => (
-              <li
-                key={member.membershipId}
-                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-              >
-                <Link
-                  href={`/dashboard/projects/${member.slug}`}
-                  className="text-sm text-ink hover:text-accent"
-                >
-                  {member.name}
-                </Link>
-                <span className="flex items-center gap-4 font-mono text-xs text-ink-muted">
-                  <span>
-                    {member.environments
-                      ? member.environments.join(" ")
-                      : "all environments"}
-                  </span>
-                  <span>inherits {member.inheritedCount}</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setRemoving({
-                        projectId: member.projectId,
-                        name: member.name,
-                        inheritedCount: member.inheritedCount,
-                      })
-                    }
-                    className="text-ink-muted hover:text-danger"
-                    aria-label={`Remove ${member.name} from workspace`}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {candidates.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={pendingProjectId}
-              onChange={(event) => setPendingProjectId(event.target.value)}
-              aria-label="Project to link"
-              className="border border-line bg-surface px-3 py-2 font-mono text-xs text-ink"
-            >
-              <option value="">Link a project…</option>
-              {candidates.map((project) => (
-                <option key={project._id} value={project._id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleAddProject}
-              disabled={!pendingProjectId || isAdding}
-              className="inline-flex items-center gap-2 border border-line px-3 py-2 font-mono text-xs text-ink-muted hover:border-accent hover:text-accent disabled:opacity-40"
-            >
-              {isAdding ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Plus className="h-3.5 w-3.5" />
-              )}
-              Link
-            </button>
-          </div>
-        )}
-      </section>
+      <LinkedProjects
+        members={members}
+        candidates={candidates}
+        pendingProjectId={pendingProjectId}
+        isAdding={isAdding}
+        onPendingChange={setPendingProjectId}
+        onAdd={handleAddProject}
+        onRemove={(member) =>
+          setRemoving({
+            projectId: member.projectId,
+            name: member.name,
+            inheritedCount: member.inheritedCount,
+          })
+        }
+      />
 
       <ScopeDialog
         workspaceId={workspace._id}

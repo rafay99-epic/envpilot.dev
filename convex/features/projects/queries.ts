@@ -217,6 +217,9 @@ export const getBySlug = query({
       .first();
 
     if (!project || project.deletedAt) return null;
+    // A workspace has its own route and query. The project page must not
+    // render it with a settings tab, members and CI keys it never asked for.
+    if (isWorkspace(project)) return null;
 
     // Returns null instead of throwing so callers keep "not found" handling.
     if (!(await canViewProject(ctx, actor._id, project))) return null;

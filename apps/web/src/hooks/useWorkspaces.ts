@@ -28,19 +28,6 @@ export function useWorkspaceBySlug(
   );
 }
 
-/** The workspaces a project belongs to. */
-export function useProjectWorkspaces(projectId: Id<"projects"> | undefined) {
-  const rows = useQuery(
-    api.features.workspaces.queries.listForProject,
-    projectId ? { projectId } : "skip"
-  );
-
-  return {
-    workspaces: rows ?? [],
-    isLoading: projectId ? rows === undefined : false,
-  };
-}
-
 /**
  * Variables a project inherits from its workspaces. Read-only rows: the
  * project can see and reveal them, and editing happens in the workspace.

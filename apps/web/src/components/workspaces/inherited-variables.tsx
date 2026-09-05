@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
 import { Boxes, Eye, EyeOff, Loader2 } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
@@ -129,28 +128,5 @@ export function InheritedVariables({ projectId }: InheritedVariablesProps) {
         </section>
       ))}
     </div>
-  );
-}
-
-/** Compact workspace chips for a project header or card. */
-export function WorkspaceChips({
-  workspaces,
-}: {
-  workspaces: { workspaceId: string; name: string; slug: string }[];
-}) {
-  if (workspaces.length === 0) return null;
-
-  return (
-    <span className="flex flex-wrap items-center gap-2">
-      {workspaces.map((workspace) => (
-        <Link
-          key={workspace.workspaceId}
-          href={`/dashboard/workspaces/${workspace.slug}`}
-          className="border border-line px-2 py-0.5 font-mono text-[11px] text-ink-muted hover:border-accent hover:text-accent"
-        >
-          {workspace.name}
-        </Link>
-      ))}
-    </span>
   );
 }

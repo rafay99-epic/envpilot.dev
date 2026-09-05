@@ -49,11 +49,11 @@ export function AdoptDuplicates({
     try {
       const result = await scanDuplicates({ workspaceId });
       setGroups(result.groups);
-      setSelected(
-        new Set(
-          result.groups.filter((g) => g.adoptable).map((group) => group.key)
-        )
-      );
+      const adoptableKeys = new Set<string>();
+      for (const group of result.groups) {
+        if (group.adoptable) adoptableKeys.add(group.key);
+      }
+      setSelected(adoptableKeys);
       if (result.groups.length === 0) {
         toast.success("No duplicated keys across these projects.");
       }

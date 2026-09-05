@@ -189,44 +189,6 @@ export const getBySlug = query({
   },
 });
 
-/** The workspaces one project belongs to, for its settings panel. */
-export const listForProject = query({
-  args: { projectId: v.id("projects") },
-  handler: async (ctx, args) => {
-    const actor = await requireAuthedUser(ctx);
-    const project = await ctx.db.get(args.projectId);
-    if (!project || project.deletedAt) return [];
-
-    const membership = await getActiveMembership(
-      ctx,
-      project.organizationId,
-      actor._id
-    );
-    if (!membership) return [];
-
-    const memberships = await ctx.db
-      .query("workspaceProjects")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect();
-
-    const rows = await Promise.all(
-      memberships.map(async (row) => {
-        const workspace = await ctx.db.get(row.workspaceId);
-        if (!workspace || workspace.deletedAt) return null;
-        return {
-          membershipId: row._id,
-          workspaceId: workspace._id,
-          name: workspace.name,
-          slug: workspace.slug,
-          environments: row.environments,
-        };
-      })
-    );
-
-    return rows.filter((row): row is NonNullable<typeof row> => row !== null);
-  },
-});
-
 /**
  * The rows a project inherits, for the "from <workspace>" section of its
  * variables page.
