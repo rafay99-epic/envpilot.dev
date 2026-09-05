@@ -15,6 +15,16 @@
 
 <!-- entry -->
 ---
+title: Quieter Error Reporting Across Every Client
+version: v1.68.1
+date: 2026-09-05
+types: [fix]
+---
+
+A pass over the Sentry inbox. The VS Code extension no longer reports crashes that belong to other extensions in the same host, and its live subscriptions recover from an expired token without logging an error on every re-run. The commit guard installs its hook in worktrees and submodules, where `.git` is a file. On the web, the sign-in links do a full page load again so the WorkOS redirect can follow, and the marketing pages run through the auth middleware so the session check no longer throws on them. The CLI reports an expired session as a plain message instead of an error, and the JetBrains plugin registers its copy guard through the editor action API, which fixes a startup exception on 2025.x IDEs.
+
+<!-- entry -->
+---
 title: Review Changes From Your Phone
 version: v1.68.0
 date: 2026-09-05

@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 
@@ -68,7 +69,11 @@ export async function requireAuthedUser(
 ): Promise<Doc<"users">> {
   const user = await getAuthedUser(ctx);
   if (!user) {
-    throw new Error("Unauthenticated: no verified user identity on request");
+    // ConvexError: prod redacts plain Error to "Server Error", and the web
+    // client's transient-auth-race triage matches on this exact text.
+    throw new ConvexError(
+      "Unauthenticated: no verified user identity on request"
+    );
   }
   return user;
 }

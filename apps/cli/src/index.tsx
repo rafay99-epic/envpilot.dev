@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { initSentry, captureError, flushSentry } from "./lib/sentry.js";
+import { initSentry } from "./lib/sentry.js";
+import { handleError } from "./lib/errors.js";
 import { createProgram } from "./lib/program.js";
 import { openTUI, isInteractiveTerminal } from "./ui/render-tui.js";
 
@@ -23,11 +24,7 @@ async function main(): Promise<void> {
 
 // Run inside a function (not top-level await) so an empty event loop can never
 // surface a "Detected unsettled top-level await" warning to users.
-main().catch(async (err) => {
-  console.error(err);
-  // Commands report their own errors via handleError(); anything landing
-  // here escaped that path entirely, so report before exiting.
-  captureError(err, { phase: "top-level" });
-  await flushSentry();
-  process.exit(1);
-});
+// Commands normally call handleError() themselves; anything landing here
+// escaped that path, so run the same triage (expected codes such as
+// SESSION_EXPIRED are printed, not reported) and exit.
+main().catch(handleError);

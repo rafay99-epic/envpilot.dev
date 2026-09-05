@@ -2,6 +2,7 @@ package dev.envpilot.jetbrains.errors
 
 import com.intellij.openapi.diagnostic.logger
 import dev.envpilot.jetbrains.BuildConfig
+import dev.envpilot.jetbrains.auth.AuthKitLogin
 import dev.envpilot.jetbrains.version.VersionCheck
 import io.sentry.Sentry
 import io.sentry.SentryLevel
@@ -35,13 +36,27 @@ object Errors {
         }
     }
 
+    /**
+     * Conditions the plugin already handles on its own: a sign-in the user
+     * cancelled or that timed out, a socket auth error (ConvexSyncService
+     * refreshes the token and re-authenticates), and a socket that is simply
+     * not connected yet. They stay in idea.log; Sentry would only be noise.
+     */
+    private fun isExpected(e: Throwable): Boolean {
+        if (e is AuthKitLogin.LoginCancelled) return true
+        val msg = e.message ?: return false
+        return msg.startsWith("auth error:") ||
+            msg.startsWith("Convex socket not connected") ||
+            msg == "socket disconnected"
+    }
+
     /** Report to Sentry + the IDE log. Safe to call from anywhere. */
     fun report(
         e: Throwable,
         context: Map<String, String> = emptyMap(),
     ) {
         log.warn(e)
-        if (!initialized.get()) return
+        if (!initialized.get() || isExpected(e)) return
         try {
             Sentry.withScope { scope ->
                 context.forEach { (k, v) -> scope.setTag(k, v) }

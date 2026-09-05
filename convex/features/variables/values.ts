@@ -1007,7 +1007,9 @@ export const updateWithValue = action({
     // verified identity before any vault write.
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Unauthenticated: no verified user identity on request");
+      throw new ConvexError(
+        "Unauthenticated: no verified user identity on request"
+      );
     }
 
     // The variable is loaded unconditionally now: resolving protection needs

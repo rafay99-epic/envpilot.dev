@@ -189,23 +189,14 @@ export class GitCommitGuardService {
 
   private async installHookAtPath(repoRoot: string): Promise<void> {
     try {
-      // Check for custom hooks path
+      // Let git resolve the hooks dir: honours core.hooksPath and worktrees
+      // or submodules, where .git is a file and ".git/hooks" is ENOTDIR.
       let hooksDir: string;
       try {
-        const { stdout } = await execAsync("git config core.hooksPath", {
+        const { stdout } = await execAsync("git rev-parse --git-path hooks", {
           cwd: repoRoot,
         });
-        const customPath = stdout.trim();
-        hooksDir = customPath
-          ? path.resolve(repoRoot, customPath)
-          : path.join(repoRoot, ".git", "hooks");
-      } catch {
-        hooksDir = path.join(repoRoot, ".git", "hooks");
-      }
-
-      // Verify .git directory exists
-      try {
-        await fs.access(path.join(repoRoot, ".git"));
+        hooksDir = path.resolve(repoRoot, stdout.trim());
       } catch {
         return; // Not a git repo
       }
