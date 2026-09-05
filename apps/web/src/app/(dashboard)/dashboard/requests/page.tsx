@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
+import { Suspense, useId, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -30,6 +31,7 @@ import { createLogger } from "@/lib/logger";
 import { PageHeader } from "@envpilot/ui";
 import { useTimeZone } from "@/hooks/useTimeZone";
 import { formatDate } from "@/lib/format";
+import { reviewSurface } from "@/lib/review-surface";
 import RequestsLoading from "./loading";
 
 const log = createLogger("app/dashboard/requests");
@@ -97,7 +99,17 @@ function envBadgeColor(env: string): "green" | "amber" | "red" | "zinc" {
   return "zinc";
 }
 
+// The surface tab and the open change request live in the query string so
+// notifications can deep-link; useSearchParams needs the boundary.
 export default function RequestsPage() {
+  return (
+    <Suspense fallback={<RequestsLoading />}>
+      <RequestsContent />
+    </Suspense>
+  );
+}
+
+function RequestsContent() {
   const {
     organization,
     roleMeta,
@@ -116,8 +128,34 @@ export default function RequestsPage() {
     (roleMeta?.level ?? roleLevel(normalizeOrgRole(organization?.role))) >=
     ROLE_LEVEL.team_lead;
 
-  const [surface, setSurface] = useState<"variables" | "changes">("variables");
-  const [status, setStatus] = useState<RequestStatus>("pending");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  // `?change=<id>` always means the changes surface, whatever `surface` says.
+  const surface: "variables" | "changes" =
+    searchParams.has("change") || searchParams.get("surface") === "changes"
+      ? "changes"
+      : "variables";
+  const setSurface = (next: "variables" | "changes") =>
+    router.replace(
+      next === "changes" ? `${pathname}?surface=changes` : pathname,
+      {
+        scroll: false,
+      }
+    );
+  // `?request=<id>` from a notification: that row gets highlighted, and the
+  // status tab follows the request until the reviewer picks a tab, so a link
+  // to an already-reviewed request does not land on an empty Pending list.
+  const highlightedRequestId = searchParams.get("request");
+  const linkedStatus = useQuery(
+    api.features.variables.requests.queries.statusForLink,
+    // Same auth gate as listForReviewer below.
+    highlightedRequestId && convexUserId
+      ? { requestId: highlightedRequestId }
+      : "skip"
+  );
+  const [pickedStatus, setStatus] = useState<RequestStatus | null>(null);
+  const status: RequestStatus = pickedStatus ?? linkedStatus ?? "pending";
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [rejectingRequest, setRejectingRequest] =
@@ -193,6 +231,7 @@ export default function RequestsPage() {
           requestId: request._id,
           value: suppliedValue ?? "",
           environments,
+          via: reviewSurface(),
         });
       } else {
         await resolveRequest.mutateAsync({
@@ -200,6 +239,7 @@ export default function RequestsPage() {
           action: "approve",
           reviewedBy: convexUserId as string,
           environments,
+          via: reviewSurface(),
         });
       }
       setNotice(`Request for "${request.key}" approved and variable created.`);
@@ -229,6 +269,7 @@ export default function RequestsPage() {
         requestId: rejectingRequest._id,
         action: "reject",
         reviewedBy: convexUserId as string,
+        via: reviewSurface(),
       });
       setNotice(`Request for "${rejectingRequest.key}" rejected.`);
       setTimeout(() => setNotice(null), 3000);
@@ -284,6 +325,7 @@ export default function RequestsPage() {
         <button
           key={value}
           onClick={() => setSurface(value)}
+          aria-pressed={surface === value}
           data-testid={`requests-surface-${value}`}
           className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
             surface === value
@@ -371,8 +413,10 @@ export default function RequestsPage() {
       ) : (
         <TerminalWindow title="requests">
           <div className="overflow-x-auto">
+            {/* Under md the rows stack into cards; same DOM, so the test ids
+                and click targets never fork. */}
             <table className="w-full">
-              <thead>
+              <thead className="hidden md:table-header-group">
                 <tr className="border-b border-line">
                   <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-accent/70">
                     Request
@@ -391,12 +435,13 @@ export default function RequestsPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody className="block divide-y divide-line md:table-row-group">
                 {requests.map((request, i) => (
                   <RequestRow
                     key={request._id}
                     request={request}
                     index={i}
+                    isHighlighted={request._id === highlightedRequestId}
                     isPending={request.status === "pending"}
                     revealedValue={revealedValues[request._id] ?? null}
                     isRevealing={revealingIds.has(request._id)}
@@ -427,9 +472,15 @@ export default function RequestsPage() {
   );
 }
 
+/** Callback ref: brings a deep-linked row into view when it mounts. */
+function scrollIntoViewOnce(node: HTMLTableRowElement | null) {
+  node?.scrollIntoView({ block: "center" });
+}
+
 function RequestRow({
   request,
   index = 0,
+  isHighlighted = false,
   isPending,
   revealedValue,
   isRevealing,
@@ -439,6 +490,7 @@ function RequestRow({
 }: {
   request: ReviewerRequest;
   index?: number;
+  isHighlighted?: boolean;
   isPending: boolean;
   revealedValue: string | null;
   isRevealing: boolean;
@@ -476,12 +528,16 @@ function RequestRow({
 
   return (
     <tr
-      className="animate-row-in align-top transition-colors hover:bg-accent-soft"
+      className={`block animate-row-in py-2 align-top transition-colors hover:bg-accent-soft md:table-row md:py-0 ${
+        isHighlighted ? "bg-accent-soft" : ""
+      }`}
       data-testid="request-row"
+      data-request-id={request._id}
+      ref={isHighlighted ? scrollIntoViewOnce : undefined}
       style={{ animationDelay: `${index * 40}ms` }}
     >
       {/* Request: key, project, requester */}
-      <td className="px-5 py-3">
+      <td className="block px-5 py-1 md:table-cell md:py-3">
         <div className="flex items-center gap-2">
           {request.isSensitive && <Lock className="h-3.5 w-3.5 text-warning" />}
           <code className="font-mono text-sm text-warning">{request.key}</code>
@@ -511,7 +567,7 @@ function RequestRow({
       </td>
 
       {/* Environments — toggleable override for pending, static otherwise */}
-      <td className="px-5 py-3">
+      <td className="block px-5 py-1 md:table-cell md:py-3">
         <div className="flex flex-wrap gap-1.5">
           {isPending
             ? ENVIRONMENTS.map((env) => {
@@ -548,7 +604,7 @@ function RequestRow({
 
       {/* Value — hidden by default, fetched on click; valueless (machine)
           requests take the reviewer's value inline instead */}
-      <td className="px-5 py-3">
+      <td className="block px-5 py-1 md:table-cell md:py-3">
         {!request.hasValue ? (
           isPending ? (
             <>
@@ -566,7 +622,7 @@ function RequestRow({
                 onChange={(e) => setSuppliedValue(e.target.value)}
                 placeholder="Enter the value to approve"
                 // 16px on phones, or iOS zooms the viewport on focus.
-                className="w-44 rounded-lg border border-line bg-surface px-2 py-1.5 font-mono text-base text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none sm:text-xs"
+                className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 font-mono text-base text-ink placeholder:text-ink-faint focus:border-accent-line focus:outline-none sm:text-xs md:w-44"
               />
             </>
           ) : (
@@ -609,15 +665,15 @@ function RequestRow({
       </td>
 
       {/* Requested date */}
-      <td className="whitespace-nowrap px-5 py-3 text-sm text-ink-subtle">
+      <td className="block whitespace-nowrap px-5 py-1 text-sm text-ink-subtle md:table-cell md:py-3">
         {formatDate(request.createdAt, timeZone)}
       </td>
 
       {/* Actions (pending) or review info (resolved) */}
-      <td className="px-5 py-3 text-right">
+      <td className="block px-5 py-1 md:table-cell md:py-3 md:text-right">
         {isPending ? (
-          <div className="flex flex-col items-end gap-1.5">
-            <div className="flex items-center justify-end gap-2">
+          <div className="flex flex-col gap-1.5 md:items-end">
+            <div className="flex items-center gap-2 [&>button]:flex-1 md:justify-end md:[&>button]:flex-none">
               <button
                 data-testid="request-accept"
                 onClick={() =>
@@ -658,7 +714,7 @@ function RequestRow({
               )}
           </div>
         ) : (
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-col gap-1 md:items-end">
             <TerminalBadge color={STATUS_BADGE_COLOR[request.status]}>
               {request.status}
             </TerminalBadge>

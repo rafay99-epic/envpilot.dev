@@ -53,6 +53,16 @@ const ACTION_TITLES: Record<string, { glyph: string; title: string }> = {
   },
   "doc.published": { glyph: "✓", title: "Documentation published" },
   "doc.shared": { glyph: "→", title: "Documentation shared" },
+  "change.requested": { glyph: "±", title: "Change requested" },
+  "change.applied": { glyph: "✓", title: "Change applied" },
+  "change.rejected": { glyph: "✗", title: "Change rejected" },
+  "change.reminder_sent": { glyph: "!", title: "Change still waiting" },
+  "change.overridden": { glyph: "!", title: "Protection overridden" },
+  "protection.enabled": { glyph: "✓", title: "Environment protected" },
+  "protection.disabled": {
+    glyph: "✗",
+    title: "Environment protection removed",
+  },
 };
 
 function escapeSlack(value: string): string {
@@ -192,6 +202,15 @@ function subject(
       ? `${title} (public link)`
       : (title ?? undefined);
   }
+  if (action.startsWith("change.")) {
+    return firstString(details, ["label", "key"]);
+  }
+  if (action === "protection.disabled") {
+    // The headline already prints `environments`, which is empty once
+    // protection is off; what got unprotected sits in `previous`.
+    const previous = stringList(details, "previous");
+    return previous.length > 0 ? previous.join(", ") : undefined;
+  }
   return undefined;
 }
 
@@ -218,10 +237,16 @@ export function buildNotificationText(input: {
   if (envs.length > 0) headline += ` (${escape(envs.join(", "))})`;
 
   const linkTarget = safeLinkTarget(input.link);
+  const linkLabel =
+    (input.action.startsWith("change.") ||
+      input.action.startsWith("variable.request")) &&
+    typeof input.details?.requestId === "string"
+      ? "Review change"
+      : "View in EnvPilot";
   const link = linkTarget
     ? input.provider === "slack"
-      ? `<${linkTarget}|View in EnvPilot>`
-      : `[View in EnvPilot](${linkTarget})`
+      ? `<${linkTarget}|${linkLabel}>`
+      : `[${linkLabel}](${linkTarget})`
     : undefined;
   const context = [
     input.projectName ? escape(input.projectName) : undefined,

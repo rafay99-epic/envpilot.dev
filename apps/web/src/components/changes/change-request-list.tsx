@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@convex/_generated/api";
@@ -45,8 +46,22 @@ function formatAge(ms: number): string {
 /**
  * Change requests for a project or an organization. Exactly one of the two
  * ids is passed; the other query is skipped.
+ *
+ * The open request lives in the URL (`?change=<id>`) rather than in state so
+ * a notification can link straight to the review drawer.
  */
-export function ChangeRequestList({
+export function ChangeRequestList(props: {
+  organizationId?: Id<"organizations">;
+  projectId?: Id<"projects">;
+}) {
+  return (
+    <Suspense fallback={<TerminalLoading />}>
+      <ChangeRequestListInner {...props} />
+    </Suspense>
+  );
+}
+
+function ChangeRequestListInner({
   organizationId,
   projectId,
 }: {
@@ -66,9 +81,41 @@ export function ChangeRequestList({
     : projectRows;
 
   const now = useNow(60_000);
-  const [reviewing, setReviewing] = useState<Id<"changeRequests"> | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const reviewing = searchParams.get("change") as Id<"changeRequests"> | null;
+  const navigate = (edit: (params: URLSearchParams) => void) => {
+    const params = new URLSearchParams(searchParams);
+    edit(params);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  };
+  const open = (id: Id<"changeRequests">) =>
+    navigate((params) => params.set("change", id));
+  // Closing keeps the org inbox on the Changes tab; the tab only exists there.
+  const close = () =>
+    navigate((params) => {
+      params.delete("change");
+      if (organizationId) params.set("surface", "changes");
+    });
 
-  if (rows === undefined) return <TerminalLoading />;
+  // The drawer renders from the id alone, so a deep link works even while the
+  // list is loading or the request sits outside the visible rows.
+  const drawer = reviewing && (
+    <ChangeReviewDrawer requestId={reviewing} onClose={close} />
+  );
+
+  if (rows === undefined) {
+    return (
+      <>
+        <TerminalLoading />
+        {drawer}
+      </>
+    );
+  }
 
   if (rows.length === 0) {
     return (
@@ -77,6 +124,7 @@ export function ChangeRequestList({
           command="envpilot change list"
           message="No change requests. Writes to a protected environment land here."
         />
+        {drawer}
       </TerminalWindow>
     );
   }
@@ -85,8 +133,10 @@ export function ChangeRequestList({
     <>
       <TerminalWindow title="changes">
         <div className="overflow-x-auto">
+          {/* Under md the rows stack into cards; same DOM, so the test ids
+              and click targets never fork. */}
           <table className="w-full">
-            <thead>
+            <thead className="hidden md:table-header-group">
               <tr className="border-b border-line">
                 <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-accent/70">
                   Change
@@ -102,21 +152,21 @@ export function ChangeRequestList({
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody className="block divide-y divide-line md:table-row-group">
               {rows.map((row) => (
                 <tr
                   key={row._id}
                   data-testid="change-request-row"
-                  onClick={() => setReviewing(row._id)}
-                  className="cursor-pointer align-top transition-colors hover:bg-accent-soft focus-within:bg-accent-soft"
+                  onClick={() => open(row._id)}
+                  className="block cursor-pointer py-2 align-top transition-colors hover:bg-accent-soft focus-within:bg-accent-soft md:table-row md:py-0"
                 >
-                  <td className="px-5 py-3">
+                  <td className="block px-5 py-1 md:table-cell md:py-3">
                     <button
                       type="button"
                       aria-label={`Review ${row.label}`}
                       onClick={(event) => {
                         event.stopPropagation();
-                        setReviewing(row._id);
+                        open(row._id);
                       }}
                       className="text-left focus-visible:outline-none"
                     >
@@ -128,7 +178,7 @@ export function ChangeRequestList({
                       </span>
                     </button>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="block px-5 py-1 md:table-cell md:py-3">
                     <div className="flex flex-wrap gap-1.5">
                       {row.environments.map((env) => (
                         <TerminalBadge key={env} color={envBadgeColor(env)}>
@@ -137,7 +187,7 @@ export function ChangeRequestList({
                       ))}
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-xs text-ink-subtle">
+                  <td className="block px-5 py-1 text-xs text-ink-subtle md:table-cell md:py-3">
                     {row.requester?.name ?? row.requester?.email ?? "Unknown"}
                     {now > 0 && (
                       <span className="ml-1.5 text-ink-faint">
@@ -145,7 +195,7 @@ export function ChangeRequestList({
                       </span>
                     )}
                   </td>
-                  <td className="px-5 py-3 text-right">
+                  <td className="block px-5 py-1 md:table-cell md:py-3 md:text-right">
                     <TerminalBadge color={STATUS_COLOR[row.status] ?? "zinc"}>
                       {row.status}
                     </TerminalBadge>
@@ -157,12 +207,7 @@ export function ChangeRequestList({
         </div>
       </TerminalWindow>
 
-      {reviewing && (
-        <ChangeReviewDrawer
-          requestId={reviewing}
-          onClose={() => setReviewing(null)}
-        />
-      )}
+      {drawer}
     </>
   );
 }

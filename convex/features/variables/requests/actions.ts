@@ -245,6 +245,7 @@ export const approveWithValue = action({
     value: v.string(),
     reviewReason: v.optional(v.string()),
     environments: v.optional(v.array(v.string())),
+    via: v.optional(v.union(v.literal("mobile"), v.literal("desktop"))),
   },
   returns: v.object({
     requestId: v.id("environmentVariableRequests"),
@@ -297,6 +298,7 @@ export const approveWithValue = action({
           requestId: args.requestId,
           reviewReason: args.reviewReason,
           environments: args.environments,
+          via: args.via,
           vaultRef: vault.id,
         }
       );

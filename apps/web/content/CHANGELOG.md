@@ -15,6 +15,20 @@
 
 <!-- entry -->
 ---
+title: Review Changes From Your Phone
+version: v1.68.0
+date: 2026-09-05
+types: [feature, improvement, fix]
+---
+
+A Slack, Discord, or email notification about a change request now links straight to that request. Open it on a phone and the review drawer is already up, with Approve and Reject pinned to the bottom of the screen instead of buried under the diff. The requests inbox stacks into cards below tablet width, and the tab and open request live in the URL, so a link you paste to a colleague lands where you were.
+
+The dashboard is installable. Add it to your home screen from Safari or Chrome and it opens on the inbox in its own window. There is no offline cache on purpose.
+
+Two fixes rode along. Slack and Discord messages for change requests and protection changes had no title, so a channel saw a bare `change.requested`; they now name the change and its environments. Variable request emails linked to the project page rather than the inbox, and outcome emails had no link at all.
+
+<!-- entry -->
+---
 title: Protected Environments
 version: v1.67.0
 date: 2026-09-05

@@ -704,9 +704,9 @@ Open Envpilot: ${appUrl}`;
 
 export const sendVariableRequestCreatedEmail = internalAction({
   args: {
+    requestId: v.id("environmentVariableRequests"),
     projectId: v.id("projects"),
     projectName: v.string(),
-    projectSlug: v.string(),
     requesterName: v.string(),
     key: v.string(),
     environments: v.array(v.string()),
@@ -721,7 +721,7 @@ export const sendVariableRequestCreatedEmail = internalAction({
     if (recipients.length === 0) return;
 
     const appUrl = getEmailConfig()?.appUrl || "https://www.envpilot.dev";
-    const link = `${appUrl}/dashboard/projects/${args.projectSlug}`;
+    const link = `${appUrl}/dashboard/requests?request=${args.requestId}`;
     const envText = args.environments.join(", ");
 
     const safeKey = escapeHtml(args.key);
@@ -764,6 +764,7 @@ export const sendVariableRequestCreatedEmail = internalAction({
 
 export const sendVariableRequestReviewedEmail = internalAction({
   args: {
+    requestId: v.id("environmentVariableRequests"),
     to: v.string(),
     requesterName: v.optional(v.string()),
     key: v.string(),
@@ -774,6 +775,8 @@ export const sendVariableRequestReviewedEmail = internalAction({
   },
   handler: async (_ctx, args) => {
     const approved = args.verdict === "approved";
+    const appUrl = getEmailConfig()?.appUrl || "https://www.envpilot.dev";
+    const link = `${appUrl}/dashboard/requests?request=${args.requestId}`;
     const safeKey = escapeHtml(args.key);
     const safeProject = escapeHtml(args.projectName);
     const safeReviewer = escapeHtml(args.reviewerName);
@@ -803,9 +806,10 @@ export const sendVariableRequestReviewedEmail = internalAction({
         )
       );
     }
+    rows.push(buttonRow(link, "Review change"));
     rows.push(
       footerRow(
-        "You received this because you submitted this variable request."
+        `You received this because you submitted this variable request.<br><br>Link not working? Copy this:<br><a href="${link}" style="color: #22c55e; word-break: break-all;">${link}</a>`
       )
     );
 
@@ -813,7 +817,7 @@ export const sendVariableRequestReviewedEmail = internalAction({
 
     const text = `${heading}\n\nYour request for ${args.key} in ${args.projectName} was ${args.verdict} by ${args.reviewerName}.${
       args.reviewReason ? `\n\nNote: ${args.reviewReason}` : ""
-    }`;
+    }\n\nReview it: ${link}`;
 
     return sendEmail(args.to, subject, html, text);
   },
@@ -823,13 +827,14 @@ export const sendVariableRequestReviewedEmail = internalAction({
 // Protected environments: change requests
 // ============================================================
 
-function changeRequestLink(): string {
+function changeRequestLink(requestId: string): string {
   const appUrl = getEmailConfig()?.appUrl || "https://www.envpilot.dev";
-  return `${appUrl}/dashboard/requests`;
+  return `${appUrl}/dashboard/requests?change=${requestId}`;
 }
 
 export const sendChangeRequestCreatedEmail = internalAction({
   args: {
+    requestId: v.id("changeRequests"),
     recipients: v.array(v.string()),
     projectName: v.string(),
     requesterName: v.string(),
@@ -840,7 +845,7 @@ export const sendChangeRequestCreatedEmail = internalAction({
   handler: async (_ctx, args) => {
     if (args.recipients.length === 0) return;
 
-    const link = changeRequestLink();
+    const link = changeRequestLink(args.requestId);
     const envText = args.environments.join(", ");
     const subject = `Change request: ${args.kind} ${args.label} in ${args.projectName} (${envText})`;
 
@@ -876,6 +881,7 @@ export const sendChangeRequestCreatedEmail = internalAction({
 
 export const sendChangeRequestReviewedEmail = internalAction({
   args: {
+    requestId: v.id("changeRequests"),
     to: v.string(),
     label: v.string(),
     projectName: v.string(),
@@ -885,6 +891,7 @@ export const sendChangeRequestReviewedEmail = internalAction({
   },
   handler: async (_ctx, args) => {
     const applied = args.verdict === "applied";
+    const link = changeRequestLink(args.requestId);
     const heading = applied
       ? "Change Request Applied"
       : "Change Request Rejected";
@@ -910,13 +917,16 @@ export const sendChangeRequestReviewedEmail = internalAction({
         )
       );
     }
+    rows.push(buttonRow(link, "Review change"));
     rows.push(
-      footerRow("You received this because you filed this change request.")
+      footerRow(
+        `You received this because you filed this change request.<br><br>Link not working? Copy this:<br><a href="${link}" style="color: #22c55e; word-break: break-all;">${link}</a>`
+      )
     );
 
     const text = `${heading}\n\nYour change to ${args.label} in ${args.projectName} was ${args.verdict} by ${args.reviewerName}.${
       args.reason ? `\n\nNote: ${args.reason}` : ""
-    }`;
+    }\n\nReview it: ${link}`;
 
     return sendEmail(
       args.to,
@@ -929,6 +939,7 @@ export const sendChangeRequestReviewedEmail = internalAction({
 
 export const sendChangeRequestReminderEmail = internalAction({
   args: {
+    requestId: v.id("changeRequests"),
     recipients: v.array(v.string()),
     projectName: v.string(),
     label: v.string(),
@@ -937,7 +948,7 @@ export const sendChangeRequestReminderEmail = internalAction({
   handler: async (_ctx, args) => {
     if (args.recipients.length === 0) return;
 
-    const link = changeRequestLink();
+    const link = changeRequestLink(args.requestId);
     const subject = `Still waiting: change request for ${args.label} in ${args.projectName}`;
 
     const html = emailWrapper(
