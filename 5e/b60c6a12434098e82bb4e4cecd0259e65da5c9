@@ -1,0 +1,56 @@
+apps/web/src/components/accounts/account-form-drawer.tsx
+  s_274796d5279c8d::t_4213f2575f5583 39-40,52
+  s_274796d5279c8d::t_2efaa43af394bb 9
+  s_274796d5279c8d::t_8439da25fd486a 89,103,114
+  s_274796d5279c8d::t_b6abc81fc9722b 126-130
+  s_274796d5279c8d::t_2e496d4edf963a 397
+apps/web/src/components/files/file-form-drawer.tsx
+  s_274796d5279c8d::t_7d4ae415ecc489 10
+  s_274796d5279c8d::t_f9270fdace0903 94,107,117
+  s_274796d5279c8d::t_42a2b02b88843b 126-130
+  s_274796d5279c8d::t_7cb49ddbc1b799 52
+  s_274796d5279c8d::t_02187ce868d7c0 33-34
+  s_274796d5279c8d::t_8903a3dc0fc1a4 348
+apps/web/src/components/variables/variable-edit-modal.tsx
+  s_274796d5279c8d::t_3449fbc4988f44 32-33,45
+  s_274796d5279c8d::t_cbeb0e0c99c1fe 78
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/accounts/page.tsx
+  s_274796d5279c8d::t_bd5d9dc8715141 465,478
+apps/web/src/components/variables/variable-create-drawer.tsx
+  s_274796d5279c8d::t_d2ab0db29c50b6 262
+  s_274796d5279c8d::t_f249effd0a7598 281
+apps/web/src/components/variables/variable-form.tsx
+  s_274796d5279c8d::t_c7d173ed3a2789 316
+  s_274796d5279c8d::t_42806d2080b7f1 8
+  s_274796d5279c8d::t_6a6e929e0b8124 35-36
+  s_274796d5279c8d::t_af787185291280 65,67-76
+apps/web/src/constants/project.ts
+  s_274796d5279c8d::t_93ea0aa4f4e45d 74-87
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/files/page.tsx
+  s_274796d5279c8d::t_b89d8a2c579e72 415
+apps/web/src/components/variables/bulk-paste-form.tsx
+  s_274796d5279c8d::t_d79b6948ed199d 27-28
+  s_274796d5279c8d::t_b436b8919085ed 49,55-57
+  s_274796d5279c8d::t_260d0a944a33fd 236
+  s_274796d5279c8d::t_fd88e699a1392d 8
+convex/features/projects/protection.ts
+  s_274796d5279c8d::t_08a918fb10ae94 157-159
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_274796d5279c8d::t_12ec4b308ac250 998
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "5eb60c6a12434098e82bb4e4cecd0259e65da5c9",
+  "prompts": {},
+  "sessions": {
+    "s_274796d5279c8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46448544-856e-4fc0-beec-74f74b2e5474",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
