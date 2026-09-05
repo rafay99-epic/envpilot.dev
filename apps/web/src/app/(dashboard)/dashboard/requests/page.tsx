@@ -146,19 +146,13 @@ function RequestsContent() {
   // `?request=<id>` from a notification: that row gets highlighted, and the
   // status tab follows the request until the reviewer picks a tab, so a link
   // to an already-reviewed request does not land on an empty Pending list.
-  const highlightedRequestId = searchParams.get(
-    "request"
-  ) as Id<"environmentVariableRequests"> | null;
-  const highlightedRequest = useQuery(
-    api.features.variables.requests.queries.getById,
-    // getById refuses non-reviewers, so only ask when the page can review.
-    highlightedRequestId && canReview
-      ? { requestId: highlightedRequestId }
-      : "skip"
+  const highlightedRequestId = searchParams.get("request");
+  const linkedStatus = useQuery(
+    api.features.variables.requests.queries.statusForLink,
+    highlightedRequestId ? { requestId: highlightedRequestId } : "skip"
   );
   const [pickedStatus, setStatus] = useState<RequestStatus | null>(null);
-  const status: RequestStatus =
-    pickedStatus ?? highlightedRequest?.status ?? "pending";
+  const status: RequestStatus = pickedStatus ?? linkedStatus ?? "pending";
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [rejectingRequest, setRejectingRequest] =
