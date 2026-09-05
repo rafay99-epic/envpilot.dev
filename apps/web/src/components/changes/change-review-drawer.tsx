@@ -123,15 +123,13 @@ export function ChangeReviewDrawer({
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
-    // Reset on both paths without a finally: a finally would make the React
+    // Promise.finally, not a finally block: a finally clause makes the React
     // Compiler skip this component.
     try {
-      await action();
-      setBusy(false);
+      await action().finally(() => setBusy(false));
       onClose();
     } catch (err) {
       setError(sanitizeConvexError(err));
-      setBusy(false);
     }
   };
 
