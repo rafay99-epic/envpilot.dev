@@ -2,6 +2,7 @@ package dev.envpilot.jetbrains.errors
 
 import com.intellij.openapi.diagnostic.logger
 import dev.envpilot.jetbrains.BuildConfig
+import dev.envpilot.jetbrains.auth.AuthKitLogin
 import dev.envpilot.jetbrains.version.VersionCheck
 import io.sentry.Sentry
 import io.sentry.SentryLevel
@@ -35,13 +36,22 @@ object Errors {
         }
     }
 
+    /** Handled by the plugin itself; logged, never sent to Sentry. */
+    private fun isExpected(e: Throwable): Boolean {
+        if (e is AuthKitLogin.LoginCancelled && !e.transient) return true
+        val msg = e.message ?: return false
+        return msg.startsWith("auth error:") ||
+            msg.startsWith("Convex socket not connected") ||
+            msg == "socket disconnected"
+    }
+
     /** Report to Sentry + the IDE log. Safe to call from anywhere. */
     fun report(
         e: Throwable,
         context: Map<String, String> = emptyMap(),
     ) {
         log.warn(e)
-        if (!initialized.get()) return
+        if (!initialized.get() || isExpected(e)) return
         try {
             Sentry.withScope { scope ->
                 context.forEach { (k, v) -> scope.setTag(k, v) }

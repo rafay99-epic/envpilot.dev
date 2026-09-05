@@ -67,6 +67,10 @@ Sentry.init({
     "Non-Error promise rejection",
     "AbortError",
     "ChunkLoadError",
+    // Browser network failures; anchored, string entries match substrings.
+    /^Failed to fetch$/,
+    /^Load failed$/,
+    /^NetworkError when attempting to fetch resource\.?$/,
   ],
 });
 

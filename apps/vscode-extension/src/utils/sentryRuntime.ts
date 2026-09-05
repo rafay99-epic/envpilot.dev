@@ -4,6 +4,7 @@
  * bundle) never blocks activation. Do not import this module directly —
  * go through ./sentry.ts.
  */
+import * as path from "path";
 import * as vscode from "vscode";
 import * as Sentry from "@sentry/node";
 
@@ -11,6 +12,21 @@ declare const __EXTENSION_SENTRY_DSN__: string;
 declare const __EXTENSION_VERSION__: string;
 
 let initialized = false;
+
+// dist/sentry.js -> parent is the installed extension folder.
+const EXTENSION_ROOT = path.dirname(__dirname);
+
+// The extension host is shared; drop unhandled errors that are not ours.
+function isForeignUnhandled(event: Sentry.ErrorEvent): boolean {
+  const values = event.exception?.values ?? [];
+  const unhandled = values.some((exc) => exc.mechanism?.handled === false);
+  if (!unhandled) return false;
+  return !values.some((exc) =>
+    exc.stacktrace?.frames?.some((frame) =>
+      frame.filename?.startsWith(EXTENSION_ROOT + path.sep)
+    )
+  );
+}
 
 export function initSentry(): void {
   // Respect VS Code's global telemetry opt-out — this is a hard requirement
@@ -46,9 +62,18 @@ export function initSentry(): void {
     //   host is torn down mid-request during shutdown/reload.
     // Anchored regex so we only drop the exact VS Code message, not any
     // error that happens to mention "Canceled" as part of a longer message.
-    ignoreErrors: [/^Canceled$/, "Channel has been closed"],
+    ignoreErrors: [
+      /^Canceled$/,
+      "Channel has been closed",
+      "fetch failed",
+      "Could not reach WorkOS",
+      "Client network socket disconnected",
+      /\b(ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN)\b/,
+      "You are not signed in.",
+    ],
 
     beforeSend(event) {
+      if (isForeignUnhandled(event)) return null;
       // Strip home directory paths from stack frames for privacy
       if (event.exception?.values) {
         for (const exc of event.exception.values) {

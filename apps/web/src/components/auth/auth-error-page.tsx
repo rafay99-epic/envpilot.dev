@@ -71,7 +71,11 @@ export function AuthErrorPage({
                   Try Again
                 </TerminalButtonLink>
               ))}
-            <TerminalButtonLink variant="secondary" href="/sign-in">
+            <TerminalButtonLink
+              variant="secondary"
+              href="/sign-in"
+              hardNavigation
+            >
               Sign In Again
             </TerminalButtonLink>
           </div>

@@ -43,12 +43,12 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
 
   if (!user) {
     return (
-      <Link
+      <a
         href="/sign-in"
         className="rounded-lg border border-accent-line bg-accent-soft px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent-soft"
       >
         Sign In
-      </Link>
+      </a>
     );
   }
 

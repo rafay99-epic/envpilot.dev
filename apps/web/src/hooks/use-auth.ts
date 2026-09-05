@@ -49,7 +49,7 @@ async function loadUser(): Promise<FetchState> {
     if (!response.ok) return { status: "failed" };
     return { status: "done", data: (await response.json()) as UserData };
   } catch (error) {
-    log.error("fetch_user_failed", {}, error);
+    log.warn("fetch_user_failed", { error: String(error) });
     return { status: "failed" };
   }
 }

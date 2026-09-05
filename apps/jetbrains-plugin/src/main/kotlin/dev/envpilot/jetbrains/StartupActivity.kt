@@ -3,8 +3,8 @@ package dev.envpilot.jetbrains
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.EditorFactory
-import com.intellij.openapi.editor.actionSystem.EditorAction
 import com.intellij.openapi.editor.actionSystem.EditorActionHandler
+import com.intellij.openapi.editor.actionSystem.EditorActionManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
@@ -214,13 +214,13 @@ class StartupActivity : ProjectActivity {
             // Unload can run restoreGlobalGuards before this deferred block; do not re-wrap then.
             if (!guardsInstalled.get()) return@invokeLater
             try {
-                val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
-                val copyAction = actionManager.getAction(IdeActions.ACTION_COPY) as EditorAction
-                originalCopyHandler.set(copyAction.handler)
-                copyAction.setupHandler(CopyGuardHandler(copyAction.handler, isCut = false))
-                val cutAction = actionManager.getAction(IdeActions.ACTION_CUT) as EditorAction
-                originalCutHandler.set(cutAction.handler)
-                cutAction.setupHandler(CopyGuardHandler(cutAction.handler, isCut = true))
+                val manager = EditorActionManager.getInstance()
+                val copy = manager.getActionHandler(IdeActions.ACTION_EDITOR_COPY)
+                originalCopyHandler.set(copy)
+                manager.setActionHandler(IdeActions.ACTION_EDITOR_COPY, CopyGuardHandler(copy, isCut = false))
+                val cut = manager.getActionHandler(IdeActions.ACTION_EDITOR_CUT)
+                originalCutHandler.set(cut)
+                manager.setActionHandler(IdeActions.ACTION_EDITOR_CUT, CopyGuardHandler(cut, isCut = true))
             } catch (e: Exception) {
                 dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "copy-guard"))
                 com.intellij.openapi.diagnostic.logger<StartupActivity>()
@@ -239,12 +239,12 @@ class StartupActivity : ProjectActivity {
         }
         if (!guardsInstalled.getAndSet(false)) return
         try {
-            val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
+            val manager = EditorActionManager.getInstance()
             originalCopyHandler.getAndSet(null)?.let {
-                (actionManager.getAction(IdeActions.ACTION_COPY) as EditorAction).setupHandler(it)
+                manager.setActionHandler(IdeActions.ACTION_EDITOR_COPY, it)
             }
             originalCutHandler.getAndSet(null)?.let {
-                (actionManager.getAction(IdeActions.ACTION_CUT) as EditorAction).setupHandler(it)
+                manager.setActionHandler(IdeActions.ACTION_EDITOR_CUT, it)
             }
         } catch (e: Exception) {
             com.intellij.openapi.diagnostic.logger<StartupActivity>()

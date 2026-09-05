@@ -77,6 +77,7 @@ const convexLogger = {
     // auto-retries past it, so treat it the same way.
     const isTransientAuthRace =
       /unauthenticated: no verified user identity/i.test(message);
+    const isRateLimited = /"kind":\s*"RateLimited"/.test(message);
 
     // Console severity matches the classification above: the self-healing
     // token-propagation race is expected auth-handshake behavior, not an
@@ -91,7 +92,8 @@ const convexLogger = {
       isTierLimitError(friendly) ||
       isAuthorizationError(friendly) ||
       isConflictError(friendly) ||
-      isTransientAuthRace
+      isTransientAuthRace ||
+      isRateLimited
     ) {
       if (isFunctionFailure) {
         // Dedupe by message: a re-clicked failing action updates the

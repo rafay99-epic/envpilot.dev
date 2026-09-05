@@ -79,22 +79,9 @@ export default authkitMiddleware({
 // Configure which routes the middleware should run on
 export const config = {
   matcher: [
-    /*
-     * Match all paths except:
-     * - _next (Next.js internals)
-     * - static files (favicon, images, etc.)
-     * - public marketing pages. These are listed in unauthenticatedPaths
-     *   below, which means the middleware boots the WorkOS SDK and attempts
-     *   a session-cookie decrypt only to then allow the request. Excluding
-     *   them here skips that work entirely, so crawler traffic on the
-     *   marketing site costs no compute.
-     *
-     *   NOT excluded: "/", "/sign-in" and "/sign-up". The two auth pages
-     *   call withAuth() server-side to bounce an already-signed-in user to
-     *   the dashboard, and "/" is the OAuth landing surface. Every route
-     *   excluded above was checked for withAuth and has none.
-     */
-    "/((?!_next|changelog|faq|vs/|wishlist|privacy|terms|logo|support|contact|pricing|sitemap\\.xml|robots\\.txt|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Everything but _next and static files. Public pages stay matched:
+    // AuthKitProvider's server action calls withAuth() on them.
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
   ],
 };

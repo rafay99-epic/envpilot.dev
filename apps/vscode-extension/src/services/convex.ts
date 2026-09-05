@@ -1,5 +1,11 @@
 import { ConvexClient } from "convex/browser";
 import { anyApi } from "convex/server";
+import * as output from "../utils/outputChannel";
+
+// Without an onError a failing subscription is an unhandled rejection per re-run.
+function onSubscriptionError(label: string) {
+  return (err: Error) => output.warn(`${label} subscription: ${err.message}`);
+}
 
 /**
  * Async fetcher returning a fresh WorkOS access token (or null when signed
@@ -138,7 +144,8 @@ export class ConvexService {
         if (arr.length > 0) {
           callback(arr);
         }
-      }
+      },
+      onSubscriptionError("revocations")
     );
 
     this.subscriptions.set(id, unsubscribe);
@@ -161,7 +168,8 @@ export class ConvexService {
       {},
       (records: unknown) => {
         callback((records as CallerProjectAccess[]) ?? []);
-      }
+      },
+      onSubscriptionError("project access")
     );
 
     this.subscriptions.set(id, unsubscribe);
@@ -203,7 +211,8 @@ export class ConvexService {
             updatedAt: number;
           }>) ?? []
         );
-      }
+      },
+      onSubscriptionError("variable metadata")
     );
 
     this.subscriptions.set(id, unsubscribe);

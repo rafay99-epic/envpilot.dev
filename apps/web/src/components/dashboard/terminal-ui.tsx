@@ -124,20 +124,27 @@ export function TerminalButtonLink({
   className = "",
   children,
   href,
+  hardNavigation = false,
   "data-testid": dataTestId,
 }: {
   variant?: ButtonVariant;
   className?: string;
   children: React.ReactNode;
   href: string;
+  /** Plain anchor; a Link cannot follow a route handler's redirect. */
+  hardNavigation?: boolean;
   "data-testid"?: string;
 }) {
+  const cls = `${buttonBase} ${buttonVariants[variant]} ${className}`;
+  if (hardNavigation) {
+    return (
+      <a href={href} data-testid={dataTestId} className={cls}>
+        {children}
+      </a>
+    );
+  }
   return (
-    <Link
-      href={href}
-      data-testid={dataTestId}
-      className={`${buttonBase} ${buttonVariants[variant]} ${className}`}
-    >
+    <Link href={href} data-testid={dataTestId} className={cls}>
       {children}
     </Link>
   );

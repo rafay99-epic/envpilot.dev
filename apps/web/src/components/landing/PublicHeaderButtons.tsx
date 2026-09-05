@@ -23,18 +23,18 @@ export function PublicHeaderButtons() {
 
   return (
     <>
-      <Link
+      <a
         href="/sign-in"
         className="text-xs text-ink-subtle transition-colors hover:text-accent"
       >
         sign-in
-      </Link>
-      <Link
+      </a>
+      <a
         href="/sign-up"
         className="rounded border border-accent-line bg-accent-soft px-3 py-1.5 text-xs text-accent transition-colors hover:bg-accent-soft"
       >
         get-started
-      </Link>
+      </a>
     </>
   );
 }
