@@ -1,0 +1,92 @@
+apps/web/src/components/ui/drawer-panel.tsx
+  s_76e30d6f1fb8d9::t_a915f8d9e45d41 213-218
+  s_76e30d6f1fb8d9::t_1d61274a8f21e8 44
+  s_76e30d6f1fb8d9::t_0ccc52f45a24b9 21-23
+convex/features/integrations/notify.ts
+  s_76e30d6f1fb8d9::t_49a5801a16749e 11
+  s_76e30d6f1fb8d9::t_0d82de0534401e 199
+convex/features/variables/requests/actions.ts
+  s_76e30d6f1fb8d9::t_3fba371423bce6 248,301
+apps/web/src/components/changes/change-review-drawer.tsx
+  s_76e30d6f1fb8d9::t_cd53c63daa693d 142-151,159-172,225-241,249-250,256,265,271-272,288,307
+  s_76e30d6f1fb8d9::t_fde4d0bb80b54f 14
+convex/features/integrations/links.ts
+  s_76e30d6f1fb8d9::t_f91de3fc346dfc 1-21
+apps/web/src/components/changes/change-request-list.tsx
+  s_76e30d6f1fb8d9::t_b6a4852e25f24a 86-88
+  s_76e30d6f1fb8d9::t_26c0e85339c1f1 136,141-142,144,150
+  s_76e30d6f1fb8d9::t_626d47aa69b303 3-4,49-51,53-64,84-85,89-97,108,117-118,120,162,171,179,191
+convex/features/changeRequests/mutations.ts
+  s_76e30d6f1fb8d9::t_b69eb6b2614e4b 522-523
+  s_76e30d6f1fb8d9::t_0fcdb21e2f3442 524
+  s_76e30d6f1fb8d9::t_14c5a361e208c5 478
+  s_76e30d6f1fb8d9::t_d88f9b5f739d5d 642
+  s_76e30d6f1fb8d9::t_8f91e6a6f67648 589
+  s_76e30d6f1fb8d9::t_715e578be172c8 665
+  s_76e30d6f1fb8d9::t_5e5e943000636a 869
+apps/web/src/lib/review-surface.ts
+  s_76e30d6f1fb8d9::t_fde4d0bb80b54f 1-11
+apps/web/package.json
+  s_76e30d6f1fb8d9::t_f63abd406bea39 3
+apps/web/src/lib/versions.ts
+  s_76e30d6f1fb8d9::t_f63abd406bea39 17
+convex/features/integrations/messages.ts
+  s_76e30d6f1fb8d9::t_6c7625f93ade07 242-246,249-250
+  s_76e30d6f1fb8d9::t_5d312a4c2cadd1 205-215
+  s_76e30d6f1fb8d9::t_a5b79c62d60f20 56-65
+convex/features/variables/requests/mutations.ts
+  s_76e30d6f1fb8d9::t_a7ff8a06f14596 193
+  s_76e30d6f1fb8d9::t_97bb9261dd6483 734
+  s_76e30d6f1fb8d9::t_bf5dd05c42367b 457
+  s_76e30d6f1fb8d9::t_b69eb6b2614e4b 455-456
+  s_76e30d6f1fb8d9::t_cd6a0c9cc60e98 811
+  s_76e30d6f1fb8d9::t_37703ebf795e50 492
+  s_76e30d6f1fb8d9::t_49a4b9cb269028 478
+  s_76e30d6f1fb8d9::t_4ad462e66a30f3 581
+apps/web/src/lib/__tests__/review-links.test.ts
+  s_76e30d6f1fb8d9::t_94ec79ea472446 28-30
+  s_76e30d6f1fb8d9::t_416ef3914d9c57 1-27,31-60
+apps/web/src/hooks/useVariableRequests.ts
+  s_76e30d6f1fb8d9::t_fde4d0bb80b54f 90,104
+convex/features/emails/emails.ts
+  s_76e30d6f1fb8d9::t_75ff596ddd7340 809,812
+  s_76e30d6f1fb8d9::t_1268cf06b4290d 707,724
+  s_76e30d6f1fb8d9::t_b47a14bf0ca98d 820
+  s_76e30d6f1fb8d9::t_5a0cc0c72cc350 830,832,837,848
+  s_76e30d6f1fb8d9::t_56a205c8bf24cc 884,894,920,922-924,929
+  s_76e30d6f1fb8d9::t_2a633d0d5f0e12 942,951
+  s_76e30d6f1fb8d9::t_081c0a6964af3f 767,778-779
+apps/web/tests/e2e/authenticated/mobile-approvals.spec.ts
+  s_76e30d6f1fb8d9::t_39683663285664 95-98,129,150-152
+  s_76e30d6f1fb8d9::t_175ab51e8ada04 1-94,99-128,130-149,153-157
+apps/web/src/app/(dashboard)/dashboard/requests/page.tsx
+  s_76e30d6f1fb8d9::t_b6a4852e25f24a 3-4,102-103,105-112,131-147,406-407,409,428,434,465-469,473,483,521-523,525-526,530,560,597,615,658,663,665-666,707
+  s_76e30d6f1fb8d9::t_fde4d0bb80b54f 34,224,232,262,318
+apps/web/content/CHANGELOG.md
+  s_76e30d6f1fb8d9::t_f63abd406bea39 17-29
+  s_76e30d6f1fb8d9::t_dcb24b3e4f05e2 16
+package.json
+  s_76e30d6f1fb8d9::t_f63abd406bea39 3
+apps/web/tests/e2e/manifest.spec.ts
+  s_76e30d6f1fb8d9::t_5950b292299a45 1-33
+apps/web/src/app/manifest.ts
+  s_76e30d6f1fb8d9::t_ee9941a22948ea 1-19
+apps/web/tests/e2e/authenticated/variable-requests.spec.ts
+  s_76e30d6f1fb8d9::t_9b73f89591b1f3 445-485
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "08cb42fc948ae7d2b5438c798c4a831b53471991",
+  "prompts": {},
+  "sessions": {
+    "s_76e30d6f1fb8d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aa28eed4-edea-4549-8533-ab9af68b4033",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
