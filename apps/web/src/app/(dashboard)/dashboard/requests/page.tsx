@@ -149,7 +149,10 @@ function RequestsContent() {
   const highlightedRequestId = searchParams.get("request");
   const linkedStatus = useQuery(
     api.features.variables.requests.queries.statusForLink,
-    highlightedRequestId ? { requestId: highlightedRequestId } : "skip"
+    // Same auth gate as listForReviewer below.
+    highlightedRequestId && convexUserId
+      ? { requestId: highlightedRequestId }
+      : "skip"
   );
   const [pickedStatus, setStatus] = useState<RequestStatus | null>(null);
   const status: RequestStatus = pickedStatus ?? linkedStatus ?? "pending";

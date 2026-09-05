@@ -206,8 +206,9 @@ async function getByIdCore(
 
 /**
  * Status of a request named in a notification link, or null when the id is
- * malformed, gone, or outside what the caller may review. Never throws: the
- * inbox uses it to pick a tab, and a stale link must not take the page down.
+ * malformed, gone, or outside what the caller may review. Never throws past
+ * the auth check: the inbox uses it to pick a tab, and a stale link must not
+ * take the page down.
  */
 export const statusForLink = query({
   args: { requestId: v.string() },
@@ -226,9 +227,9 @@ export const statusForLink = query({
     );
     const request = id ? await ctx.db.get(id) : null;
     if (!request) return null;
-    const allowed =
-      request.requestedBy === actor._id ||
-      (await canReviewRequests(ctx, actor._id, request.projectId));
+    // Reviewer-only on purpose: the inbox is the only caller, and a requester
+    // who has since left the organization gets nothing.
+    const allowed = await canReviewRequests(ctx, actor._id, request.projectId);
     return allowed ? request.status : null;
   },
 });
