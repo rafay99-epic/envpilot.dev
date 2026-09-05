@@ -157,11 +157,10 @@ export function BulkPasteForm({
       await onSubmit(formDataEntries);
     } catch {
       // Error handled by parent
-    } finally {
-      setIsSubmitting(false);
-      onSubmittingChange?.(false);
-      setProgress(null);
     }
+    setIsSubmitting(false);
+    onSubmittingChange?.(false);
+    setProgress(null);
   }
 
   return (

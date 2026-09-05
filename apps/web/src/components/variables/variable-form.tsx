@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ENVIRONMENTS, type Environment } from "@/constants/project";
 import { Eye, EyeOff, RotateCcw } from "lucide-react";
 import { EnvironmentPicker } from "@/components/environments/environment-picker";
@@ -77,19 +77,6 @@ export function VariableForm({
       initialData.rotationFrequencyDays > 0
   );
 
-  useEffect(() => {
-    if (initialData) {
-      setFormData((prev) => ({
-        ...prev,
-        ...initialData,
-      }));
-      setRotationEnabled(
-        !!initialData.rotationFrequencyDays &&
-          initialData.rotationFrequencyDays > 0
-      );
-    }
-  }, [initialData]);
-
   const { options, locked, selected } = resolveEnvironments(
     formData.environments,
     allowedEnvironments,
@@ -158,9 +145,8 @@ export function VariableForm({
       await onSubmit({ ...formData, environments: selected });
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsSubmitting(false);
     }
+    setIsSubmitting(false);
   };
 
   return (

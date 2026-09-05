@@ -65,7 +65,10 @@ export function VariableEditModal({
   return (
     <DrawerPanel isOpen={isOpen} onClose={onClose} title="Edit Variable">
       {initialData && (
+        // Keyed by the variable so switching rows remounts the form with the
+        // new initial data instead of syncing it through an effect.
         <VariableForm
+          key={variable?._id}
           initialData={initialData}
           onSubmit={handleSubmit}
           onCancel={onClose}
