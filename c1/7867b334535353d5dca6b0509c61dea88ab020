@@ -1,0 +1,65 @@
+apps/web/src/components/auth/user-button.tsx
+  s_2befb751b3d07b::t_cdbb82483f9d4b 46,51
+apps/web/src/components/ConvexClientProvider.tsx
+  s_2befb751b3d07b::t_cdbb82483f9d4b 80-81,96-97
+apps/vscode-extension/src/utils/sentryRuntime.ts
+  s_2befb751b3d07b::t_79b5247cb2981d 7,16-36,71-82,85
+apps/web/src/hooks/use-auth.ts
+  s_2befb751b3d07b::t_cdbb82483f9d4b 52-53
+apps/web/src/components/auth/auth-error-page.tsx
+  s_2befb751b3d07b::t_1a637e9de8a639 74-78
+apps/web/src/lib/versions.ts
+  s_2befb751b3d07b::t_3976328ee3252b 17-19,23
+apps/jetbrains-plugin/src/main/kotlin/dev/envpilot/jetbrains/StartupActivity.kt
+  s_2befb751b3d07b::t_dc9522fb6a9eaf 7,217-225,244,246,249
+apps/cli/package.json
+  s_2befb751b3d07b::t_293194ca7e3b17 3
+apps/jetbrains-plugin/src/main/kotlin/dev/envpilot/jetbrains/errors/Errors.kt
+  s_2befb751b3d07b::t_dc9522fb6a9eaf 5,39-52,59
+apps/vscode-extension/src/services/gitCommitGuard.ts
+  s_2befb751b3d07b::t_79b5247cb2981d 192-193,196,199
+apps/vscode-extension/package.json
+  s_2befb751b3d07b::t_293194ca7e3b17 5
+convex/features/variables/values.ts
+  s_2befb751b3d07b::t_cdbb82483f9d4b 1010-1012
+apps/web/src/instrumentation-client.ts
+  s_2befb751b3d07b::t_cdbb82483f9d4b 70-73
+apps/web/src/proxy.ts
+  s_2befb751b3d07b::t_cdbb82483f9d4b 83,85-90,92
+apps/vscode-extension/src/services/convex.ts
+  s_2befb751b3d07b::t_27a3b0581e3ab1 3
+  s_2befb751b3d07b::t_79b5247cb2981d 6-13,152-153,176-177,219-220
+  s_2befb751b3d07b::t_c5e0049032852d 4-5
+convex/lib/identity.ts
+  s_2befb751b3d07b::t_cdbb82483f9d4b 1,72-76
+apps/cli/src/index.tsx
+  s_2befb751b3d07b::t_27a3b0581e3ab1 3-4
+  s_2befb751b3d07b::t_79b5247cb2981d 27-30
+apps/jetbrains-plugin/gradle.properties
+  s_2befb751b3d07b::t_293194ca7e3b17 1
+apps/web/content/CHANGELOG.md
+  s_2befb751b3d07b::t_3976328ee3252b 17-25
+  s_2befb751b3d07b::t_f4543e4dc2bf9f 16
+apps/web/src/components/landing/PublicHeaderButtons.tsx
+  s_2befb751b3d07b::t_cdbb82483f9d4b 26-28,33-34,39
+apps/web/package.json
+  s_2befb751b3d07b::t_293194ca7e3b17 3
+apps/web/src/components/dashboard/terminal-ui.tsx
+  s_2befb751b3d07b::t_8ad0c3c118975f 127,134-136,139-146,148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "c17867b334535353d5dca6b0509c61dea88ab020",
+  "prompts": {},
+  "sessions": {
+    "s_2befb751b3d07b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3030dcc9-439a-4db6-9ea9-1f1b3ae021e2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
