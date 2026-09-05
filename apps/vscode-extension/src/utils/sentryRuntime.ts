@@ -29,7 +29,7 @@ function isForeignUnhandled(event: Sentry.ErrorEvent): boolean {
   if (!unhandled) return false;
   return !values.some((exc) =>
     exc.stacktrace?.frames?.some((frame) =>
-      frame.filename?.startsWith(EXTENSION_ROOT)
+      frame.filename?.startsWith(EXTENSION_ROOT + path.sep)
     )
   );
 }

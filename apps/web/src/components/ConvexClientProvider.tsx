@@ -78,7 +78,10 @@ const convexLogger = {
     const isTransientAuthRace =
       /unauthenticated: no verified user identity/i.test(message);
     // @convex-dev/rate-limiter payload; the user gets a toast, Sentry a crumb.
-    const isRateLimited = /"kind":"RateLimited"/.test(message);
+    // The logger only receives Convex's formatted string, so this matches the
+    // payload text in both shapes Convex emits: compact ("kind":"RateLimited")
+    // and pretty-printed ("kind": "RateLimited").
+    const isRateLimited = /"kind":\s*"RateLimited"/.test(message);
 
     // Console severity matches the classification above: the self-healing
     // token-propagation race is expected auth-handshake behavior, not an
