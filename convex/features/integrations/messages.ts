@@ -205,11 +205,9 @@ function subject(
   if (action.startsWith("change.")) {
     return firstString(details, ["label", "key"]);
   }
-  if (action.startsWith("protection.")) {
-    // "environments" carries the newly protected set; protection.disabled
-    // clears it, so the meaningful list there is what got unprotected.
-    const envs = environments(details);
-    if (envs.length > 0) return envs.join(", ");
+  if (action === "protection.disabled") {
+    // The headline already prints `environments`, which is empty once
+    // protection is off; what got unprotected sits in `previous`.
     const previous = stringList(details, "previous");
     return previous.length > 0 ? previous.join(", ") : undefined;
   }
@@ -240,8 +238,9 @@ export function buildNotificationText(input: {
 
   const linkTarget = safeLinkTarget(input.link);
   const linkLabel =
-    input.action.startsWith("change.") ||
-    input.action.startsWith("variable.request")
+    (input.action.startsWith("change.") ||
+      input.action.startsWith("variable.request")) &&
+    typeof input.details?.requestId === "string"
       ? "Review change"
       : "View in EnvPilot";
   const link = linkTarget

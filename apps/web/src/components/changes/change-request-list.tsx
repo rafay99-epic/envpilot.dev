@@ -83,12 +83,24 @@ function ChangeRequestListInner({
   const now = useNow(60_000);
   const router = useRouter();
   const pathname = usePathname();
-  const reviewing = useSearchParams().get(
-    "change"
-  ) as Id<"changeRequests"> | null;
+  const searchParams = useSearchParams();
+  const reviewing = searchParams.get("change") as Id<"changeRequests"> | null;
+  const navigate = (edit: (params: URLSearchParams) => void) => {
+    const params = new URLSearchParams(searchParams);
+    edit(params);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  };
   const open = (id: Id<"changeRequests">) =>
-    router.replace(`${pathname}?change=${id}`, { scroll: false });
-  const close = () => router.replace(pathname, { scroll: false });
+    navigate((params) => params.set("change", id));
+  // Closing keeps the org inbox on the Changes tab; the tab only exists there.
+  const close = () =>
+    navigate((params) => {
+      params.delete("change");
+      if (organizationId) params.set("surface", "changes");
+    });
 
   // The drawer renders from the id alone, so a deep link works even while the
   // list is loading or the request sits outside the visible rows.
@@ -96,7 +108,14 @@ function ChangeRequestListInner({
     <ChangeReviewDrawer requestId={reviewing} onClose={close} />
   );
 
-  if (rows === undefined) return <TerminalLoading />;
+  if (rows === undefined) {
+    return (
+      <>
+        <TerminalLoading />
+        {drawer}
+      </>
+    );
+  }
 
   if (rows.length === 0) {
     return (

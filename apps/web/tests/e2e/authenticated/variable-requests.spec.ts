@@ -463,7 +463,8 @@ test.describe("variable requests — deep link from a notification", () => {
       .first();
     await expect(row).toBeVisible({ timeout: 30_000 });
     await expect(row).toHaveAttribute("data-request-id", requestId);
-    await expect(row).toHaveClass(/bg-accent-soft/);
+    // Standalone token: the hover variant is always present.
+    await expect(row).toHaveClass(/(?:^|\s)bg-accent-soft(?:\s|$)/);
     await expect(row).toBeInViewport();
 
     // Leave nothing pending behind.
