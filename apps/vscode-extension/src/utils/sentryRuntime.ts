@@ -13,16 +13,10 @@ declare const __EXTENSION_VERSION__: string;
 
 let initialized = false;
 
-// This chunk lives at <extension root>/dist/sentry.js, so its parent dir is
-// the installed extension folder — the one path prefix that is ours.
+// dist/sentry.js -> parent is the installed extension folder.
 const EXTENSION_ROOT = path.dirname(__dirname);
 
-/**
- * The Node SDK's uncaught-exception / unhandled-rejection hooks are process
- * wide, and the extension host is one process shared with every installed
- * extension. Drop a global-handler event unless a frame comes from our
- * bundle; otherwise we report other extensions' crashes as ours.
- */
+// The extension host is shared; drop unhandled errors that are not ours.
 function isForeignUnhandled(event: Sentry.ErrorEvent): boolean {
   const values = event.exception?.values ?? [];
   const unhandled = values.some((exc) => exc.mechanism?.handled === false);
@@ -71,13 +65,10 @@ export function initSentry(): void {
     ignoreErrors: [
       /^Canceled$/,
       "Channel has been closed",
-      // Offline / flaky network: WorkOS refresh and Convex socket failures
-      // are retried by the token manager and the socket's own backoff.
       "fetch failed",
       "Could not reach WorkOS",
       "Client network socket disconnected",
       /\b(ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN)\b/,
-      // Fire-and-forget reports run at shutdown even when signed out.
       "You are not signed in.",
     ],
 

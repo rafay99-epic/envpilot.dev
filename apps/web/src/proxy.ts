@@ -79,16 +79,8 @@ export default authkitMiddleware({
 // Configure which routes the middleware should run on
 export const config = {
   matcher: [
-    /*
-     * Match all paths except _next internals and static files.
-     *
-     * Marketing pages (/changelog, /pricing, ...) are deliberately NOT
-     * excluded even though they are public: AuthKitProvider's client hook
-     * POSTs a server action to whatever page it is mounted on, and that
-     * action calls withAuth(), which throws "route that isn't covered by the
-     * AuthKit middleware" when the middleware was skipped. They stay listed
-     * in unauthenticatedPaths so the middleware lets them through.
-     */
+    // Everything but _next and static files. Public pages stay matched:
+    // AuthKitProvider's server action calls withAuth() on them.
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
   ],

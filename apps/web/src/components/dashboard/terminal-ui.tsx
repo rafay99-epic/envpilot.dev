@@ -131,8 +131,7 @@ export function TerminalButtonLink({
   className?: string;
   children: React.ReactNode;
   href: string;
-  /** Plain anchor (document load). Required for route handlers that 307
-   *  elsewhere, such as /sign-in: a client Link cannot follow that redirect. */
+  /** Plain anchor; a Link cannot follow a route handler's redirect. */
   hardNavigation?: boolean;
   "data-testid"?: string;
 }) {

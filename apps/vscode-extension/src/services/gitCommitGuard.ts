@@ -189,8 +189,7 @@ export class GitCommitGuardService {
 
   private async installHookAtPath(repoRoot: string): Promise<void> {
     try {
-      // Let git resolve the hooks dir: honours core.hooksPath and worktrees
-      // or submodules, where .git is a file and ".git/hooks" is ENOTDIR.
+      // Handles core.hooksPath and worktrees (.git is a file there).
       let hooksDir: string;
       try {
         const { stdout } = await execAsync("git rev-parse --git-path hooks", {

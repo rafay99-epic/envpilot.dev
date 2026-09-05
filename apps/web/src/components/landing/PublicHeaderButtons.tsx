@@ -23,8 +23,6 @@ export function PublicHeaderButtons() {
 
   return (
     <>
-      {/* Plain anchors: these are route handlers that 307 to WorkOS, and a
-          client-side Link navigation cannot follow that redirect. */}
       <a
         href="/sign-in"
         className="text-xs text-ink-subtle transition-colors hover:text-accent"

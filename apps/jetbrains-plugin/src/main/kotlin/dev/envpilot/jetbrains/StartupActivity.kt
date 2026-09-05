@@ -214,8 +214,6 @@ class StartupActivity : ProjectActivity {
             // Unload can run restoreGlobalGuards before this deferred block; do not re-wrap then.
             if (!guardsInstalled.get()) return@invokeLater
             try {
-                // EditorActionManager is the supported way to wrap editor copy/cut;
-                // the "$Copy" action itself is not an EditorAction on every IDE.
                 val manager = EditorActionManager.getInstance()
                 val copy = manager.getActionHandler(IdeActions.ACTION_EDITOR_COPY)
                 originalCopyHandler.set(copy)

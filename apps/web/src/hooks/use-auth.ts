@@ -49,7 +49,6 @@ async function loadUser(): Promise<FetchState> {
     if (!response.ok) return { status: "failed" };
     return { status: "done", data: (await response.json()) as UserData };
   } catch (error) {
-    // Network failure (offline, dev server down): breadcrumb, not an Issue.
     log.warn("fetch_user_failed", { error: String(error) });
     return { status: "failed" };
   }

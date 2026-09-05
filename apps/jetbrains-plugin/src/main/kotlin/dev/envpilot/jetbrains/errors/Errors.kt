@@ -36,13 +36,7 @@ object Errors {
         }
     }
 
-    /**
-     * Conditions the plugin already handles on its own: a sign-in the user
-     * cancelled or that timed out (transient ones are network failures and
-     * stay reported), a socket auth error (ConvexSyncService refreshes the
-     * token and re-authenticates), and a socket that is simply not connected
-     * yet. They stay in idea.log; Sentry would only be noise.
-     */
+    /** Handled by the plugin itself; logged, never sent to Sentry. */
     private fun isExpected(e: Throwable): Boolean {
         if (e is AuthKitLogin.LoginCancelled && !e.transient) return true
         val msg = e.message ?: return false

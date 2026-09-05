@@ -24,7 +24,4 @@ async function main(): Promise<void> {
 
 // Run inside a function (not top-level await) so an empty event loop can never
 // surface a "Detected unsettled top-level await" warning to users.
-// Commands normally call handleError() themselves; anything landing here
-// escaped that path, so run the same triage (expected codes such as
-// SESSION_EXPIRED are printed, not reported) and exit.
 main().catch(handleError);

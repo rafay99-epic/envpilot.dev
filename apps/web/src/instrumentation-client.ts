@@ -67,9 +67,7 @@ Sentry.init({
     "Non-Error promise rejection",
     "AbortError",
     "ChunkLoadError",
-    // Browser network failures (offline, blocked, dev server down). Anchored:
-    // string entries match as substrings and would swallow "Failed to fetch
-    // sessions" style app errors.
+    // Browser network failures; anchored, string entries match substrings.
     /^Failed to fetch$/,
     /^Load failed$/,
     /^NetworkError when attempting to fetch resource\.?$/,
