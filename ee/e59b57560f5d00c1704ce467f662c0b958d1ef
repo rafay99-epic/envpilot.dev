@@ -1,0 +1,36 @@
+apps/web/src/components/workspaces/index.ts
+  s_907ffcf933f32f::t_63e4447a97b35f 1,4-5
+apps/web/content/CHANGELOG.md
+  s_907ffcf933f32f::t_0d6c09a90f8cce 17-29
+apps/web/src/components/workspaces/shared-variables.tsx
+  s_907ffcf933f32f::t_63e4447a97b35f 1-107
+apps/web/src/components/workspaces/adopt-duplicates.tsx
+  s_907ffcf933f32f::t_63e4447a97b35f 52-56
+apps/web/src/lib/versions.ts
+  s_907ffcf933f32f::t_0d6c09a90f8cce 17
+apps/web/package.json
+  s_907ffcf933f32f::t_0d6c09a90f8cce 3
+convex/features/projects/queries.ts
+  s_907ffcf933f32f::t_144b7db7bade30 220-222
+apps/web/src/app/(dashboard)/dashboard/workspaces/[slug]/page.tsx
+  s_907ffcf933f32f::t_b87af76f85024c 52,54-55,60
+  s_907ffcf933f32f::t_63e4447a97b35f 5,22,24,221-235,237-251
+apps/web/src/components/workspaces/linked-projects.tsx
+  s_907ffcf933f32f::t_63e4447a97b35f 1-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "eee59b57560f5d00c1704ce467f662c0b958d1ef",
+  "prompts": {},
+  "sessions": {
+    "s_907ffcf933f32f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0837503-b2fa-4f7d-8244-7a3ebcd5dd60",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
