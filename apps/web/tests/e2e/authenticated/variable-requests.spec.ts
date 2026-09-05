@@ -442,6 +442,47 @@ test.describe("variable requests — reviewer approvals page", () => {
   });
 });
 
+test.describe("variable requests — deep link from a notification", () => {
+  test("E: ?request=<id> lands on the seeded row and highlights it", async ({
+    page,
+  }) => {
+    test.skip(!DEVELOPER_CLI_TOKEN, DEVELOPER_TOKEN_SKIP);
+    test.setTimeout(90_000);
+    const clientErrors = trackClientErrors(page);
+
+    const key = uniqueKey("E");
+    const requestId = await seedRequest(key, ["development"]);
+    await pinActiveOrg(page.context());
+
+    await page.goto(`/dashboard/requests?request=${requestId}`, {
+      waitUntil: "domcontentloaded",
+    });
+    const row = page
+      .getByTestId("request-row")
+      .filter({ hasText: key })
+      .first();
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    await expect(row).toHaveAttribute("data-request-id", requestId);
+    await expect(row).toHaveClass(/bg-accent-soft/);
+    await expect(row).toBeInViewport();
+
+    // Leave nothing pending behind.
+    await row.getByTestId("request-reject").click();
+    const dialog = page.locator("div.fixed.inset-0.z-50").filter({
+      hasText: "Reject Variable Request",
+    });
+    await dialog.getByRole("button", { name: /^Reject$/ }).click();
+    await expect(
+      page.getByTestId("request-row").filter({ hasText: key })
+    ).toHaveCount(0, { timeout: 20_000 });
+
+    expect(
+      clientErrors,
+      `unexpected client-side errors: ${clientErrors.join("\n")}`
+    ).toEqual([]);
+  });
+});
+
 test.describe("variable requests — project-level requests page", () => {
   test("D: the sidebar Requests item navigates to the project requests page and lists the seeded request", async ({
     page,

@@ -8,6 +8,7 @@ import {
   checkNumericLimit,
 } from "../featureRegistry/gates";
 import { buildNotificationText, matchesProjectScope } from "./messages";
+import { reviewPath } from "./links";
 import { rateLimiter } from "../../lib/rateLimits";
 import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { enqueueWebhookDelivery } from "./queue";
@@ -194,10 +195,8 @@ export const prepare = internalMutation({
     ]);
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL ?? "https://www.envpilot.dev";
-    const link = organization
-      ? `${appUrl.replace(/\/+$/, "")}/organizations/${organization.slug}`
-      : appUrl;
     const details = parseDetails(audit.details);
+    const link = `${appUrl.replace(/\/+$/, "")}${reviewPath(audit.action, details, organization?.slug)}`;
 
     for (const hook of targets) {
       try {

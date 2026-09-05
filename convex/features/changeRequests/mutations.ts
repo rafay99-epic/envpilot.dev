@@ -475,6 +475,7 @@ async function fileChangeRequest(
       0,
       internal.features.emails.emails.sendChangeRequestCreatedEmail,
       {
+        requestId,
         recipients: approvers.map((a) => a.email),
         projectName: project.name,
         requesterName: actor.name || actor.email,
@@ -518,6 +519,9 @@ export const review = mutation({
     requestId: v.id("changeRequests"),
     decision: v.union(v.literal("approve"), v.literal("reject")),
     reason: v.optional(v.string()),
+    // Reported by the web client from its viewport so the audit trail can
+    // count reviews done from a phone.
+    via: v.optional(v.union(v.literal("mobile"), v.literal("desktop"))),
   },
   returns: v.union(v.literal("applied"), v.literal("rejected")),
   handler: async (ctx, args) => {
@@ -582,6 +586,7 @@ export const review = mutation({
           label: request.label,
           targetId: request.targetId,
           reason: args.reason,
+          ...(args.via !== undefined && { via: args.via }),
         },
       });
       await notifyRequester(
@@ -634,6 +639,7 @@ export const review = mutation({
         appliedResourceId,
         reviewedBy: actor._id,
         reason: args.reason,
+        ...(args.via !== undefined && { via: args.via }),
       },
     });
 
@@ -656,6 +662,7 @@ async function notifyRequester(
     0,
     internal.features.emails.emails.sendChangeRequestReviewedEmail,
     {
+      requestId: request._id,
       to: requester.email,
       label: request.label,
       projectName: project.name,
@@ -859,6 +866,7 @@ export const sendIdleReminders = internalMutation({
           0,
           internal.features.emails.emails.sendChangeRequestReminderEmail,
           {
+            requestId: request._id,
             recipients: approvers.map((a) => a.email),
             projectName: project.name,
             label: request.label,

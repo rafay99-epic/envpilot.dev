@@ -11,6 +11,7 @@ import {
   TerminalLoading,
 } from "@/components/dashboard/terminal-ui";
 import { sanitizeConvexError } from "@/lib/error-messages";
+import { reviewSurface } from "@/lib/review-surface";
 
 /**
  * Non-secret fields worth diffing, per resource type. A payload never carries
@@ -138,6 +139,16 @@ export function ChangeReviewDrawer({
   const fields = request ? (DIFF_FIELDS[request.resourceType] ?? []) : [];
   const isPending = request?.status === "pending";
 
+  const decide = (decision: "approve" | "reject") =>
+    void run(() =>
+      review({
+        requestId,
+        decision,
+        reason: decision === "reject" ? rejectReason.trim() : undefined,
+        via: reviewSurface(),
+      })
+    );
+
   return (
     <DrawerPanel
       isOpen
@@ -145,6 +156,20 @@ export function ChangeReviewDrawer({
       title="Review change request"
       width="xl"
       preventClose={busy}
+      footer={
+        request && isPending ? (
+          <ReviewActions
+            busy={busy}
+            canApprove={request.canApprove}
+            canCancel={request.canCancel}
+            isStale={request.isStale}
+            rejectDisabled={rejectReason.trim().length === 0}
+            onCancel={() => void run(() => cancel({ requestId }))}
+            onReject={() => decide("reject")}
+            onApprove={() => decide("approve")}
+          />
+        ) : undefined
+      }
     >
       {request === undefined ? (
         <TerminalLoading />
@@ -197,27 +222,23 @@ export function ChangeReviewDrawer({
           {error && <p className="text-sm text-danger">{error}</p>}
 
           {isPending && (
-            <ReviewActions
-              busy={busy}
-              canApprove={request.canApprove}
-              canCancel={request.canCancel}
-              isStale={request.isStale}
-              rejectReason={rejectReason}
-              onRejectReasonChange={setRejectReason}
-              onCancel={() => void run(() => cancel({ requestId }))}
-              onReject={() =>
-                void run(() =>
-                  review({
-                    requestId,
-                    decision: "reject",
-                    reason: rejectReason.trim(),
-                  })
-                )
-              }
-              onApprove={() =>
-                void run(() => review({ requestId, decision: "approve" }))
-              }
-            />
+            <div>
+              <label
+                htmlFor="change-reject-reason"
+                className="block text-sm font-medium text-ink-muted"
+              >
+                Rejection reason
+              </label>
+              <textarea
+                id="change-reject-reason"
+                data-testid="change-reject-reason"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={2}
+                placeholder="Required to reject"
+                className="mt-1 block w-full rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink placeholder-ink-subtle focus:border-line-strong focus:outline-none"
+              />
+            </div>
           )}
         </div>
       )}
@@ -225,14 +246,14 @@ export function ChangeReviewDrawer({
   );
 }
 
-/** Reject reason and the three decisions an approver can take. */
+/** The decisions an approver can take. Lives in the drawer footer so the
+ *  buttons stay on screen on a phone regardless of the diff length. */
 function ReviewActions({
   busy,
   canApprove,
   canCancel,
   isStale,
-  rejectReason,
-  onRejectReasonChange,
+  rejectDisabled,
   onCancel,
   onReject,
   onApprove,
@@ -241,33 +262,14 @@ function ReviewActions({
   canApprove: boolean;
   canCancel: boolean;
   isStale: boolean;
-  rejectReason: string;
-  onRejectReasonChange: (value: string) => void;
+  rejectDisabled: boolean;
   onCancel: () => void;
   onReject: () => void;
   onApprove: () => void;
 }) {
   return (
-    <>
-      <div>
-        <label
-          htmlFor="change-reject-reason"
-          className="block text-sm font-medium text-ink-muted"
-        >
-          Rejection reason
-        </label>
-        <textarea
-          id="change-reject-reason"
-          data-testid="change-reject-reason"
-          value={rejectReason}
-          onChange={(e) => onRejectReasonChange(e.target.value)}
-          rows={2}
-          placeholder="Required to reject"
-          className="mt-1 block w-full rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink placeholder-ink-subtle focus:border-line-strong focus:outline-none"
-        />
-      </div>
-
-      <div className="flex flex-wrap justify-end gap-2 pt-2">
+    <div className="space-y-2">
+      <div className="flex flex-wrap justify-end gap-2 [&>button]:flex-1 sm:[&>button]:flex-none">
         {canCancel && (
           <TerminalButton
             type="button"
@@ -283,7 +285,7 @@ function ReviewActions({
           type="button"
           variant="secondary"
           data-testid="change-reject"
-          disabled={busy || !canApprove || rejectReason.trim().length === 0}
+          disabled={busy || !canApprove || rejectDisabled}
           onClick={onReject}
         >
           Reject
@@ -302,6 +304,6 @@ function ReviewActions({
           A second person applies this change.
         </p>
       )}
-    </>
+    </div>
   );
 }

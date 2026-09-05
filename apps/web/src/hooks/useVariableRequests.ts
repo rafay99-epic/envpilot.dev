@@ -87,6 +87,7 @@ export function useResolveVariableRequest() {
       reviewReason?: string;
       /** Reviewer's environment override — approve only. */
       environments?: string[];
+      via?: "mobile" | "desktop";
     }) => {
       if (data.action === "cancel") {
         const requestId = await cancel({
@@ -100,6 +101,7 @@ export function useResolveVariableRequest() {
         action: data.action,
         reviewReason: data.reviewReason,
         environments: data.action === "approve" ? data.environments : undefined,
+        via: data.via,
       });
       return result;
     },

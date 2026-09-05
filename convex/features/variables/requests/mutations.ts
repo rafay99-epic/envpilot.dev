@@ -190,9 +190,9 @@ async function insertRequest(
     0,
     internal.features.emails.emails.sendVariableRequestCreatedEmail,
     {
+      requestId,
       projectId: args.projectId,
       projectName: project.name,
-      projectSlug: project.slug,
       requesterName: args.requesterLabel,
       key: args.key,
       environments: args.environments,
@@ -452,6 +452,9 @@ const reviewArgs = {
   reviewReason: v.optional(v.string()),
   // Reviewer may override the approved environments (approve only).
   environments: v.optional(v.array(v.string())),
+  // Reported by the web client from its viewport so the audit trail can
+  // count reviews done from a phone.
+  via: v.optional(v.union(v.literal("mobile"), v.literal("desktop"))),
 };
 
 export const review = mutation({
@@ -472,6 +475,7 @@ export const _approveWithSuppliedRef = internalMutation({
     requestId: v.id("environmentVariableRequests"),
     reviewReason: v.optional(v.string()),
     environments: v.optional(v.array(v.string())),
+    via: v.optional(v.union(v.literal("mobile"), v.literal("desktop"))),
     vaultRef: v.string(),
   },
   handler: async (ctx, args) => reviewCore(ctx, { ...args, action: "approve" }),
@@ -485,6 +489,7 @@ async function reviewCore(
     reviewReason?: string;
     environments?: string[];
     vaultRef?: string;
+    via?: "mobile" | "desktop";
   }
 ) {
   {
@@ -573,6 +578,7 @@ async function reviewCore(
           environments: request.environments,
           requesterId: request.requestedBy,
           reviewReason: args.reviewReason,
+          ...(args.via !== undefined && { via: args.via }),
         },
         resourceType: "variable",
         involvesSensitiveData: request.isSensitive,
@@ -725,6 +731,7 @@ async function reviewCore(
         requestedEnvironments: request.environments,
         approvedEnvironments,
         environments: approvedEnvironments,
+        ...(args.via !== undefined && { via: args.via }),
       },
       resourceType: "variable",
       involvesSensitiveData: request.isSensitive,
@@ -801,6 +808,7 @@ async function notifyRequesterOfVerdict(
     0,
     internal.features.emails.emails.sendVariableRequestReviewedEmail,
     {
+      requestId: args.request._id,
       to: requester.email,
       requesterName: requester.name,
       key: args.request.key,

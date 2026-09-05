@@ -18,6 +18,9 @@ interface DrawerPanelProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /** Pinned below the scrolling body; put the decision buttons here so they
+   *  stay reachable on a phone no matter how long the content is. */
+  footer?: ReactNode;
   width?: "md" | "lg" | "xl";
   preventClose?: boolean;
   /** Which edge of the screen the panel slides in from. */
@@ -38,6 +41,7 @@ export function DrawerPanel({
   onClose,
   title,
   children,
+  footer,
   width = "lg",
   preventClose = false,
   side = "right",
@@ -206,6 +210,12 @@ export function DrawerPanel({
                 <div className="flex-1 overflow-y-auto px-6 py-4">
                   {children}
                 </div>
+
+                {footer && (
+                  <div className="border-t border-line px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                    {footer}
+                  </div>
+                )}
               </div>
             </m.div>
           </div>
