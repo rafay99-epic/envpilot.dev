@@ -1,0 +1,31 @@
+apps/web/src/components/dashboard/terminal-ui.tsx
+  s_2befb751b3d07b::t_4c22acfc90d76d 134
+apps/web/src/instrumentation-client.ts
+  s_2befb751b3d07b::t_4c22acfc90d76d 70
+apps/vscode-extension/src/utils/sentryRuntime.ts
+  s_2befb751b3d07b::t_4c22acfc90d76d 16,19
+apps/vscode-extension/src/services/gitCommitGuard.ts
+  s_2befb751b3d07b::t_4c22acfc90d76d 192
+apps/web/src/proxy.ts
+  s_2befb751b3d07b::t_4c22acfc90d76d 82-83
+apps/jetbrains-plugin/src/main/kotlin/dev/envpilot/jetbrains/errors/Errors.kt
+  s_2befb751b3d07b::t_4c22acfc90d76d 39
+apps/vscode-extension/src/services/convex.ts
+  s_2befb751b3d07b::t_4c22acfc90d76d 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "ec336798ffc786cf48138027bdea685aad21bc0e",
+  "prompts": {},
+  "sessions": {
+    "s_2befb751b3d07b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3030dcc9-439a-4db6-9ea9-1f1b3ae021e2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
