@@ -725,12 +725,6 @@ export const cancelForTarget = internalMutation({
 });
 
 /**
- * Move a project's change-request history to the project's new organization,
- * a batch at a time. The move mutation schedules this instead of patching an
- * unbounded inbox inside its own transaction; each pass patches only rows
- * still carrying the old org, so it reschedules itself until none remain.
- */
-/**
  * Patch organizationId onto up to `max` rows of a moved project that still
  * carry the source organization. Returns how many were patched; a full batch
  * means more may remain.
@@ -759,6 +753,12 @@ export async function retenantChangeRequestsBatch(
   return patched;
 }
 
+/**
+ * Move a project's change-request history to the project's new organization,
+ * a batch at a time. The move mutation schedules this instead of patching an
+ * unbounded inbox inside its own transaction; each pass patches only rows
+ * still carrying the old org, so it reschedules itself until none remain.
+ */
 export const retenantChangeRequests = internalMutation({
   args: {
     projectId: v.id("projects"),
