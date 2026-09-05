@@ -54,7 +54,7 @@ export const COMPARISONS: Comparison[] = [
       {
         feature: "Access control",
         envpilot:
-          "Role-based (Admin / Team Lead / Member) plus per-variable grants",
+          "Six capability-backed roles (Owner to Viewer) plus per-variable and per-file grants",
         competitor: "Role-based, per-project and per-config scoping",
       },
       {
@@ -63,9 +63,15 @@ export const COMPARISONS: Comparison[] = [
         competitor: "doppler run -- <command>",
       },
       {
+        feature: "Beyond variables",
+        envpilot:
+          "Secret files (keystores, SSH keys, service-account JSON) and shared logins, same roles and audit trail",
+        competitor: "Variables, including multi-line values",
+      },
+      {
         feature: "Client surfaces",
         envpilot:
-          "CLI, VS Code extension, web dashboard — real-time sync across all three",
+          "CLI, VS Code and JetBrains, web dashboard, GitHub Action, Docker image, REST API, MCP server for agents",
         competitor: "CLI, web dashboard, broad CI/CD and cloud integrations",
       },
       {
@@ -129,12 +135,12 @@ export const COMPARISONS: Comparison[] = [
     rows: [
       {
         feature: "Hosting model",
-        envpilot: "Fully managed cloud",
+        envpilot: "Fully managed cloud; no self-hosted option",
         competitor: "Self-hosted (open source) or managed cloud",
       },
       {
         feature: "Source model",
-        envpilot: "Closed source, managed service",
+        envpilot: "Open source (MIT) on GitHub, hosted as a service",
         competitor: "Open source core (MIT-licensed components)",
       },
       {
@@ -156,12 +162,18 @@ export const COMPARISONS: Comparison[] = [
       },
       {
         feature: "Editor integration",
-        envpilot: "Native VS Code extension with real-time sync",
+        envpilot: "VS Code and JetBrains plugins with real-time sync",
         competitor: "CLI-centric; community editor tooling",
       },
       {
+        feature: "Beyond variables",
+        envpilot:
+          "Secret files and shared logins in the same project, same roles, same audit trail",
+        competitor: "SSH and PKI as separate products in the platform",
+      },
+      {
         feature: "Scope",
-        envpilot: "Focused: team environment variables done well",
+        envpilot: "Focused: what a product team shares, done well",
         competitor: "Broad: secrets, PKI, SSH, scanning, K8s operator",
       },
       {
@@ -178,13 +190,12 @@ export const COMPARISONS: Comparison[] = [
     ],
     chooseCompetitor: [
       "Self-hosting is a hard requirement (data residency, air-gapped environments, policy)",
-      "You want an open-source core you can audit and extend",
       "You need the broader platform features: secret scanning, PKI, Kubernetes operator",
     ],
     faq: [
       {
         q: "Is Envpilot open source?",
-        a: "The Envpilot service is closed source, while the CLI is published on npm. If an auditable open-source core or self-hosting is a requirement, Infisical is the better fit — that's a genuine differentiator of theirs.",
+        a: "Yes. The whole platform is MIT-licensed and public at github.com/rafay99-epic/envpilot.dev, and the CLI is on npm. What Envpilot does not offer is self-hosting: the hosted service is the only deployment. If running it yourself is a requirement, Infisical is the better fit.",
       },
       {
         q: "Can I migrate from Infisical to Envpilot?",
@@ -193,6 +204,95 @@ export const COMPARISONS: Comparison[] = [
       {
         q: "Which is easier to set up?",
         a: "For a managed experience both are quick. If you self-host Infisical you take on database, upgrades, and availability — Envpilot has no self-hosted option but also nothing to operate.",
+      },
+    ],
+  },
+  {
+    slug: "phase",
+    name: "Phase",
+    title: "Envpilot vs Phase",
+    metaTitle: "Envpilot vs Phase — Secrets Manager Comparison",
+    metaDescription:
+      "An honest comparison of Envpilot and Phase for team secrets: hosting, encryption, access control, what each stores beyond environment variables, pricing model, and when to choose each.",
+    intro: [
+      "Phase is an open-source, end-to-end encrypted secrets platform you can self-host or use as a cloud service, with a console, CLI, SDKs and a Kubernetes operator. Envpilot is a managed service built around what a product team actually shares: environment variables, the secret files that never fit in one, and the shared logins that usually live in the group chat.",
+      "Both replace the .env in Slack. Phase leans toward infrastructure teams who want to run their own secrets platform and wire it into deployment tooling. Envpilot leans toward small teams who want the sharing problem gone, in the terminal, the editor and the agent, without operating anything.",
+    ],
+    rows: [
+      {
+        feature: "Hosting model",
+        envpilot: "Fully managed cloud; no self-hosted option",
+        competitor: "Self-hosted (Docker, Kubernetes, cloud) or managed cloud",
+      },
+      {
+        feature: "Source model",
+        envpilot: "Open source (MIT) on GitHub, hosted as a service",
+        competitor: "Open source",
+      },
+      {
+        feature: "Encryption at rest",
+        envpilot:
+          "AES-256 via an isolated vault (WorkOS Vault); only references stored in the app database",
+        competitor: "End-to-end encrypted, client-side keys",
+      },
+      {
+        feature: "Access control",
+        envpilot:
+          "Six capability-backed roles plus per-variable and per-file grants with optional expiry",
+        competitor: "Role-based, scoped by app and environment",
+      },
+      {
+        feature: "Runtime injection",
+        envpilot: "envpilot run -- <command>",
+        competitor: "phase run -- <command>",
+      },
+      {
+        feature: "Beyond variables",
+        envpilot:
+          "Secret files (keystores, SSH keys, service-account JSON) and shared logins, same roles and audit trail",
+        competitor: "Variables, with secret referencing and personal overrides",
+      },
+      {
+        feature: "Editor and agent access",
+        envpilot:
+          "VS Code and JetBrains plugins, plus a read-only MCP server with scoped keys",
+        competitor: "CLI and SDKs; integrations for deployment targets",
+      },
+      {
+        feature: "Change control",
+        envpilot:
+          "Protected environments: writes become change requests a second person approves",
+        competitor: "Role-based write access per environment",
+      },
+      {
+        feature: "Pricing model",
+        envpilot: "Free tier; flat per-organization Pro plan",
+        competitor: "Free tier; paid plans priced per user",
+      },
+    ],
+    chooseEnvpilot: [
+      "You share more than variables: signing keystores, service-account JSON, SSH keys, a vendor dashboard login",
+      "You want flat per-organization pricing instead of per-user costs",
+      "Your team wants secrets in the editor and in the coding agent, not only in the shell",
+      "Production changes should need a second approval before they land",
+    ],
+    chooseCompetitor: [
+      "Self-hosting is a hard requirement (data residency, air-gapped environments, policy)",
+      "You want end-to-end encryption where the server never holds a decryption key",
+      "You are wiring secrets into Kubernetes and deployment platforms and want a native operator",
+    ],
+    faq: [
+      {
+        q: "Can I migrate from Phase to Envpilot?",
+        a: "Yes. Export each environment from the Phase CLI or console as dotenv text, then bulk-import it into Envpilot from the dashboard or with envpilot push. Files and shared logins are added separately, since Phase has no equivalent object.",
+      },
+      {
+        q: "Is Envpilot end-to-end encrypted like Phase?",
+        a: "No, and the difference matters. Phase encrypts on the client so its server cannot read your secrets. Envpilot decrypts server-side through an isolated vault so that the dashboard, share links, MCP tools and the audit trail can work on values. If a server that never holds a key is your requirement, Phase is the right pick.",
+      },
+      {
+        q: "Does Envpilot self-host?",
+        a: "No. Envpilot is open source under MIT, but the hosted service is the only deployment. Phase and Infisical both offer self-hosting.",
       },
     ],
   },

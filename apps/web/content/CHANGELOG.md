@@ -15,6 +15,16 @@
 
 <!-- entry -->
 ---
+title: Envpilot vs Phase, and a Refreshed Infisical Page
+version: v1.69.0
+date: 2026-09-05
+types: [feature, improvement]
+---
+
+A new comparison page, [Envpilot vs Phase](/vs/phase), joins Doppler, Infisical and .env files in the footer. The Infisical page no longer calls Envpilot closed source; the platform has been MIT-licensed on GitHub for a while and the page now says so, while still pointing at Infisical for self-hosting. The Doppler and Infisical pages gain a "Beyond variables" row covering secret files and shared logins, and the client list now includes JetBrains, the GitHub Action, the Docker image, the REST API and the MCP server.
+
+<!-- entry -->
+---
 title: Quieter Error Reporting Across Every Client
 version: v1.68.1
 date: 2026-09-05

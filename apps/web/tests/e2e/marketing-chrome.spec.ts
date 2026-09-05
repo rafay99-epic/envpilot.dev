@@ -18,6 +18,7 @@ const PAGES = [
   { path: "/privacy", eyebrow: "envpilot — privacy" },
   { path: "/terms", eyebrow: "envpilot — terms" },
   { path: "/vs/doppler", eyebrow: "envpilot — comparison" },
+  { path: "/vs/phase", eyebrow: "envpilot — comparison" },
 ] as const;
 
 test.describe("marketing sub-page chrome", () => {
