@@ -49,6 +49,7 @@ const FOOTER_COLUMNS: FooterColumn[] = [
     links: [
       { label: "vs Doppler", href: "/vs/doppler" },
       { label: "vs Infisical", href: "/vs/infisical" },
+      { label: "vs Phase", href: "/vs/phase" },
       { label: "vs .env files", href: "/vs/dotenv" },
     ],
   },
