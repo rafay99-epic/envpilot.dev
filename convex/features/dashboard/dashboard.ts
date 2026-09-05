@@ -230,16 +230,9 @@ export const getRecentProjects = query({
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
-    const recentProjects = await ctx.db
-      .query("projects")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
+    const projects = await activeProjectsQuery(ctx.db, args.organizationId)
       .order("desc")
-      .take(50);
-    const projects = recentProjects
-      .filter((p) => p.deletedAt === undefined)
-      .slice(0, 5);
+      .take(5);
 
     // Cap the per-project variable read. Collecting every variable of each of
     // the 5 shown projects re-ran on every variable write; for a "recent
@@ -323,13 +316,10 @@ export const getOnboardingStatus = query({
   },
   handler: async (ctx, args) => {
     // Check if any projects exist
-    const allProjects = await ctx.db
-      .query("projects")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .collect();
-    const projects = allProjects.filter((p) => p.deletedAt === undefined);
+    const projects = await activeProjectsQuery(
+      ctx.db,
+      args.organizationId
+    ).collect();
 
     const projectCount = projects.length;
     const projectIds = new Set(projects.map((project) => project._id));
@@ -422,6 +412,8 @@ export const getAnalytics = query({
       .take(AUDIT_LOG_CAP);
 
     // Fetch all non-deleted projects
+    // Includes workspaces on purpose: their audit rows carry a workspace
+    // projectId and need a name in the activity breakdown.
     const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>

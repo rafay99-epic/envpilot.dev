@@ -116,7 +116,7 @@ export const _listScopedProjects = internalQuery({
   ),
   handler: async (ctx, args) => {
     // Workspaces are excluded at the index: an API key must never see one
-    // listed as a project, and `assertPullable` refuses if one is targeted.
+    // listed as a project, and slug lookup returns null if one is targeted.
     let projects = await activeProjectsQuery(
       ctx.db,
       args.organizationId

@@ -1,4 +1,3 @@
-import { ConvexError } from "convex/values";
 import type { DatabaseReader } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 
@@ -56,19 +55,4 @@ export function activeWorkspacesQuery(
         .eq("kind", WORKSPACE_KIND)
         .eq("deletedAt", undefined)
     );
-}
-
-/**
- * Refuse a client pull aimed at a workspace, at every surface that pulls
- * (CLI, extension, REST, MCP, GitHub Action, Docker image).
- *
- * ConvexError, not Error: production redacts plain Error messages to "Server
- * Error", and this one has to tell the user what to do instead.
- */
-export function assertPullable(project: Doc<"projects">): void {
-  if (isWorkspace(project)) {
-    throw new ConvexError(
-      `"${project.name}" is a workspace, not a project. Pull from a project that belongs to it.`
-    );
-  }
 }
