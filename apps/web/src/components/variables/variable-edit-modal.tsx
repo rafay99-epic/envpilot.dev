@@ -29,6 +29,8 @@ interface VariableEditModalProps {
   onCreateTag?: (name: string, color: string) => Promise<void>;
   /** Environments this project protects; selecting one turns save into a proposal. */
   protectedEnvironments?: readonly string[];
+  /** Environments the caller may write to. Defaults to all of them. */
+  allowedEnvironments?: readonly string[];
 }
 
 export function VariableEditModal({
@@ -40,6 +42,7 @@ export function VariableEditModal({
   availableTags,
   onCreateTag,
   protectedEnvironments,
+  allowedEnvironments,
 }: VariableEditModalProps) {
   const initialData: Partial<VariableFormData> | undefined = variable
     ? {
@@ -72,6 +75,7 @@ export function VariableEditModal({
           availableTags={availableTags}
           onCreateTag={onCreateTag}
           protectedEnvironments={protectedEnvironments}
+          allowedEnvironments={allowedEnvironments}
         />
       )}
     </DrawerPanel>

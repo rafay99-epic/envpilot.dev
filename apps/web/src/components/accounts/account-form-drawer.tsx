@@ -6,6 +6,7 @@ import { DrawerPanel } from "@/components/ui/drawer-panel";
 import {
   ENVIRONMENTS,
   envToggleClasses,
+  pickAllowedEnvironments,
   type Environment,
 } from "@/constants/project";
 import type { Account } from "@/hooks";
@@ -35,6 +36,8 @@ interface AccountFormDrawerProps {
   submitLabel?: string;
   /** Environments this project protects; selecting one turns save into a proposal. */
   protectedEnvironments?: readonly string[];
+  /** Environments the caller may write to. Defaults to all of them. */
+  allowedEnvironments?: readonly string[];
 }
 
 export function AccountFormDrawer({
@@ -46,6 +49,7 @@ export function AccountFormDrawer({
   title,
   submitLabel,
   protectedEnvironments,
+  allowedEnvironments,
 }: AccountFormDrawerProps) {
   const isEditing = !!account;
 
@@ -82,6 +86,7 @@ export function AccountFormDrawer({
         isSubmitting={isSubmitting}
         submitLabel={submitLabel}
         protectedEnvironments={protectedEnvironments}
+        allowedEnvironments={allowedEnvironments}
       />
     </DrawerPanel>
   );
@@ -95,6 +100,7 @@ interface AccountFormProps {
   isSubmitting: boolean;
   submitLabel?: string;
   protectedEnvironments?: readonly string[];
+  allowedEnvironments?: readonly string[];
 }
 
 function AccountForm({
@@ -105,6 +111,7 @@ function AccountForm({
   isSubmitting,
   submitLabel,
   protectedEnvironments,
+  allowedEnvironments = ENVIRONMENTS,
 }: AccountFormProps) {
   const isEditing = !!account;
   const accountId = account?._id;
@@ -116,8 +123,11 @@ function AccountForm({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [description, setDescription] = useState(account?.description ?? "");
-  const [environments, setEnvironments] = useState<Environment[]>(
-    (account?.environments as Environment[] | undefined) ?? ["development"]
+  const [environments, setEnvironments] = useState<Environment[]>(() =>
+    pickAllowedEnvironments(
+      (account?.environments as Environment[] | undefined) ?? ["development"],
+      allowedEnvironments
+    )
   );
 
   const [showPassword, setShowPassword] = useState(false);
@@ -384,7 +394,7 @@ function AccountForm({
           aria-labelledby={environmentsLabelId}
           className="mt-2 flex flex-wrap gap-2"
         >
-          {ENVIRONMENTS.map((env) => (
+          {allowedEnvironments.map((env) => (
             <button
               key={env}
               type="button"

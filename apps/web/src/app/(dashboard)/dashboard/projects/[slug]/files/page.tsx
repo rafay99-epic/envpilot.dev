@@ -412,6 +412,7 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
         file={editingFile}
         replaceMode={replaceMode}
         protectedEnvironments={protection?.environments}
+        allowedEnvironments={protection?.allowedEnvironments}
       />
 
       {permissionsFile && (

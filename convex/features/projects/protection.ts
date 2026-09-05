@@ -154,6 +154,9 @@ export const getProtection = query({
 
     return {
       environments: project.protection?.environments ?? [],
+      // The environments this member may write to. Forms offer only these,
+      // so a scoped developer never sees production as a choice at all.
+      allowedEnvironments: environmentScope ?? VALID_ENVIRONMENTS,
       canManage: hasCapability(profile, "project.protection.manage"),
       canApprove: hasCapability(profile, "project.protection.approve"),
       canOverride: hasCapability(profile, "project.protection.override"),

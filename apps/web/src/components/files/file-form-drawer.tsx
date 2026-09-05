@@ -7,6 +7,7 @@ import {
   ENVIRONMENTS,
   type Environment,
   envToggleClasses,
+  pickAllowedEnvironments,
 } from "@/constants/project";
 import { formatBytes, type SecretFile } from "@/hooks/useSecretFiles";
 
@@ -29,6 +30,8 @@ interface FileFormDrawerProps {
   replaceMode?: boolean;
   /** Environments this project protects; selecting one turns save into a proposal. */
   protectedEnvironments?: readonly string[];
+  /** Environments the caller may write to. Defaults to all of them. */
+  allowedEnvironments?: readonly string[];
 }
 
 const MODES = [
@@ -46,6 +49,7 @@ export function FileFormDrawer({
   file,
   replaceMode = false,
   protectedEnvironments,
+  allowedEnvironments,
 }: FileFormDrawerProps) {
   const isEditing = !!file;
 
@@ -87,6 +91,7 @@ export function FileFormDrawer({
         onCancel={onClose}
         isSubmitting={isSubmitting}
         protectedEnvironments={protectedEnvironments}
+        allowedEnvironments={allowedEnvironments}
       />
     </DrawerPanel>
   );
@@ -99,6 +104,7 @@ interface FileFormProps {
   onCancel: () => void;
   isSubmitting: boolean;
   protectedEnvironments?: readonly string[];
+  allowedEnvironments?: readonly string[];
 }
 
 function FileForm({
@@ -108,6 +114,7 @@ function FileForm({
   onCancel,
   isSubmitting,
   protectedEnvironments,
+  allowedEnvironments = ENVIRONMENTS,
 }: FileFormProps) {
   const isEditing = !!file;
   const needsUpload = !isEditing || replaceMode;
@@ -116,8 +123,11 @@ function FileForm({
   const [path, setPath] = useState(file?.path ?? "");
   const [mode, setMode] = useState(file?.mode ?? "0600");
   const [description, setDescription] = useState(file?.description ?? "");
-  const [environments, setEnvironments] = useState<Environment[]>(
-    (file?.environments as Environment[] | undefined) ?? ["development"]
+  const [environments, setEnvironments] = useState<Environment[]>(() =>
+    pickAllowedEnvironments(
+      (file?.environments as Environment[] | undefined) ?? ["development"],
+      allowedEnvironments
+    )
   );
   const [picked, setPicked] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -335,7 +345,7 @@ function FileForm({
               Environments <span className="text-danger">*</span>
             </legend>
             <div className="mt-2 flex flex-wrap gap-2">
-              {ENVIRONMENTS.map((env) => (
+              {allowedEnvironments.map((env) => (
                 <button
                   key={env}
                   type="button"

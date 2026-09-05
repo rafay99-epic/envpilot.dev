@@ -5,6 +5,7 @@ import {
   ENVIRONMENTS,
   type Environment,
   envToggleClasses,
+  pickAllowedEnvironments,
 } from "@/constants/project";
 import {
   parseEnvFile,
@@ -23,6 +24,8 @@ interface BulkPasteFormProps {
   availableTags?: Tag[];
   onCreateTag?: (name: string, color: string) => Promise<void>;
   protectedEnvironments?: readonly string[];
+  /** Environments the caller may write to. Defaults to all of them. */
+  allowedEnvironments?: readonly string[];
 }
 
 /** Stable identity so an omitted `availableTags` never re-renders TagSelector. */
@@ -43,14 +46,15 @@ export function BulkPasteForm({
   availableTags = NO_TAGS,
   onCreateTag,
   protectedEnvironments,
+  allowedEnvironments = ENVIRONMENTS,
 }: BulkPasteFormProps) {
   const environmentsLabelId = useId();
   const [rawText, setRawText] = useState("");
   const [entries, setEntries] = useState<ParsedEnvEntry[]>([]);
   const [errors, setErrors] = useState<EnvParseError[]>([]);
-  const [environments, setEnvironments] = useState<Environment[]>([
-    "development",
-  ]);
+  const [environments, setEnvironments] = useState<Environment[]>(() =>
+    pickAllowedEnvironments(["development"], allowedEnvironments)
+  );
   const [isSensitive, setIsSensitive] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -229,7 +233,7 @@ export function BulkPasteForm({
           aria-labelledby={environmentsLabelId}
           className="mt-2 flex flex-wrap gap-2"
         >
-          {ENVIRONMENTS.map((env) => (
+          {allowedEnvironments.map((env) => (
             <button
               key={env}
               type="button"

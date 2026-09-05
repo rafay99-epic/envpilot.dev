@@ -995,6 +995,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         variable={editingVariable}
         onSave={handleUpdateVariable}
         protectedEnvironments={protection?.environments}
+        allowedEnvironments={protection?.allowedEnvironments}
         showRotation={showRotation}
         availableTags={orgTags}
         onCreateTag={

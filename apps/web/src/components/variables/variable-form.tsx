@@ -5,6 +5,7 @@ import {
   ENVIRONMENTS,
   type Environment,
   envToggleClasses,
+  pickAllowedEnvironments,
 } from "@/constants/project";
 import { RotateCcw } from "lucide-react";
 import type { Tag } from "@/hooks/useTags";
@@ -31,6 +32,8 @@ interface VariableFormProps {
   onCreateTag?: (name: string, color: string) => Promise<void>;
   /** Environments this project protects; selecting one turns save into a proposal. */
   protectedEnvironments?: readonly string[];
+  /** Environments the caller may write to. Defaults to all of them. */
+  allowedEnvironments?: readonly string[];
 }
 
 const ROTATION_PRESETS = [
@@ -59,11 +62,18 @@ export function VariableForm({
   availableTags,
   onCreateTag,
   protectedEnvironments,
+  allowedEnvironments = ENVIRONMENTS,
 }: VariableFormProps) {
-  const [formData, setFormData] = useState<VariableFormData>(() => ({
-    ...defaultFormData,
-    ...initialData,
-  }));
+  const [formData, setFormData] = useState<VariableFormData>(() => {
+    const merged = { ...defaultFormData, ...initialData };
+    return {
+      ...merged,
+      environments: pickAllowedEnvironments(
+        merged.environments,
+        allowedEnvironments
+      ),
+    };
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const environmentsLabelId = useId();
@@ -303,7 +313,7 @@ export function VariableForm({
           aria-labelledby={environmentsLabelId}
           className="mt-2 flex flex-wrap gap-2"
         >
-          {ENVIRONMENTS.map((env) => (
+          {allowedEnvironments.map((env) => (
             <button
               key={env}
               type="button"

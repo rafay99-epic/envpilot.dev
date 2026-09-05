@@ -259,6 +259,7 @@ export function VariableCreateDrawer({
             availableTags={availableTags}
             onCreateTag={requestOnly ? undefined : handleCreateTag}
             protectedEnvironments={protection?.environments}
+            allowedEnvironments={protection?.allowedEnvironments}
           />
         )
       ) : bulkBlocked ? (
@@ -277,6 +278,7 @@ export function VariableCreateDrawer({
           availableTags={availableTags}
           onCreateTag={requestOnly ? undefined : handleCreateTag}
           protectedEnvironments={protection?.environments}
+          allowedEnvironments={protection?.allowedEnvironments}
         />
       )}
     </DrawerPanel>

@@ -71,3 +71,17 @@ export function envToggleClasses(env: Environment, selected: boolean): string {
 export type ProjectIcon = (typeof PROJECT_ICONS)[number];
 export type ProjectColor = string;
 export type Environment = (typeof ENVIRONMENTS)[number];
+
+/**
+ * Narrows a default/initial environment selection to what the caller may
+ * write. Falls back to the first allowed environment when the default (e.g.
+ * "development") isn't one of them, so a scoped user never starts on an
+ * environment they can't save.
+ */
+export function pickAllowedEnvironments(
+  environments: readonly Environment[],
+  allowed: readonly string[]
+): Environment[] {
+  const filtered = environments.filter((env) => allowed.includes(env));
+  return filtered.length > 0 ? filtered : [allowed[0] as Environment];
+}

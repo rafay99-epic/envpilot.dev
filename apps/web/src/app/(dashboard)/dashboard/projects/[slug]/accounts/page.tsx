@@ -462,6 +462,7 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
           title="Add Account"
           submitLabel="Create Account"
           protectedEnvironments={protection?.environments}
+          allowedEnvironments={protection?.allowedEnvironments}
         />
 
         {/* Edit drawer */}
@@ -474,6 +475,7 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
             editingAccount ? () => revealCredentials(editingAccount) : undefined
           }
           protectedEnvironments={protection?.environments}
+          allowedEnvironments={protection?.allowedEnvironments}
         />
 
         {/* Delete confirm */}
