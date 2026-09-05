@@ -1,0 +1,39 @@
+apps/web/src/components/marketing/MarketingShell.tsx
+  s_773414b20ffd69::t_07726a0a1b18ab 52
+apps/web/tests/e2e/marketing-chrome.spec.ts
+  s_773414b20ffd69::t_0e79856a9d9a00 21
+apps/web/content/CHANGELOG.md
+  s_773414b20ffd69::t_370e36c23b1fe6 17-23,25
+  s_773414b20ffd69::t_c1a9a067891031 24
+  s_773414b20ffd69::t_8376dc3dcdd1af 16
+apps/web/src/lib/versions.ts
+  s_773414b20ffd69::t_370e36c23b1fe6 17
+apps/blog/content/secrets-that-are-not-environment-variables.mdx
+  s_773414b20ffd69::t_c1a9a067891031 81-85
+  s_773414b20ffd69::t_08c0833ccdf791 1-80,86-96
+apps/web/src/lib/comparisons.ts
+  s_773414b20ffd69::t_d3d6c3590d84ac 138,143
+  s_773414b20ffd69::t_f4c7dc665a8118 198
+  s_773414b20ffd69::t_8549a372aa6616 165,168-173,176
+  s_773414b20ffd69::t_d7f6e28cac31bf 57,65-70,74
+  s_773414b20ffd69::t_ea07372e24e336 211-298
+  s_773414b20ffd69::t_3a1869efd8cc82 210
+apps/web/package.json
+  s_773414b20ffd69::t_370e36c23b1fe6 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "e594a86c5ba63adff026c4aa243af946e0762e95",
+  "prompts": {},
+  "sessions": {
+    "s_773414b20ffd69": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "96890cd2-d2e9-4cbb-bbff-9da680f47c4e",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
