@@ -223,8 +223,9 @@ export default function ProjectMembersPage({
     // A role change since the selection was made can leave a disabled,
     // outside-the-ceiling environment checked — drop it before it's sent.
     const ceiling = editingScopeMember.roleEnvironments;
-    const scoped = ceiling
-      ? editEnvScope.filter((env) => ceiling.includes(env))
+    const withinCeiling = ceiling ? new Set(ceiling) : null;
+    const scoped = withinCeiling
+      ? editEnvScope.filter((env) => withinCeiling.has(env))
       : editEnvScope;
 
     // Covering the full ceiling = unrestricted-within-role = send nothing.

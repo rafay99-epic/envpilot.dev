@@ -1,5 +1,7 @@
 import { ENVIRONMENTS } from "@/constants/project";
 
+const KNOWN: ReadonlySet<string> = new Set(ENVIRONMENTS);
+
 // Pure scope helpers, kept out of the component module so that file
 // exports only its component and Fast Refresh has a boundary it can
 // preserve state across.
@@ -19,7 +21,8 @@ export function isUnrestrictedScope(
   ceiling?: string[]
 ): boolean {
   const universe = ceiling ?? ENVIRONMENTS;
-  return universe.every((env) => selected.includes(env));
+  const chosen = new Set(selected);
+  return universe.every((env) => chosen.has(env));
 }
 
 /**
@@ -40,9 +43,8 @@ export function formatEnvironmentScope(environments?: string[] | null): string {
   // rejects it on write, but a legacy row could carry it — show the truth).
   if (environments == null) return "All environments";
   if (environments.length === 0) return "No environments";
-  const known = ENVIRONMENTS.filter((env) => environments.includes(env));
-  const extras = environments.filter(
-    (env) => !(ENVIRONMENTS as readonly string[]).includes(env)
-  );
+  const scoped = new Set(environments);
+  const known = ENVIRONMENTS.filter((env) => scoped.has(env));
+  const extras = environments.filter((env) => !KNOWN.has(env));
   return [...known, ...extras].join(", ");
 }

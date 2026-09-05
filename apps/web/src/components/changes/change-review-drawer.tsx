@@ -59,6 +59,50 @@ function render(value: unknown): string {
   return String(value);
 }
 
+/**
+ * The non-secret field diff an approver reads before deciding. Its own
+ * component so the drawer body stays about the review actions.
+ */
+function ChangeDiffTable({
+  payload,
+  current,
+  fields,
+}: {
+  payload: Record<string, unknown> | null;
+  current: Record<string, unknown> | null;
+  fields: readonly string[];
+}) {
+  if (payload === null) {
+    return <p className="text-sm text-ink-subtle">Unreadable payload.</p>;
+  }
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="border-b border-line text-left text-ink-subtle">
+          <th className="py-2 font-medium">Field</th>
+          <th className="py-2 font-medium">Current</th>
+          <th className="py-2 font-medium">Proposed</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-line">
+        {fields.map((field) => (
+          <tr key={field}>
+            <td className="py-2 pr-3 text-ink-muted">{field}</td>
+            <td className="py-2 pr-3 font-mono text-ink-subtle">
+              {NOT_IN_SNAPSHOT.has(field)
+                ? "not shown"
+                : render(current?.[field])}
+            </td>
+            <td className="py-2 font-mono text-ink">
+              {field in payload ? render(payload[field]) : "unchanged"}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export function ChangeReviewDrawer({
   requestId,
   onClose,
@@ -139,34 +183,11 @@ export function ChangeReviewDrawer({
             <p className="text-sm text-ink-muted">Reason: {request.reason}</p>
           )}
 
-          {payload === null ? (
-            <p className="text-sm text-ink-subtle">Unreadable payload.</p>
-          ) : (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-line text-left text-ink-subtle">
-                  <th className="py-2 font-medium">Field</th>
-                  <th className="py-2 font-medium">Current</th>
-                  <th className="py-2 font-medium">Proposed</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {fields.map((field) => (
-                  <tr key={field}>
-                    <td className="py-2 pr-3 text-ink-muted">{field}</td>
-                    <td className="py-2 pr-3 font-mono text-ink-subtle">
-                      {NOT_IN_SNAPSHOT.has(field)
-                        ? "not shown"
-                        : render(current?.[field])}
-                    </td>
-                    <td className="py-2 font-mono text-ink">
-                      {field in payload ? render(payload[field]) : "unchanged"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <ChangeDiffTable
+            payload={payload}
+            current={current}
+            fields={fields}
+          />
 
           {request.reviewReason && (
             <p className="text-xs text-ink-subtle">
@@ -177,78 +198,111 @@ export function ChangeReviewDrawer({
           {error && <p className="text-sm text-danger">{error}</p>}
 
           {isPending && (
-            <>
-              <div>
-                <label
-                  htmlFor="change-reject-reason"
-                  className="block text-sm font-medium text-ink-muted"
-                >
-                  Rejection reason
-                </label>
-                <textarea
-                  id="change-reject-reason"
-                  data-testid="change-reject-reason"
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  rows={2}
-                  placeholder="Required to reject"
-                  className="mt-1 block w-full rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink placeholder-ink-subtle focus:border-line-strong focus:outline-none"
-                />
-              </div>
-
-              <div className="flex flex-wrap justify-end gap-2 pt-2">
-                {request.canCancel && (
-                  <TerminalButton
-                    type="button"
-                    variant="secondary"
-                    data-testid="change-cancel"
-                    disabled={busy}
-                    onClick={() => void run(() => cancel({ requestId }))}
-                  >
-                    Cancel request
-                  </TerminalButton>
-                )}
-                <TerminalButton
-                  type="button"
-                  variant="secondary"
-                  data-testid="change-reject"
-                  disabled={
-                    busy ||
-                    !request.canApprove ||
-                    rejectReason.trim().length === 0
-                  }
-                  onClick={() =>
-                    void run(() =>
-                      review({
-                        requestId,
-                        decision: "reject",
-                        reason: rejectReason.trim(),
-                      })
-                    )
-                  }
-                >
-                  Reject
-                </TerminalButton>
-                <TerminalButton
-                  type="button"
-                  data-testid="change-approve"
-                  disabled={busy || !request.canApprove || request.isStale}
-                  onClick={() =>
-                    void run(() => review({ requestId, decision: "approve" }))
-                  }
-                >
-                  Approve
-                </TerminalButton>
-              </div>
-              {!request.canApprove && (
-                <p className="text-right text-xs text-ink-subtle">
-                  A second person applies this change.
-                </p>
-              )}
-            </>
+            <ReviewActions
+              busy={busy}
+              canApprove={request.canApprove}
+              canCancel={request.canCancel}
+              isStale={request.isStale}
+              rejectReason={rejectReason}
+              onRejectReasonChange={setRejectReason}
+              onCancel={() => void run(() => cancel({ requestId }))}
+              onReject={() =>
+                void run(() =>
+                  review({
+                    requestId,
+                    decision: "reject",
+                    reason: rejectReason.trim(),
+                  })
+                )
+              }
+              onApprove={() =>
+                void run(() => review({ requestId, decision: "approve" }))
+              }
+            />
           )}
         </div>
       )}
     </DrawerPanel>
+  );
+}
+
+/** Reject reason and the three decisions an approver can take. */
+function ReviewActions({
+  busy,
+  canApprove,
+  canCancel,
+  isStale,
+  rejectReason,
+  onRejectReasonChange,
+  onCancel,
+  onReject,
+  onApprove,
+}: {
+  busy: boolean;
+  canApprove: boolean;
+  canCancel: boolean;
+  isStale: boolean;
+  rejectReason: string;
+  onRejectReasonChange: (value: string) => void;
+  onCancel: () => void;
+  onReject: () => void;
+  onApprove: () => void;
+}) {
+  return (
+    <>
+      <div>
+        <label
+          htmlFor="change-reject-reason"
+          className="block text-sm font-medium text-ink-muted"
+        >
+          Rejection reason
+        </label>
+        <textarea
+          id="change-reject-reason"
+          data-testid="change-reject-reason"
+          value={rejectReason}
+          onChange={(e) => onRejectReasonChange(e.target.value)}
+          rows={2}
+          placeholder="Required to reject"
+          className="mt-1 block w-full rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink placeholder-ink-subtle focus:border-line-strong focus:outline-none"
+        />
+      </div>
+
+      <div className="flex flex-wrap justify-end gap-2 pt-2">
+        {canCancel && (
+          <TerminalButton
+            type="button"
+            variant="secondary"
+            data-testid="change-cancel"
+            disabled={busy}
+            onClick={onCancel}
+          >
+            Cancel request
+          </TerminalButton>
+        )}
+        <TerminalButton
+          type="button"
+          variant="secondary"
+          data-testid="change-reject"
+          disabled={busy || !canApprove || rejectReason.trim().length === 0}
+          onClick={onReject}
+        >
+          Reject
+        </TerminalButton>
+        <TerminalButton
+          type="button"
+          data-testid="change-approve"
+          disabled={busy || !canApprove || isStale}
+          onClick={onApprove}
+        >
+          Approve
+        </TerminalButton>
+      </div>
+      {!canApprove && (
+        <p className="text-right text-xs text-ink-subtle">
+          A second person applies this change.
+        </p>
+      )}
+    </>
   );
 }

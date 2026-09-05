@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { DrawerPanel } from "@/components/ui/drawer-panel";
+import { EnvironmentPicker } from "@/components/environments/environment-picker";
 import {
-  ENVIRONMENTS,
-  envToggleClasses,
-  pickAllowedEnvironments,
-  type Environment,
-} from "@/constants/project";
+  protectionState,
+  resolveEnvironments,
+} from "@/components/environments/selection";
+import { ENVIRONMENTS, type Environment } from "@/constants/project";
 import type { Account } from "@/hooks";
 import { isSafeHttpUrl } from "@/lib/account-payload";
 import type { AccountVaultPayload } from "@/lib/account-payload";
@@ -115,19 +115,14 @@ function AccountForm({
 }: AccountFormProps) {
   const isEditing = !!account;
   const accountId = account?._id;
-  // Names the environment toggle group, which has no single input to label.
-  const environmentsLabelId = useId();
 
   const [name, setName] = useState(account?.name ?? "");
   const [websiteUrl, setWebsiteUrl] = useState(account?.websiteUrl ?? "");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [description, setDescription] = useState(account?.description ?? "");
-  const [environments, setEnvironments] = useState<Environment[]>(() =>
-    pickAllowedEnvironments(
-      (account?.environments as Environment[] | undefined) ?? ["development"],
-      allowedEnvironments
-    )
+  const [environments, setEnvironments] = useState<string[]>(
+    () => account?.environments ?? ["development"]
   );
 
   const [showPassword, setShowPassword] = useState(false);
@@ -182,9 +177,25 @@ function AccountForm({
     };
   }, [accountId]);
 
+  const { options, locked, selected } = resolveEnvironments(
+    environments,
+    allowedEnvironments,
+    account?.environments
+  );
+  const { proposing } = protectionState(
+    selected,
+    account?.environments,
+    protectedEnvironments
+  );
+
+  // Toggling works off the resolved selection, never off raw state: a scope
+  // that narrowed after mount must not resurrect an environment the caller
+  // can no longer write to.
   const toggleEnvironment = (env: Environment) => {
-    setEnvironments((prev) =>
-      prev.includes(env) ? prev.filter((e) => e !== env) : [...prev, env]
+    setEnvironments(
+      selected.includes(env)
+        ? selected.filter((e) => e !== env)
+        : [...selected, env]
     );
   };
 
@@ -196,7 +207,7 @@ function AccountForm({
       setError("Name is required");
       return;
     }
-    if (environments.length === 0) {
+    if (selected.length === 0) {
       setError("At least one environment is required");
       return;
     }
@@ -225,26 +236,13 @@ function AccountForm({
         username: credentialsChanged ? username : "",
         password: credentialsChanged ? password : "",
         description: description.trim(),
-        environments,
+        environments: selected,
         credentialsChanged,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     }
   };
-
-  // The server checks the union of the account's stored environments and the
-  // proposed ones (touchedEnvironments), so removing a protected environment
-  // is still a proposal — union the two here or the UI would say "Save
-  // Changes" for a write the server turns into a request.
-  const touchedEnvironments = new Set([
-    ...((account?.environments as Environment[] | undefined) ?? []),
-    ...environments,
-  ]);
-  const protectedSelected = [...touchedEnvironments].filter((env) =>
-    protectedEnvironments?.includes(env)
-  );
-  const isProposal = protectedSelected.length > 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -290,76 +288,23 @@ function AccountForm({
         />
       </div>
 
-      {/* Username */}
-      <div>
-        <label
-          htmlFor="account-username"
-          className="block text-sm font-medium text-ink-muted"
-        >
-          Username / Email{" "}
-          {!isEditing && <span className="text-danger">*</span>}
-        </label>
-        <input
-          id="account-username"
-          type="text"
-          value={username}
-          onChange={(e) => {
-            setUsername(e.target.value);
-            credentialsDirty.current = true;
-          }}
-          disabled={isPrefilling}
-          placeholder={isPrefilling ? "Loading…" : "user@example.com"}
-          className="mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
-        />
-      </div>
-
-      {/* Password */}
-      <div>
-        <label
-          htmlFor="account-password"
-          className="block text-sm font-medium text-ink-muted"
-        >
-          Password {!isEditing && <span className="text-danger">*</span>}
-        </label>
-        <div className="relative mt-1">
-          <input
-            id="account-password"
-            type={showPassword ? "text" : "password"}
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              credentialsDirty.current = true;
-            }}
-            disabled={isPrefilling}
-            placeholder={isPrefilling ? "Loading…" : "••••••••"}
-            className="block w-full rounded-lg border px-4 py-2 pr-10 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((prev) => !prev)}
-            aria-label={showPassword ? "Hide password" : "Show password"}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-muted hover:text-ink-muted"
-            tabIndex={-1}
-          >
-            {showPassword ? (
-              <EyeOff className="h-5 w-5" />
-            ) : (
-              <Eye className="h-5 w-5" />
-            )}
-          </button>
-        </div>
-        {isEditing && !prefillFailed && (
-          <p className="mt-1 text-xs text-ink-muted">
-            Editing either field rewrites the stored credentials.
-          </p>
-        )}
-        {isEditing && prefillFailed && (
-          <p className="mt-1 text-xs text-warning">
-            Could not load existing credentials. Enter both fields to replace
-            them, or leave blank to keep the current values.
-          </p>
-        )}
-      </div>
+      <CredentialFields
+        username={username}
+        password={password}
+        isEditing={isEditing}
+        isPrefilling={isPrefilling}
+        prefillFailed={prefillFailed}
+        showPassword={showPassword}
+        onToggleShowPassword={() => setShowPassword((prev) => !prev)}
+        onUsernameChange={(next) => {
+          setUsername(next);
+          credentialsDirty.current = true;
+        }}
+        onPasswordChange={(next) => {
+          setPassword(next);
+          credentialsDirty.current = true;
+        }}
+      />
 
       {/* Description */}
       <div>
@@ -379,47 +324,15 @@ function AccountForm({
         />
       </div>
 
-      {/* Environments */}
-      <div>
-        {/* A span, not a <label>: this names the toggle group below, not one
-            input. */}
-        <span
-          id={environmentsLabelId}
-          className="block text-sm font-medium text-ink-muted"
-        >
-          Environments <span className="text-danger">*</span>
-        </span>
-        <div
-          role="group"
-          aria-labelledby={environmentsLabelId}
-          className="mt-2 flex flex-wrap gap-2"
-        >
-          {allowedEnvironments.map((env) => (
-            <button
-              key={env}
-              type="button"
-              onClick={() => toggleEnvironment(env as Environment)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${envToggleClasses(
-                env as Environment,
-                environments.includes(env as Environment)
-              )}`}
-            >
-              {env}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {isProposal && (
-        <p
-          data-testid="account-protected-note"
-          className="text-xs text-warning"
-        >
-          {protectedSelected.join(", ")}{" "}
-          {protectedSelected.length > 1 ? "are" : "is"} protected. A second
-          person applies this change.
-        </p>
-      )}
+      <EnvironmentPicker
+        allowedEnvironments={options}
+        lockedEnvironments={locked}
+        selected={selected}
+        onToggle={toggleEnvironment}
+        protectedEnvironments={protectedEnvironments}
+        existingEnvironments={account?.environments}
+        testIdPrefix="account"
+      />
 
       {/* Actions */}
       <div className="flex justify-end gap-3 pt-4">
@@ -440,12 +353,107 @@ function AccountForm({
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {isSubmitting
             ? "Saving…"
-            : isProposal
+            : proposing
               ? "Propose change"
               : (submitLabel ??
                 (isEditing ? "Save Changes" : "Create Account"))}
         </button>
       </div>
     </form>
+  );
+}
+
+const credentialInputClasses =
+  "mt-1 block w-full rounded-lg border px-4 py-2 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface";
+
+/**
+ * Username and password, with the reveal toggle and the edit-mode guidance.
+ * Both fields are disabled until the vault prefill settles, so an edit never
+ * looks writable while it is still loading.
+ */
+function CredentialFields({
+  username,
+  password,
+  isEditing,
+  isPrefilling,
+  prefillFailed,
+  showPassword,
+  onToggleShowPassword,
+  onUsernameChange,
+  onPasswordChange,
+}: {
+  username: string;
+  password: string;
+  isEditing: boolean;
+  isPrefilling: boolean;
+  prefillFailed: boolean;
+  showPassword: boolean;
+  onToggleShowPassword: () => void;
+  onUsernameChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+}) {
+  const required = isEditing ? null : <span className="text-danger">*</span>;
+  return (
+    <>
+      <div>
+        <label
+          htmlFor="account-username"
+          className="block text-sm font-medium text-ink-muted"
+        >
+          Username / Email {required}
+        </label>
+        <input
+          id="account-username"
+          type="text"
+          value={username}
+          onChange={(e) => onUsernameChange(e.target.value)}
+          disabled={isPrefilling}
+          placeholder={isPrefilling ? "Loading…" : "user@example.com"}
+          className={credentialInputClasses}
+        />
+      </div>
+
+      <div>
+        <label
+          htmlFor="account-password"
+          className="block text-sm font-medium text-ink-muted"
+        >
+          Password {required}
+        </label>
+        <div className="relative mt-1">
+          <input
+            id="account-password"
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => onPasswordChange(e.target.value)}
+            disabled={isPrefilling}
+            placeholder={isPrefilling ? "Loading…" : "••••••••"}
+            className="block w-full rounded-lg border px-4 py-2 pr-10 font-mono text-sm focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong border-line bg-surface-raised text-ink placeholder-ink-subtle disabled:bg-surface"
+          />
+          <button
+            type="button"
+            onClick={onToggleShowPassword}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-muted hover:text-ink-muted"
+            tabIndex={-1}
+          >
+            {showPassword ? (
+              <EyeOff className="h-5 w-5" />
+            ) : (
+              <Eye className="h-5 w-5" />
+            )}
+          </button>
+        </div>
+        {isEditing && (
+          <p
+            className={`mt-1 text-xs ${prefillFailed ? "text-warning" : "text-ink-muted"}`}
+          >
+            {prefillFailed
+              ? "Could not load existing credentials. Enter both fields to replace them, or leave blank to keep the current values."
+              : "Editing either field rewrites the stored credentials."}
+          </p>
+        )}
+      </div>
+    </>
   );
 }

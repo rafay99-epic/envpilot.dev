@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, useId } from "react";
+import { useState, useRef, useEffect } from "react";
+import { X } from "lucide-react";
+import { ENVIRONMENTS, type Environment } from "@/constants/project";
+import { EnvironmentPicker } from "@/components/environments/environment-picker";
 import {
-  ENVIRONMENTS,
-  type Environment,
-  envToggleClasses,
-  pickAllowedEnvironments,
-} from "@/constants/project";
+  protectionState,
+  resolveEnvironments,
+} from "@/components/environments/selection";
 import {
   parseEnvFile,
   type ParsedEnvEntry,
@@ -48,13 +49,10 @@ export function BulkPasteForm({
   protectedEnvironments,
   allowedEnvironments = ENVIRONMENTS,
 }: BulkPasteFormProps) {
-  const environmentsLabelId = useId();
   const [rawText, setRawText] = useState("");
   const [entries, setEntries] = useState<ParsedEnvEntry[]>([]);
   const [errors, setErrors] = useState<EnvParseError[]>([]);
-  const [environments, setEnvironments] = useState<Environment[]>(() =>
-    pickAllowedEnvironments(["development"], allowedEnvironments)
-  );
+  const [environments, setEnvironments] = useState<string[]>(["development"]);
   const [isSensitive, setIsSensitive] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,9 +94,14 @@ export function BulkPasteForm({
     }, 300);
   }
 
+  // Toggling works off the resolved selection, never off raw state: a scope
+  // that narrowed after mount must not resurrect an environment the caller
+  // can no longer write to.
   function handleEnvironmentToggle(env: Environment) {
-    setEnvironments((prev) =>
-      prev.includes(env) ? prev.filter((e) => e !== env) : [...prev, env]
+    setEnvironments(
+      selected.includes(env)
+        ? selected.filter((e) => e !== env)
+        : [...selected, env]
     );
   }
 
@@ -106,11 +109,16 @@ export function BulkPasteForm({
     setEntries((prev) => prev.filter((e) => e.key !== key));
   }
 
-  const protectedSelected = environments.filter((env) =>
-    protectedEnvironments?.includes(env)
+  const { options, selected } = resolveEnvironments(
+    environments,
+    allowedEnvironments
   );
-  const isProposal = protectedSelected.length > 0;
-  const effectiveSubmitLabel = isProposal ? "Propose All" : submitLabel;
+  const { proposing } = protectionState(
+    selected,
+    undefined,
+    protectedEnvironments
+  );
+  const effectiveSubmitLabel = proposing ? "Propose All" : submitLabel;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -121,7 +129,7 @@ export function BulkPasteForm({
       return;
     }
 
-    if (environments.length === 0) {
+    if (selected.length === 0) {
       setSubmitError("Select at least one environment");
       return;
     }
@@ -140,7 +148,7 @@ export function BulkPasteForm({
       key: entry.key,
       value: entry.value,
       description: "",
-      environments,
+      environments: selected,
       isSensitive,
       tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
     }));
@@ -183,79 +191,22 @@ export function BulkPasteForm({
           disabled={isSubmitting}
         />
         {rawText.trim() && (
-          <p className="mt-1 text-xs text-ink-muted">
-            {entries.length} variable{entries.length !== 1 ? "s" : ""} parsed
-            {errors.length > 0 && (
-              <span className="text-warning">
-                {" "}
-                · {errors.length} error{errors.length !== 1 ? "s" : ""}
-              </span>
-            )}
-          </p>
+          <ParseCounts entries={entries.length} errors={errors.length} />
         )}
       </div>
 
-      {/* Parse errors */}
-      {errors.length > 0 && (
-        <div className="rounded-lg border p-3 border-warning-line bg-warning-soft">
-          <p className="text-xs font-medium text-warning">Parse warnings:</p>
-          <ul className="mt-1 space-y-0.5">
-            {errors.slice(0, 5).map((err) => (
-              <li
-                key={`${err.line}-${err.reason}`}
-                className="text-xs text-warning"
-              >
-                Line {err.line}: {err.reason}
-              </li>
-            ))}
-            {errors.length > 5 && (
-              <li className="text-xs text-warning">
-                ...and {errors.length - 5} more
-              </li>
-            )}
-          </ul>
-        </div>
-      )}
+      <ParseWarnings errors={errors} />
 
-      {/* Environments */}
-      <div>
-        <div
-          id={environmentsLabelId}
-          className="block text-sm font-medium text-ink-muted"
-        >
-          Environments <span className="text-danger">*</span>
-        </div>
-        <p className="mt-0.5 text-xs text-ink-muted">
-          Applied to all variables
-        </p>
-        <div
-          role="group"
-          aria-labelledby={environmentsLabelId}
-          className="mt-2 flex flex-wrap gap-2"
-        >
-          {allowedEnvironments.map((env) => (
-            <button
-              key={env}
-              type="button"
-              onClick={() => handleEnvironmentToggle(env as Environment)}
-              disabled={isSubmitting}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${envToggleClasses(env as Environment, environments.includes(env as Environment))}`}
-            >
-              {env}
-            </button>
-          ))}
-        </div>
-        {isProposal && (
-          <p
-            data-testid="bulk-protected-note"
-            className="mt-1.5 text-xs text-warning"
-          >
-            {protectedSelected.join(", ")}{" "}
-            {protectedSelected.length > 1 ? "are" : "is"} protected. These will
-            be filed for approval instead of created directly.
-          </p>
-        )}
-      </div>
+      <EnvironmentPicker
+        allowedEnvironments={options}
+        selected={selected}
+        onToggle={handleEnvironmentToggle}
+        protectedEnvironments={protectedEnvironments}
+        disabled={isSubmitting}
+        testIdPrefix="bulk"
+        description="Applied to all variables"
+        noteSuffix="These will be filed for approval instead of created directly."
+      />
 
       {/* Sensitive toggle */}
       <div>
@@ -285,7 +236,6 @@ export function BulkPasteForm({
         />
       )}
 
-      {/* Preview list */}
       {entries.length > 0 && (
         <div>
           <p className="block text-sm font-medium text-ink-muted">
@@ -293,71 +243,20 @@ export function BulkPasteForm({
           </p>
           <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2 border-line">
             {entries.map((entry) => (
-              <div
+              <EntryPreview
                 key={entry.key}
-                className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-surface-hover"
-              >
-                <div className="min-w-0 flex-1">
-                  <span className="font-mono font-medium text-ink">
-                    {entry.key}
-                  </span>
-                  <span className="mx-1.5 text-ink-muted">=</span>
-                  <span className="truncate font-mono text-ink-muted">
-                    {isSensitive
-                      ? "••••••••"
-                      : entry.value.length > 40
-                        ? entry.value.slice(0, 40) + "..."
-                        : entry.value}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveEntry(entry.key)}
-                  disabled={isSubmitting}
-                  aria-label={`Remove ${entry.key}`}
-                  className="ml-2 shrink-0 rounded p-1 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
-                >
-                  <svg
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
+                entry={entry}
+                masked={isSensitive}
+                disabled={isSubmitting}
+                onRemove={() => handleRemoveEntry(entry.key)}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {/* Progress */}
       {progress && (
-        <div className="rounded-lg border p-3 border-line bg-surface-raised">
-          <div className="flex items-center gap-2">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-line" />
-            <span className="text-sm text-ink-muted">
-              {isProposal ? "Proposing" : "Creating"} {progress.completed}/
-              {progress.total}...
-            </span>
-          </div>
-          {progress.failures.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {progress.failures.map((f) => (
-                <p key={f.key} className="text-xs text-danger">
-                  {f.key}: {f.error}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
+        <SubmitProgressPanel progress={progress} proposing={proposing} />
       )}
 
       {/* Actions */}
@@ -376,10 +275,116 @@ export function BulkPasteForm({
           className="rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-ink text-ink-inverse hover:bg-ink-muted"
         >
           {isSubmitting
-            ? `${isProposal ? "Proposing" : "Creating"} ${progress?.completed ?? 0}/${progress?.total ?? 0}...`
+            ? `${proposing ? "Proposing" : "Creating"} ${progress?.completed ?? 0}/${progress?.total ?? 0}...`
             : `${effectiveSubmitLabel} (${entries.length})`}
         </button>
       </div>
     </form>
+  );
+}
+
+/** Parse warnings from the pasted block, capped at five lines. */
+function ParseWarnings({ errors }: { errors: readonly EnvParseError[] }) {
+  if (errors.length === 0) return null;
+  return (
+    <div className="rounded-lg border p-3 border-warning-line bg-warning-soft">
+      <p className="text-xs font-medium text-warning">Parse warnings:</p>
+      <ul className="mt-1 space-y-0.5">
+        {errors.slice(0, 5).map((err) => (
+          <li
+            key={`${err.line}-${err.reason}`}
+            className="text-xs text-warning"
+          >
+            Line {err.line}: {err.reason}
+          </li>
+        ))}
+        {errors.length > 5 && (
+          <li className="text-xs text-warning">
+            ...and {errors.length - 5} more
+          </li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
+/** One parsed row in the preview, with its remove button. */
+function EntryPreview({
+  entry,
+  masked,
+  disabled,
+  onRemove,
+}: {
+  entry: ParsedEnvEntry;
+  masked: boolean;
+  disabled: boolean;
+  onRemove: () => void;
+}) {
+  const preview =
+    entry.value.length > 40 ? entry.value.slice(0, 40) + "..." : entry.value;
+  return (
+    <div className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-surface-hover">
+      <div className="min-w-0 flex-1">
+        <span className="font-mono font-medium text-ink">{entry.key}</span>
+        <span className="mx-1.5 text-ink-muted">=</span>
+        <span className="truncate font-mono text-ink-muted">
+          {masked ? "••••••••" : preview}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={disabled}
+        aria-label={`Remove ${entry.key}`}
+        className="ml-2 shrink-0 rounded p-1 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
+      >
+        <X aria-hidden="true" className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+/** "12 variables parsed · 1 error" under the paste box. */
+function ParseCounts({ entries, errors }: { entries: number; errors: number }) {
+  return (
+    <p className="mt-1 text-xs text-ink-muted">
+      {entries} variable{entries !== 1 ? "s" : ""} parsed
+      {errors > 0 && (
+        <span className="text-warning">
+          {" "}
+          · {errors} error{errors !== 1 ? "s" : ""}
+        </span>
+      )}
+    </p>
+  );
+}
+
+/** Live progress while the entries are written one at a time. */
+function SubmitProgressPanel({
+  progress,
+  proposing,
+}: {
+  progress: SubmitProgress;
+  proposing: boolean;
+}) {
+  return (
+    <div className="rounded-lg border p-3 border-line bg-surface-raised">
+      <div className="flex items-center gap-2">
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-line" />
+        <span className="text-sm text-ink-muted">
+          {proposing ? "Proposing" : "Creating"} {progress.completed}/
+          {progress.total}...
+        </span>
+      </div>
+      {progress.failures.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {progress.failures.map((f) => (
+            <p key={f.key} className="text-xs text-danger">
+              {f.key}: {f.error}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

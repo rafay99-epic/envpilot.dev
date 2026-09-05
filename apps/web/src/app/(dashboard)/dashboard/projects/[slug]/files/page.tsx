@@ -170,9 +170,10 @@ export default function ProjectFilesPage({ params }: FilesPageProps) {
       // The submit button already reads "Propose change" when a protected
       // environment is selected, so the click IS the confirmation; without
       // the flag the action refuses with PROTECTED_ENVIRONMENT.
+      const protectedEnvironments = new Set(protection?.environments ?? []);
       const result: unknown = await uploadFile({
         request: data.environments.some((env) =>
-          protection?.environments.includes(env)
+          protectedEnvironments.has(env)
         ),
         projectId,
         name: data.name,

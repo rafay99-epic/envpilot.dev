@@ -16,7 +16,9 @@ import type { Doc } from "@convex/_generated/dataModel";
 const BILLING_HREF = "/dashboard/settings?tab=billing";
 
 function sameSet(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((env) => b.includes(env));
+  if (a.length !== b.length) return false;
+  const other = new Set(b);
+  return a.every((env) => other.has(env));
 }
 
 /**
