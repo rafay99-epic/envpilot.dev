@@ -1,0 +1,23 @@
+apps/web/src/components/settings/org/SharedVariables.tsx
+  s_907ffcf933f32f::t_408cab0af4a09d 19-24
+  s_907ffcf933f32f::t_18b19c4779be5e 7-8,56,85-90,111-117
+apps/web/src/components/settings/org/SharedGroupRow.tsx
+  s_907ffcf933f32f::t_18b19c4779be5e 1-10,12-156
+  s_907ffcf933f32f::t_408cab0af4a09d 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "9d7d03626690c293a1172a1bee5a544180b828b5",
+  "prompts": {},
+  "sessions": {
+    "s_907ffcf933f32f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0837503-b2fa-4f7d-8244-7a3ebcd5dd60",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
