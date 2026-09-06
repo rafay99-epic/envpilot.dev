@@ -2,14 +2,10 @@
 
 import { useState } from "react";
 import { useMutation } from "convex/react";
-import { Check, Pencil, Trash2, X } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { SettingsRow, SettingsSection } from "@envpilot/ui";
-import {
-  TerminalInput,
-  TerminalLoading,
-} from "@/components/dashboard/terminal-ui";
+import { SettingsSection } from "@envpilot/ui";
+import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { ConfirmDialog } from "@/components/ui";
 import { MergeSheet } from "@/components/workspaces";
 import {
@@ -20,11 +16,12 @@ import {
   type DuplicateGroup,
 } from "@/hooks";
 import { sanitizeConvexError } from "@/lib/error-messages";
-
-type SharedGroup = ReturnType<typeof useSharedGroups>["groups"][number];
-
-const PILL =
-  "rounded-full border border-line bg-surface-raised px-2 py-0.5 text-xs text-ink-muted";
+import {
+  GroupRow,
+  PILL,
+  SharingSwitch,
+  type SharedGroup,
+} from "./SharedGroupRow";
 
 export function SharedVariablesTab({
   organizationId,
@@ -44,8 +41,6 @@ export function SharedVariablesTab({
   const renameGroup = useMutation(api.features.projects.mutations.update);
   const removeGroup = useMutation(api.features.projects.mutations.remove);
 
-  const [editingId, setEditingId] = useState<Id<"projects"> | null>(null);
-  const [draftName, setDraftName] = useState("");
   const [pendingDelete, setPendingDelete] = useState<SharedGroup | null>(null);
   const [merging, setMerging] = useState<DuplicateGroup[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,21 +53,9 @@ export function SharedVariablesTab({
     }
   };
 
-  const startRename = (group: SharedGroup) => {
-    setEditingId(group._id);
-    setDraftName(group.name);
-    setError(null);
-  };
-
-  const saveRename = async (group: SharedGroup) => {
-    const name = draftName.trim();
-    if (!name || name === group.name) {
-      setEditingId(null);
-      return;
-    }
+  const rename = async (group: SharedGroup, name: string) => {
     try {
       await renameGroup({ projectId: group._id, name });
-      setEditingId(null);
     } catch (err) {
       setError(sanitizeConvexError(err));
     }
@@ -99,41 +82,12 @@ export function SharedVariablesTab({
       >
         {error && <p className="font-mono text-[12px] text-danger">{error}</p>}
 
-        <SettingsRow
-          label="Share variables across projects"
-          description={
-            groups.length === 0
-              ? "One row read by several projects. Turning this off stops new sharing."
-              : `One row read by several projects. Turning this off stops new sharing; the ${groups.length} ${groups.length === 1 ? "group" : "groups"} you have keep working.`
-          }
-          control={
-            <div className="flex items-center gap-2">
-              {!allowed && (
-                <span className="text-[12px] text-ink-subtle">
-                  Not available on this plan
-                </span>
-              )}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={enabled}
-                aria-label="Share variables across projects"
-                disabled={!canToggle || !allowed}
-                onClick={toggleSharing}
-                className={`flex h-5 w-9 items-center border disabled:opacity-40 ${
-                  enabled ? "border-accent" : "border-line"
-                }`}
-              >
-                <span
-                  className={`block h-3.5 w-3.5 ${
-                    enabled
-                      ? "translate-x-4 bg-accent"
-                      : "translate-x-0.5 bg-ink-subtle"
-                  }`}
-                />
-              </button>
-            </div>
-          }
+        <SharingSwitch
+          groupCount={groups.length}
+          allowed={allowed}
+          enabled={enabled}
+          canToggle={canToggle}
+          onToggle={toggleSharing}
         />
 
         {!enabled && (
@@ -154,81 +108,13 @@ export function SharedVariablesTab({
         ) : (
           <div className="divide-y divide-line border-t border-line">
             {groups.map((group) => (
-              <div key={group._id} className="flex items-start gap-3 py-3">
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  {editingId === group._id ? (
-                    <div className="flex items-center gap-2">
-                      <TerminalInput
-                        type="text"
-                        value={draftName}
-                        onChange={(e) => setDraftName(e.target.value)}
-                        aria-label={`Rename ${group.name}`}
-                        className="min-w-40 flex-1"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            saveRename(group);
-                          }
-                          if (e.key === "Escape") setEditingId(null);
-                        }}
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => saveRename(group)}
-                        disabled={!draftName.trim()}
-                        title="Save name"
-                        className="rounded-panel p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-accent disabled:opacity-50"
-                      >
-                        <Check className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setEditingId(null)}
-                        title="Cancel"
-                        className="rounded-panel p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-ink"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-sm font-medium text-ink">
-                        {group.name}
-                      </span>
-                      <span className={PILL}>
-                        {group.keys.length} variable
-                        {group.keys.length === 1 ? "" : "s"}
-                      </span>
-                      <span className={PILL}>
-                        {group.projects.length} project
-                        {group.projects.length === 1 ? "" : "s"}
-                      </span>
-                    </div>
-                  )}
-                  {group.keys.length > 0 && (
-                    <p className="truncate font-mono text-xs text-ink-muted">
-                      {group.keys.join(", ")}
-                    </p>
-                  )}
-                </div>
-                {isOwner && editingId !== group._id && (
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => startRename(group)}
-                      title={`Rename ${group.name}`}
-                      className="rounded-panel p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-accent"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => setPendingDelete(group)}
-                      title={`Delete ${group.name}`}
-                      className="rounded-panel p-1.5 text-ink-subtle hover:bg-surface-hover hover:text-danger"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
+              <GroupRow
+                key={group._id}
+                group={group}
+                canManage={isOwner}
+                onRename={(name) => rename(group, name)}
+                onDelete={() => setPendingDelete(group)}
+              />
             ))}
           </div>
         )}
