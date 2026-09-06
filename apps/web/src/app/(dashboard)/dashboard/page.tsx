@@ -104,12 +104,10 @@ export default function DashboardPage() {
         }
       />
 
-      {organization.slug && (
-        <DuplicateKeysBanner
-          organizationId={activeOrganizationId}
-          orgSlug={organization.slug}
-        />
-      )}
+      <DuplicateKeysBanner
+        organizationId={activeOrganizationId}
+        orgSlug={organization.slug}
+      />
 
       {/* Stats as terminal output */}
       <TerminalWindow title="system-status">
@@ -338,7 +336,7 @@ function DuplicateKeysBanner({
   orgSlug,
 }: {
   organizationId: Id<"organizations"> | undefined;
-  orgSlug: string;
+  orgSlug: string | null | undefined;
 }) {
   const duplicates = useDuplicateKeysForOrganization(organizationId);
   const storageKey = `envpilot.duplicates-banner.${organizationId}`;
@@ -348,7 +346,7 @@ function DuplicateKeysBanner({
     () => true
   );
 
-  if (dismissed || duplicates.length === 0) return null;
+  if (!orgSlug || dismissed || duplicates.length === 0) return null;
 
   const projectCount = new Set(duplicates.flatMap((row) => row.projectIds))
     .size;

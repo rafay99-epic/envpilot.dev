@@ -166,24 +166,27 @@ export function VariableListItem({
 
         <RowActions
           variable={variable}
-          onReveal={onReveal}
-          isRevealing={isRevealing}
-          isValueVisible={isValueVisible}
+          revealState={
+            isRevealing
+              ? "revealing"
+              : isValueVisible && revealedValue
+                ? "shown"
+                : "hidden"
+          }
           revealedValue={revealedValue}
           copied={copied}
-          onToggleReveal={handleToggleReveal}
+          onToggleReveal={onReveal ? handleToggleReveal : undefined}
           onCopy={handleCopy}
           onShare={onShare}
           activeShareCount={activeShareCount}
           onShareAcross={onShareAcross}
           onViewHistory={onViewHistory}
-          canManagePermissions={canManagePermissions}
-          onManagePermissions={onManagePermissions}
+          onManagePermissions={
+            canManagePermissions ? onManagePermissions : undefined
+          }
           readOnlyLabel={readOnlyLabel}
-          canEdit={canEdit}
-          onEdit={onEdit}
-          canDelete={canDelete}
-          onDelete={onDelete}
+          onEdit={!readOnlyLabel && canEdit ? onEdit : undefined}
+          onDelete={!readOnlyLabel && canDelete ? onDelete : undefined}
         />
       </div>
 
@@ -199,35 +202,32 @@ export function VariableListItem({
   );
 }
 
+type RevealState = "revealing" | "shown" | "hidden";
+
 type RowActionsProps = Pick<
   VariableListItemProps,
   | "variable"
-  | "onReveal"
-  | "isRevealing"
   | "revealedValue"
   | "onShare"
   | "activeShareCount"
   | "onShareAcross"
   | "onViewHistory"
-  | "canManagePermissions"
   | "onManagePermissions"
   | "readOnlyLabel"
-  | "canEdit"
   | "onEdit"
-  | "canDelete"
   | "onDelete"
 > & {
-  isValueVisible: boolean;
+  revealState: RevealState;
   copied: boolean;
-  onToggleReveal: () => void;
+  onToggleReveal: (() => void) | undefined;
   onCopy: () => void;
 };
 
+// Each callback is only passed when the action is allowed, so this renders
+// what it is given and never re-derives permissions.
 function RowActions({
   variable,
-  onReveal,
-  isRevealing,
-  isValueVisible,
+  revealState,
   revealedValue,
   copied,
   onToggleReveal,
@@ -236,47 +236,20 @@ function RowActions({
   activeShareCount,
   onShareAcross,
   onViewHistory,
-  canManagePermissions,
   onManagePermissions,
   readOnlyLabel,
-  canEdit,
   onEdit,
-  canDelete,
   onDelete,
 }: RowActionsProps) {
   return (
     <div className="flex items-center gap-1">
-      {onReveal && (
-        <button
-          onClick={onToggleReveal}
-          disabled={isRevealing}
-          className="rounded-lg p-2 text-ink-muted disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
-          title={
-            isValueVisible && revealedValue ? "Hide value" : "Reveal value"
-          }
-        >
-          {isRevealing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : isValueVisible && revealedValue ? (
-            <EyeOff className="h-4 w-4" />
-          ) : (
-            <Eye className="h-4 w-4" />
-          )}
-        </button>
-      )}
-      {revealedValue && (
-        <button
-          onClick={onCopy}
-          className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
-          title={copied ? "Copied!" : "Copy key=value"}
-        >
-          {copied ? (
-            <Check className="h-4 w-4 text-accent" />
-          ) : (
-            <Copy className="h-4 w-4" />
-          )}
-        </button>
-      )}
+      <RevealActions
+        revealState={revealState}
+        revealedValue={revealedValue}
+        copied={copied}
+        onToggleReveal={onToggleReveal}
+        onCopy={onCopy}
+      />
       {onShare && (
         <button
           onClick={onShare}
@@ -320,7 +293,7 @@ function RowActions({
           </svg>
         </button>
       )}
-      {canManagePermissions && onManagePermissions && (
+      {onManagePermissions && (
         <button
           onClick={onManagePermissions}
           className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
@@ -344,7 +317,7 @@ function RowActions({
       {readOnlyLabel && (
         <span className="px-2 text-xs text-ink-subtle">{readOnlyLabel}</span>
       )}
-      {!readOnlyLabel && canEdit && onEdit && (
+      {onEdit && (
         <button
           onClick={onEdit}
           className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
@@ -365,7 +338,7 @@ function RowActions({
           </svg>
         </button>
       )}
-      {!readOnlyLabel && canDelete && onDelete && (
+      {onDelete && (
         <button
           onClick={onDelete}
           className="rounded-lg p-2 text-ink-muted hover:bg-danger-soft hover:text-danger"
@@ -387,5 +360,50 @@ function RowActions({
         </button>
       )}
     </div>
+  );
+}
+
+function RevealActions({
+  revealState,
+  revealedValue,
+  copied,
+  onToggleReveal,
+  onCopy,
+}: Pick<
+  RowActionsProps,
+  "revealState" | "revealedValue" | "copied" | "onToggleReveal" | "onCopy"
+>) {
+  return (
+    <>
+      {onToggleReveal && (
+        <button
+          onClick={onToggleReveal}
+          disabled={revealState === "revealing"}
+          className="rounded-lg p-2 text-ink-muted disabled:opacity-50 hover:bg-surface-hover hover:text-ink-muted"
+          title={revealState === "shown" ? "Hide value" : "Reveal value"}
+        >
+          {revealState === "revealing" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : revealState === "shown" ? (
+            <EyeOff className="h-4 w-4" />
+          ) : (
+            <Eye className="h-4 w-4" />
+          )}
+        </button>
+      )}
+      {revealedValue && (
+        <button
+          onClick={onCopy}
+          className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
+          title={copied ? "Copied!" : "Copy key=value"}
+        >
+          {copied ? (
+            <Check className="h-4 w-4 text-accent" />
+          ) : (
+            <Copy className="h-4 w-4" />
+          )}
+        </button>
+      )}
+    </>
   );
 }
