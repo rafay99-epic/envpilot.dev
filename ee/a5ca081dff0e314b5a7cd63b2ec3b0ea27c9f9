@@ -1,0 +1,49 @@
+convex/features/variables/resolve.ts
+  s_907ffcf933f32f::t_c37e68e8b77c8f 69-72,105-107,122
+convex/features/variables/helpers.ts
+  s_907ffcf933f32f::t_c37e68e8b77c8f 448-449,464
+apps/web/src/components/workspaces/share-sheet.tsx
+  s_907ffcf933f32f::t_12d8b2761d6437 64-67,232-242,253
+convex/features/variables/mutations.ts
+  s_907ffcf933f32f::t_c37e68e8b77c8f 23,158-160,534,1224
+convex/features/ide/queries.ts
+  s_907ffcf933f32f::t_c37e68e8b77c8f 29-31
+convex/lib/audit.ts
+  s_907ffcf933f32f::t_58af846486f034 63-66,151-154
+convex/features/projects/mutations.ts
+  s_907ffcf933f32f::t_c37e68e8b77c8f 446,450
+  s_907ffcf933f32f::t_58af846486f034 11,447-449
+convex/features/dashboard/dashboard.ts
+  s_907ffcf933f32f::t_58af846486f034 5-8,49-54
+apps/web/src/app/(dashboard)/dashboard/page.tsx
+  s_907ffcf933f32f::t_58af846486f034 518-521
+convex/features/projects/queries.ts
+  s_907ffcf933f32f::t_c37e68e8b77c8f 93
+convex/features/variables/queries.ts
+  s_907ffcf933f32f::t_c37e68e8b77c8f 62-65,68-78,581-583,594-604,897-900,908
+apps/web/src/app/(dashboard)/dashboard/audit/page.tsx
+  s_907ffcf933f32f::t_58af846486f034 60-63
+convex/features/workspaces/queries.ts
+  s_907ffcf933f32f::t_58af846486f034 185-186,200
+apps/web/src/components/variables/variable-list-item.tsx
+  s_907ffcf933f32f::t_1505808265d9bd 167-187,201-388
+  s_907ffcf933f32f::t_8b06eb4b256b5c 389-391
+apps/web/src/components/workspaces/scope-dialog.tsx
+  s_907ffcf933f32f::t_12d8b2761d6437 41,45-54,69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "eea5ca081dff0e314b5a7cd63b2ec3b0ea27c9f9",
+  "prompts": {},
+  "sessions": {
+    "s_907ffcf933f32f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0837503-b2fa-4f7d-8244-7a3ebcd5dd60",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
