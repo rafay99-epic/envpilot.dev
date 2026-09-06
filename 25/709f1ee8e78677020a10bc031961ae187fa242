@@ -1,0 +1,67 @@
+convex/features/workspaces/share.ts
+  s_907ffcf933f32f::t_c59cd732a41d33 21,137-147,301-307,316,380,392,419,427,452,457-473,484,495,523
+convex/features/workspaces/mutations.ts
+  s_907ffcf933f32f::t_c59cd732a41d33 83-84,133
+convex/features/projects/mutations.ts
+  s_907ffcf933f32f::t_df2d9fbfdead44 12,452-459
+  s_907ffcf933f32f::t_e57304e977bc2f 460
+convex/features/variables/mutations.ts
+  s_907ffcf933f32f::t_c59cd732a41d33 413-415,746,749
+convex/lib/authz.ts
+  s_907ffcf933f32f::t_df2d9fbfdead44 578,582,587-596,909-912
+apps/web/src/app/(dashboard)/dashboard/page.tsx
+  s_907ffcf933f32f::t_a22384a60a35de 341-344
+apps/web/src/app/(dashboard)/organizations/[slug]/settings/page.tsx
+  s_907ffcf933f32f::t_a22384a60a35de 41-44,86
+apps/web/src/components/settings/org/SharedVariables.tsx
+  s_907ffcf933f32f::t_a22384a60a35de 24,27,68,146
+apps/web/src/components/workspaces/scope-dialog.tsx
+  s_907ffcf933f32f::t_a22384a60a35de 51,66-72
+apps/web/src/components/workspaces/shared-row-dialogs.tsx
+  s_907ffcf933f32f::t_a22384a60a35de 83,110,124
+  s_907ffcf933f32f::t_efbdc3a299fad6 111-112
+apps/web/src/settings/org.tabs.tsx
+  s_907ffcf933f32f::t_efbdc3a299fad6 64-66
+  s_907ffcf933f32f::t_a22384a60a35de 25,39,62
+convex/lib/projectKind.ts
+  s_907ffcf933f32f::t_df2d9fbfdead44 78-84
+apps/docs/content/dashboard/project.mdx
+  s_907ffcf933f32f::t_a22384a60a35de 46
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_907ffcf933f32f::t_a22384a60a35de 119-120
+  s_907ffcf933f32f::t_efbdc3a299fad6 216-218
+  s_907ffcf933f32f::t_9b3bde7f11380d 115-118
+convex/features/projects/protection.ts
+  s_907ffcf933f32f::t_c59cd732a41d33 13,54-57
+  s_907ffcf933f32f::t_94ad35aa4241ff 58
+apps/web/src/components/workspaces/shared-block.tsx
+  s_907ffcf933f32f::t_a22384a60a35de 83,105-108,189
+convex/features/workspaces/adopt.ts
+  s_907ffcf933f32f::t_df2d9fbfdead44 26-27,54
+apps/web/tests/e2e/authenticated/shared-variables.spec.ts
+  s_907ffcf933f32f::t_efbdc3a299fad6 60-73,110-123
+convex/lib/audit.ts
+  s_907ffcf933f32f::t_c59cd732a41d33 583-587
+convex/features/projects/deletion.ts
+  s_907ffcf933f32f::t_c59cd732a41d33 11,260-263
+convex/features/variables/queries.ts
+  s_907ffcf933f32f::t_c59cd732a41d33 63-68,81,86-88,898-906,1331-1342
+convex/features/workspaces/queries.ts
+  s_907ffcf933f32f::t_c59cd732a41d33 10,187-204,218-219,226,245-246,256,279-281
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "25709f1ee8e78677020a10bc031961ae187fa242",
+  "prompts": {},
+  "sessions": {
+    "s_907ffcf933f32f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0837503-b2fa-4f7d-8244-7a3ebcd5dd60",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
