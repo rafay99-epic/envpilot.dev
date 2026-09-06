@@ -49,7 +49,12 @@ export function useDuplicateKeys(projectId: Id<"projects"> | undefined) {
     api.features.workspaces.queries.duplicateKeys,
     projectId ? { projectId } : "skip"
   );
-  return new Map((rows ?? []).map((row) => [row.key, row.others]));
+  return new Map(
+    (rows ?? []).map((row) => [
+      row.key,
+      { others: row.others, verified: row.verified },
+    ])
+  );
 }
 
 export function useDuplicateKeysForOrganization(
@@ -61,6 +66,29 @@ export function useDuplicateKeysForOrganization(
       organizationId ? { organizationId } : "skip"
     ) ?? []
   );
+}
+
+/** Tier ceiling, the org switch, and whether the caller may flip it. */
+export function useSharingStatus(
+  organizationId: Id<"organizations"> | undefined
+) {
+  return (
+    useQuery(
+      api.features.workspaces.enabled.status,
+      organizationId ? { organizationId } : "skip"
+    ) ?? { allowed: false, enabled: false, canToggle: false }
+  );
+}
+
+export type DuplicateGroup = ReturnType<
+  typeof useDuplicateKeysForOrganization
+>[number];
+
+export function useMergeActions() {
+  return {
+    setSharingEnabled: useMutation(api.features.workspaces.enabled.setEnabled),
+    mergeMany: useAction(api.features.workspaces.merge.mergeMany),
+  };
 }
 
 export function useShareActions() {

@@ -19,7 +19,10 @@ export {
   useDuplicateKeys,
   useDuplicateKeysForOrganization,
   useShareActions,
+  useSharingStatus,
+  useMergeActions,
   type SharedRow,
+  type DuplicateGroup,
 } from "./useWorkspaces";
 export { useAutoPageSize } from "./useAutoPageSize";
 export {

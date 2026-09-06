@@ -5,13 +5,20 @@ import { useMutation } from "convex/react";
 import { Check, Pencil, Trash2, X } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { SettingsSection } from "@envpilot/ui";
+import { SettingsRow, SettingsSection } from "@envpilot/ui";
 import {
   TerminalInput,
   TerminalLoading,
 } from "@/components/dashboard/terminal-ui";
 import { ConfirmDialog } from "@/components/ui";
-import { useDuplicateKeysForOrganization, useSharedGroups } from "@/hooks";
+import { MergeSheet } from "@/components/workspaces";
+import {
+  useDuplicateKeysForOrganization,
+  useMergeActions,
+  useSharedGroups,
+  useSharingStatus,
+  type DuplicateGroup,
+} from "@/hooks";
 import { sanitizeConvexError } from "@/lib/error-messages";
 
 type SharedGroup = ReturnType<typeof useSharedGroups>["groups"][number];
@@ -27,7 +34,11 @@ export function SharedVariablesTab({
   isOwner: boolean;
 }) {
   const { groups, isLoading } = useSharedGroups(organizationId);
-  const duplicates = useDuplicateKeysForOrganization(organizationId);
+  const { allowed, enabled, canToggle } = useSharingStatus(organizationId);
+  const { setSharingEnabled } = useMergeActions();
+  const duplicates = useDuplicateKeysForOrganization(
+    enabled ? organizationId : undefined
+  );
   // Groups are ordinary projects underneath, so rename and delete are the
   // project mutations — the backend still enforces owner-only removal.
   const renameGroup = useMutation(api.features.projects.mutations.update);
@@ -36,7 +47,16 @@ export function SharedVariablesTab({
   const [editingId, setEditingId] = useState<Id<"projects"> | null>(null);
   const [draftName, setDraftName] = useState("");
   const [pendingDelete, setPendingDelete] = useState<SharedGroup | null>(null);
+  const [merging, setMerging] = useState<DuplicateGroup[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const toggleSharing = async () => {
+    try {
+      await setSharingEnabled({ organizationId, enabled: !enabled });
+    } catch (err) {
+      setError(sanitizeConvexError(err));
+    }
+  };
 
   const startRename = (group: SharedGroup) => {
     setEditingId(group._id);
@@ -79,7 +99,47 @@ export function SharedVariablesTab({
       >
         {error && <p className="font-mono text-[12px] text-danger">{error}</p>}
 
-        {groups.length === 0 ? (
+        <SettingsRow
+          label="Share variables across projects"
+          description={`One row read by several projects. Turning this off stops new sharing; the ${groups.length} groups you have keep working.`}
+          control={
+            <div className="flex items-center gap-2">
+              {!allowed && (
+                <span className="text-[12px] text-ink-subtle">
+                  Not available on this plan
+                </span>
+              )}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={enabled}
+                aria-label="Share variables across projects"
+                disabled={!canToggle || !allowed}
+                onClick={toggleSharing}
+                className={`flex h-5 w-9 items-center border disabled:opacity-40 ${
+                  enabled ? "border-accent" : "border-line"
+                }`}
+              >
+                <span
+                  className={`block h-3.5 w-3.5 ${
+                    enabled
+                      ? "translate-x-4 bg-accent"
+                      : "translate-x-0.5 bg-ink-subtle"
+                  }`}
+                />
+              </button>
+            </div>
+          }
+        />
+
+        {!enabled && (
+          <p className="text-sm text-ink-subtle">
+            Sharing is off. {groups.length} groups keep working; nothing new can
+            be shared until it is on.
+          </p>
+        )}
+
+        {!enabled ? null : groups.length === 0 ? (
           <p className="text-sm text-ink-subtle">
             Nothing shared yet. Share a variable from a project&rsquo;s
             variables page.
@@ -168,29 +228,7 @@ export function SharedVariablesTab({
       </SettingsSection>
 
       {duplicates.length > 0 && (
-        <SettingsSection
-          title="Duplicated keys"
-          description="The same key defined separately in more than one project. Each copy rotates on its own."
-        >
-          <p className="text-sm text-ink-subtle">
-            Share it from any of those projects&rsquo; variables page.
-          </p>
-          <div className="divide-y divide-line border-t border-line">
-            {duplicates.map((duplicate) => (
-              <div
-                key={duplicate.key}
-                className="flex items-center justify-between gap-3 py-2.5"
-              >
-                <span className="truncate font-mono text-sm text-ink">
-                  {duplicate.key}
-                </span>
-                <span className="shrink-0 text-xs text-ink-muted">
-                  in {duplicate.projectIds.length} projects
-                </span>
-              </div>
-            ))}
-          </div>
-        </SettingsSection>
+        <Identical duplicates={duplicates} onMerge={setMerging} />
       )}
 
       <ConfirmDialog
@@ -203,6 +241,77 @@ export function SharedVariablesTab({
         variant="danger"
         confirmPhrase={pendingDelete?.name}
       />
+
+      <MergeSheet
+        organizationId={organizationId}
+        groups={merging}
+        onClose={() => setMerging(null)}
+      />
     </>
+  );
+}
+
+/** Keys several projects hold separately, with the merge entry points. */
+function Identical({
+  duplicates,
+  onMerge,
+}: {
+  duplicates: DuplicateGroup[];
+  onMerge: (groups: DuplicateGroup[]) => void;
+}) {
+  const projectCount = new Set(duplicates.flatMap((row) => row.projectIds))
+    .size;
+  return (
+    <SettingsSection
+      title="Identical across projects"
+      description={`${duplicates.length} keys · ${projectCount} projects`}
+      aside={
+        <button
+          type="button"
+          onClick={() => onMerge(duplicates)}
+          className="border border-accent px-2.5 py-1 text-xs text-accent"
+        >
+          Merge all
+        </button>
+      }
+    >
+      <div className="divide-y divide-line border-t border-line">
+        {duplicates.map((duplicate) => (
+          <div
+            key={duplicate.key}
+            className="flex items-center gap-3 py-2.5 text-xs"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-mono text-sm text-ink">
+                {duplicate.key}
+              </span>
+              <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                {duplicate.environments.map((env) => (
+                  <span key={env} className={PILL}>
+                    {env}
+                  </span>
+                ))}
+                <span className="text-ink-muted">
+                  {duplicate.projectIds.length} projects
+                  {duplicate.verified ? "" : " · compared on merge"}
+                </span>
+                {duplicate.protectedIn.length > 0 && (
+                  <span className="rounded-full bg-warning-soft px-2 py-0.5 text-warning">
+                    protected in {duplicate.protectedIn.join(", ")}
+                  </span>
+                )}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => onMerge([duplicate])}
+              className="shrink-0 border border-line px-2.5 py-1 text-ink-muted hover:text-ink"
+            >
+              Merge
+            </button>
+          </div>
+        ))}
+      </div>
+    </SettingsSection>
   );
 }

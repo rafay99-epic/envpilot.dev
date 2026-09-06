@@ -8,6 +8,7 @@ import {
 } from "../../lib/authHelpers";
 import { assertOrgAction, assertProjectAction } from "../../lib/authz";
 import { touchedEnvironments } from "../../lib/protection";
+import { isWorkspace } from "../../lib/projectKind";
 
 /**
  * The authorization a change request has to pass, shared by the mutation
@@ -21,7 +22,8 @@ export type ChangeKind =
   | "update"
   | "delete"
   | "restore"
-  | "rollback";
+  | "rollback"
+  | "share";
 
 /** The row a proposal targets. Null for a create, which has none yet. */
 export type ChangeTarget =
@@ -128,6 +130,27 @@ export async function assertCouldWriteDirectly(
       project
     );
     return { target: null, currentEnvironments: [] };
+  }
+  // A share targets a row that still lives in a member project; the group
+  // is the request's project because its protection is the members' union.
+  if (kind === "share") {
+    if (resourceType !== "variable" || !isWorkspace(project)) {
+      throw new ConvexError("Only variables can be shared into a group");
+    }
+    const id = targetId
+      ? ctx.db.normalizeId("environmentVariables", targetId)
+      : null;
+    const variable = id ? await ctx.db.get(id) : null;
+    if (!variable || variable.deletedAt) {
+      throw new ConvexError("Target variable not found");
+    }
+    await assertProjectAction(
+      ctx,
+      actorId,
+      variable.projectId,
+      "project:manage_workspaces"
+    );
+    return { target: variable, currentEnvironments: variable.environments };
   }
 
   const isWrite = kind === "update" || kind === "rollback";

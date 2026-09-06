@@ -236,14 +236,30 @@ export const listInheritedForProject = query({
   },
 });
 
-/** key -> ids of active projects that hold an active row with that key. */
-async function keyOwners(
+export type DuplicateGroup = {
+  key: string;
+  environments: string[];
+  /** False when a row has no value hash yet: same key, value unverified. */
+  verified: boolean;
+  rows: {
+    variableId: Id<"environmentVariables">;
+    projectId: Id<"projects">;
+    vaultRef: string;
+    createdAt: number;
+  }[];
+};
+
+/**
+ * Rows that are the same variable in more than one project: same key, same
+ * environment set, same value hash. Rows without a hash (written before the
+ * hash table existed) group by key and environments only and are marked
+ * unverified so the merge compares them through the vault.
+ */
+export async function duplicateGroups(
   ctx: Parameters<typeof getActiveMembership>[0],
   organizationId: Id<"organizations">
-): Promise<Map<string, Set<Id<"projects">>>> {
-  const owners = new Map<string, Set<Id<"projects">>>();
-  // Every active row per project: the tier cap bounds each read, and a
-  // partial scan would hide duplicates without saying so.
+): Promise<DuplicateGroup[]> {
+  const groups = new Map<string, DuplicateGroup>();
   for (const project of await activeProjectsQuery(
     ctx.db,
     organizationId
@@ -255,17 +271,33 @@ async function keyOwners(
       )
       .collect();
     for (const row of rows) {
-      const set = owners.get(row.key) ?? new Set();
-      set.add(project._id);
-      owners.set(row.key, set);
+      const hashed = await ctx.db
+        .query("vaultValueHashes")
+        .withIndex("by_vault_ref", (q) => q.eq("vaultRef", row.vaultRef))
+        .first();
+      const environments = [...row.environments].sort();
+      const id = `${row.key}\u0000${environments.join(",")}\u0000${hashed?.hash ?? ""}`;
+      const group = groups.get(id) ?? {
+        key: row.key,
+        environments,
+        verified: hashed !== null,
+        rows: [],
+      };
+      group.rows.push({
+        variableId: row._id,
+        projectId: project._id,
+        vaultRef: row.vaultRef,
+        createdAt: row.createdAt,
+      });
+      groups.set(id, group);
     }
   }
-  return owners;
+  return [...groups.values()].filter((group) => group.rows.length > 1);
 }
 
 /**
- * Keys this project owns that other projects in the org also own. Feeds the
- * "same key in N projects" tag; the share sheet re-checks values server side.
+ * Keys this project owns that other projects hold with the same value. Feeds
+ * the "same value in N projects" tag.
  */
 export const duplicateKeys = query({
   args: { projectId: v.id("projects") },
@@ -279,12 +311,17 @@ export const duplicateKeys = query({
     if (!resolved || !(resolved.access.isOwner || resolved.access.assigned)) {
       return [];
     }
-    const owners = await keyOwners(ctx, resolved.project.organizationId);
-    const out: { key: string; others: number }[] = [];
-    for (const [key, projects] of owners) {
-      if (projects.has(args.projectId) && projects.size > 1) {
-        out.push({ key, others: projects.size - 1 });
-      }
+    const out: { key: string; others: number; verified: boolean }[] = [];
+    for (const group of await duplicateGroups(
+      ctx,
+      resolved.project.organizationId
+    )) {
+      if (!group.rows.some((row) => row.projectId === args.projectId)) continue;
+      out.push({
+        key: group.key,
+        others: group.rows.length - 1,
+        verified: group.verified,
+      });
     }
     return out;
   },
@@ -303,10 +340,26 @@ export const duplicateKeysForOrganization = query({
     if (!membership) return [];
     const profile = await getRoleProfile(ctx, membership.role);
     if (!bypassesAssignment(profile)) return [];
-    const owners = await keyOwners(ctx, args.organizationId);
-    const out: { key: string; projectIds: Id<"projects">[] }[] = [];
-    for (const [key, projects] of owners) {
-      if (projects.size > 1) out.push({ key, projectIds: [...projects] });
+    const out = [];
+    for (const group of await duplicateGroups(ctx, args.organizationId)) {
+      const projectIds = group.rows.map((row) => row.projectId);
+      const protectedIn: string[] = [];
+      for (const projectId of projectIds) {
+        const project = await ctx.db.get(projectId);
+        if (
+          project &&
+          protectedEnvironmentsIn(project, group.environments).length > 0
+        ) {
+          protectedIn.push(project.name);
+        }
+      }
+      out.push({
+        key: group.key,
+        environments: group.environments,
+        verified: group.verified,
+        projectIds,
+        protectedIn,
+      });
     }
     return out;
   },

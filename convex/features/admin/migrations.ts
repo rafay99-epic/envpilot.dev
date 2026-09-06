@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { query, mutation, internalMutation } from "../../_generated/server";
 import type { MutationCtx } from "../../_generated/server";
+import { internal } from "../../_generated/api";
 import { SEED_FEATURES, SEED_ROLES } from "../../lib/seedData";
 import {
   hasCapability,
@@ -22,6 +23,15 @@ export const listMigrations = query({
           "Seeds all gatable features into the featureRegistry table. Idempotent — skips existing keys.",
         category: "Core",
         priority: 1,
+        destructive: false,
+        runOnce: false,
+      },
+      {
+        name: "backfill-value-hashes",
+        description:
+          "Writes a per-organization HMAC for every active variable that has none, so duplicate detection never reads the vault. Runs in the background in pages of 100. Idempotent.",
+        category: "Core",
+        priority: 9,
         destructive: false,
         runOnce: false,
       },
@@ -259,6 +269,13 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
 async function runMigrationByName(ctx: MutationCtx, name: string) {
   // Keeps the original `args.name` references below working untouched.
   const args = { name };
+
+  if (args.name === "backfill-value-hashes") {
+    await ctx.scheduler.runAfter(0, internal.features.vault.hashes.backfill, {
+      cursor: null,
+    });
+    return { success: true, scheduled: true };
+  }
 
   if (args.name === "seed-tier-definitions") {
     const existing = await ctx.db.query("tierDefinitions").collect();

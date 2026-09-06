@@ -73,9 +73,14 @@ export default defineSchema({
     //  migrations cleanup; nothing prunes these rows now.)
     settings: v.optional(
       v.object({
-        teamLeadsCanCreateProjects: v.boolean(),
+        teamLeadsCanCreateProjects: v.optional(v.boolean()),
+        // Owner's switch for sharing variables across projects. The tier
+        // flag is the ceiling; this is the org's choice under it.
+        sharedVariables: v.optional(v.boolean()),
       })
     ),
+    // Per-org HMAC key for vaultValueHashes. Minted on first hash.
+    hashKey: v.optional(v.string()),
     // WorkOS organization ID (for SSO integration)
     workosOrgId: v.optional(v.string()),
     // User who created the organization
@@ -262,6 +267,21 @@ export default defineSchema({
     // rather than filtered in memory after the read.
     .index("by_org_kind_deleted", ["organizationId", "kind", "deletedAt"])
     .index("by_created_by", ["createdBy"]),
+
+  // ==========================================
+  // VALUE HASHES
+  // ==========================================
+  // HMAC of a vault object's plaintext, keyed per organization, written by
+  // the vault layer on every mint. Lets duplicate detection compare values
+  // without reading the vault. Equal hashes in one org mean equal values.
+  vaultValueHashes: defineTable({
+    organizationId: v.id("organizations"),
+    vaultRef: v.string(),
+    hash: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_vault_ref", ["vaultRef"])
+    .index("by_organization", ["organizationId"]),
 
   // ==========================================
   // WORKSPACE MEMBERSHIP
@@ -492,7 +512,9 @@ export default defineSchema({
       v.literal("update"),
       v.literal("delete"),
       v.literal("restore"),
-      v.literal("rollback")
+      v.literal("rollback"),
+      // Adopt copies into a shared row; the group is the project.
+      v.literal("share")
     ),
     // Existing resource id; absent on create
     targetId: v.optional(v.string()),
@@ -1284,6 +1306,8 @@ export default defineSchema({
       v.literal("org.member_suspended"),
       v.literal("org.member_reinstated"),
       v.literal("org.transferred"),
+      v.literal("org.sharing_enabled"),
+      v.literal("org.sharing_disabled"),
       // Workspace actions. Membership is logged against the MEMBER project,
       // because "who gained access to this project's secrets" is the question
       // an auditor asks, and the workspace name rides in the details blob.

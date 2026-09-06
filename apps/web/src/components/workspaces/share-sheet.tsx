@@ -94,7 +94,7 @@ export function ShareSheet({ projectId, variable, onClose }: ShareSheetProps) {
     if (!projectId || !variable) return;
     setIsSharing(true);
     try {
-      await share({
+      const result = await share({
         projectId,
         variableId: variable._id,
         projectIds: [...picked],
@@ -104,7 +104,9 @@ export function ShareSheet({ projectId, variable, onClose }: ShareSheetProps) {
             : { name: newName.trim() || variable.key.toLowerCase() },
       });
       toast.success(
-        `${variable.key} is now read by ${picked.size + 1} projects.`
+        "requested" in result
+          ? `Sent for approval. ${variable.key} stays where it is until a second person applies it.`
+          : `${variable.key} is now read by ${picked.size + 1} projects.`
       );
       onClose();
     } catch (error) {

@@ -10,6 +10,7 @@ import {
 } from "../featureRegistry/gates";
 import { isWorkspace, WORKSPACE_KIND } from "../../lib/projectKind";
 import { syncWorkspaceProtection } from "../../lib/protection";
+import { assertSharingEnabled } from "../workspaces/enabled";
 import { requireAuthedUser } from "../../lib/identity";
 import {
   assertOrgAction,
@@ -140,16 +141,7 @@ export async function createProjectCore(
     // Tier limits. A workspace never occupies a project slot, and vice
     // versa — the two are counted through separate index ranges.
     if (args.kind === WORKSPACE_KIND) {
-      const gate = await checkBooleanFeature(
-        ctx.db,
-        args.organizationId,
-        "workspaces"
-      );
-      if (!gate.allowed) {
-        throw new ConvexError(
-          gate.reason ?? "Workspaces are not available on this plan."
-        );
-      }
+      await assertSharingEnabled(ctx.db, args.organizationId);
 
       const workspaceCheck = await checkCountedLimit(
         ctx.db,

@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { recordValueHash } from "./hashes";
 import { internalAction } from "../../_generated/server";
 
 /**
@@ -376,7 +377,15 @@ export const createSecret = internalAction({
     idempotencyKey: v.optional(v.string()),
   },
   returns: vaultObjectResult,
-  handler: (_ctx, args) => vaultCreate(args),
+  handler: async (ctx, args) => {
+    const result = await vaultCreate(args);
+    await recordValueHash(ctx, {
+      organizationId: args.organizationId,
+      vaultRef: result.id,
+      value: args.value,
+    });
+    return result;
+  },
 });
 
 export const readSecret = internalAction({

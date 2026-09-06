@@ -10,6 +10,7 @@ import {
 import { roleLevel, ROLE_LEVEL } from "../../lib/authz";
 import { pool, VAULT_POOL_WIDTH } from "../../lib/pool";
 import { vaultCreate, vaultRead } from "../vault/vault";
+import { recordValueHash } from "../vault/hashes";
 import {
   assertValidVariableFields,
   isValidVariableKey,
@@ -1323,6 +1324,11 @@ export const importValues = action({
               organizationId: project.organizationId,
               projectId: args.projectId,
             });
+            await recordValueHash(ctx, {
+              organizationId: project.organizationId,
+              vaultRef: vault.id,
+              value: entry.value,
+            });
             return { ok: true as const, key: entry.key, vaultRef: vault.id };
           } catch {
             return { ok: false as const };
@@ -1438,6 +1444,11 @@ export const importValues = action({
             organizationId: project.organizationId,
             projectId: args.projectId,
           });
+          await recordValueHash(ctx, {
+            organizationId: project.organizationId,
+            vaultRef: vault.id,
+            value: entry.value,
+          });
           return {
             kind: "update",
             variableId: current._id,
@@ -1449,6 +1460,11 @@ export const importValues = action({
           value: entry.value,
           organizationId: project.organizationId,
           projectId: args.projectId,
+        });
+        await recordValueHash(ctx, {
+          organizationId: project.organizationId,
+          vaultRef: vault.id,
+          value: entry.value,
         });
         return { kind: "create", key: entry.key, vaultRef: vault.id };
       },

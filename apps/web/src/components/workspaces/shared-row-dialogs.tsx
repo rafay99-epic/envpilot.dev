@@ -117,11 +117,17 @@ function EditNotice({ row }: { row: SharedRow }) {
 }
 
 /** Warning pill on a private row whose key other projects also own. */
-export function DuplicateBadge({ others }: { others: number | undefined }) {
+export function DuplicateBadge({
+  others,
+  verified,
+}: {
+  others: number | undefined;
+  verified?: boolean;
+}) {
   if (!others) return null;
   return (
     <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
-      same key in {others + 1} projects
+      same {verified ? "value" : "key"} in {others + 1} projects
     </span>
   );
 }

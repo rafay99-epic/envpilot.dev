@@ -11,6 +11,7 @@ import {
 } from "../featureRegistry/gates";
 import { findEnvironmentConflicts } from "../variables/helpers";
 import { syncWorkspaceProtection } from "../../lib/protection";
+import { assertSharingEnabled } from "./enabled";
 import { MAX_WORKSPACES_PER_PROJECT } from "../variables/resolve";
 
 /**
@@ -25,6 +26,7 @@ export async function linkProjectCore(
 ): Promise<Id<"workspaceProjects">> {
   {
     const { workspace, project } = await loadEdge(ctx, args);
+    await assertSharingEnabled(ctx.db, workspace.organizationId);
 
     // Both sides are checked. Manage rights on the project being added stop
     // someone granting their own project access to credentials they were

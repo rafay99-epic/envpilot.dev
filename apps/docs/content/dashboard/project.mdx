@@ -43,6 +43,8 @@ Search, filter to sensitive-only, sort, reveal individually or all at once, and 
 
 The same credential often lives in several projects. Sharing keeps one row that every picked project reads, so a rotation is one edit.
 
+Sharing is off until an owner turns it on under **Organization → Settings → Shared variables**. Turning it off later stops new sharing only; groups that already exist keep working for every client.
+
 A row whose key also exists in other projects shows **same key in N projects**. Its **Share across projects** action opens a sheet listing every project you can manage: projects holding the same value are preselected and their copies are moved into the shared row (they land in each project's trash for 7 days); projects with a different value are listed but cannot be picked until that is resolved. Pick an existing group or name a new one and confirm.
 
 Shared rows appear pinned above the table in every project that reads them, with a **N projects** pill. Edit and delete work in place and state how many projects change before you confirm. You can edit a shared row only if you could edit variables in every project it reaches. If any of those projects protects an environment the row is in, the edit is filed as a change request instead of landing directly.
@@ -50,6 +52,8 @@ Shared rows appear pinned above the table in every project that reads them, with
 **Stop sharing here** removes this project from the group. By default the current values are copied into the project first, so its next pull is unchanged. The last project to leave takes the group with it.
 
 The CLI, the editor extensions, the MCP server, the GitHub Action and the Docker image all receive shared rows with no update: resolution happens on the server. Pushing a shared key from a client is refused with a message naming the group.
+
+**Merge in one click.** The same settings tab lists every key that is identical across projects, and the dashboard shows the count. **Merge all** opens a sheet with three environment chips. Development and staging are on by default and merge on the spot. Production is off by default; when it is on, a key that reaches a project protecting production is not merged directly but filed as a change request for a second person to apply, exactly like a production edit. Keys with different values, or with an environment that is off, are held back with the reason and never touched.
 
 Groups are listed and renamed under **Organization → Settings → Shared variables**. Free organizations get one group with three projects and ten variables.
 

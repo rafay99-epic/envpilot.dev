@@ -25,6 +25,7 @@ import {
   useCreateTag,
   useProtection,
   useDuplicateKeys,
+  useSharingStatus,
   type SharedRow,
 } from "@/hooks";
 import { useVariableHistory as useConvexVariableHistory } from "@/hooks";
@@ -112,9 +113,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   // Read access keeps the trash recovery route available to members who may
   // need to restore content they previously deleted.
   const canRequestVariable = capabilities["project.requests.submit"] === true;
-  const { allowed: sharingEnabled } = useFeatureGate(
-    organization?.id as Id<"organizations"> | undefined,
-    "workspaces"
+  const { enabled: sharingEnabled } = useSharingStatus(
+    organization?.id as Id<"organizations"> | undefined
   );
   const canManageShares =
     sharingEnabled && capabilities["project.workspaces.manage"] === true;
@@ -984,7 +984,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                     }
                     badge={
                       <DuplicateBadge
-                        others={duplicateKeys.get(variable.key)}
+                        others={duplicateKeys.get(variable.key)?.others}
+                        verified={duplicateKeys.get(variable.key)?.verified}
                       />
                     }
                     onShareAcross={

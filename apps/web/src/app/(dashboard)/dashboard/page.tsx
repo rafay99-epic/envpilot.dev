@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -14,7 +14,10 @@ import {
   useFeatureGate,
   useConvexUser,
   useNow,
+  useSharingStatus,
+  type DuplicateGroup,
 } from "@/hooks";
+import { MergeSheet } from "@/components/workspaces";
 import { useAuthContext } from "@/components/auth";
 import type { Id } from "@convex/_generated/dataModel";
 import {
@@ -104,10 +107,7 @@ export default function DashboardPage() {
         }
       />
 
-      <DuplicateKeysBanner
-        organizationId={activeOrganizationId}
-        orgSlug={organization.slug}
-      />
+      <DuplicateKeysBanner organizationId={activeOrganizationId} />
 
       {/* Stats as terminal output */}
       <TerminalWindow title="system-status">
@@ -333,15 +333,14 @@ function readDismissed(storageKey: string): boolean {
 
 function DuplicateKeysBanner({
   organizationId,
-  orgSlug,
 }: {
   organizationId: Id<"organizations"> | undefined;
-  orgSlug: string | null | undefined;
 }) {
-  const { allowed: enabled } = useFeatureGate(organizationId, "workspaces");
+  const { enabled } = useSharingStatus(organizationId);
   const duplicates = useDuplicateKeysForOrganization(
     enabled ? organizationId : undefined
   );
+  const [merging, setMerging] = useState<DuplicateGroup[] | null>(null);
   const storageKey = `envpilot.duplicates-banner.${organizationId}`;
   const dismissed = useSyncExternalStore(
     subscribeDismissal,
@@ -349,10 +348,12 @@ function DuplicateKeysBanner({
     () => true
   );
 
-  if (!orgSlug || dismissed || duplicates.length === 0) return null;
+  if (dismissed || duplicates.length === 0) return null;
 
-  const projectCount = new Set(duplicates.flatMap((row) => row.projectIds))
-    .size;
+  // Unverified rows share a key but their values are only compared at merge.
+  const verified = duplicates.filter((row) => row.verified);
+  const shown = verified.length > 0 ? verified : duplicates;
+  const projectCount = new Set(shown.flatMap((row) => row.projectIds)).size;
 
   const dismiss = () => {
     try {
@@ -366,23 +367,28 @@ function DuplicateKeysBanner({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line px-4 py-3">
       <p className="text-sm text-ink">
-        {duplicates.length} key{duplicates.length === 1 ? "" : "s"}{" "}
-        {duplicates.length === 1 ? "is" : "are"} duplicated across{" "}
-        {projectCount} projects.{" "}
+        {shown.length} key{shown.length === 1 ? "" : "s"}{" "}
+        {shown.length === 1 ? "is" : "are"}{" "}
+        {verified.length > 0 ? "identical" : "duplicated"} across {projectCount}{" "}
+        projects.{" "}
         <span className="text-ink-muted">
-          Share them so a rotation is one edit instead of six.
+          Merge development and staging in one click. Production goes to
+          approval.
         </span>
       </p>
       <div className="flex items-center gap-2">
         <TerminalButton variant="secondary" onClick={dismiss}>
           Not now
         </TerminalButton>
-        <TerminalButtonLink
-          href={`/organizations/${orgSlug}/settings?tab=shared`}
-        >
-          Review duplicates
-        </TerminalButtonLink>
+        <TerminalButton onClick={() => setMerging(duplicates)}>
+          Merge
+        </TerminalButton>
       </div>
+      <MergeSheet
+        organizationId={organizationId}
+        groups={merging}
+        onClose={() => setMerging(null)}
+      />
     </div>
   );
 }

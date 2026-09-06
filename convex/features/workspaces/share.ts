@@ -4,6 +4,7 @@ import {
   internalMutation,
   internalQuery,
   type ActionCtx,
+  type QueryCtx,
 } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
@@ -34,6 +35,7 @@ type Candidate = {
     variableId: Id<"environmentVariables">;
     vaultRef: string;
     environments: string[];
+    hash: string | null;
   } | null;
 };
 
@@ -42,6 +44,7 @@ const candidatesValidator = v.object({
     key: v.string(),
     vaultRef: v.string(),
     environments: v.array(v.string()),
+    hash: v.union(v.string(), v.null()),
     organizationId: v.id("organizations"),
   }),
   projects: v.array(
@@ -53,6 +56,7 @@ const candidatesValidator = v.object({
           variableId: v.id("environmentVariables"),
           vaultRef: v.string(),
           environments: v.array(v.string()),
+          hash: v.union(v.string(), v.null()),
         }),
         v.null()
       ),
@@ -124,6 +128,7 @@ export const _candidates = internalQuery({
               variableId: row._id,
               vaultRef: row.vaultRef,
               environments: row.environments,
+              hash: await valueHash(ctx, row.vaultRef),
             }
           : null,
       });
@@ -158,6 +163,7 @@ export const _candidates = internalQuery({
         key: source.key,
         vaultRef: source.vaultRef,
         environments: source.environments,
+        hash: await valueHash(ctx, source.vaultRef),
         organizationId: project.organizationId,
       },
       projects,
@@ -178,22 +184,38 @@ type Candidates = {
     key: string;
     vaultRef: string;
     environments: string[];
+    hash: string | null;
     organizationId: Id<"organizations">;
   };
   projects: Candidate[];
   groups: Group[];
 };
 
+async function valueHash(
+  ctx: Pick<QueryCtx, "db">,
+  vaultRef: string
+): Promise<string | null> {
+  const row = await ctx.db
+    .query("vaultValueHashes")
+    .withIndex("by_vault_ref", (q) => q.eq("vaultRef", vaultRef))
+    .first();
+  return row?.hash ?? null;
+}
+
+/** Same environments and same value. Hashes decide; the vault is read only
+ * for rows written before hashes existed. */
 async function verdicts(
   ctx: Pick<ActionCtx, "runAction">,
-  source: { vaultRef: string; environments: string[] },
+  source: { vaultRef: string; environments: string[]; hash: string | null },
   projects: Candidate[]
 ): Promise<Map<Id<"projects">, Verdict>> {
-  const sourceValue = await ctx.runAction(
-    internal.features.vault.vault.readSecret,
-    { vaultRef: source.vaultRef }
-  );
   const out = new Map<Id<"projects">, Verdict>();
+  let sourceValue: string | null | undefined;
+  const readSource = async () =>
+    (sourceValue ??= await ctx.runAction(
+      internal.features.vault.vault.readSecret,
+      { vaultRef: source.vaultRef }
+    ));
   for (const project of projects) {
     if (!project.row) {
       out.set(project._id, "absent");
@@ -204,14 +226,26 @@ async function verdicts(
       project.row.environments.every((env) =>
         source.environments.includes(env)
       );
-    const value = sameEnvironments
-      ? await ctx
-          .runAction(internal.features.vault.vault.readSecret, {
-            vaultRef: project.row.vaultRef,
-          })
-          .catch(() => null)
-      : null;
-    out.set(project._id, value === sourceValue ? "same" : "different");
+    if (!sameEnvironments) {
+      out.set(project._id, "different");
+      continue;
+    }
+    if (source.hash !== null && project.row.hash !== null) {
+      out.set(
+        project._id,
+        source.hash === project.row.hash ? "same" : "different"
+      );
+      continue;
+    }
+    const value = await ctx
+      .runAction(internal.features.vault.vault.readSecret, {
+        vaultRef: project.row.vaultRef,
+      })
+      .catch(() => null);
+    out.set(
+      project._id,
+      value !== null && value === (await readSource()) ? "same" : "different"
+    );
   }
   return out;
 }
@@ -267,8 +301,15 @@ export const share = action({
       v.object({ name: v.string() })
     ),
   },
-  returns: v.object({ workspaceId: v.id("projects") }),
-  handler: async (ctx, args): Promise<{ workspaceId: Id<"projects"> }> => {
+  returns: v.union(
+    v.object({ workspaceId: v.id("projects") }),
+    v.object({
+      workspaceId: v.id("projects"),
+      requested: v.literal(true),
+      requestId: v.id("changeRequests"),
+    })
+  ),
+  handler: async (ctx, args): Promise<ShareResult> => {
     const found: Candidates = await ctx.runQuery(
       internal.features.workspaces.share._candidates,
       { projectId: args.projectId, variableId: args.variableId }
@@ -305,23 +346,83 @@ export const share = action({
     const outsiders = (existing?.memberIds ?? []).some(
       (id) => !selected.includes(id)
     );
+    const duplicateIds = picked.flatMap((project) =>
+      project.row ? [project.row.variableId] : []
+    );
     try {
-      await ctx.runMutation(internal.features.workspaces.adopt._applyAdoption, {
+      return await adoptOrRequest(ctx, {
         workspaceId: linked.workspaceId,
         survivorId: args.variableId,
-        duplicateIds: picked.flatMap((project) =>
-          project.row ? [project.row.variableId] : []
-        ),
+        duplicateIds,
         key: found.source.key,
+        environments: found.source.environments,
         appliesTo: outsiders ? selected : undefined,
       });
     } catch (error) {
       await ctx.runMutation(internal.features.workspaces.share._unlink, linked);
       throw error;
     }
-    return { workspaceId: linked.workspaceId };
   },
 });
+
+export type ShareResult =
+  | { workspaceId: Id<"projects"> }
+  | {
+      workspaceId: Id<"projects">;
+      requested: true;
+      requestId: Id<"changeRequests">;
+    };
+
+/**
+ * Adopt now, or file a `share` change request when the group (already
+ * linked, so its protection is the members' union) protects one of the
+ * row's environments. Same rule as any other production write.
+ */
+export async function adoptOrRequest(
+  ctx: Pick<ActionCtx, "runQuery" | "runMutation">,
+  args: {
+    workspaceId: Id<"projects">;
+    survivorId: Id<"environmentVariables">;
+    duplicateIds: Id<"environmentVariables">[];
+    key: string;
+    environments: string[];
+    appliesTo: Id<"projects">[] | undefined;
+  }
+): Promise<ShareResult> {
+  const protectedEnvs: string[] = await ctx.runQuery(
+    internal.features.changeRequests.queries.protectedEnvironmentsForWrite,
+    { projectId: args.workspaceId, environments: args.environments }
+  );
+  if (protectedEnvs.length > 0) {
+    const requestId: Id<"changeRequests"> = await ctx.runMutation(
+      internal.features.changeRequests.mutations.createStaged,
+      {
+        projectId: args.workspaceId,
+        resourceType: "variable",
+        kind: "share",
+        targetId: args.survivorId,
+        environments: args.environments,
+        payload: JSON.stringify({
+          key: args.key,
+          environments: args.environments,
+          duplicateIds: args.duplicateIds,
+          appliesTo: args.appliesTo,
+        }),
+        label: args.key,
+        source: "web",
+      }
+    );
+    return { workspaceId: args.workspaceId, requested: true, requestId };
+  }
+  await ctx.runMutation(internal.features.workspaces.adopt._applyAdoption, {
+    workspaceId: args.workspaceId,
+    survivorId: args.survivorId,
+    duplicateIds: args.duplicateIds,
+    key: args.key,
+    appliesTo: args.appliesTo,
+  });
+  return { workspaceId: args.workspaceId };
+}
 
 type Linked = {
   workspaceId: Id<"projects">;

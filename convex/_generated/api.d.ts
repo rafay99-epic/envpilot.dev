@@ -129,9 +129,12 @@ import type * as features_variables_rotation from "../features/variables/rotatio
 import type * as features_variables_share from "../features/variables/share.js";
 import type * as features_variables_values from "../features/variables/values.js";
 import type * as features_vault_gc from "../features/vault/gc.js";
+import type * as features_vault_hashes from "../features/vault/hashes.js";
 import type * as features_vault_reveal from "../features/vault/reveal.js";
 import type * as features_vault_vault from "../features/vault/vault.js";
 import type * as features_workspaces_adopt from "../features/workspaces/adopt.js";
+import type * as features_workspaces_enabled from "../features/workspaces/enabled.js";
+import type * as features_workspaces_merge from "../features/workspaces/merge.js";
 import type * as features_workspaces_mutations from "../features/workspaces/mutations.js";
 import type * as features_workspaces_queries from "../features/workspaces/queries.js";
 import type * as features_workspaces_share from "../features/workspaces/share.js";
@@ -282,9 +285,12 @@ declare const fullApi: ApiFromModules<{
   "features/variables/share": typeof features_variables_share;
   "features/variables/values": typeof features_variables_values;
   "features/vault/gc": typeof features_vault_gc;
+  "features/vault/hashes": typeof features_vault_hashes;
   "features/vault/reveal": typeof features_vault_reveal;
   "features/vault/vault": typeof features_vault_vault;
   "features/workspaces/adopt": typeof features_workspaces_adopt;
+  "features/workspaces/enabled": typeof features_workspaces_enabled;
+  "features/workspaces/merge": typeof features_workspaces_merge;
   "features/workspaces/mutations": typeof features_workspaces_mutations;
   "features/workspaces/queries": typeof features_workspaces_queries;
   "features/workspaces/share": typeof features_workspaces_share;

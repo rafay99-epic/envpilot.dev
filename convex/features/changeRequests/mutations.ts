@@ -75,7 +75,8 @@ const kindValidator = v.union(
   v.literal("update"),
   v.literal("delete"),
   v.literal("restore"),
-  v.literal("rollback")
+  v.literal("rollback"),
+  v.literal("share")
 );
 
 const sourceValidator = v.union(
