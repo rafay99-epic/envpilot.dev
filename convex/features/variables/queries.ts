@@ -60,7 +60,12 @@ export const listByProject = query({
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    if (!(await resolveProjectAccessContext(ctx, args.projectId, actor._id))) {
+    const resolved = await resolveProjectAccessContext(
+      ctx,
+      args.projectId,
+      actor._id
+    );
+    if (!resolved || !(resolved.access.isOwner || resolved.access.assigned)) {
       return [];
     }
     const limit = args.limit ?? LIST_READ_CAP;
@@ -73,17 +78,14 @@ export const listByProject = query({
         q.eq("projectId", args.projectId).eq("deletedAt", undefined)
       )
       .take(limit + 1);
-    const variables = args.environment
-      ? rows.filter((row) => row.environments.includes(args.environment!))
-      : rows;
-
-    if (variables.length > limit) {
+    if (rows.length > limit) {
       throw new ConvexError(
         `Project has more than ${limit} active variables, refusing a partial read. Contact support to raise the limit.`
       );
     }
-
-    return variables;
+    return args.environment
+      ? rows.filter((row) => row.environments.includes(args.environment!))
+      : rows;
   },
 });
 
@@ -893,6 +895,15 @@ export const listMetadataByProject = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const resolved = await resolveProjectAccessContext(
+      ctx,
+      args.projectId,
+      actor._id
+    );
+    if (!resolved || !(resolved.access.isOwner || resolved.access.assigned)) {
+      return [];
+    }
     const limit = args.limit ?? LIST_READ_CAP;
     const variables = await resolveEffectiveVariables(ctx, {
       projectId: args.projectId,
@@ -1317,6 +1328,18 @@ export const getDeleted = query({
     for (const membership of memberships) {
       const workspace = await ctx.db.get(membership.workspaceId);
       if (!workspace || workspace.deletedAt) continue;
+      // Listed only where restore would be allowed: delete rights in every
+      // project the group reaches.
+      try {
+        await authorizeVariableAccess(ctx, {
+          userId: actor._id,
+          projectId: workspace._id,
+          action: "project:delete_variable",
+          preloadedProject: workspace,
+        });
+      } catch {
+        continue;
+      }
       const shared = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project_deleted", (q) =>

@@ -410,7 +410,9 @@ export const createMany = internalMutation({
     const varCheck = await checkCountedLimit(
       ctx.db,
       project.organizationId,
-      "max_variables_per_project",
+      isWorkspace(project)
+        ? "max_variables_per_workspace"
+        : "max_variables_per_project",
       (limit) => countActiveVariables(ctx.db, args.projectId, limit),
       gate,
       args.variables.length
@@ -741,9 +743,10 @@ export async function updateCore(
     variable: {
       ...variable,
       environments: updates.environments ?? variable.environments,
+      isSensitive: updates.isSensitive ?? variable.isSensitive,
     },
     userId: updatedBy,
-    action: "variable.updated",
+    action: auditAction,
   });
 
   if (override && isProtectedWrite(project, touched)) {

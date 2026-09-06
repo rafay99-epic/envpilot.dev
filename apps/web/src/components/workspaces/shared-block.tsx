@@ -80,7 +80,7 @@ function SharedGroup({
   const [isSaving, setIsSaving] = useState(false);
 
   const group = rows[0].workspace;
-  const readers = new Set(rows.flatMap((row) => row.reached));
+  const readers = new Set(rows.flatMap((row) => row.reachedIds));
 
   // Only fetched while the scope dialog is open: the picker needs project ids
   // and the row itself carries names.
@@ -101,6 +101,10 @@ function SharedGroup({
       if (result.failed.length > 0) {
         toast.warning(
           `Stopped sharing. Could not copy ${result.failed.map((entry) => entry.key).join(", ")}.`
+        );
+      } else if (result.pending.length > 0) {
+        toast.success(
+          `Stopped sharing. ${result.pending.join(", ")} await approval before they land in ${projectName}.`
         );
       } else {
         toast.success(`${projectName} no longer reads ${group.name}.`);
@@ -182,7 +186,7 @@ function SharedGroup({
               revealedValue={revealedValues[row._id] ?? null}
               isRevealing={revealingIds.has(row._id)}
               canEdit={row.canEdit}
-              canDelete={row.canEdit}
+              canDelete={row.canDelete}
               readOnlyLabel={row.canEdit ? undefined : "read only"}
               onEdit={() => onEdit(row)}
               onDelete={() => onDelete(row)}

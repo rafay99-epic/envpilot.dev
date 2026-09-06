@@ -22,6 +22,7 @@ export function orgSettingsTabs({
   isOwner,
   canManageApiKeys,
   showTags,
+  showShared,
   notificationsRegistered,
 }: {
   slug: string;
@@ -35,6 +36,7 @@ export function orgSettingsTabs({
   isOwner: boolean;
   canManageApiKeys: boolean;
   showTags: boolean;
+  showShared: boolean;
   notificationsRegistered: boolean;
 }): SettingsTabDef[] {
   const organizationId = organization._id as Id<"organizations">;
@@ -57,8 +59,11 @@ export function orgSettingsTabs({
     },
     {
       id: "shared",
+      hidden: !showShared,
       label: "Shared variables",
-      render: () => <SharedVariablesTab organizationId={organizationId} />,
+      render: () => (
+        <SharedVariablesTab organizationId={organizationId} isOwner={isOwner} />
+      ),
     },
     {
       id: "apiKeys",

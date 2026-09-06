@@ -8,6 +8,7 @@ import {
 } from "../../_generated/server";
 import { del as deleteBlob } from "../files/blobStore";
 import { deleteVaultObject } from "../vault/gc";
+import { syncWorkspaceProtection } from "../../lib/protection";
 
 const EXTERNAL_BATCH_SIZE = 8;
 const DATABASE_BATCH_SIZE = 64;
@@ -256,7 +257,10 @@ async function deleteProjectRows(
       .query("workspaceProjects")
       .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .take(DATABASE_BATCH_SIZE);
-    for (const row of asMember) await ctx.db.delete(row._id);
+    for (const row of asMember) {
+      await ctx.db.delete(row._id);
+      await syncWorkspaceProtection(ctx, row.workspaceId, row.createdBy);
+    }
     if (asMember.length > 0) return true;
 
     const asWorkspace = await ctx.db

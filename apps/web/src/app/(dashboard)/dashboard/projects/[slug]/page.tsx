@@ -112,7 +112,12 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   // Read access keeps the trash recovery route available to members who may
   // need to restore content they previously deleted.
   const canRequestVariable = capabilities["project.requests.submit"] === true;
-  const canManageShares = capabilities["project.workspaces.manage"] === true;
+  const { allowed: sharingEnabled } = useFeatureGate(
+    organization?.id as Id<"organizations"> | undefined,
+    "workspaces"
+  );
+  const canManageShares =
+    sharingEnabled && capabilities["project.workspaces.manage"] === true;
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
@@ -208,7 +213,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const rollbackVariable = useRollbackVariable();
   const revealSecret = useRevealSecret();
   const protection = useProtection(projectId);
-  const duplicateKeys = useDuplicateKeys(projectId);
+  const duplicateKeys = useDuplicateKeys(
+    canManageShares ? projectId : undefined
+  );
   const proposeChange = useAction(
     api.features.changeRequests.actions.createVariableChange
   );

@@ -580,7 +580,11 @@ export async function auditSharedWrite(
       "_id" | "key" | "environments" | "isSensitive" | "appliesTo"
     >;
     userId: Id<"users">;
-    action: "variable.created" | "variable.updated" | "variable.deleted";
+    action:
+      | "variable.created"
+      | "variable.updated"
+      | "variable.rotated"
+      | "variable.deleted";
   }
 ): Promise<void> {
   if (!isWorkspace(input.project)) return;

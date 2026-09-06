@@ -75,7 +75,13 @@ export async function reachedProjects(
   for (const membership of memberships) {
     if (appliesTo && !appliesTo.includes(membership.projectId)) continue;
     const project = await db.get(membership.projectId);
-    if (project && !project.deletedAt) projects.push(project);
+    if (
+      project &&
+      !project.deletedAt &&
+      project.organizationId === membership.organizationId
+    ) {
+      projects.push(project);
+    }
   }
   return projects;
 }

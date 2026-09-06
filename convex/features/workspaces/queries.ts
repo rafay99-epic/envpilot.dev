@@ -7,6 +7,7 @@ import {
   getRoleProfile,
   bypassesAssignment,
   getVariableAccess,
+  assertProjectCapability,
   isEnvironmentScopeAllowed,
 } from "../../lib/authz";
 import {
@@ -18,8 +19,6 @@ import {
 import { protectedEnvironmentsIn } from "../../lib/protection";
 import { resolveEffectiveVariables } from "../variables/resolve";
 import { resolveProjectAccessContext } from "../variables/helpers";
-
-const MAX_SCAN_ROWS = 2000;
 
 /**
  * A workspace is visible to anyone who can read a project that reads it.
@@ -185,6 +184,24 @@ export const listInheritedForProject = query({
       const level = await getVariableAccess(ctx, actor._id, row);
       if (level === null) continue;
       const workspace = await ctx.db.get(workspaceId);
+      const canDelete =
+        level === "write" &&
+        (await assertProjectCapability(
+          ctx,
+          actor._id,
+          workspaceId,
+          "project.variables.delete",
+          workspace
+        )
+          .then(() => true)
+          .catch(() => false));
+      const protectedEnvironments = [
+        ...new Set(
+          reached.flatMap((member) =>
+            protectedEnvironmentsIn(member, row.environments)
+          )
+        ),
+      ];
       out.push({
         _id: row._id,
         key: row.key,
@@ -198,12 +215,15 @@ export const listInheritedForProject = query({
         tagIds: row.tagIds,
         appliesTo: row.appliesTo,
         canEdit: level === "write",
+        canDelete,
+        protectedEnvironments,
         workspace: {
           _id: workspaceId,
           name: row.source.name,
           slug: workspace?.slug ?? "",
         },
         reached: reached.map((member) => member.name),
+        reachedIds: reached.map((member) => member._id),
         protectedIn: reached
           .filter(
             (member) =>
@@ -222,7 +242,8 @@ async function keyOwners(
   organizationId: Id<"organizations">
 ): Promise<Map<string, Set<Id<"projects">>>> {
   const owners = new Map<string, Set<Id<"projects">>>();
-  let scanned = 0;
+  // Every active row per project: the tier cap bounds each read, and a
+  // partial scan would hide duplicates without saying so.
   for (const project of await activeProjectsQuery(
     ctx.db,
     organizationId
@@ -232,14 +253,12 @@ async function keyOwners(
       .withIndex("by_project_deleted", (q) =>
         q.eq("projectId", project._id).eq("deletedAt", undefined)
       )
-      .take(Math.max(0, MAX_SCAN_ROWS - scanned));
-    scanned += rows.length;
+      .collect();
     for (const row of rows) {
       const set = owners.get(row.key) ?? new Set();
       set.add(project._id);
       owners.set(row.key, set);
     }
-    if (scanned >= MAX_SCAN_ROWS) break;
   }
   return owners;
 }
@@ -257,7 +276,9 @@ export const duplicateKeys = query({
       args.projectId,
       actor._id
     );
-    if (!resolved) return [];
+    if (!resolved || !(resolved.access.isOwner || resolved.access.assigned)) {
+      return [];
+    }
     const owners = await keyOwners(ctx, resolved.project.organizationId);
     const out: { key: string; others: number }[] = [];
     for (const [key, projects] of owners) {

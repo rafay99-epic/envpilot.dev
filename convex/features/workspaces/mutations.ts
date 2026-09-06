@@ -80,6 +80,8 @@ export async function linkProjectCore(
       createdAt: now,
     });
     await syncWorkspaceProtection(ctx, args.workspaceId, actor._id);
+    // Moves the member's IDE change signal.
+    await ctx.db.patch(args.projectId, { updatedAt: now });
 
     await ctx.db.insert("auditLogs", {
       organizationId: workspace.organizationId,
@@ -128,6 +130,7 @@ export const removeProject = mutation({
     // needs vault reads and calls this mutation last.
     await ctx.db.delete(membership._id);
     await syncWorkspaceProtection(ctx, args.workspaceId, actor._id);
+    await ctx.db.patch(args.projectId, { updatedAt: Date.now() });
 
     await ctx.db.insert("auditLogs", {
       organizationId: workspace.organizationId,

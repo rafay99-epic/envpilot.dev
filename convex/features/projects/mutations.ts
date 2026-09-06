@@ -9,6 +9,7 @@ import {
   countActiveWorkspaces,
 } from "../featureRegistry/gates";
 import { isWorkspace, WORKSPACE_KIND } from "../../lib/projectKind";
+import { syncWorkspaceProtection } from "../../lib/protection";
 import { requireAuthedUser } from "../../lib/identity";
 import {
   assertOrgAction,
@@ -447,6 +448,15 @@ export const move = mutation({
       throw new ConvexError(
         "Shared variable groups cannot move between organizations."
       );
+    }
+    // Sharing never crosses an organization: the project leaves its groups.
+    const memberships = await ctx.db
+      .query("workspaceProjects")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const membership of memberships) {
+      await ctx.db.delete(membership._id);
+      await syncWorkspaceProtection(ctx, membership.workspaceId, actor._id);
     }
 
     const sourceOrg = await ctx.db.get(project.organizationId);

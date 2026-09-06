@@ -57,6 +57,20 @@ test.describe("shared variables", () => {
       await expect(
         sheet.getByText(`Share ${SHARED_KEY}`, { exact: false })
       ).toBeVisible({ timeout: 15_000 });
+      // Nothing else holds this fresh key, so pick the first project that
+      // does not have it yet. No pickable project means nothing to share with.
+      await expect(sheet.getByRole("checkbox").first()).toBeVisible({
+        timeout: 15_000,
+      });
+      const candidate = sheet
+        .getByRole("checkbox", { disabled: false })
+        .first();
+      if (!(await candidate.isVisible().catch(() => false))) {
+        await page.keyboard.press("Escape");
+        test.skip(true, "No other project to share with in this org.");
+        return;
+      }
+      await candidate.check();
       await sheet.getByRole("button", { name: /^Share with/ }).click();
       await expect(sheet).toBeHidden({ timeout: 20_000 });
 
@@ -93,6 +107,20 @@ test.describe("shared variables", () => {
       await page.goto(`/dashboard/projects/${projectSlug}`, {
         waitUntil: "domcontentloaded",
       });
+      // A run that died while the row was shared unshares it first so the
+      // private copy comes back and the ordinary delete helper can remove it.
+      const stopSharing = page.getByRole("button", {
+        name: /stop sharing here/i,
+      });
+      if (await stopSharing.isVisible().catch(() => false)) {
+        await stopSharing.click();
+        await page
+          .getByRole("button", { name: "Stop sharing", exact: true })
+          .click();
+        await expect(
+          variableRow(page, SHARED_KEY).first().getByTitle("Delete variable")
+        ).toBeVisible({ timeout: 20_000 });
+      }
       await deleteVariableByKey(page, SHARED_KEY);
     }
   });

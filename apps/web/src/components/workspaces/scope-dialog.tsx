@@ -48,10 +48,7 @@ export function ScopeDialog({
   if (targetId !== loadedFor) {
     setLoadedFor(targetId);
     setMode(target?.appliesTo ? "some" : "all");
-    const current = new Set(members.map((member) => member.projectId));
-    setPicked(
-      new Set((target?.appliesTo ?? []).filter((id) => current.has(id)))
-    );
+    setPicked(new Set(target?.appliesTo ?? []));
   }
 
   async function handleSave() {
@@ -66,7 +63,13 @@ export function ScopeDialog({
       await setVariableScope({
         workspaceId,
         variableId: target.variableId,
-        projectIds: mode === "all" ? undefined : [...picked],
+        // Projects unlinked since the scope was saved are dropped here.
+        projectIds:
+          mode === "all"
+            ? undefined
+            : [...picked].filter((id) =>
+                members.some((member) => member.projectId === id)
+              ),
       });
       toast.success(
         mode === "all"

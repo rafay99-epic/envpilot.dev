@@ -10,6 +10,7 @@ import {
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { createAuditLog } from "../../lib/audit";
 import { syncWorkspaceProtection } from "../../lib/protection";
+import { isWorkspace } from "../../lib/projectKind";
 
 /**
  * Protected environments: the CONFIG surface.
@@ -49,6 +50,11 @@ export const setProtection = mutation({
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
       throw new ConvexError("Project not found");
+    }
+    if (isWorkspace(project)) {
+      throw new ConvexError(
+        "A shared group's protection follows the projects that read it."
+      );
     }
 
     await assertProjectCapability(

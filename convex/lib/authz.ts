@@ -575,15 +575,25 @@ async function assertAcrossMembers(
     );
 
   if (capability === "project.read") {
+    const passed: ProjectAuthResult[] = [];
     let lastError: unknown;
     for (const member of members) {
       try {
-        return await check(member);
+        passed.push(await check(member));
       } catch (error) {
         lastError = error;
       }
     }
-    throw lastError;
+    if (passed.length === 0) throw lastError;
+    // Readable through any member, so the scope is the union of theirs.
+    const unrestricted = passed.some((r) => r.environmentScope === undefined);
+    return {
+      ...passed[0],
+      assigned: passed.some((r) => r.assigned),
+      environmentScope: unrestricted
+        ? undefined
+        : [...new Set(passed.flatMap((r) => r.environmentScope ?? []))],
+    };
   }
 
   const results: ProjectAuthResult[] = [];
@@ -896,7 +906,10 @@ export async function getVariableAccess(
     project._id,
     variable.appliesTo
   );
-  if (members.length === 0) return resolveIn(variable.projectId);
+  // Scoped to nobody is unreachable; only an unscoped empty group falls back.
+  if (members.length === 0) {
+    return variable.appliesTo ? null : resolveIn(variable.projectId);
+  }
   const levels = await Promise.all(members.map((m) => resolveIn(m._id)));
   if (levels.every((level) => level === "write")) return "write";
   return levels.some((level) => level !== null) ? "read" : null;

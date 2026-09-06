@@ -23,6 +23,8 @@ export const _applyAdoption = internalMutation({
     survivorId: v.id("environmentVariables"),
     duplicateIds: v.array(v.id("environmentVariables")),
     key: v.string(),
+    /** Set when the group already has members the caller did not pick. */
+    appliesTo: v.optional(v.array(v.id("projects"))),
   },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
@@ -49,6 +51,7 @@ export const _applyAdoption = internalMutation({
 
     await ctx.db.patch(args.survivorId, {
       projectId: args.workspaceId,
+      appliesTo: args.appliesTo,
       updatedAt: now,
     });
 

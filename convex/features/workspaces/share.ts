@@ -18,6 +18,7 @@ import {
 } from "../../lib/projectKind";
 import { createProjectCore } from "../projects/mutations";
 import { linkProjectCore } from "./mutations";
+import { syncWorkspaceProtection } from "../../lib/protection";
 
 /**
  * Sharing from a project row: one action creates or picks the group, links
@@ -133,6 +134,17 @@ export const _candidates = internalQuery({
       ctx.db,
       project.organizationId
     ).collect()) {
+      // Read on the group means read on one of its projects.
+      try {
+        await assertProjectAction(
+          ctx,
+          actor._id,
+          workspace._id,
+          "project:read"
+        );
+      } catch {
+        continue;
+      }
       const members = await reachedProjects(ctx.db, workspace._id);
       groups.push({
         _id: workspace._id,
@@ -286,6 +298,13 @@ export const share = action({
         group: args.group,
       }
     );
+    // A group that already reaches projects the caller did not pick keeps
+    // the new row scoped to the picked ones.
+    const existing = found.groups.find((g) => g._id === linked.workspaceId);
+    const selected = [args.projectId, ...args.projectIds];
+    const outsiders = (existing?.memberIds ?? []).some(
+      (id) => !selected.includes(id)
+    );
     try {
       await ctx.runMutation(internal.features.workspaces.adopt._applyAdoption, {
         workspaceId: linked.workspaceId,
@@ -294,6 +313,7 @@ export const share = action({
           project.row ? [project.row.variableId] : []
         ),
         key: found.source.key,
+        appliesTo: outsiders ? selected : undefined,
       });
     } catch (error) {
       await ctx.runMutation(internal.features.workspaces.share._unlink, linked);
@@ -357,6 +377,7 @@ export const _unlink = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
+    const actor = await requireAuthedUser(ctx);
     for (const projectId of args.linked) {
       const membership = await ctx.db
         .query("workspaceProjects")
@@ -368,6 +389,7 @@ export const _unlink = internalMutation({
     }
     // A group minted seconds ago with nothing in it has nothing to cascade.
     if (args.created) await ctx.db.delete(args.workspaceId);
+    else await syncWorkspaceProtection(ctx, args.workspaceId, actor._id);
     return null;
   },
 });
@@ -394,6 +416,7 @@ export const unshare = action({
   },
   returns: v.object({
     copied: v.array(v.string()),
+    pending: v.array(v.string()),
     failed: v.array(v.object({ key: v.string(), reason: v.string() })),
   }),
   handler: async (
@@ -401,6 +424,7 @@ export const unshare = action({
     args
   ): Promise<{
     copied: string[];
+    pending: string[];
     failed: { key: string; reason: string }[];
   }> => {
     const rows: InheritedRow[] = await ctx.runQuery(
@@ -425,21 +449,28 @@ export const unshare = action({
     });
 
     const copied: string[] = [];
+    const pending: string[] = [];
     const failed: { key: string; reason: string }[] = [];
     for (const [index, row] of rows.entries()) {
       if (!args.keepCopies) break;
       try {
-        await ctx.runAction(api.features.variables.values.createWithValue, {
-          projectId: args.projectId,
-          key: row.key,
-          value: values[index],
-          environments: row.environments,
-          isSensitive: row.isSensitive,
-          description: row.description,
-          rotationFrequencyDays: row.rotationFrequencyDays,
-          source: "web",
-        });
-        copied.push(row.key);
+        const result = await ctx.runAction(
+          api.features.variables.values.createWithValue,
+          {
+            projectId: args.projectId,
+            key: row.key,
+            value: values[index],
+            environments: row.environments,
+            isSensitive: row.isSensitive,
+            description: row.description,
+            rotationFrequencyDays: row.rotationFrequencyDays,
+            tagIds: row.tagIds,
+            source: "web",
+          }
+        );
+        // A protected environment turns the copy into a change request.
+        if ("requested" in result) pending.push(row.key);
+        else copied.push(row.key);
       } catch (error) {
         failed.push({
           key: row.key,
@@ -450,7 +481,7 @@ export const unshare = action({
     await ctx.runMutation(internal.features.workspaces.share._deleteIfEmpty, {
       workspaceId: args.workspaceId,
     });
-    return { copied, failed };
+    return { copied, pending, failed };
   },
 });
 
@@ -461,6 +492,7 @@ type InheritedRow = {
   isSensitive: boolean;
   description?: string;
   rotationFrequencyDays?: number;
+  tagIds?: Id<"variableTags">[];
 };
 
 export const _inheritedRows = internalQuery({
@@ -488,6 +520,7 @@ export const _inheritedRows = internalQuery({
         isSensitive: row.isSensitive,
         description: row.description,
         rotationFrequencyDays: row.rotationFrequencyDays,
+        tagIds: row.tagIds,
       }));
   },
 });

@@ -21,8 +21,10 @@ const PILL =
 
 export function SharedVariablesTab({
   organizationId,
+  isOwner,
 }: {
   organizationId: Id<"organizations">;
+  isOwner: boolean;
 }) {
   const { groups, isLoading } = useSharedGroups(organizationId);
   const duplicates = useDuplicateKeysForOrganization(organizationId);
@@ -63,6 +65,7 @@ export function SharedVariablesTab({
       setPendingDelete(null);
     } catch (err) {
       setError(sanitizeConvexError(err));
+      throw err;
     }
   };
 
@@ -140,7 +143,7 @@ export function SharedVariablesTab({
                     </p>
                   )}
                 </div>
-                {editingId !== group._id && (
+                {isOwner && editingId !== group._id && (
                   <div className="flex gap-1">
                     <button
                       onClick={() => startRename(group)}

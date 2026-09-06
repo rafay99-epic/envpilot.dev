@@ -38,6 +38,10 @@ function OrganizationSettingsPageContent({
     organization?._id as Id<"organizations"> | undefined,
     "variable_tags"
   );
+  const { allowed: showShared } = useFeatureGate(
+    organization?._id as Id<"organizations"> | undefined,
+    "workspaces"
+  );
 
   const tierData = useQuery(
     api.features.featureRegistry.queries.getResolvedFeatures,
@@ -79,6 +83,7 @@ function OrganizationSettingsPageContent({
         isOwner,
         canManageApiKeys,
         showTags,
+        showShared,
         notificationsRegistered,
       })
     : [];

@@ -338,7 +338,10 @@ function DuplicateKeysBanner({
   organizationId: Id<"organizations"> | undefined;
   orgSlug: string | null | undefined;
 }) {
-  const duplicates = useDuplicateKeysForOrganization(organizationId);
+  const { allowed: enabled } = useFeatureGate(organizationId, "workspaces");
+  const duplicates = useDuplicateKeysForOrganization(
+    enabled ? organizationId : undefined
+  );
   const storageKey = `envpilot.duplicates-banner.${organizationId}`;
   const dismissed = useSyncExternalStore(
     subscribeDismissal,

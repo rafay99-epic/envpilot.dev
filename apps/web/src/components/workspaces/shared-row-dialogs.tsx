@@ -80,9 +80,7 @@ export function SharedRowDialogs({
         onClose={onClose}
         variable={editing}
         onSave={handleUpdate}
-        protectedEnvironments={
-          editing?.protectedIn.length ? editing.environments : undefined
-        }
+        protectedEnvironments={editing?.protectedEnvironments}
         showRotation={showRotation}
         notice={editing && <EditNotice row={editing} />}
       />
@@ -109,8 +107,9 @@ function EditNotice({ row }: { row: SharedRow }) {
       </p>
       {row.protectedIn.length > 0 && (
         <p className="text-warning">
-          {row.protectedIn.join(" and ")} protect {row.environments.join(", ")}.
-          This will be filed as a change request for a second person to apply.
+          {row.protectedIn.join(" and ")} protect{" "}
+          {row.protectedEnvironments.join(", ")}. This will be filed as a change
+          request for a second person to apply.
         </p>
       )}
     </div>
@@ -122,7 +121,7 @@ export function DuplicateBadge({ others }: { others: number | undefined }) {
   if (!others) return null;
   return (
     <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
-      same key in {others} projects
+      same key in {others + 1} projects
     </span>
   );
 }
