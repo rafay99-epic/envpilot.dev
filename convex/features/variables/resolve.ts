@@ -66,7 +66,10 @@ export async function resolveEffectiveVariables(
       // Absent appliesTo = every member project, and it keeps following
       // membership as projects join. Present = exactly that list.
       if (row.appliesTo && !row.appliesTo.includes(args.projectId)) continue;
-      if (args.environment && !row.environments.includes(args.environment)) {
+      if (
+        args.environment !== undefined &&
+        !row.environments.includes(args.environment)
+      ) {
         continue;
       }
 
@@ -99,9 +102,9 @@ async function activeRows(
     )
     .collect();
 
-  return environment
-    ? rows.filter((row) => row.environments.includes(environment))
-    : rows;
+  return environment === undefined
+    ? rows
+    : rows.filter((row) => row.environments.includes(environment));
 }
 
 /**
@@ -116,7 +119,7 @@ function assertNoDuplicatePairs(rows: ResolvedVariable[]): void {
   for (const row of rows) {
     const owner = row.source.kind === "own" ? "this project" : row.source.name;
 
-    for (const environment of row.environments) {
+    for (const environment of new Set(row.environments)) {
       const pair = `${row.key} ${environment}`;
       const existing = claimed.get(pair);
       if (existing !== undefined) {

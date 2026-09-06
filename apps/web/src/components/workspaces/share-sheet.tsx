@@ -61,11 +61,10 @@ export function ShareSheet({ projectId, variable, onClose }: ShareSheetProps) {
     preview({ projectId, variableId })
       .then((result) => {
         if (cancelled) return;
-        const chosen = new Set(
-          result.projects
-            .filter((project) => project.verdict === "same")
-            .map((project) => project._id)
-        );
+        const chosen = new Set<Id<"projects">>();
+        for (const project of result.projects) {
+          if (project.verdict === "same") chosen.add(project._id);
+        }
         const best = result.groups
           .map((existing) => ({
             existing,
@@ -230,15 +229,17 @@ export function ShareSheet({ projectId, variable, onClose }: ShareSheetProps) {
                   </span>
                 </label>
               ))}
-              <label className="flex items-center gap-3 px-3 py-2">
-                <input
-                  type="radio"
-                  name="share-group"
-                  checked={group.kind === "new"}
-                  onChange={() => setGroup({ kind: "new" })}
-                  className="accent-accent"
-                />
-                <span className="text-sm text-ink">New group</span>
+              <div className="flex items-center gap-3 px-3 py-2">
+                <label className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="share-group"
+                    checked={group.kind === "new"}
+                    onChange={() => setGroup({ kind: "new" })}
+                    className="accent-accent"
+                  />
+                  <span className="text-sm text-ink">New group</span>
+                </label>
                 <input
                   type="text"
                   value={newName}
@@ -249,7 +250,7 @@ export function ShareSheet({ projectId, variable, onClose }: ShareSheetProps) {
                   aria-label="New group name"
                   className="min-w-0 flex-1 border border-line bg-transparent px-2 py-1 text-sm text-ink"
                 />
-              </label>
+              </div>
             </div>
           </div>
         </div>

@@ -38,17 +38,20 @@ export function ScopeDialog({
   const { setVariableScope } = useShareActions();
 
   const [mode, setMode] = useState<"all" | "some">("all");
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [picked, setPicked] = useState<Set<Id<"projects">>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
-  // Sync form state to the row being edited, without an effect: rendering a
-  // different target is the signal, and doing it here keeps the component
-  // compiler-friendly.
-  if (target && loadedFor !== target.variableId) {
-    setLoadedFor(target.variableId);
-    setMode(target.appliesTo ? "some" : "all");
-    setPicked(new Set((target.appliesTo ?? []).map((id) => id as string)));
+  // Sync form state to the row being edited during render, not in an effect.
+  // Closing clears it so reopening the same row reloads its saved scope.
+  const targetId = target?.variableId ?? null;
+  if (targetId !== loadedFor) {
+    setLoadedFor(targetId);
+    setMode(target?.appliesTo ? "some" : "all");
+    const current = new Set(members.map((member) => member.projectId));
+    setPicked(
+      new Set((target?.appliesTo ?? []).filter((id) => current.has(id)))
+    );
   }
 
   async function handleSave() {
@@ -63,8 +66,7 @@ export function ScopeDialog({
       await setVariableScope({
         workspaceId,
         variableId: target.variableId,
-        projectIds:
-          mode === "all" ? undefined : ([...picked] as Id<"projects">[]),
+        projectIds: mode === "all" ? undefined : [...picked],
       });
       toast.success(
         mode === "all"

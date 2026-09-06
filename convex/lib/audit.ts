@@ -60,6 +60,10 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "org.created": "info",
   "project.created": "info",
   "project.moved": "warning",
+  "workspace.created": "info",
+  "workspace.project_added": "warning",
+  "workspace.project_removed": "warning",
+  "workspace.variable_adopted": "info",
   "variable.created": "info",
   "variable.requested": "info",
   "variable.request_approved": "info",
@@ -144,6 +148,10 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
 
   // Project
   "project.created": "project",
+  "workspace.created": "project",
+  "workspace.project_added": "project",
+  "workspace.project_removed": "project",
+  "workspace.variable_adopted": "variable",
   "project.updated": "project",
   "project.deleted": "project",
   "project.moved": "project",

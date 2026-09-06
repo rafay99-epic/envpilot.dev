@@ -59,15 +59,23 @@ export const listByProject = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    if (!(await resolveProjectAccessContext(ctx, args.projectId, actor._id))) {
+      return [];
+    }
     const limit = args.limit ?? LIST_READ_CAP;
 
-    // Own rows plus everything inherited from the workspaces this project
-    // belongs to. Each row carries `source`, so the page can group inherited
-    // ones under the workspace they came from and render them read-only.
-    const variables = await resolveEffectiveVariables(ctx, {
-      projectId: args.projectId,
-      environment: args.environment,
-    });
+    // Own rows only: push and import diff against this list, and a shared
+    // row must never be deleted or rewritten from a member project.
+    const rows = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+      )
+      .take(limit + 1);
+    const variables = args.environment
+      ? rows.filter((row) => row.environments.includes(args.environment!))
+      : rows;
 
     if (variables.length > limit) {
       throw new ConvexError(
@@ -570,6 +578,9 @@ async function listWithAccessCore(
   ).map((row) =>
     row.source.kind === "own" ? row : { ...row, projectId: args.projectId }
   );
+  const inherited = new Set(
+    resolvedRows.filter((row) => row.source.kind !== "own").map((r) => r._id)
+  );
 
   const truncatedAt = resolvedRows.length > limit ? limit : undefined;
   const allVariables = resolvedRows.slice(0, limit);
@@ -580,9 +591,17 @@ async function listWithAccessCore(
     isEnvironmentScopeAllowed(access.environmentScope, variable.environments)
   );
 
-  const variablesWithAccess = variables.map((variable) =>
-    mapVariableRow(variable, access)
-  );
+  // A shared row is never writable from a member project's list.
+  const variablesWithAccess = variables.map((variable) => {
+    const mapped = mapVariableRow(variable, access);
+    return inherited.has(variable._id)
+      ? {
+          ...mapped,
+          permission: mapped.hasAccess ? ("read" as const) : null,
+          canManagePermissions: false,
+        }
+      : mapped;
+  });
 
   // Assigned members (and owners) may list metadata for every variable;
   // grant-only viewers see just the variables shared with them.
@@ -875,12 +894,10 @@ export const listMetadataByProject = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? LIST_READ_CAP;
-    const variables = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project_deleted", (q) =>
-        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
-      )
-      .take(limit + 1);
+    const variables = await resolveEffectiveVariables(ctx, {
+      projectId: args.projectId,
+      environment: args.environment,
+    });
 
     if (variables.length > limit) {
       throw new ConvexError(
@@ -888,11 +905,7 @@ export const listMetadataByProject = query({
       );
     }
 
-    const filtered = args.environment
-      ? variables.filter((v) => v.environments.includes(args.environment!))
-      : variables;
-
-    return filtered.map((v) => ({
+    return variables.map((v) => ({
       _id: v._id,
       key: v.key,
       environments: v.environments,

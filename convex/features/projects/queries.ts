@@ -90,6 +90,7 @@ export const listByOrganization = query({
       (project): project is NonNullable<typeof project> =>
         project !== null &&
         project.deletedAt === undefined &&
+        !isWorkspace(project) &&
         project.organizationId === args.organizationId
     );
   },

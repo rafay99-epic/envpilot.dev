@@ -20,6 +20,7 @@ import {
   auditSharedWrite,
   logVariableAccess,
 } from "../../lib/audit";
+import { isWorkspace } from "../../lib/projectKind";
 import { rateLimiter } from "../../lib/rateLimits";
 import {
   authorizeVariableAccess,
@@ -154,7 +155,9 @@ export async function createCore(
     const varCheck = await checkCountedLimit(
       ctx.db,
       project.organizationId,
-      "max_variables_per_project",
+      isWorkspace(project)
+        ? "max_variables_per_workspace"
+        : "max_variables_per_project",
       (limit) => countActiveVariables(ctx.db, args.projectId, limit),
       gate
     );
@@ -528,6 +531,7 @@ export async function updateCore(
       key: variable.key,
       environments: updates.environments,
       excludeVariableId: variable._id,
+      appliesTo: variable.appliesTo,
     });
     if (envClashes.length > 0) {
       throw new ConvexError(
@@ -1217,6 +1221,7 @@ export async function restoreCore(
     projectId: variable.projectId,
     key: variable.key,
     environments: variable.environments,
+    appliesTo: variable.appliesTo,
   });
   if (envClashes.length > 0) {
     const where = envClashes

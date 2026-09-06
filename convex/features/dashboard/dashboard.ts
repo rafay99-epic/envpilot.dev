@@ -2,7 +2,10 @@ import { v } from "convex/values";
 import { query } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
 import { batchGetUsers } from "../../lib/users";
-import { activeProjectsQuery } from "../../lib/projectKind";
+import {
+  activeProjectsQuery,
+  activeWorkspacesQuery,
+} from "../../lib/projectKind";
 import { resolveFeatureValue } from "../featureRegistry/resolver";
 import {
   normalizeOrgRole,
@@ -43,7 +46,12 @@ export const getStats = query({
     let encryptedCount = 0;
     let variablesCapped = false;
     let variableBudget = VARIABLE_SCAN_CAP;
-    for (const project of projects) {
+    // Shared rows count as variables even though their group is not a project.
+    const workspaces = await activeWorkspacesQuery(
+      ctx.db,
+      args.organizationId
+    ).collect();
+    for (const project of [...projects, ...workspaces]) {
       if (variableBudget <= 0) {
         variablesCapped = true;
         break;

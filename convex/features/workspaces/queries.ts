@@ -182,6 +182,8 @@ export const listInheritedForProject = query({
       const reached = members.filter(
         (member) => !row.appliesTo || row.appliesTo.includes(member._id)
       );
+      const level = await getVariableAccess(ctx, actor._id, row);
+      if (level === null) continue;
       const workspace = await ctx.db.get(workspaceId);
       out.push({
         _id: row._id,
@@ -195,7 +197,7 @@ export const listInheritedForProject = query({
         rotationFrequencyDays: row.rotationFrequencyDays,
         tagIds: row.tagIds,
         appliesTo: row.appliesTo,
-        canEdit: (await getVariableAccess(ctx, actor._id, row)) === "write",
+        canEdit: level === "write",
         workspace: {
           _id: workspaceId,
           name: row.source.name,

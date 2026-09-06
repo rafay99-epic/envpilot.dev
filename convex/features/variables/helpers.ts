@@ -445,6 +445,8 @@ export async function findEnvironmentConflicts(
     .collect();
 
   for (const membership of memberships) {
+    const workspace = await ctx.db.get(membership.workspaceId);
+    if (!workspace || workspace.deletedAt) continue;
     const rows = (
       await activeRowsWithKey(ctx, membership.workspaceId, args.key, args)
     ).filter(
@@ -455,12 +457,11 @@ export async function findEnvironmentConflicts(
     const clash = overlappingEnvironments(rows, wanted);
     if (clash.length === 0) continue;
 
-    const workspace = await ctx.db.get(membership.workspaceId);
     conflicts.push({
       source: {
         kind: "workspace",
         workspaceId: membership.workspaceId,
-        name: workspace?.name ?? "a workspace",
+        name: workspace.name,
       },
       environments: clash,
     });

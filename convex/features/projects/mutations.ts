@@ -8,7 +8,7 @@ import {
   countActiveProjects,
   countActiveWorkspaces,
 } from "../featureRegistry/gates";
-import { WORKSPACE_KIND } from "../../lib/projectKind";
+import { isWorkspace, WORKSPACE_KIND } from "../../lib/projectKind";
 import { requireAuthedUser } from "../../lib/identity";
 import {
   assertOrgAction,
@@ -442,6 +442,11 @@ export const move = mutation({
 
     if (project.organizationId === args.targetOrganizationId) {
       throw new ConvexError("Project is already in the target organization");
+    }
+    if (isWorkspace(project)) {
+      throw new ConvexError(
+        "Shared variable groups cannot move between organizations."
+      );
     }
 
     const sourceOrg = await ctx.db.get(project.organizationId);
