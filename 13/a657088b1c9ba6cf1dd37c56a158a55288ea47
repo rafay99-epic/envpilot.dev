@@ -1,0 +1,117 @@
+convex/features/projects/protection.ts
+  s_907ffcf933f32f::t_15c39dd7e9cf90 12
+  s_907ffcf933f32f::t_bd731f7430616a 91-97
+  s_907ffcf933f32f::t_f2823a3156c9f9 98
+convex/features/variables/helpers.ts
+  s_907ffcf933f32f::t_e566648ded062b 426
+  s_907ffcf933f32f::t_2a7f5ba4649222 455
+convex/lib/audit.ts
+  s_907ffcf933f32f::t_612badb25da9f6 9,560-599
+  s_907ffcf933f32f::t_56d163b11349e9 600
+convex/features/workspaces/adopt.ts
+  s_907ffcf933f32f::t_20ad69af62864d 2,6-9
+apps/web/src/components/workspaces/share-sheet.tsx
+  s_907ffcf933f32f::t_5019adcde5cd8c 95,100,108
+  s_907ffcf933f32f::t_da2405372afd04 54
+  s_907ffcf933f32f::t_d1dd056af3c2a4 160-161
+  s_907ffcf933f32f::t_bdcae3104f4350 3,5,7-8,11-32,36-37,39-41,43-45,47,59-66,68-94,96,98-99,102-105,110,114,117-120,123-159,162-214,216-224,227-229,232-254,257
+  s_907ffcf933f32f::t_5eaf1fc52b0ea1 48,50-53,55,58
+  s_907ffcf933f32f::t_01855c749563ed 42,67,101
+convex/lib/authz.ts
+  s_907ffcf933f32f::t_b4f2984138882b 20,493-502,560-567,576-590,600-607,880-893,899-902
+  s_907ffcf933f32f::t_4e331de3c0abc9 568-575,894-898
+  s_907ffcf933f32f::t_a633988db2d3d1 591-599
+convex/features/workspaces/queries.ts
+  s_907ffcf933f32f::t_4e331de3c0abc9 171-173
+  s_907ffcf933f32f::t_e112ab1c9eb1f7 21
+  s_907ffcf933f32f::t_0cf7d87dc21905 9-10,12-18,22,25-26,42-50,55,62,64,71,77-82,90,92,112-120,122-134,147-150,167-170,174-186,189,192,195-288
+apps/docs/content/dashboard/project.mdx
+  s_907ffcf933f32f::t_172a90abe8a552 42-55
+apps/web/src/settings/org.tabs.tsx
+  s_907ffcf933f32f::t_7d33ce7146b1da 7
+  s_907ffcf933f32f::t_623182ce1bcecf 59-61
+  s_907ffcf933f32f::t_4c7551f4a54842 58
+  s_907ffcf933f32f::t_ed8245149f7bf8 62
+apps/web/src/hooks/index.ts
+  s_907ffcf933f32f::t_64407442b6aa96 16-22
+convex/features/auth/queries.ts
+  s_907ffcf933f32f::t_a633988db2d3d1 15,207-221
+  s_907ffcf933f32f::t_317482fae85f60 222
+convex/lib/protection.ts
+  s_907ffcf933f32f::t_bd731f7430616a 21,145-168
+  s_907ffcf933f32f::t_e941c83a073083 169
+convex/features/variables/queries.ts
+  s_907ffcf933f32f::t_612badb25da9f6 1290,1295,1297-1314,1319-1330
+  s_907ffcf933f32f::t_4e331de3c0abc9 1315-1318
+convex/features/variables/mutations.ts
+  s_907ffcf933f32f::t_612badb25da9f6 18-22,267-278,735-743,869-874
+apps/web/tests/e2e/authenticated/shared-variables.spec.ts
+  s_907ffcf933f32f::t_02703514b4fe3f 3,31-32
+  s_907ffcf933f32f::t_e112ab1c9eb1f7 12-15,18,20,22-24,33,36,40-49,53-56,58-67,69,71-88,90-96
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/trash/page.tsx
+  s_907ffcf933f32f::t_d1dd056af3c2a4 373-377
+apps/web/src/app/(dashboard)/dashboard/page.tsx
+  s_907ffcf933f32f::t_51875e3215fd83 107-113
+  s_907ffcf933f32f::t_942dbc8b05dd59 3
+  s_907ffcf933f32f::t_a522cd3560d21b 22
+  s_907ffcf933f32f::t_6fa8413c7c8585 336-344,350-361,363-378,382-383
+  s_907ffcf933f32f::t_fedd7afda70577 8
+  s_907ffcf933f32f::t_4a4ddcc99cf9a2 379-381
+  s_907ffcf933f32f::t_2724c4d3750bf2 316-335,345-349,362,386-387
+  s_907ffcf933f32f::t_b1e84fe7368b0d 384-385
+  s_907ffcf933f32f::t_35cc1fd1ccb814 388
+apps/web/content/CHANGELOG.md
+  s_907ffcf933f32f::t_172a90abe8a552 18,20,24,26,28,30
+apps/web/src/hooks/useWorkspaces.ts
+  s_907ffcf933f32f::t_fc92241f0f4cb1 5,7,11,16-17,21-22,32-33,39,44-50,52-62,64,66,68-73
+  s_907ffcf933f32f::t_64407442b6aa96 8-10
+apps/web/src/components/workspaces/index.ts
+  s_907ffcf933f32f::t_ad36a0579b7afe 1-2
+convex/features/vault/reveal.ts
+  s_907ffcf933f32f::t_a633988db2d3d1 42
+convex/features/variables/resolve.ts
+  s_907ffcf933f32f::t_0e53df67a9e175 69
+apps/web/src/components/settings/org/SharedVariables.tsx
+  s_907ffcf933f32f::t_01855c749563ed 55,65
+  s_907ffcf933f32f::t_4459e57058091d 4-6,8-14,17,19-20,22-32,34-37,39-43,45-48,51-54,56-57,59-60,62-64,67,69,71-77,79-105,107-110,112,114-139,142-203
+convex/features/workspaces/share.ts
+  s_907ffcf933f32f::t_81e96883b0a58c 75,131,163-173,223-231,259-260,280,306-310,327,359,399-406,410,457-464,468,499
+  s_907ffcf933f32f::t_4e331de3c0abc9 6,9,32,34,36,70-73,176,208-211,450-452
+  s_907ffcf933f32f::t_c75892a4b43482 1,3-5,7-8,10-11,13-20,23-26,29-31,37,39-67,69,74,76-90,92-105,107-108,110-128,132-140,144-162,174-175,177-188,190-202,204-205,207,212-222,232-258,261-277,281-288,290-296,299-300,302-304,312-326,328-350,352-358,360-373,375-383,385-398,407-409,411-418,420-425,427-449,453-455,466-467,469-498,500-527
+convex/features/workspaces/mutations.ts
+  s_907ffcf933f32f::t_e566648ded062b 13,21,24,69,72,82,127-128,130,188
+  s_907ffcf933f32f::t_67cd256e8b21ed 6,17-18
+  s_907ffcf933f32f::t_113aa400524c1a 205,208,293
+apps/web/src/components/workspaces/shared-block.tsx
+  s_907ffcf933f32f::t_01855c749563ed 123
+  s_907ffcf933f32f::t_e794c049b46714 6,8,10-13,16,18,20-29,33-34,36-45,47-79,82-93,96-99,101-108,116-122,124-131,133-202,205-207,210-215,217-220,222-225,229-230,236-238,241
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_907ffcf933f32f::t_01855c749563ed 27-28,44,110,206,251-255,523-569,945-955,1016-1027,1200-1249
+  s_907ffcf933f32f::t_fb322255e62752 1250
+apps/web/src/components/workspaces/scope-dialog.tsx
+  s_907ffcf933f32f::t_ad36a0579b7afe 7,38,99,102,120
+convex/lib/projectKind.ts
+  s_907ffcf933f32f::t_b4f2984138882b 59-81
+apps/web/src/components/variables/variable-edit-modal.tsx
+  s_907ffcf933f32f::t_7769db60b6f814 3,35-36,49,71
+apps/web/src/components/variables/variable-list-item.tsx
+  s_907ffcf933f32f::t_a480761cd9e157 3,5,39-43,64-66,114,211-220,263-268,289
+convex/_generated/api.d.ts
+  s_907ffcf933f32f::t_3a405e09a5b904 81,137,234,290
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "13a657088b1c9ba6cf1dd37c56a158a55288ea47",
+  "prompts": {},
+  "sessions": {
+    "s_907ffcf933f32f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0837503-b2fa-4f7d-8244-7a3ebcd5dd60",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
