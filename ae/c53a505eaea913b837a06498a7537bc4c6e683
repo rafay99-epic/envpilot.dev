@@ -1,0 +1,20 @@
+apps/web/tests/e2e/authenticated/shared-variables.spec.ts
+  s_907ffcf933f32f::t_02703514b4fe3f 11-59,66-67,73-77,79-92,96-97
+  s_907ffcf933f32f::t_cd06aedab38eaf 60-65,68-71,78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "aec53a505eaea913b837a06498a7537bc4c6e683",
+  "prompts": {},
+  "sessions": {
+    "s_907ffcf933f32f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0837503-b2fa-4f7d-8244-7a3ebcd5dd60",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
