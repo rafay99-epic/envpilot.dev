@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Id } from "@convex/_generated/dataModel";
-import { Eye, EyeOff, Copy, Check, Loader2, Share2 } from "lucide-react";
+import { Eye, EyeOff, Copy, Check, Loader2, Share2, Boxes } from "lucide-react";
 import { TagBadge } from "./tag-badge";
 import { formatDateTimeShort } from "@/lib/format";
 import { useTimeZone } from "@/hooks/useTimeZone";
@@ -36,6 +36,11 @@ interface VariableListItemProps {
   showCheckbox?: boolean;
   isSelected?: boolean;
   onToggleSelect?: () => void;
+  /** Extra pills beside the key: reach count, duplicate-key hint. */
+  badge?: ReactNode;
+  onShareAcross?: () => void;
+  /** Replaces edit and delete with this text when the caller may not write. */
+  readOnlyLabel?: string;
 }
 
 export function VariableListItem({
@@ -56,6 +61,9 @@ export function VariableListItem({
   showCheckbox = false,
   isSelected = false,
   onToggleSelect,
+  badge,
+  onShareAcross,
+  readOnlyLabel,
 }: VariableListItemProps) {
   const [isValueVisible, setIsValueVisible] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -103,6 +111,7 @@ export function VariableListItem({
               <code className="font-mono text-sm font-semibold text-ink">
                 {variable.key}
               </code>
+              {badge}
               {variable.isSensitive && (
                 <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
                   Sensitive
@@ -199,6 +208,16 @@ export function VariableListItem({
               )}
             </button>
           )}
+          {onShareAcross && (
+            <button
+              onClick={onShareAcross}
+              aria-label={`Share ${variable.key} across projects`}
+              title="Share across projects"
+              className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
+            >
+              <Boxes className="h-4 w-4" />
+            </button>
+          )}
           {onViewHistory && (
             <button
               onClick={onViewHistory}
@@ -241,7 +260,12 @@ export function VariableListItem({
               </svg>
             </button>
           )}
-          {canEdit && onEdit && (
+          {readOnlyLabel && (
+            <span className="px-2 text-xs text-ink-subtle">
+              {readOnlyLabel}
+            </span>
+          )}
+          {!readOnlyLabel && canEdit && onEdit && (
             <button
               onClick={onEdit}
               className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-muted"
@@ -262,7 +286,7 @@ export function VariableListItem({
               </svg>
             </button>
           )}
-          {canDelete && onDelete && (
+          {!readOnlyLabel && canDelete && onDelete && (
             <button
               onClick={onDelete}
               className="rounded-lg p-2 text-ink-muted hover:bg-danger-soft hover:text-danger"

@@ -15,7 +15,11 @@ import {
   countRotationEnabledVariables,
 } from "../featureRegistry/gates";
 import { resolveOrgGateContext } from "../featureRegistry/resolver";
-import { createAuditLog, logVariableAccess } from "../../lib/audit";
+import {
+  createAuditLog,
+  auditSharedWrite,
+  logVariableAccess,
+} from "../../lib/audit";
 import { rateLimiter } from "../../lib/rateLimits";
 import {
   authorizeVariableAccess,
@@ -259,6 +263,18 @@ export async function createCore(
     },
     involvesSensitiveData: args.isSensitive ?? false,
     resourceType: "variable",
+  });
+  await auditSharedWrite(ctx, {
+    project,
+    variable: {
+      _id: variableId,
+      key: args.key,
+      environments: args.environments,
+      isSensitive: args.isSensitive ?? false,
+      appliesTo: undefined,
+    },
+    userId: args.createdBy,
+    action: "variable.created",
   });
 
   if (args.override && isProtectedWrite(project, args.environments)) {
@@ -716,6 +732,15 @@ export async function updateCore(
     involvesSensitiveData: variable.isSensitive,
     resourceType: "variable",
   });
+  await auditSharedWrite(ctx, {
+    project,
+    variable: {
+      ...variable,
+      environments: updates.environments ?? variable.environments,
+    },
+    userId: updatedBy,
+    action: "variable.updated",
+  });
 
   if (override && isProtectedWrite(project, touched)) {
     await createAuditLog(ctx, {
@@ -840,6 +865,12 @@ export async function removeCore(
     },
     involvesSensitiveData: variable.isSensitive,
     resourceType: "variable",
+  });
+  await auditSharedWrite(ctx, {
+    project,
+    variable,
+    userId: args.deletedBy,
+    action: "variable.deleted",
   });
 
   if (args.override && isProtectedWrite(project, variable.environments)) {

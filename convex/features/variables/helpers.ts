@@ -417,16 +417,13 @@ export async function findEnvironmentConflicts(
       if (args.appliesTo && !args.appliesTo.includes(member.projectId)) {
         continue;
       }
-      const carried = carriedEnvironments(wanted, member.environments);
-      if (carried.length === 0) continue;
-
       const rows = await activeRowsWithKey(
         ctx,
         member.projectId,
         args.key,
         args
       );
-      const clash = overlappingEnvironments(rows, carried);
+      const clash = overlappingEnvironments(rows, wanted);
       if (clash.length === 0) continue;
 
       const project = await ctx.db.get(member.projectId);
@@ -448,9 +445,6 @@ export async function findEnvironmentConflicts(
     .collect();
 
   for (const membership of memberships) {
-    const carried = carriedEnvironments(wanted, membership.environments);
-    if (carried.length === 0) continue;
-
     const rows = (
       await activeRowsWithKey(ctx, membership.workspaceId, args.key, args)
     ).filter(
@@ -458,7 +452,7 @@ export async function findEnvironmentConflicts(
       // so a row scoped elsewhere is not in this project's namespace.
       (row) => !row.appliesTo || row.appliesTo.includes(args.projectId)
     );
-    const clash = overlappingEnvironments(rows, carried);
+    const clash = overlappingEnvironments(rows, wanted);
     if (clash.length === 0) continue;
 
     const workspace = await ctx.db.get(membership.workspaceId);
@@ -506,17 +500,6 @@ function overlappingEnvironments(
     }
   }
   return [...clashes];
-}
-
-/** Environments a membership actually carries. Absent filter = all of them. */
-function carriedEnvironments(
-  wanted: string[],
-  membershipEnvironments: string[] | undefined
-): string[] {
-  if (!membershipEnvironments) return wanted;
-  return wanted.filter((environment) =>
-    membershipEnvironments.includes(environment)
-  );
 }
 
 /** Standard user-facing message for a per-environment key clash. */

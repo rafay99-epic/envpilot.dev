@@ -2,23 +2,24 @@
 
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { Id } from "@convex/_generated/dataModel";
+import type { Id } from "@convex/_generated/dataModel";
 
-/** Workspaces visible to the caller in an organization. */
-export function useWorkspaces(organizationId: Id<"organizations"> | undefined) {
-  const workspaces = useQuery(
+/** Shared-variable groups visible to the caller, for the org settings page. */
+export function useSharedGroups(
+  organizationId: Id<"organizations"> | undefined
+) {
+  const groups = useQuery(
     api.features.workspaces.queries.listByOrganization,
     organizationId ? { organizationId } : "skip"
   );
-
   return {
-    workspaces: workspaces ?? [],
-    isLoading: organizationId ? workspaces === undefined : false,
+    groups: groups ?? [],
+    isLoading: organizationId ? groups === undefined : false,
   };
 }
 
-/** One workspace with its shared variables and member projects. */
-export function useWorkspaceBySlug(
+/** One group with its rows and the projects that read them. */
+export function useSharedGroupBySlug(
   organizationId: Id<"organizations"> | undefined,
   slug: string | undefined
 ) {
@@ -28,42 +29,47 @@ export function useWorkspaceBySlug(
   );
 }
 
-/**
- * Variables a project inherits from its workspaces. Read-only rows: the
- * project can see and reveal them, and editing happens in the workspace.
- */
-export function useInheritedVariables(projectId: Id<"projects"> | undefined) {
+/** Rows a project reads from groups, with per-row edit rights and reach. */
+export function useSharedRows(projectId: Id<"projects"> | undefined) {
   const rows = useQuery(
     api.features.workspaces.queries.listInheritedForProject,
     projectId ? { projectId } : "skip"
   );
-
   return {
-    inherited: rows ?? [],
+    rows: rows ?? [],
     isLoading: projectId ? rows === undefined : false,
   };
 }
 
-export function useWorkspaceActions() {
-  const create = useMutation(api.features.workspaces.mutations.create);
-  const scanDuplicates = useAction(
-    api.features.workspaces.adopt.scanDuplicates
-  );
-  const adoptKeys = useAction(api.features.workspaces.adopt.adoptKeys);
-  const setVariableScope = useMutation(
-    api.features.workspaces.mutations.setVariableScope
-  );
-  const addProject = useMutation(api.features.workspaces.mutations.addProject);
-  const removeProject = useMutation(
-    api.features.workspaces.mutations.removeProject
-  );
+export type SharedRow = ReturnType<typeof useSharedRows>["rows"][number];
 
+/** Keys this project owns that other projects also own: `key -> others`. */
+export function useDuplicateKeys(projectId: Id<"projects"> | undefined) {
+  const rows = useQuery(
+    api.features.workspaces.queries.duplicateKeys,
+    projectId ? { projectId } : "skip"
+  );
+  return new Map((rows ?? []).map((row) => [row.key, row.others]));
+}
+
+export function useDuplicateKeysForOrganization(
+  organizationId: Id<"organizations"> | undefined
+) {
+  return (
+    useQuery(
+      api.features.workspaces.queries.duplicateKeysForOrganization,
+      organizationId ? { organizationId } : "skip"
+    ) ?? []
+  );
+}
+
+export function useShareActions() {
   return {
-    create,
-    addProject,
-    removeProject,
-    scanDuplicates,
-    adoptKeys,
-    setVariableScope,
+    preview: useAction(api.features.workspaces.share.preview),
+    share: useAction(api.features.workspaces.share.share),
+    unshare: useAction(api.features.workspaces.share.unshare),
+    setVariableScope: useMutation(
+      api.features.workspaces.mutations.setVariableScope
+    ),
   };
 }

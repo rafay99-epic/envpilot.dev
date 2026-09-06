@@ -13,10 +13,13 @@ export {
 // Project hooks
 export { useOrganizationProjects, useProjectBySlug } from "./useProjects";
 export {
-  useWorkspaces,
-  useWorkspaceBySlug,
-  useInheritedVariables,
-  useWorkspaceActions,
+  useSharedGroups,
+  useSharedGroupBySlug,
+  useSharedRows,
+  useDuplicateKeys,
+  useDuplicateKeysForOrganization,
+  useShareActions,
+  type SharedRow,
 } from "./useWorkspaces";
 export { useAutoPageSize } from "./useAutoPageSize";
 export {

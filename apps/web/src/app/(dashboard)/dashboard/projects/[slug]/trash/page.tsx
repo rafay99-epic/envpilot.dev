@@ -370,6 +370,11 @@ export default function TrashPage({ params }: TrashPageProps) {
                       <code className="font-mono text-sm font-semibold line-through text-ink-muted">
                         {variable.key}
                       </code>
+                      {variable.sharedFrom && (
+                        <span className="ml-2 rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
+                          shared
+                        </span>
+                      )}
                       <p className="mt-1 text-xs text-ink-subtle">
                         Deleted {pluralDays(daysAgo(variable.deletedAt, now))}{" "}
                         ago

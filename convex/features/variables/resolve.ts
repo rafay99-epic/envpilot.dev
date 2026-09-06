@@ -62,29 +62,16 @@ export async function resolveEffectiveVariables(
     // keys on their next pull rather than reading rows queued for purge.
     if (!workspace || workspace.deletedAt !== undefined) continue;
 
-    const carried = membership.environments;
-
     for (const row of await activeRows(ctx, membership.workspaceId)) {
       // Absent appliesTo = every member project, and it keeps following
       // membership as projects join. Present = exactly that list.
       if (row.appliesTo && !row.appliesTo.includes(args.projectId)) continue;
-
-      // A membership scoped to production carries only production, however
-      // many environments the workspace row itself declares.
-      const environments = carried
-        ? row.environments.filter((environment) =>
-            carried.includes(environment)
-          )
-        : row.environments;
-
-      if (environments.length === 0) continue;
-      if (args.environment && !environments.includes(args.environment)) {
+      if (args.environment && !row.environments.includes(args.environment)) {
         continue;
       }
 
       inherited.push({
         ...row,
-        environments,
         source: {
           kind: "workspace",
           workspaceId: workspace._id,

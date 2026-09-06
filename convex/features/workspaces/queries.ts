@@ -6,34 +6,25 @@ import {
   getActiveMembership,
   getRoleProfile,
   bypassesAssignment,
+  getVariableAccess,
+  isEnvironmentScopeAllowed,
 } from "../../lib/authz";
-import { activeWorkspacesQuery, isWorkspace } from "../../lib/projectKind";
+import {
+  activeProjectsQuery,
+  activeWorkspacesQuery,
+  isWorkspace,
+  reachedProjects,
+} from "../../lib/projectKind";
+import { protectedEnvironmentsIn } from "../../lib/protection";
 import { resolveEffectiveVariables } from "../variables/resolve";
 import { resolveProjectAccessContext } from "../variables/helpers";
-import { isEnvironmentScopeAllowed } from "../../lib/authz";
+
+const MAX_SCAN_ROWS = 2000;
 
 /**
- * Workspace reads.
- *
- * Visibility mirrors projects exactly, because a workspace IS a project row:
- * roles that bypass assignment see every workspace in the org, everyone else
- * sees the ones they are assigned to. Reading a workspace's page is a
- * different question from reading the values it shares — that second one is
- * answered by project membership, in resolve.ts, and needs nothing here.
+ * A workspace is visible to anyone who can read a project that reads it.
+ * There is no member list on the workspace itself.
  */
-
-type WorkspaceSummary = {
-  _id: Id<"projects">;
-  name: string;
-  slug: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  variableCount: number;
-  projectCount: number;
-  updatedAt: number;
-};
-
 async function visibleWorkspaces(
   ctx: Parameters<typeof getActiveMembership>[0],
   organizationId: Id<"organizations">,
@@ -41,56 +32,54 @@ async function visibleWorkspaces(
 ): Promise<Doc<"projects">[]> {
   const membership = await getActiveMembership(ctx, organizationId, userId);
   if (!membership) return [];
-
   const profile = await getRoleProfile(ctx, membership.role);
   const all = await activeWorkspacesQuery(ctx.db, organizationId).collect();
   if (bypassesAssignment(profile)) return all;
-
   const assignments = await ctx.db
     .query("projectMembers")
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .collect();
-  const assigned = new Set(assignments.map((row) => row.projectId as string));
-
-  return all.filter((workspace) => assigned.has(workspace._id as string));
+  const assigned = new Set(assignments.map((row) => row.projectId));
+  const visible: Doc<"projects">[] = [];
+  for (const workspace of all) {
+    const members = await reachedProjects(ctx.db, workspace._id);
+    if (members.some((member) => assigned.has(member._id))) {
+      visible.push(workspace);
+    }
+  }
+  return visible;
 }
 
 export const listByOrganization = query({
   args: { organizationId: v.id("organizations") },
-  handler: async (ctx, args): Promise<WorkspaceSummary[]> => {
+  handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
     const workspaces = await visibleWorkspaces(
       ctx,
       args.organizationId,
       actor._id
     );
-
-    return await Promise.all(
+    return Promise.all(
       workspaces.map(async (workspace) => {
-        const [variables, memberships] = await Promise.all([
+        const [variables, members] = await Promise.all([
           ctx.db
             .query("environmentVariables")
             .withIndex("by_project_deleted", (q) =>
               q.eq("projectId", workspace._id).eq("deletedAt", undefined)
             )
             .collect(),
-          ctx.db
-            .query("workspaceProjects")
-            .withIndex("by_workspace", (q) =>
-              q.eq("workspaceId", workspace._id)
-            )
-            .collect(),
+          reachedProjects(ctx.db, workspace._id),
         ]);
-
         return {
           _id: workspace._id,
           name: workspace.name,
           slug: workspace.slug,
-          description: workspace.description,
-          icon: workspace.icon,
-          color: workspace.color,
-          variableCount: variables.length,
-          projectCount: memberships.length,
+          keys: variables.map((variable) => variable.key),
+          projects: members.map((member) => ({
+            _id: member._id,
+            name: member.name,
+            slug: member.slug,
+          })),
           updatedAt: workspace.updatedAt,
         };
       })
@@ -98,20 +87,11 @@ export const listByOrganization = query({
   },
 });
 
-/**
- * A workspace with its member projects, each annotated with what it actually
- * inherits. The per-project count is what makes `appliesTo` legible: a
- * workspace of eight variables where one project inherits four is a fact the
- * page has to state, not something the reader should have to work out.
- */
+/** One workspace with its shared rows and the projects that read them. */
 export const getBySlug = query({
-  args: {
-    organizationId: v.id("organizations"),
-    slug: v.string(),
-  },
+  args: { organizationId: v.id("organizations"), slug: v.string() },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-
     const workspace = await ctx.db
       .query("projects")
       .withIndex("by_org_slug_deleted", (q) =>
@@ -121,9 +101,7 @@ export const getBySlug = query({
           .eq("deletedAt", undefined)
       )
       .first();
-
     if (!workspace || !isWorkspace(workspace)) return null;
-
     const visible = await visibleWorkspaces(
       ctx,
       args.organizationId,
@@ -131,78 +109,45 @@ export const getBySlug = query({
     );
     if (!visible.some((row) => row._id === workspace._id)) return null;
 
-    const memberships = await ctx.db
-      .query("workspaceProjects")
-      .withIndex("by_workspace", (q) => q.eq("workspaceId", workspace._id))
-      .collect();
-
-    const variables = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project_deleted", (q) =>
-        q.eq("projectId", workspace._id).eq("deletedAt", undefined)
-      )
-      .collect();
-
-    const projects = await Promise.all(
-      memberships.map(async (membership) => {
-        const project = await ctx.db.get(membership.projectId);
-        const inherits = variables.filter((variable) => {
-          if (
-            variable.appliesTo &&
-            !variable.appliesTo.includes(membership.projectId)
-          ) {
-            return false;
-          }
-          if (!membership.environments) return true;
-          return variable.environments.some((environment) =>
-            membership.environments?.includes(environment)
-          );
-        }).length;
-
-        return {
-          membershipId: membership._id,
-          projectId: membership.projectId,
-          name: project?.name ?? "Deleted project",
-          slug: project?.slug ?? "",
-          environments: membership.environments,
-          inheritedCount: inherits,
-        };
-      })
-    );
-
+    const [members, variables] = await Promise.all([
+      reachedProjects(ctx.db, workspace._id),
+      ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project_deleted", (q) =>
+          q.eq("projectId", workspace._id).eq("deletedAt", undefined)
+        )
+        .collect(),
+    ]);
     return {
-      workspace,
-      projects,
+      workspace: {
+        _id: workspace._id,
+        name: workspace.name,
+        slug: workspace.slug,
+      },
+      projects: members.map((member) => ({
+        _id: member._id,
+        name: member.name,
+        slug: member.slug,
+        inheritedCount: variables.filter(
+          (row) => !row.appliesTo || row.appliesTo.includes(member._id)
+        ).length,
+      })),
       variables: variables.map((variable) => ({
         _id: variable._id,
         key: variable.key,
         environments: variable.environments,
         isSensitive: variable.isSensitive,
-        updatedAt: variable.updatedAt,
-        // undefined = every member project, and it keeps following
-        // membership. A list = the fixed subset this row is scoped to.
         appliesTo: variable.appliesTo,
-        appliesToCount: variable.appliesTo?.length,
       })),
-      memberCount: memberships.length,
     };
   },
 });
 
 /**
- * The rows a project inherits, for the "from <workspace>" section of its
- * variables page.
- *
- * Deliberately separate from listWithAccessPaginated rather than folded into
- * it: inherited rows live in a different index range, so merging them would
- * mean rebuilding that query's cursor semantics for no user-visible gain.
- * The page renders them as their own group, which is what the design calls
- * for anyway.
- *
- * Access: project read plus the caller's own environment scope. vaultRef
- * rides along so the row can reveal exactly like an owned one — that access
- * IS the feature, and it is granted by project membership, never by being
- * named on the workspace.
+ * The rows a project reads from workspaces, for the pinned block on its
+ * variables page. Each row carries what the UI needs to edit in place:
+ * whether this caller may, how many projects it reaches, and which of them
+ * would turn the write into a change request.
  */
 export const listInheritedForProject = query({
   args: { projectId: v.id("projects") },
@@ -214,29 +159,132 @@ export const listInheritedForProject = query({
       actor._id
     );
     if (!resolved) return [];
-
     const { access } = resolved;
     const rows = await resolveEffectiveVariables(ctx, {
       projectId: args.projectId,
     });
 
-    return rows
-      .filter((row) => row.source.kind === "workspace")
-      .filter((row) =>
-        isEnvironmentScopeAllowed(access.environmentScope, row.environments)
-      )
-      .map((row) => ({
+    const membersByWorkspace = new Map<Id<"projects">, Doc<"projects">[]>();
+    const out = [];
+    for (const row of rows) {
+      if (row.source.kind !== "workspace") continue;
+      if (
+        !isEnvironmentScopeAllowed(access.environmentScope, row.environments)
+      ) {
+        continue;
+      }
+      const workspaceId = row.source.workspaceId;
+      let members = membersByWorkspace.get(workspaceId);
+      if (!members) {
+        members = await reachedProjects(ctx.db, workspaceId);
+        membersByWorkspace.set(workspaceId, members);
+      }
+      const reached = members.filter(
+        (member) => !row.appliesTo || row.appliesTo.includes(member._id)
+      );
+      const workspace = await ctx.db.get(workspaceId);
+      out.push({
         _id: row._id,
         key: row.key,
+        description: row.description,
         environments: row.environments,
         isSensitive: row.isSensitive,
+        version: row.version,
         updatedAt: row.updatedAt,
         vaultRef: row.vaultRef,
-        description: row.description,
-        workspace:
-          row.source.kind === "workspace"
-            ? { id: row.source.workspaceId, name: row.source.name }
-            : null,
-      }));
+        rotationFrequencyDays: row.rotationFrequencyDays,
+        tagIds: row.tagIds,
+        appliesTo: row.appliesTo,
+        canEdit: (await getVariableAccess(ctx, actor._id, row)) === "write",
+        workspace: {
+          _id: workspaceId,
+          name: row.source.name,
+          slug: workspace?.slug ?? "",
+        },
+        reached: reached.map((member) => member.name),
+        protectedIn: reached
+          .filter(
+            (member) =>
+              protectedEnvironmentsIn(member, row.environments).length > 0
+          )
+          .map((member) => member.name),
+      });
+    }
+    return out;
+  },
+});
+
+/** key -> ids of active projects that hold an active row with that key. */
+async function keyOwners(
+  ctx: Parameters<typeof getActiveMembership>[0],
+  organizationId: Id<"organizations">
+): Promise<Map<string, Set<Id<"projects">>>> {
+  const owners = new Map<string, Set<Id<"projects">>>();
+  let scanned = 0;
+  for (const project of await activeProjectsQuery(
+    ctx.db,
+    organizationId
+  ).collect()) {
+    const rows = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", project._id).eq("deletedAt", undefined)
+      )
+      .take(Math.max(0, MAX_SCAN_ROWS - scanned));
+    scanned += rows.length;
+    for (const row of rows) {
+      const set = owners.get(row.key) ?? new Set();
+      set.add(project._id);
+      owners.set(row.key, set);
+    }
+    if (scanned >= MAX_SCAN_ROWS) break;
+  }
+  return owners;
+}
+
+/**
+ * Keys this project owns that other projects in the org also own. Feeds the
+ * "same key in N projects" tag; the share sheet re-checks values server side.
+ */
+export const duplicateKeys = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const resolved = await resolveProjectAccessContext(
+      ctx,
+      args.projectId,
+      actor._id
+    );
+    if (!resolved) return [];
+    const owners = await keyOwners(ctx, resolved.project.organizationId);
+    const out: { key: string; others: number }[] = [];
+    for (const [key, projects] of owners) {
+      if (projects.has(args.projectId) && projects.size > 1) {
+        out.push({ key, others: projects.size - 1 });
+      }
+    }
+    return out;
+  },
+});
+
+/** Org-wide duplicate summary for the dashboard banner and settings page. */
+export const duplicateKeysForOrganization = query({
+  args: { organizationId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const membership = await getActiveMembership(
+      ctx,
+      args.organizationId,
+      actor._id
+    );
+    if (!membership) return [];
+    const profile = await getRoleProfile(ctx, membership.role);
+    if (!bypassesAssignment(profile)) return [];
+    const owners = await keyOwners(ctx, args.organizationId);
+    const out: { key: string; projectIds: Id<"projects">[] }[] = [];
+    for (const [key, projects] of owners) {
+      if (projects.size > 1) out.push({ key, projectIds: [...projects] });
+    }
+    return out;
   },
 });

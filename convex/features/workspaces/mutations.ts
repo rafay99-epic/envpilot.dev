@@ -3,80 +3,25 @@ import { mutation, type MutationCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import { assertProjectAction } from "../../lib/authz";
-import { isWorkspace, WORKSPACE_KIND } from "../../lib/projectKind";
-import { createProjectCore } from "../projects/mutations";
+import { isWorkspace } from "../../lib/projectKind";
 import {
   checkCountedLimit,
   countProjectWorkspaces,
   countWorkspaceProjects,
 } from "../featureRegistry/gates";
 import { findEnvironmentConflicts } from "../variables/helpers";
+import { syncWorkspaceProtection } from "../../lib/protection";
 import { MAX_WORKSPACES_PER_PROJECT } from "../variables/resolve";
 
 /**
- * Workspace membership.
- *
- * Creating a workspace is `createProjectCore` with a kind stamp, and editing
- * its variables is the ordinary project.variables.* check on the workspace
- * row, so neither needs code here. What does need code is the membership
- * edge, because adding a project is the one action that widens who can read a
- * secret: every reader of the project gains read on the workspace's values,
- * without being named on the workspace at all.
+ * Group membership. Adding a project is the one action that widens who can
+ * read a secret, so both ends are checked. share.ts and unshare drive these.
  */
 
-export const create = mutation({
-  args: {
-    organizationId: v.id("organizations"),
-    name: v.string(),
-    slug: v.string(),
-    description: v.optional(v.string()),
-    icon: v.optional(v.string()),
-    color: v.optional(v.string()),
-    /**
-     * Projects to link on creation. A workspace exists to be shared with, so
-     * making it in one step is the normal case, not an extra feature.
-     */
-    projectIds: v.optional(v.array(v.id("projects"))),
-  },
-  returns: v.id("projects"),
-  handler: async (ctx, args): Promise<Id<"projects">> => {
-    const actor = await requireAuthedUser(ctx);
-    const { projectIds, ...workspaceArgs } = args;
-
-    const workspaceId = await createProjectCore(ctx, actor, {
-      ...workspaceArgs,
-      kind: WORKSPACE_KIND,
-    });
-
-    for (const projectId of projectIds ?? []) {
-      await linkProjectCore(ctx, actor, { workspaceId, projectId });
-    }
-
-    return workspaceId;
-  },
-});
-
-export const addProject = mutation({
-  args: {
-    workspaceId: v.id("projects"),
-    projectId: v.id("projects"),
-    environments: v.optional(v.array(v.string())),
-  },
-  returns: v.id("workspaceProjects"),
-  handler: async (ctx, args): Promise<Id<"workspaceProjects">> => {
-    const actor = await requireAuthedUser(ctx);
-    return linkProjectCore(ctx, actor, args);
-  },
-});
-
-async function linkProjectCore(
+export async function linkProjectCore(
   ctx: MutationCtx,
   actor: Doc<"users">,
-  args: {
-    workspaceId: Id<"projects">;
-    projectId: Id<"projects">;
-    environments?: string[];
-  }
+  args: { workspaceId: Id<"projects">; projectId: Id<"projects"> }
 ): Promise<Id<"workspaceProjects">> {
   {
     const { workspace, project } = await loadEdge(ctx, args);
@@ -121,25 +66,20 @@ async function linkProjectCore(
     );
     if (!perProject.allowed) throw new ConvexError(perProject.reason!);
 
-    // Every key the workspace would start sharing has to be free in the
-    // project, in the environments this membership carries. Strict
+    // Every key the workspace shares has to be free in the project. Strict
     // inheritance: a collision is refused here, never resolved by precedence
     // at read time.
-    await assertNoIncomingCollisions(ctx, {
-      workspace,
-      project,
-      environments: args.environments,
-    });
+    await assertNoIncomingCollisions(ctx, { workspace, project });
 
     const now = Date.now();
     const membershipId = await ctx.db.insert("workspaceProjects", {
       organizationId: workspace.organizationId,
       workspaceId: args.workspaceId,
       projectId: args.projectId,
-      environments: args.environments,
       createdBy: actor._id,
       createdAt: now,
     });
+    await syncWorkspaceProtection(ctx, args.workspaceId, actor._id);
 
     await ctx.db.insert("auditLogs", {
       organizationId: workspace.organizationId,
@@ -149,7 +89,6 @@ async function linkProjectCore(
       details: JSON.stringify({
         workspace: workspace.name,
         project: project.name,
-        environments: args.environments ?? "all",
       }),
       createdAt: now,
     });
@@ -185,10 +124,10 @@ export const removeProject = mutation({
       throw new ConvexError(`"${project.name}" is not in "${workspace.name}".`);
     }
 
-    // Leaving drops the inherited keys. Copying them into the project first,
-    // or replacing them with fresh values, is the client-driven flow that
-    // runs BEFORE this mutation, because it needs vault writes.
+    // Copying values into the project first happens in unshare.ts, which
+    // needs vault reads and calls this mutation last.
     await ctx.db.delete(membership._id);
+    await syncWorkspaceProtection(ctx, args.workspaceId, actor._id);
 
     await ctx.db.insert("auditLogs", {
       organizationId: workspace.organizationId,
@@ -246,11 +185,7 @@ async function loadEdge(
  */
 async function assertNoIncomingCollisions(
   ctx: Parameters<typeof findEnvironmentConflicts>[0],
-  args: {
-    workspace: Doc<"projects">;
-    project: Doc<"projects">;
-    environments: string[] | undefined;
-  }
+  args: { workspace: Doc<"projects">; project: Doc<"projects"> }
 ): Promise<void> {
   const shared = await ctx.db
     .query("environmentVariables")
@@ -264,20 +199,13 @@ async function assertNoIncomingCollisions(
   for (const row of shared) {
     if (row.appliesTo && !row.appliesTo.includes(args.project._id)) continue;
 
-    const carried = args.environments
-      ? row.environments.filter((environment) =>
-          args.environments?.includes(environment)
-        )
-      : row.environments;
-    if (carried.length === 0) continue;
-
     const conflicts = await findEnvironmentConflicts(ctx, {
       projectId: args.project._id,
       key: row.key,
-      environments: carried,
+      environments: row.environments,
     });
     if (conflicts.length > 0) {
-      clashing.push(`${row.key} (${carried.join(", ")})`);
+      clashing.push(`${row.key} (${row.environments.join(", ")})`);
     }
   }
 
@@ -287,8 +215,6 @@ async function assertNoIncomingCollisions(
     );
   }
 }
-
-export { MAX_WORKSPACES_PER_PROJECT };
 
 /**
  * Narrow one shared variable to a subset of the workspace's projects, or hand
@@ -361,17 +287,10 @@ export const setVariableScope = mutation({
         reaches(nowScoped, membership.projectId);
       if (!gaining) continue;
 
-      const carried = membership.environments
-        ? variable.environments.filter((environment) =>
-            membership.environments?.includes(environment)
-          )
-        : variable.environments;
-      if (carried.length === 0) continue;
-
       const conflicts = await findEnvironmentConflicts(ctx, {
         projectId: membership.projectId,
         key: variable.key,
-        environments: carried,
+        environments: variable.environments,
       });
       if (conflicts.length > 0) {
         const project = await ctx.db.get(membership.projectId);

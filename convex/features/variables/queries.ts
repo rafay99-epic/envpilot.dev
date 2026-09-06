@@ -1287,12 +1287,47 @@ export const getDeleted = query({
       .order("desc")
       .take(100);
 
-    return deletedVariables.map((variable) => ({
+    const rows = deletedVariables.map((variable) => ({
       _id: variable._id,
       key: variable.key,
       deletedAt: variable.deletedAt as number,
       environments: variable.environments,
+      sharedFrom: undefined as string | undefined,
     }));
+
+    // Shared rows this project read live in the workspace's trash. Listing
+    // them here means "restore for all" is reachable from any member.
+    const memberships = await ctx.db
+      .query("workspaceProjects")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const membership of memberships) {
+      const workspace = await ctx.db.get(membership.workspaceId);
+      if (!workspace || workspace.deletedAt) continue;
+      const shared = await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project_deleted", (q) =>
+          q.eq("projectId", workspace._id).gte("deletedAt", cutoff)
+        )
+        .order("desc")
+        .take(100);
+      for (const variable of shared) {
+        if (
+          variable.appliesTo &&
+          !variable.appliesTo.includes(args.projectId)
+        ) {
+          continue;
+        }
+        rows.push({
+          _id: variable._id,
+          key: variable.key,
+          deletedAt: variable.deletedAt as number,
+          environments: variable.environments,
+          sharedFrom: workspace.name,
+        });
+      }
+    }
+    return rows.sort((a, b) => b.deletedAt - a.deletedAt);
   },
 });
 

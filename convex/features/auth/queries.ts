@@ -12,6 +12,7 @@ import {
   effectiveEnvironments,
 } from "../../lib/authz";
 import { expandActions } from "../../lib/roleProfiles";
+import { isWorkspace, reachedProjects } from "../../lib/projectKind";
 import {
   orgRoleValidator,
   legacyOrgRoleValidator,
@@ -202,6 +203,22 @@ export const resolveLegacyRoles = query({
       environmentScope =
         effectiveEnvironments(legacyProfile, projectMembership?.environments) ??
         null;
+    }
+    // A shared row counts as assigned when the caller is assigned to every
+    // project that reads it, matching assertProjectCapability.
+    if (!assigned && isWorkspace(project)) {
+      const members = await reachedProjects(ctx.db, project._id);
+      const rows = await Promise.all(
+        members.map((member) =>
+          ctx.db
+            .query("projectMembers")
+            .withIndex("by_project_and_user", (q) =>
+              q.eq("projectId", member._id).eq("userId", actor._id)
+            )
+            .first()
+        )
+      );
+      assigned = members.length > 0 && rows.every((row) => row !== null);
     }
 
     let grantOnly = false;

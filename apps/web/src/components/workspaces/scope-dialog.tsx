@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
-import { useWorkspaceActions } from "@/hooks";
+import { useShareActions } from "@/hooks";
 import { Modal } from "@/components/ui";
 import { sanitizeConvexError } from "@/lib/error-messages";
 
@@ -35,7 +35,7 @@ export function ScopeDialog({
   members,
   onClose,
 }: ScopeDialogProps) {
-  const { setVariableScope } = useWorkspaceActions();
+  const { setVariableScope } = useShareActions();
 
   const [mode, setMode] = useState<"all" | "some">("all");
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -96,10 +96,10 @@ export function ScopeDialog({
             />
             <span>
               <span className="block font-mono text-xs text-ink">
-                All projects in this workspace
+                All projects in this group
               </span>
               <span className="block font-mono text-[11px] text-ink-muted">
-                Keeps following membership. A project linked later gets it too.
+                Keeps following the group. A project added later gets it too.
               </span>
             </span>
           </label>
@@ -117,7 +117,7 @@ export function ScopeDialog({
                 Only the projects I pick
               </span>
               <span className="block font-mono text-[11px] text-ink-muted">
-                A fixed list. A project linked later does not get it.
+                A fixed list. A project added later does not get it.
               </span>
             </span>
           </label>

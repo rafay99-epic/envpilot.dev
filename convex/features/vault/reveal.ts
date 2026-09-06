@@ -3,9 +3,6 @@ import { action, query } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import { requireAuthedUser } from "../../lib/identity";
 import { getVariableAccess, getAccountAccess } from "../../lib/authz";
-import { isWorkspace } from "../../lib/projectKind";
-import type { Doc, Id } from "../../_generated/dataModel";
-import type { QueryCtx } from "../../_generated/server";
 
 /**
  * Browser value-reveal path — Stage 3.
@@ -42,14 +39,7 @@ export const canRevealVaultRef = query({
       .first();
     if (variable) {
       if (variable.deletedAt) return false;
-      if ((await getVariableAccess(ctx, actor._id, variable)) !== null) {
-        return true;
-      }
-      // A workspace-owned value is readable through any member project the
-      // caller can read. Without this the feature contradicts itself: the row
-      // lists on the project's page and then refuses to reveal for exactly
-      // the people it was shared with.
-      return await canRevealThroughWorkspace(ctx, actor._id, variable);
+      return (await getVariableAccess(ctx, actor._id, variable)) !== null;
     }
 
     // 2. Historical version value (diff view). Access follows the parent
@@ -78,59 +68,6 @@ export const canRevealVaultRef = query({
     return false;
   },
 });
-
-/**
- * Workspace inheritance for the reveal path.
- *
- * Access to a shared value comes from membership of a project that reads it,
- * never from being named on the workspace. This asks the SAME per-project
- * check the rest of the app uses, once per member project, by evaluating a
- * copy of the row as though it lived in that project — so environment scope
- * and per-variable grants keep applying unchanged instead of being
- * re-implemented here.
- */
-async function canRevealThroughWorkspace(
-  ctx: QueryCtx,
-  userId: Id<"users">,
-  variable: Doc<"environmentVariables">
-): Promise<boolean> {
-  const owner = await ctx.db.get(variable.projectId);
-  if (!owner || !isWorkspace(owner)) return false;
-
-  const memberships = await ctx.db
-    .query("workspaceProjects")
-    .withIndex("by_workspace", (q) => q.eq("workspaceId", variable.projectId))
-    .collect();
-
-  for (const membership of memberships) {
-    if (
-      variable.appliesTo &&
-      !variable.appliesTo.includes(membership.projectId)
-    ) {
-      continue;
-    }
-
-    const carried = membership.environments
-      ? variable.environments.filter((environment) =>
-          membership.environments?.includes(environment)
-        )
-      : variable.environments;
-    if (carried.length === 0) continue;
-
-    const project = await ctx.db.get(membership.projectId);
-    if (!project || project.deletedAt) continue;
-
-    const access = await getVariableAccess(
-      ctx,
-      userId,
-      { ...variable, projectId: membership.projectId, environments: carried },
-      project
-    );
-    if (access !== null) return true;
-  }
-
-  return false;
-}
 
 /**
  * Reveal the decrypted value behind a vaultRef, gated by {@link canRevealVaultRef}.

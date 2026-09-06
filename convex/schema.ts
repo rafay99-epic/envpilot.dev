@@ -275,9 +275,6 @@ export default defineSchema({
     workspaceId: v.id("projects"),
     // The member project that reads it.
     projectId: v.id("projects"),
-    // Which environments this membership carries. Absent = all of them.
-    // Lets a workspace share production and staging while dev stays local.
-    environments: v.optional(v.array(v.string())),
     createdBy: v.id("users"),
     createdAt: v.number(),
   })

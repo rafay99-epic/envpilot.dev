@@ -1,9 +1,11 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
   useDashboardStats,
+  useDuplicateKeysForOrganization,
   useRecentActivity,
   useRecentProjects,
   useTeamMembersQuickView,
@@ -17,6 +19,7 @@ import { useAuthContext } from "@/components/auth";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   TerminalWindow,
+  TerminalButton,
   TerminalButtonLink,
   TerminalLoading,
   TerminalEmptyState,
@@ -100,6 +103,13 @@ export default function DashboardPage() {
           ) : undefined
         }
       />
+
+      {organization.slug && (
+        <DuplicateKeysBanner
+          organizationId={activeOrganizationId}
+          orgSlug={organization.slug}
+        />
+      )}
 
       {/* Stats as terminal output */}
       <TerminalWindow title="system-status">
@@ -298,6 +308,79 @@ export default function DashboardPage() {
             )}
           </TerminalWindow>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Dismissal lives in localStorage, so it is an external store: the server
+// snapshot keeps the banner out of the SSR pass and off the hydration diff,
+// and the listener set is what re-renders the banner away on "Not now".
+const dismissalListeners = new Set<() => void>();
+
+function subscribeDismissal(onChange: () => void) {
+  dismissalListeners.add(onChange);
+  return () => {
+    dismissalListeners.delete(onChange);
+  };
+}
+
+function readDismissed(storageKey: string): boolean {
+  try {
+    return window.localStorage.getItem(storageKey) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function DuplicateKeysBanner({
+  organizationId,
+  orgSlug,
+}: {
+  organizationId: Id<"organizations"> | undefined;
+  orgSlug: string;
+}) {
+  const duplicates = useDuplicateKeysForOrganization(organizationId);
+  const storageKey = `envpilot.duplicates-banner.${organizationId}`;
+  const dismissed = useSyncExternalStore(
+    subscribeDismissal,
+    () => readDismissed(storageKey),
+    () => true
+  );
+
+  if (dismissed || duplicates.length === 0) return null;
+
+  const projectCount = new Set(duplicates.flatMap((row) => row.projectIds))
+    .size;
+
+  const dismiss = () => {
+    try {
+      window.localStorage.setItem(storageKey, "1");
+    } catch {
+      // A blocked storage just means the banner returns next visit.
+    }
+    dismissalListeners.forEach((listener) => listener());
+  };
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line px-4 py-3">
+      <p className="text-sm text-ink">
+        {duplicates.length} key{duplicates.length === 1 ? "" : "s"}{" "}
+        {duplicates.length === 1 ? "is" : "are"} duplicated across{" "}
+        {projectCount} projects.{" "}
+        <span className="text-ink-muted">
+          Share them so a rotation is one edit instead of six.
+        </span>
+      </p>
+      <div className="flex items-center gap-2">
+        <TerminalButton variant="secondary" onClick={dismiss}>
+          Not now
+        </TerminalButton>
+        <TerminalButtonLink
+          href={`/organizations/${orgSlug}/settings?tab=shared`}
+        >
+          Review duplicates
+        </TerminalButtonLink>
       </div>
     </div>
   );

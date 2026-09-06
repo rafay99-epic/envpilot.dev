@@ -6,6 +6,7 @@ import {
 } from "../_generated/server";
 import { Id, Doc } from "../_generated/dataModel";
 import { scheduleWebhookNotification } from "../features/integrations/notify";
+import { isWorkspace, reachedProjects } from "./projectKind";
 
 /**
  * Audit Log Helper Functions
@@ -555,4 +556,45 @@ export function generateSessionId(): string {
   const timestamp = Date.now().toString(36);
   const randomPart = Math.random().toString(36).substring(2, 12);
   return `sess_${timestamp}_${randomPart}`;
+}
+
+/**
+ * A write to a shared row is a write to every project that reads it. Each
+ * one gets its own audit row, which is also what fans the webhook
+ * notifications out per project.
+ */
+export async function auditSharedWrite(
+  ctx: MutationCtx,
+  input: {
+    project: Doc<"projects">;
+    variable: Pick<
+      Doc<"environmentVariables">,
+      "_id" | "key" | "environments" | "isSensitive" | "appliesTo"
+    >;
+    userId: Id<"users">;
+    action: "variable.created" | "variable.updated" | "variable.deleted";
+  }
+): Promise<void> {
+  if (!isWorkspace(input.project)) return;
+  const members = await reachedProjects(
+    ctx.db,
+    input.project._id,
+    input.variable.appliesTo
+  );
+  for (const member of members) {
+    await createAuditLog(ctx, {
+      organizationId: member.organizationId,
+      projectId: member._id,
+      variableId: input.variable._id,
+      userId: input.userId,
+      action: input.action,
+      details: {
+        key: input.variable.key,
+        environments: input.variable.environments,
+        sharedFrom: input.project.name,
+      },
+      involvesSensitiveData: input.variable.isSensitive,
+      resourceType: "variable",
+    });
+  }
 }

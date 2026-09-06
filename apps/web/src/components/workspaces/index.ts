@@ -1,5 +1,3 @@
-export { InheritedVariables } from "./inherited-variables";
-export { AdoptDuplicates } from "./adopt-duplicates";
+export { SharedBlock } from "./shared-block";
+export { ShareSheet } from "./share-sheet";
 export { ScopeDialog, type ScopeTarget } from "./scope-dialog";
-export { SharedVariables } from "./shared-variables";
-export { LinkedProjects } from "./linked-projects";

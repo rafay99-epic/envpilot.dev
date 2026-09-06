@@ -24,6 +24,8 @@ import {
   useOrganizationTags,
   useCreateTag,
   useProtection,
+  useDuplicateKeys,
+  type SharedRow,
 } from "@/hooks";
 import { useVariableHistory as useConvexVariableHistory } from "@/hooks";
 import { ENVIRONMENTS, DEFAULT_PROJECT_COLOR } from "@/constants/project";
@@ -39,7 +41,7 @@ import {
   TagFilter,
   type VariableFormData,
 } from "@/components/variables";
-import { InheritedVariables } from "@/components/workspaces";
+import { SharedBlock, ShareSheet } from "@/components/workspaces";
 import { BulkJobStatusLine } from "@/components/variables/BulkJobStatusLine";
 import { useRevealSecret } from "@/hooks/useRevealSecret";
 import { FeatureGate } from "@/components/tier/FeatureGate";
@@ -105,6 +107,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   // Read access keeps the trash recovery route available to members who may
   // need to restore content they previously deleted.
   const canRequestVariable = capabilities["project.requests.submit"] === true;
+  const canManageShares = capabilities["project.workspaces.manage"] === true;
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
@@ -200,6 +203,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const rollbackVariable = useRollbackVariable();
   const revealSecret = useRevealSecret();
   const protection = useProtection(projectId);
+  const duplicateKeys = useDuplicateKeys(projectId);
   const proposeChange = useAction(
     api.features.changeRequests.actions.createVariableChange
   );
@@ -244,6 +248,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   );
   // Share drawer state
   const [sharingVariable, setSharingVariable] = useState<Variable | null>(null);
+  // Cross-project sharing: the sheet, plus the shared row being edited or
+  // deleted. Shared rows are written through their group, not this project.
+  const [sharingAcross, setSharingAcross] = useState<Variable | null>(null);
+  const [editingShared, setEditingShared] = useState<SharedRow | null>(null);
+  const [deletingShared, setDeletingShared] = useState<SharedRow | null>(null);
 
   // History modal state
   const [historyVariableId, setHistoryVariableId] = useState<string | null>(
@@ -511,7 +520,53 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     }
   };
 
-  const handleRevealValue = async (variable: Variable) => {
+  const handleUpdateShared = async (
+    variableId: Id<"environmentVariables">,
+    data: VariableFormData
+  ) => {
+    if (!editingShared) return;
+    try {
+      const result = await updateVariable.mutateAsync({
+        variableId,
+        projectId: editingShared.workspace._id,
+        value: data.value || undefined,
+        description: data.description,
+        environments: data.environments,
+        isSensitive: data.isSensitive,
+        changeReason: "Updated via dashboard",
+        rotationFrequencyDays: data.rotationFrequencyDays,
+        tagIds: data.tagIds,
+      });
+      toast.success(
+        result.requested
+          ? "Sent for approval."
+          : `Updated in ${editingShared.reached.length} projects.`
+      );
+    } catch (err) {
+      const message = sanitizeConvexError(err);
+      toast.error(message);
+      throw new Error(message);
+    }
+  };
+
+  const handleDeleteShared = async () => {
+    if (!deletingShared) return;
+    try {
+      await deleteVariable.mutateAsync({
+        variableId: deletingShared._id,
+        projectId: deletingShared.workspace._id,
+      });
+      setDeletingShared(null);
+      toast.success(`${deletingShared.key} deleted everywhere it was read.`);
+    } catch (err) {
+      toast.error(sanitizeConvexError(err));
+    }
+  };
+
+  const handleRevealValue = async (variable: {
+    _id: string;
+    vaultRef?: string;
+  }) => {
     if (revealedValues[variable._id]) return;
     if (!variable.vaultRef || !organization?.id) return;
 
@@ -887,6 +942,17 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           </div>
         </div>
 
+        <SharedBlock
+          projectId={projectId}
+          projectName={project.name}
+          canManage={canManageShares}
+          revealedValues={revealedValues}
+          revealingIds={revealingIds}
+          onReveal={handleRevealValue}
+          onEdit={setEditingShared}
+          onDelete={setDeletingShared}
+        />
+
         <div className="divide-y divide-line">
           {showListLoading ? (
             <TerminalLoading />
@@ -947,6 +1013,18 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                     onShare={
                       canShare ? () => setSharingVariable(variable) : undefined
                     }
+                    badge={
+                      duplicateKeys.get(variable.key) ? (
+                        <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
+                          same key in {duplicateKeys.get(variable.key)} projects
+                        </span>
+                      ) : undefined
+                    }
+                    onShareAcross={
+                      canManageShares
+                        ? () => setSharingAcross(variable)
+                        : undefined
+                    }
                     showCheckbox={canDeleteVariable}
                     isSelected={selectedIds.has(variable._id)}
                     onToggleSelect={() => toggleSelect(variable._id)}
@@ -971,8 +1049,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             </>
           )}
         </div>
-
-        <InheritedVariables projectId={project?._id} />
 
         {/* Pinned to the panel's bottom edge, inside its border. Renders null
             when nothing is running, and because it lives here rather than
@@ -1120,6 +1196,57 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           />
         </FeatureGate>
       )}
+
+      <VariableEditModal
+        isOpen={!!editingShared}
+        onClose={() => setEditingShared(null)}
+        variable={editingShared}
+        onSave={handleUpdateShared}
+        protectedEnvironments={
+          editingShared?.protectedIn.length
+            ? editingShared.environments
+            : undefined
+        }
+        showRotation={showRotation}
+        notice={
+          editingShared && (
+            <div className="mb-4 space-y-1 border px-3 py-2 text-xs border-line text-ink-muted">
+              <p>
+                Shared. Saving changes it in {editingShared.reached.length}{" "}
+                projects: {editingShared.reached.join(", ")}.
+              </p>
+              {editingShared.protectedIn.length > 0 && (
+                <p className="text-warning">
+                  {editingShared.protectedIn.join(" and ")} protect{" "}
+                  {editingShared.environments.join(", ")}. This will be filed as
+                  a change request for a second person to apply.
+                </p>
+              )}
+            </div>
+          )
+        }
+      />
+
+      <ConfirmDialog
+        isOpen={!!deletingShared}
+        onClose={() => setDeletingShared(null)}
+        onConfirm={handleDeleteShared}
+        title={`Delete ${deletingShared?.key ?? ""}?`}
+        message={`${deletingShared?.reached.length ?? 0} projects read this value and lose the key on their next pull, sync or workflow run.`}
+        confirmText="Delete"
+        variant="danger"
+        confirmPhrase={
+          (deletingShared?.reached.length ?? 0) > 1
+            ? deletingShared?.key
+            : undefined
+        }
+      />
+
+      <ShareSheet
+        projectId={projectId}
+        variable={sharingAcross}
+        onClose={() => setSharingAcross(null)}
+      />
 
       {sharingVariable && projectId && orgId && (
         <ShareSecretDrawer

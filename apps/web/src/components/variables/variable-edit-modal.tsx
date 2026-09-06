@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { DrawerPanel } from "@/components/ui";
 import { VariableForm, type VariableFormData } from "./variable-form";
 import type { Id } from "@convex/_generated/dataModel";
@@ -31,6 +32,8 @@ interface VariableEditModalProps {
   protectedEnvironments?: readonly string[];
   /** Environments the caller may write to. Defaults to all of them. */
   allowedEnvironments?: readonly string[];
+  /** Blast radius of the save, shown above the form. */
+  notice?: ReactNode;
 }
 
 export function VariableEditModal({
@@ -43,6 +46,7 @@ export function VariableEditModal({
   onCreateTag,
   protectedEnvironments,
   allowedEnvironments,
+  notice,
 }: VariableEditModalProps) {
   const initialData: Partial<VariableFormData> | undefined = variable
     ? {
@@ -64,6 +68,7 @@ export function VariableEditModal({
 
   return (
     <DrawerPanel isOpen={isOpen} onClose={onClose} title="Edit Variable">
+      {notice}
       {initialData && (
         // Keyed by the variable so switching rows remounts the form with the
         // new initial data instead of syncing it through an effect.

@@ -39,6 +39,20 @@ The diff page compares two or more environments (default development vs producti
 
 Search, filter to sensitive-only, sort, reveal individually or all at once, and export as per-environment `.env` files or a JSON/Markdown report. For a key missing from one environment there is a **copy-from** helper — there is no one-click sync mutation.
 
+## Shared variables
+
+The same credential often lives in several projects. Sharing keeps one row that every picked project reads, so a rotation is one edit.
+
+A row whose key also exists in other projects shows **same key in N projects**. Its **Share across projects** action opens a sheet listing every project you can manage: projects holding the same value are preselected and their copies are moved into the shared row (they land in each project's trash for 30 days); projects with a different value are listed but cannot be picked until that is resolved. Pick an existing group or name a new one and confirm.
+
+Shared rows appear pinned above the table in every project that reads them, with a **N projects** pill. Edit and delete work in place and state how many projects change before you confirm. You can edit a shared row only if you could edit variables in every project it reaches. If any of those projects protects an environment the row is in, the edit is filed as a change request instead of landing directly.
+
+**Stop sharing here** removes this project from the group. By default the current values are copied into the project first, so its next pull is unchanged. The last project to leave takes the group with it.
+
+The CLI, the editor extensions, the MCP server, the GitHub Action and the Docker image all receive shared rows with no update: resolution happens on the server. Pushing a shared key from a client is refused with a message naming the group.
+
+Groups are listed and renamed under **Organization → Settings → Shared variables**. Free organizations get one group with three projects and ten variables.
+
 ## Trash
 
 Soft-deleted variables and shared accounts are listed separately, each restorable individually. Retention is **7 days**, shown per row as "Deleted N days ago — M days left", turning red at one day or less. **Empty trash** purges everything immediately, destroying the vault values.

@@ -15,26 +15,19 @@
 
 <!-- entry -->
 ---
-title: Workspaces Share One Variable Across Projects
+title: Share One Variable Across Projects
 version: v1.70.0
-date: 2026-09-05
+date: 2026-09-06
 types: [feature]
 ---
 
-A workspace holds one copy of a variable and every linked project reads that row. Rotate it once and each project picks up the new value on its next pull, so the same credential no longer lives in six places that drift apart.
+A variable can now be shared with other projects. One row, one vault object, every picked project reads it, so rotating a credential is one edit instead of six.
 
-Workspaces get their own entry in the sidebar. Create one, link the projects that should read it, and add variables the way you would in a project. Each linked project shows what it inherits in a read-only "From workspace" group on its variables page, with reveal working as it does for the project's own rows. A per-variable scope picker narrows a row to some of the linked projects, and a duplicate scan finds keys the linked projects already copy and moves one copy up.
+On a project's variables page, a row whose key also exists elsewhere shows "same key in N projects". Share it from there: projects holding the same value are preselected and their copies are adopted into the shared row, projects with a different value are listed but held back. Shared rows sit pinned above the table in every project that reads them, editable in place, with the number of affected projects on every confirm button. Stop sharing in one project and the current values are copied back so its next pull is unchanged.
 
-The CLI, the VS Code and JetBrains extensions, the REST API, the MCP server, the GitHub Action and the Docker image all receive inherited variables without an update, because resolution happens on the server. Free organizations get one workspace with three projects and ten variables.
+Safety follows the projects, not the group. You can edit a shared row only if you could edit variables in every project it reaches. If any of those projects protects an environment, the edit becomes a change request for a second person to apply. Each project gets its own audit entry and notification.
 
----
-title: Envpilot vs Phase, and a Refreshed Infisical Page
-version: v1.69.0
-date: 2026-09-05
-types: [feature, improvement]
----
-
-A new comparison page, [Envpilot vs Phase](/vs/phase), joins Doppler, Infisical and .env files in the footer. The Infisical page no longer calls Envpilot closed source; the platform has been MIT-licensed on GitHub for a while and the page now says so, while still pointing at Infisical for self-hosting. The Doppler and Infisical pages gain a "Beyond variables" row covering secret files and shared logins, and the client list now includes JetBrains, the GitHub Action, the Docker image, the REST API and the MCP server.
+The CLI, the VS Code and JetBrains extensions, the REST API, the MCP server, the GitHub Action and the Docker image receive shared rows without an update. Groups are managed under Organization settings. Free organizations get one group with three projects and ten variables.
 
 <!-- entry -->
 ---

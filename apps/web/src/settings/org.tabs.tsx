@@ -4,6 +4,7 @@ import { ApiKeysSection } from "@/components/api-keys/ApiKeysSection";
 import { IntegrationsSection } from "@/components/integrations/IntegrationsSection";
 import { DangerTab } from "@/components/settings/org/Danger";
 import { GeneralTab } from "@/components/settings/org/General";
+import { SharedVariablesTab } from "@/components/settings/org/SharedVariables";
 import { TagsTab } from "@/components/settings/org/Tags";
 
 /**
@@ -53,6 +54,11 @@ export function orgSettingsTabs({
       hidden: !showTags,
       locked: isOwner ? undefined : OWNER_ONLY,
       render: () => <TagsTab organizationId={organization._id} />,
+    },
+    {
+      id: "shared",
+      label: "Shared variables",
+      render: () => <SharedVariablesTab organizationId={organizationId} />,
     },
     {
       id: "apiKeys",

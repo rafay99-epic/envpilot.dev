@@ -56,3 +56,26 @@ export function activeWorkspacesQuery(
         .eq("deletedAt", undefined)
     );
 }
+
+/**
+ * The member projects a workspace row reaches: every linked project, or the
+ * `appliesTo` subset when the variable names one. Authorization on a shared
+ * row is decided against these, never against the workspace row itself.
+ */
+export async function reachedProjects(
+  db: DatabaseReader,
+  workspaceId: Id<"projects">,
+  appliesTo?: readonly Id<"projects">[]
+): Promise<Doc<"projects">[]> {
+  const memberships = await db
+    .query("workspaceProjects")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .collect();
+  const projects: Doc<"projects">[] = [];
+  for (const membership of memberships) {
+    if (appliesTo && !appliesTo.includes(membership.projectId)) continue;
+    const project = await db.get(membership.projectId);
+    if (project && !project.deletedAt) projects.push(project);
+  }
+  return projects;
+}

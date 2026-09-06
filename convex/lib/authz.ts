@@ -17,6 +17,7 @@ import {
 } from "./roleProfiles";
 export { effectiveEnvironments } from "./roleProfiles";
 import type { OrgAction, ProjectAction } from "./capabilities";
+import { isWorkspace, reachedProjects } from "./projectKind";
 
 // ─── Unified role model ───────────────────────────────────────────────────────
 //
@@ -489,6 +490,16 @@ export async function assertProjectCapability(
     throw new Error("Project not found");
   }
 
+  // A shared row is authorized against the projects that read it: reading
+  // needs any one of them, writing needs all of them. A workspace with no
+  // members falls through to the ordinary check on its own row.
+  if (isWorkspace(project)) {
+    const members = await reachedProjects(ctx.db, project._id);
+    if (members.length > 0) {
+      return assertAcrossMembers(ctx, userId, members, capability, action);
+    }
+  }
+
   const membership = await ctx.db
     .query("organizationMembers")
     .withIndex("by_org_and_user", (q) =>
@@ -543,6 +554,54 @@ export async function assertProjectCapability(
       profile,
       projectMembership.environments
     ),
+  };
+}
+
+async function assertAcrossMembers(
+  ctx: MutationCtx | QueryCtx,
+  userId: Id<"users">,
+  members: Doc<"projects">[],
+  capability: CapabilityKey,
+  action: string
+): Promise<ProjectAuthResult> {
+  const check = (member: Doc<"projects">) =>
+    assertProjectCapability(
+      ctx,
+      userId,
+      member._id,
+      capability,
+      member,
+      action
+    );
+
+  if (capability === "project.read") {
+    let lastError: unknown;
+    for (const member of members) {
+      try {
+        return await check(member);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
+  }
+
+  const results: ProjectAuthResult[] = [];
+  for (const member of members) results.push(await check(member));
+  const restricted = results.flatMap((result) =>
+    result.environmentScope ? [result.environmentScope] : []
+  );
+  const environmentScope =
+    restricted.length === 0
+      ? undefined
+      : restricted.reduce((acc, scope) =>
+          acc.filter((env) => scope.includes(env))
+        );
+  return {
+    orgRole: results[0].orgRole,
+    profile: results[0].profile,
+    assigned: results.some((result) => result.assigned),
+    environmentScope,
   };
 }
 
@@ -818,14 +877,29 @@ export async function getVariableAccess(
       : await ctx.db.get(variable.projectId);
   if (!project || project.deletedAt) return null;
 
-  return resolveResourceAccess(ctx, {
-    userId,
-    projectId: variable.projectId,
-    organizationId: project.organizationId,
-    resourceEnvironments: variable.environments,
-    blanketWrite: "project.variables.update",
-    getGrant: () => getActiveVariableGrant(ctx, userId, variable._id),
-  });
+  const resolveIn = (projectId: Id<"projects">) =>
+    resolveResourceAccess(ctx, {
+      userId,
+      projectId,
+      organizationId: project.organizationId,
+      resourceEnvironments: variable.environments,
+      blanketWrite: "project.variables.update",
+      getGrant: () => getActiveVariableGrant(ctx, userId, variable._id),
+    });
+
+  if (!isWorkspace(project)) return resolveIn(variable.projectId);
+
+  // Shared row: write needs write in every project that reads it, read
+  // needs read in any of them.
+  const members = await reachedProjects(
+    ctx.db,
+    project._id,
+    variable.appliesTo
+  );
+  if (members.length === 0) return resolveIn(variable.projectId);
+  const levels = await Promise.all(members.map((m) => resolveIn(m._id)));
+  if (levels.every((level) => level === "write")) return "write";
+  return levels.some((level) => level !== null) ? "read" : null;
 }
 
 // ─── Account-level access ─────────────────────────────────────────────────────
