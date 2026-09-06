@@ -79,8 +79,6 @@ export default defineSchema({
         sharedVariables: v.optional(v.boolean()),
       })
     ),
-    // Per-org HMAC key for vaultValueHashes. Minted on first hash.
-    hashKey: v.optional(v.string()),
     // WorkOS organization ID (for SSO integration)
     workosOrgId: v.optional(v.string()),
     // User who created the organization

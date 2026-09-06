@@ -9,11 +9,12 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 
 /**
- * Value hashes: HMAC-SHA256 of a secret's plaintext under a per-organization
- * key, stored against the vault object. Duplicate detection compares hashes
- * instead of reading the vault. A hash tells someone who can already read
- * both values that they are equal, and nothing else; the org key makes a
- * cross-org comparison meaningless by construction.
+ * Value hashes: HMAC-SHA256 of a secret's plaintext under a key derived from
+ * the deployment secret VALUE_HASH_SECRET and the organization id, stored
+ * against the vault object. Duplicate detection compares hashes instead of
+ * reading the vault. Equal hashes mean equal values within one org and
+ * nothing across orgs. Without the secret, nothing is hashed and detection
+ * falls back to comparing through the vault at merge time.
  */
 
 async function hmacHex(key: string, value: string): Promise<string> {
@@ -35,25 +36,15 @@ async function hmacHex(key: string, value: string): Promise<string> {
     .join("");
 }
 
-function randomKey(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 /** Record the hash for a freshly minted vault object. Never throws. */
 export async function recordValueHash(
   ctx: ActionCtx,
   args: { organizationId: string; vaultRef: string; value: string }
 ): Promise<void> {
+  const secret = process.env.VALUE_HASH_SECRET;
+  if (!secret) return;
   try {
-    const key: string | null = await ctx.runMutation(
-      internal.features.vault.hashes._orgKey,
-      { organizationId: args.organizationId, candidate: randomKey() }
-    );
-    if (!key) return;
+    const key = await hmacHex(secret, args.organizationId);
     await ctx.runMutation(internal.features.vault.hashes._upsert, {
       organizationId: args.organizationId,
       vaultRef: args.vaultRef,
@@ -63,20 +54,6 @@ export async function recordValueHash(
     // A missing hash only means "compare on merge"; the write itself stands.
   }
 }
-
-/** The org's key, minting `candidate` when none exists yet. */
-export const _orgKey = internalMutation({
-  args: { organizationId: v.string(), candidate: v.string() },
-  returns: v.union(v.string(), v.null()),
-  handler: async (ctx, args): Promise<string | null> => {
-    const id = ctx.db.normalizeId("organizations", args.organizationId);
-    const org = id ? await ctx.db.get(id) : null;
-    if (!org || !id) return null;
-    if (org.hashKey) return org.hashKey;
-    await ctx.db.patch(id, { hashKey: args.candidate });
-    return args.candidate;
-  },
-});
 
 export const _upsert = internalMutation({
   args: { organizationId: v.string(), vaultRef: v.string(), hash: v.string() },

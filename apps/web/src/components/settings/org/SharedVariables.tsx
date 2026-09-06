@@ -101,7 +101,11 @@ export function SharedVariablesTab({
 
         <SettingsRow
           label="Share variables across projects"
-          description={`One row read by several projects. Turning this off stops new sharing; the ${groups.length} groups you have keep working.`}
+          description={
+            groups.length === 0
+              ? "One row read by several projects. Turning this off stops new sharing."
+              : `One row read by several projects. Turning this off stops new sharing; the ${groups.length} ${groups.length === 1 ? "group" : "groups"} you have keep working.`
+          }
           control={
             <div className="flex items-center gap-2">
               {!allowed && (
@@ -134,8 +138,11 @@ export function SharedVariablesTab({
 
         {!enabled && (
           <p className="text-sm text-ink-subtle">
-            Sharing is off. {groups.length} groups keep working; nothing new can
-            be shared until it is on.
+            Sharing is off.{" "}
+            {groups.length > 0
+              ? `${groups.length} ${groups.length === 1 ? "group keeps" : "groups keep"} working; `
+              : ""}
+            nothing new can be shared until it is on.
           </p>
         )}
 
