@@ -1,0 +1,32 @@
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_907ffcf933f32f::t_3b98b8afd11c0d 44-49,979-981,1160-1162,1164-1167
+apps/web/src/components/workspaces/index.ts
+  s_907ffcf933f32f::t_3b98b8afd11c0d 4
+apps/web/src/app/(dashboard)/dashboard/page.tsx
+  s_907ffcf933f32f::t_3271e0bcf1d185 339
+  s_907ffcf933f32f::t_3b98b8afd11c0d 107-110,349
+apps/web/src/components/workspaces/shared-row-dialogs.tsx
+  s_907ffcf933f32f::t_3b98b8afd11c0d 1-128
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/trash/page.tsx
+  s_907ffcf933f32f::t_3b98b8afd11c0d 373,593-599
+  s_907ffcf933f32f::t_ba3cf04161575c 600-601
+apps/web/src/components/variables/variable-list-item.tsx
+  s_907ffcf933f32f::t_3b98b8afd11c0d 169-175,178,184-186,188-189,205-206,220,222,226-227,230,246-252,296,320,341,365-407
+  s_907ffcf933f32f::t_e7958f7c4490a0 408-409
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "7bc301a77144050932e90d7691f878b7029c3469",
+  "prompts": {},
+  "sessions": {
+    "s_907ffcf933f32f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0837503-b2fa-4f7d-8244-7a3ebcd5dd60",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
