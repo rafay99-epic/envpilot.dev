@@ -1,4 +1,6 @@
 import { v, ConvexError } from "convex/values";
+import { resolveEffectiveVariables } from "../variables/resolve";
+import { isWorkspace } from "../../lib/projectKind";
 import {
   action,
   internalMutation,
@@ -167,6 +169,12 @@ export const _authorizePull = internalMutation({
         await logApiKeyDenied("project_deleted");
         return { ok: false as const, denied: "invalid_token" as const };
       }
+      // A key scoped to a workspace row must not pull it as if it were a
+      // project. Same uniform denial as every other bad key.
+      if (isWorkspace(project)) {
+        await logApiKeyDenied("project_is_workspace");
+        return { ok: false as const, denied: "invalid_token" as const };
+      }
 
       // apiKeys credentials gate on `public_api` — the Action surface rides
       // the same flag as the REST API it pulls through (⚖️ PLAN D2).
@@ -231,12 +239,12 @@ export const _readScopedVariables = internalQuery({
     // let a CI run "succeed" while deploying with missing secrets. If a
     // project legitimately outgrows this, raise the bound deliberately.
     const MAX_PULL_VARIABLES = 1000;
-    const variables = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project_deleted", (q) =>
-        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
-      )
-      .take(MAX_PULL_VARIABLES + 1);
+    // Own rows plus the ones inherited from linked workspaces, already
+    // narrowed to the requested environment.
+    const variables = await resolveEffectiveVariables(ctx, {
+      projectId: args.projectId,
+      environment: args.environment,
+    });
 
     if (variables.length > MAX_PULL_VARIABLES) {
       throw new ConvexError(
@@ -244,12 +252,10 @@ export const _readScopedVariables = internalQuery({
       );
     }
 
-    return variables
-      .filter((variable) => variable.environments.includes(args.environment))
-      .map((variable) => ({
-        key: variable.key,
-        vaultRef: variable.vaultRef ?? null,
-      }));
+    return variables.map((variable) => ({
+      key: variable.key,
+      vaultRef: variable.vaultRef ?? null,
+    }));
   },
 });
 

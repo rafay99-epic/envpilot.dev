@@ -12,6 +12,18 @@ export {
 
 // Project hooks
 export { useOrganizationProjects, useProjectBySlug } from "./useProjects";
+export {
+  useSharedGroups,
+  useSharedGroupBySlug,
+  useSharedRows,
+  useDuplicateKeys,
+  useDuplicateKeysForOrganization,
+  useShareActions,
+  useSharingStatus,
+  useMergeActions,
+  type SharedRow,
+  type DuplicateGroup,
+} from "./useWorkspaces";
 export { useAutoPageSize } from "./useAutoPageSize";
 export {
   useCreateProject,

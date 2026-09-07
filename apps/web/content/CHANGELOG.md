@@ -15,13 +15,21 @@
 
 <!-- entry -->
 ---
-title: Envpilot vs Phase, and a Refreshed Infisical Page
-version: v1.69.0
-date: 2026-09-05
-types: [feature, improvement]
+title: Share One Variable Across Projects
+version: v1.70.0
+date: 2026-09-06
+types: [feature]
 ---
 
-A new comparison page, [Envpilot vs Phase](/vs/phase), joins Doppler, Infisical and .env files in the footer. The Infisical page no longer calls Envpilot closed source; the platform has been MIT-licensed on GitHub for a while and the page now says so, while still pointing at Infisical for self-hosting. The Doppler and Infisical pages gain a "Beyond variables" row covering secret files and shared logins, and the client list now includes JetBrains, the GitHub Action, the Docker image, the REST API and the MCP server.
+A variable can now be shared with other projects. One row, one vault object, every picked project reads it, so rotating a credential is one edit instead of six.
+
+On a project's variables page, a row whose key also exists elsewhere shows "same key in N projects". Share it from there: projects holding the same value are preselected and their copies are adopted into the shared row, projects with a different value are listed but held back. Shared rows sit pinned above the table in every project that reads them, editable in place, with the number of affected projects on every confirm button. Stop sharing in one project and the current values are copied back so its next pull is unchanged.
+
+Safety follows the projects, not the group. You can edit a shared row only if you could edit variables in every project it reaches. If any of those projects protects an environment, the edit, and the share itself, becomes a change request for a second person to apply. Each project gets its own audit entry and notification.
+
+Sharing is off until an owner turns it on in Organization settings, and turning it off never breaks a pull. The same settings tab lists every key that is identical across projects and merges them in one click: development and staging on the spot, production through approval, anything with a different value held back with the reason. Identity is decided by a per-organization hash written at save time, so no vault reads are needed to find duplicates. Run the `backfill-value-hashes` migration once for variables saved before this release.
+
+The CLI, the VS Code and JetBrains extensions, the REST API, the MCP server, the GitHub Action and the Docker image receive shared rows without an update. Groups are managed under Organization settings. Shared variables are a Pro feature.
 
 <!-- entry -->
 ---

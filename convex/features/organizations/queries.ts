@@ -17,7 +17,12 @@ const organizationForMemberValidator = v.object({
   slug: v.string(),
   description: v.optional(v.string()),
   logoUrl: v.optional(v.string()),
-  settings: v.optional(v.object({ teamLeadsCanCreateProjects: v.boolean() })),
+  settings: v.optional(
+    v.object({
+      teamLeadsCanCreateProjects: v.optional(v.boolean()),
+      sharedVariables: v.optional(v.boolean()),
+    })
+  ),
   workosOrgId: v.optional(v.string()),
   createdBy: v.id("users"),
   createdAt: v.number(),

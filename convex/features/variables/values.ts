@@ -10,7 +10,12 @@ import {
 import { roleLevel, ROLE_LEVEL } from "../../lib/authz";
 import { pool, VAULT_POOL_WIDTH } from "../../lib/pool";
 import { vaultCreate, vaultRead } from "../vault/vault";
-import { assertValidVariableFields, isValidVariableKey } from "./helpers";
+import { recordValueHash } from "../vault/hashes";
+import {
+  assertValidVariableFields,
+  isValidVariableKey,
+  environmentConflictMessage,
+} from "./helpers";
 import {
   PROTECTED_ENVIRONMENT_CODE,
   touchedEnvironments,
@@ -428,7 +433,7 @@ export const createWithValue = action({
     // create mutation re-checks (race-safe backstop), but failing only there
     // left an orphaned vault secret behind for every clash. Same key across
     // DISJOINT environments is legal (per-environment uniqueness).
-    const envClashes: string[] = await ctx.runQuery(
+    const envClashes = await ctx.runQuery(
       internal.features.variables.queries.getEnvironmentConflictsInternal,
       {
         projectId: args.projectId,
@@ -437,9 +442,7 @@ export const createWithValue = action({
       }
     );
     if (envClashes.length > 0) {
-      throw new ConvexError(
-        `Variable "${args.key}" already exists in environment(s): ${envClashes.join(", ")}. The same key is allowed only across non-overlapping environments.`
-      );
+      throw new ConvexError(environmentConflictMessage(args.key, envClashes));
     }
 
     // Protection is resolved before the vault write so a proposal and a
@@ -1321,6 +1324,11 @@ export const importValues = action({
               organizationId: project.organizationId,
               projectId: args.projectId,
             });
+            await recordValueHash(ctx, {
+              organizationId: project.organizationId,
+              vaultRef: vault.id,
+              value: entry.value,
+            });
             return { ok: true as const, key: entry.key, vaultRef: vault.id };
           } catch {
             return { ok: false as const };
@@ -1436,6 +1444,11 @@ export const importValues = action({
             organizationId: project.organizationId,
             projectId: args.projectId,
           });
+          await recordValueHash(ctx, {
+            organizationId: project.organizationId,
+            vaultRef: vault.id,
+            value: entry.value,
+          });
           return {
             kind: "update",
             variableId: current._id,
@@ -1447,6 +1460,11 @@ export const importValues = action({
           value: entry.value,
           organizationId: project.organizationId,
           projectId: args.projectId,
+        });
+        await recordValueHash(ctx, {
+          organizationId: project.organizationId,
+          vaultRef: vault.id,
+          value: entry.value,
         });
         return { kind: "create", key: entry.key, vaultRef: vault.id };
       },

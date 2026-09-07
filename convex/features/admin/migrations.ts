@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { query, mutation, internalMutation } from "../../_generated/server";
 import type { MutationCtx } from "../../_generated/server";
+import { internal } from "../../_generated/api";
 import { SEED_FEATURES, SEED_ROLES } from "../../lib/seedData";
 import {
   hasCapability,
@@ -22,6 +23,24 @@ export const listMigrations = query({
           "Seeds all gatable features into the featureRegistry table. Idempotent — skips existing keys.",
         category: "Core",
         priority: 1,
+        destructive: false,
+        runOnce: false,
+      },
+      {
+        name: "resync-shared-variables-tier-features",
+        description:
+          "Force-sets the five shared-variables tier values (workspaces, max_workspaces, max_projects_per_workspace, max_workspaces_per_project, max_variables_per_workspace) from TIER_CONFIGS. Run once after a deploy that changed them; seed-tier-features never overwrites.",
+        category: "Core",
+        priority: 8,
+        destructive: false,
+        runOnce: false,
+      },
+      {
+        name: "backfill-value-hashes",
+        description:
+          "Writes a per-organization HMAC for every active variable that has none, so duplicate detection never reads the vault. Runs in the background in pages of 100. Idempotent.",
+        category: "Core",
+        priority: 9,
         destructive: false,
         runOnce: false,
       },
@@ -189,6 +208,13 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
     doc_sharing: "true",
     doc_public_links: "false",
     max_active_doc_links: "0",
+    // Shared variables are Pro. The switch in org settings still exists on
+    // free but reads "Not available on this plan".
+    workspaces: "false",
+    max_workspaces: "0",
+    max_projects_per_workspace: "0",
+    max_workspaces_per_project: "0",
+    max_variables_per_workspace: "0",
   },
   pro: {
     max_projects: "null",
@@ -237,12 +263,62 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
     doc_sharing: "true",
     doc_public_links: "true",
     max_active_doc_links: "null",
+    workspaces: "true",
+    max_workspaces: "null",
+    // These two are NOT paywalls. 50 member projects bounds the conflict
+    // lookups one variable write performs inside a mutation; 5 workspaces
+    // bounds the indexed reads one pull performs. Raise them in tier config
+    // when someone actually reaches them.
+    max_projects_per_workspace: "50",
+    max_workspaces_per_project: "5",
+    max_variables_per_workspace: "null",
   },
 };
 
 async function runMigrationByName(ctx: MutationCtx, name: string) {
   // Keeps the original `args.name` references below working untouched.
   const args = { name };
+
+  if (args.name === "resync-shared-variables-tier-features") {
+    const keys = [
+      "workspaces",
+      "max_workspaces",
+      "max_projects_per_workspace",
+      "max_workspaces_per_project",
+      "max_variables_per_workspace",
+    ] as const;
+    let updated = 0;
+    for (const [tierName, features] of Object.entries(TIER_CONFIGS)) {
+      for (const featureKey of keys) {
+        const value = features[featureKey];
+        const existing = await ctx.db
+          .query("tierFeatures")
+          .withIndex("by_tier_and_feature", (q) =>
+            q.eq("tierName", tierName).eq("featureKey", featureKey)
+          )
+          .first();
+        if (existing) {
+          await ctx.db.patch(existing._id, { value, updatedAt: Date.now() });
+        } else {
+          await ctx.db.insert("tierFeatures", {
+            tierName,
+            featureKey,
+            value,
+            updatedAt: Date.now(),
+          });
+        }
+        updated++;
+      }
+    }
+    return { success: true, updated };
+  }
+
+  if (args.name === "backfill-value-hashes") {
+    await ctx.scheduler.runAfter(0, internal.features.vault.hashes.backfill, {
+      cursor: null,
+    });
+    return { success: true, scheduled: true };
+  }
 
   if (args.name === "seed-tier-definitions") {
     const existing = await ctx.db.query("tierDefinitions").collect();
@@ -296,6 +372,7 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
           "Version history & rollback",
           "Bulk .env import",
           "Granular permissions",
+          "Shared variables across projects",
           "Secret rotation & expiry",
           "365-day audit log retention",
           "Priority support",

@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { requireAuthedUser } from "../../lib/identity";
 import { getActiveMembership } from "../../lib/authz";
 import type { Id } from "../../_generated/dataModel";
+import { resolveEffectiveVariables } from "../variables/resolve";
 
 /**
  * Lightweight change signal for IDE real-time sync: the max updatedAt across
@@ -25,13 +26,14 @@ export const projectVersion = query({
     );
     if (!membership) return null;
 
-    let latest = 0;
-    for (const row of await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project_deleted", (q) =>
-        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
-      )
-      .collect()) {
+    // Link and unlink touch the project row, so membership changes move
+    // the version even when every shared row is older than the project.
+    let latest = project.updatedAt;
+    // Resolved, not own rows only: an edit to a workspace variable has to
+    // move every linked project's version or the IDE never re-pulls it.
+    for (const row of await resolveEffectiveVariables(ctx, {
+      projectId: args.projectId,
+    })) {
       latest = Math.max(latest, row.updatedAt);
     }
     for (const row of await ctx.db

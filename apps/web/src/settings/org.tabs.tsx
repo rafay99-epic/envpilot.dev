@@ -4,6 +4,7 @@ import { ApiKeysSection } from "@/components/api-keys/ApiKeysSection";
 import { IntegrationsSection } from "@/components/integrations/IntegrationsSection";
 import { DangerTab } from "@/components/settings/org/Danger";
 import { GeneralTab } from "@/components/settings/org/General";
+import { SharedVariablesTab } from "@/components/settings/org/SharedVariables";
 import { TagsTab } from "@/components/settings/org/Tags";
 
 /**
@@ -21,6 +22,7 @@ export function orgSettingsTabs({
   isOwner,
   canManageApiKeys,
   showTags,
+  showShared,
   notificationsRegistered,
 }: {
   slug: string;
@@ -34,6 +36,7 @@ export function orgSettingsTabs({
   isOwner: boolean;
   canManageApiKeys: boolean;
   showTags: boolean;
+  showShared: boolean;
   notificationsRegistered: boolean;
 }): SettingsTabDef[] {
   const organizationId = organization._id as Id<"organizations">;
@@ -53,6 +56,14 @@ export function orgSettingsTabs({
       hidden: !showTags,
       locked: isOwner ? undefined : OWNER_ONLY,
       render: () => <TagsTab organizationId={organization._id} />,
+    },
+    {
+      id: "shared",
+      hidden: !showShared,
+      label: "Shared variables",
+      render: () => (
+        <SharedVariablesTab organizationId={organizationId} isOwner={isOwner} />
+      ),
     },
     {
       id: "apiKeys",

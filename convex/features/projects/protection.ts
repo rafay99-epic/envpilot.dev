@@ -9,6 +9,8 @@ import {
 } from "../../lib/authz";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { createAuditLog } from "../../lib/audit";
+import { syncWorkspaceProtection } from "../../lib/protection";
+import { isWorkspace } from "../../lib/projectKind";
 
 /**
  * Protected environments: the CONFIG surface.
@@ -49,6 +51,11 @@ export const setProtection = mutation({
     if (!project || project.deletedAt) {
       throw new ConvexError("Project not found");
     }
+    if (isWorkspace(project)) {
+      throw new ConvexError(
+        "A shared group's protection follows the projects that read it."
+      );
+    }
 
     await assertProjectCapability(
       ctx,
@@ -86,6 +93,14 @@ export const setProtection = mutation({
           : undefined,
       updatedAt: now,
     });
+
+    const memberships = await ctx.db
+      .query("workspaceProjects")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const membership of memberships) {
+      await syncWorkspaceProtection(ctx, membership.workspaceId, actor._id);
+    }
 
     if (args.environments.length > 0) {
       // Both sets, always: narrowing from [staging, production] to [staging]

@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import { applyAdoptionCore } from "../workspaces/adopt";
 import type { MutationCtx } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
@@ -41,6 +42,8 @@ export type VariablePayload = {
   tagIds?: string[];
   targetVersion?: number;
   rotationFrequencyDays?: number;
+  duplicateIds?: string[];
+  appliesTo?: string[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -129,6 +132,8 @@ export function parseVariablePayload(raw: string): VariablePayload {
     tagIds: asStringArray(parsed.tagIds),
     targetVersion: asNumber(parsed.targetVersion),
     rotationFrequencyDays: asNumber(parsed.rotationFrequencyDays),
+    duplicateIds: asStringArray(parsed.duplicateIds),
+    appliesTo: asStringArray(parsed.appliesTo),
   };
 }
 
@@ -276,6 +281,22 @@ async function applyVariableChange(
       });
       return variableId;
     }
+    case "share": {
+      if (!targetId || payload.key === undefined) {
+        throw new ConvexError("The target variable no longer exists");
+      }
+      await applyAdoptionCore(ctx, {
+        workspaceId: request.projectId,
+        survivorId: targetId,
+        duplicateIds:
+          normalizeIds(ctx, "environmentVariables", payload.duplicateIds) ?? [],
+        key: payload.key,
+        appliesTo: normalizeIds(ctx, "projects", payload.appliesTo),
+        actorId: author,
+        viaRequestId: request._id,
+      });
+      return targetId;
+    }
     case "rollback": {
       if (!targetId) {
         throw new ConvexError("The target variable no longer exists");
@@ -369,7 +390,8 @@ async function applyAccountChange(
       });
     }
     case "rollback":
-      throw new ConvexError("Rollback is only supported for variables");
+    case "share":
+      throw new ConvexError("This change kind is only supported for variables");
     default: {
       const _exhaustive: never = request.kind;
       throw new ConvexError(`Unsupported change kind: ${String(_exhaustive)}`);
@@ -494,10 +516,21 @@ async function applyFileChange(
       });
     }
     case "rollback":
-      throw new ConvexError("Rollback is only supported for variables");
+    case "share":
+      throw new ConvexError("This change kind is only supported for variables");
     default: {
       const _exhaustive: never = request.kind;
       throw new ConvexError(`Unsupported change kind: ${String(_exhaustive)}`);
     }
   }
+}
+
+function normalizeIds<T extends "environmentVariables" | "projects">(
+  ctx: MutationCtx,
+  table: T,
+  ids: string[] | undefined
+): Id<T>[] | undefined {
+  return ids
+    ?.map((id) => ctx.db.normalizeId(table, id))
+    .filter((id): id is Id<T> => id !== null);
 }

@@ -18,6 +18,7 @@ import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { getActiveMembership, getRoleProfile, hasCapability } from "./authz";
+import { reachedProjects } from "./projectKind";
 
 export const PROTECTED_ENVIRONMENT_CODE = "PROTECTED_ENVIRONMENT";
 
@@ -140,4 +141,29 @@ export async function assertProtectedWrite(
     environments: protectedEnvs,
   };
   throw new ConvexError(error);
+}
+
+/**
+ * A workspace's protection is derived: the union of what its member projects
+ * protect. Keeping it on the row means every call site above stays a plain
+ * `project.protection` read. Call after membership or a member's protection
+ * changes.
+ */
+export async function syncWorkspaceProtection(
+  ctx: MutationCtx,
+  workspaceId: Id<"projects">,
+  actorId: Id<"users">
+): Promise<void> {
+  const members = await reachedProjects(ctx.db, workspaceId);
+  const environments = [
+    ...new Set(members.flatMap((m) => m.protection?.environments ?? [])),
+  ];
+  const now = Date.now();
+  await ctx.db.patch(workspaceId, {
+    protection:
+      environments.length > 0
+        ? { environments, updatedBy: actorId, updatedAt: now }
+        : undefined,
+    updatedAt: now,
+  });
 }

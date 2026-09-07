@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query, internalQuery } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
+import { activeProjectsQuery, isWorkspace } from "../../lib/projectKind";
 import {
   getActiveMembership,
   getRoleProfile,
@@ -68,12 +69,10 @@ export const listByOrganization = query({
     if (bypassesAssignment(profile)) {
       // Trashed projects are skipped at the index, not read and discarded —
       // a long-lived org's trash used to dominate this read.
-      return await ctx.db
-        .query("projects")
-        .withIndex("by_organization_and_deleted_at", (q) =>
-          q.eq("organizationId", args.organizationId).eq("deletedAt", undefined)
-        )
-        .collect();
+      // activeProjectsQuery, not the plain deleted-at range: workspaces are
+      // project rows and must never surface as projects in a grid, a picker
+      // or `envpilot list projects`.
+      return await activeProjectsQuery(ctx.db, args.organizationId).collect();
     }
 
     // Assignment-scoped roles read only their own rows: this grows with the
@@ -91,6 +90,7 @@ export const listByOrganization = query({
       (project): project is NonNullable<typeof project> =>
         project !== null &&
         project.deletedAt === undefined &&
+        !isWorkspace(project) &&
         project.organizationId === args.organizationId
     );
   },
@@ -194,6 +194,10 @@ export const _getBySlug = internalQuery({
       .first();
 
     if (!project) return null;
+    // A workspace is not addressable by a machine surface. Returning null
+    // rather than throwing keeps the existing policy: never confirm to a key
+    // that something exists when it is not in that key's world.
+    if (isWorkspace(project)) return null;
     return project;
   },
 });
@@ -214,6 +218,9 @@ export const getBySlug = query({
       .first();
 
     if (!project || project.deletedAt) return null;
+    // A workspace has its own route and query. The project page must not
+    // render it with a settings tab, members and CI keys it never asked for.
+    if (isWorkspace(project)) return null;
 
     // Returns null instead of throwing so callers keep "not found" handling.
     if (!(await canViewProject(ctx, actor._id, project))) return null;

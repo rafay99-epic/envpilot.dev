@@ -8,6 +8,7 @@ import {
 } from "../../_generated/server";
 import { del as deleteBlob } from "../files/blobStore";
 import { deleteVaultObject } from "../vault/gc";
+import { syncWorkspaceProtection } from "../../lib/protection";
 
 const EXTERNAL_BATCH_SIZE = 8;
 const DATABASE_BATCH_SIZE = 64;
@@ -39,6 +40,7 @@ type DeletionStage =
   | "doc_shares"
   | "docs"
   | "favorites"
+  | "workspace_links"
   | "members"
   | "access"
   | "api_keys"
@@ -63,7 +65,8 @@ const NEXT_STAGE: Record<DeletionStage, DeletionStage | null> = {
   doc_content: "doc_shares",
   doc_shares: "docs",
   docs: "favorites",
-  favorites: "members",
+  favorites: "workspace_links",
+  workspace_links: "members",
   members: "access",
   access: "api_keys",
   api_keys: "webhooks",
@@ -247,6 +250,27 @@ async function deleteProjectRows(
     return rows.length > 0;
   }
 
+  if (stage === "workspace_links") {
+    // Both directions in one stage: a deleted member project loses its
+    // memberships, and a deleted workspace loses every project that read it.
+    const asMember = await ctx.db
+      .query("workspaceProjects")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .take(DATABASE_BATCH_SIZE);
+    for (const row of asMember) {
+      await ctx.db.delete(row._id);
+      await syncWorkspaceProtection(ctx, row.workspaceId, row.createdBy);
+    }
+    if (asMember.length > 0) return true;
+
+    const asWorkspace = await ctx.db
+      .query("workspaceProjects")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", projectId))
+      .take(DATABASE_BATCH_SIZE);
+    for (const row of asWorkspace) await ctx.db.delete(row._id);
+    return asWorkspace.length > 0;
+  }
+
   if (stage === "members") {
     const rows = await ctx.db
       .query("projectMembers")
@@ -342,6 +366,7 @@ export const processDeletion = internalMutation({
       stage === "doc_shares" ||
       stage === "docs" ||
       stage === "favorites" ||
+      stage === "workspace_links" ||
       stage === "members" ||
       stage === "access"
     ) {

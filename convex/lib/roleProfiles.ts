@@ -115,6 +115,7 @@ export const SYSTEM_PROFILES: Record<string, RoleProfile> = {
       "project.templates.manage",
       "project.protection.manage",
       "project.protection.approve",
+      "project.workspaces.manage",
       "notify.variable_changes",
     ]),
   },

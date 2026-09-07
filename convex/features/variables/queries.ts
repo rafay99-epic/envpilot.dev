@@ -6,6 +6,7 @@ import { requireAuthedUser } from "../../lib/identity";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { authorizeVariableAccess } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
+import { resolveEffectiveVariables } from "./resolve";
 import {
   getVariableAccess,
   isEnvironmentScopeAllowed,
@@ -58,27 +59,33 @@ export const listByProject = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const resolved = await resolveProjectAccessContext(
+      ctx,
+      args.projectId,
+      actor._id
+    );
+    if (!resolved || !(resolved.access.isOwner || resolved.access.assigned)) {
+      return [];
+    }
     const limit = args.limit ?? LIST_READ_CAP;
-    const variables = await ctx.db
+
+    // Own rows only: push and import diff against this list, and a shared
+    // row must never be deleted or rewritten from a member project.
+    const rows = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_deleted", (q) =>
         q.eq("projectId", args.projectId).eq("deletedAt", undefined)
       )
       .take(limit + 1);
-
-    if (variables.length > limit) {
+    if (rows.length > limit) {
       throw new ConvexError(
         `Project has more than ${limit} active variables, refusing a partial read. Contact support to raise the limit.`
       );
     }
-
-    if (args.environment) {
-      return variables.filter((v) =>
-        v.environments.includes(args.environment!)
-      );
-    }
-
-    return variables;
+    return args.environment
+      ? rows.filter((row) => row.environments.includes(args.environment!))
+      : rows;
   },
 });
 
@@ -557,14 +564,28 @@ async function listWithAccessCore(
   // dropped and reported as `truncatedAt` instead of silently vanishing.
   // Access filtering below makes row counts unreliable as a cap signal.
   const limit = args.limit ?? LIST_READ_CAP;
-  const allVariables = await ctx.db
-    .query("environmentVariables")
-    .withIndex("by_project_deleted", (q) =>
-      q.eq("projectId", args.projectId).eq("deletedAt", undefined)
-    )
-    .take(limit + 1);
-  const truncatedAt = allVariables.length > limit ? limit : undefined;
-  if (truncatedAt !== undefined) allVariables.pop();
+
+  // Own rows PLUS everything inherited from the project's workspaces. This is
+  // the read the CLI and the VS Code extension pull through (values.ts
+  // pullValues -> _listWithAccessCapped), so leaving it on the raw index is
+  // what would make workspaces invisible to both of them.
+  //
+  // mapVariableRow decides access from the row's projectId, and an inherited
+  // row's projectId is the WORKSPACE. Presenting it as this project's row is
+  // correct: access to a shared value comes from membership of a project that
+  // reads it, which is the same rule resolve.ts documents and vault/reveal.ts
+  // enforces.
+  const resolvedRows = (
+    await resolveEffectiveVariables(ctx, { projectId: args.projectId })
+  ).map((row) =>
+    row.source.kind === "own" ? row : { ...row, projectId: args.projectId }
+  );
+  const inherited = new Set(
+    resolvedRows.filter((row) => row.source.kind !== "own").map((r) => r._id)
+  );
+
+  const truncatedAt = resolvedRows.length > limit ? limit : undefined;
+  const allVariables = resolvedRows.slice(0, limit);
 
   // Scoped developers never receive out-of-scope variables at all —
   // not even their metadata/keys
@@ -572,9 +593,17 @@ async function listWithAccessCore(
     isEnvironmentScopeAllowed(access.environmentScope, variable.environments)
   );
 
-  const variablesWithAccess = variables.map((variable) =>
-    mapVariableRow(variable, access)
-  );
+  // A shared row is never writable from a member project's list.
+  const variablesWithAccess = variables.map((variable) => {
+    const mapped = mapVariableRow(variable, access);
+    return inherited.has(variable._id)
+      ? {
+          ...mapped,
+          permission: mapped.hasAccess ? ("read" as const) : null,
+          canManagePermissions: false,
+        }
+      : mapped;
+  });
 
   // Assigned members (and owners) may list metadata for every variable;
   // grant-only viewers see just the variables shared with them.
@@ -866,13 +895,20 @@ export const listMetadataByProject = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const resolved = await resolveProjectAccessContext(
+      ctx,
+      args.projectId,
+      actor._id
+    );
+    if (!resolved || !(resolved.access.isOwner || resolved.access.assigned)) {
+      return [];
+    }
     const limit = args.limit ?? LIST_READ_CAP;
-    const variables = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project_deleted", (q) =>
-        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
-      )
-      .take(limit + 1);
+    const variables = await resolveEffectiveVariables(ctx, {
+      projectId: args.projectId,
+      environment: args.environment,
+    });
 
     if (variables.length > limit) {
       throw new ConvexError(
@@ -880,11 +916,7 @@ export const listMetadataByProject = query({
       );
     }
 
-    const filtered = args.environment
-      ? variables.filter((v) => v.environments.includes(args.environment!))
-      : variables;
-
-    return filtered.map((v) => ({
+    return variables.map((v) => ({
       _id: v._id,
       key: v.key,
       environments: v.environments,
@@ -1279,12 +1311,59 @@ export const getDeleted = query({
       .order("desc")
       .take(100);
 
-    return deletedVariables.map((variable) => ({
+    const rows = deletedVariables.map((variable) => ({
       _id: variable._id,
       key: variable.key,
       deletedAt: variable.deletedAt as number,
       environments: variable.environments,
+      sharedFrom: undefined as string | undefined,
     }));
+
+    // Shared rows this project read live in the workspace's trash. Listing
+    // them here means "restore for all" is reachable from any member.
+    const memberships = await ctx.db
+      .query("workspaceProjects")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const membership of memberships) {
+      const workspace = await ctx.db.get(membership.workspaceId);
+      if (!workspace || workspace.deletedAt) continue;
+      // Listed only where restore would be allowed: delete rights in every
+      // project the group reaches.
+      try {
+        await authorizeVariableAccess(ctx, {
+          userId: actor._id,
+          projectId: workspace._id,
+          action: "project:delete_variable",
+          preloadedProject: workspace,
+        });
+      } catch {
+        continue;
+      }
+      const shared = await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project_deleted", (q) =>
+          q.eq("projectId", workspace._id).gte("deletedAt", cutoff)
+        )
+        .order("desc")
+        .take(100);
+      for (const variable of shared) {
+        if (
+          variable.appliesTo &&
+          !variable.appliesTo.includes(args.projectId)
+        ) {
+          continue;
+        }
+        rows.push({
+          _id: variable._id,
+          key: variable.key,
+          deletedAt: variable.deletedAt as number,
+          environments: variable.environments,
+          sharedFrom: workspace.name,
+        });
+      }
+    }
+    return rows.sort((a, b) => b.deletedAt - a.deletedAt);
   },
 });
 
@@ -1331,7 +1410,24 @@ export const getEnvironmentConflictsInternal = internalQuery({
     key: v.string(),
     environments: v.array(v.string()),
   },
-  returns: v.array(v.string()),
+  returns: v.array(
+    v.object({
+      source: v.union(
+        v.object({ kind: v.literal("self") }),
+        v.object({
+          kind: v.literal("workspace"),
+          workspaceId: v.id("projects"),
+          name: v.string(),
+        }),
+        v.object({
+          kind: v.literal("member"),
+          projectId: v.id("projects"),
+          name: v.string(),
+        })
+      ),
+      environments: v.array(v.string()),
+    })
+  ),
   handler: async (ctx, args) =>
     findEnvironmentConflicts(ctx, {
       projectId: args.projectId,

@@ -15,7 +15,12 @@ import {
   countRotationEnabledVariables,
 } from "../featureRegistry/gates";
 import { resolveOrgGateContext } from "../featureRegistry/resolver";
-import { createAuditLog, logVariableAccess } from "../../lib/audit";
+import {
+  createAuditLog,
+  auditSharedWrite,
+  logVariableAccess,
+} from "../../lib/audit";
+import { isWorkspace } from "../../lib/projectKind";
 import { rateLimiter } from "../../lib/rateLimits";
 import {
   authorizeVariableAccess,
@@ -37,6 +42,7 @@ import {
   findEnvironmentConflicts,
   findBatchInternalConflicts,
   environmentConflictMessage,
+  describeConflictSource,
 } from "./helpers";
 import {
   assertProtectedWrite,
@@ -149,7 +155,9 @@ export async function createCore(
     const varCheck = await checkCountedLimit(
       ctx.db,
       project.organizationId,
-      "max_variables_per_project",
+      isWorkspace(project)
+        ? "max_variables_per_workspace"
+        : "max_variables_per_project",
       (limit) => countActiveVariables(ctx.db, args.projectId, limit),
       gate
     );
@@ -258,6 +266,18 @@ export async function createCore(
     },
     involvesSensitiveData: args.isSensitive ?? false,
     resourceType: "variable",
+  });
+  await auditSharedWrite(ctx, {
+    project,
+    variable: {
+      _id: variableId,
+      key: args.key,
+      environments: args.environments,
+      isSensitive: args.isSensitive ?? false,
+      appliesTo: undefined,
+    },
+    userId: args.createdBy,
+    action: "variable.created",
   });
 
   if (args.override && isProtectedWrite(project, args.environments)) {
@@ -390,7 +410,9 @@ export const createMany = internalMutation({
     const varCheck = await checkCountedLimit(
       ctx.db,
       project.organizationId,
-      "max_variables_per_project",
+      isWorkspace(project)
+        ? "max_variables_per_workspace"
+        : "max_variables_per_project",
       (limit) => countActiveVariables(ctx.db, args.projectId, limit),
       gate,
       args.variables.length
@@ -511,6 +533,7 @@ export async function updateCore(
       key: variable.key,
       environments: updates.environments,
       excludeVariableId: variable._id,
+      appliesTo: variable.appliesTo,
     });
     if (envClashes.length > 0) {
       throw new ConvexError(
@@ -715,6 +738,16 @@ export async function updateCore(
     involvesSensitiveData: variable.isSensitive,
     resourceType: "variable",
   });
+  await auditSharedWrite(ctx, {
+    project,
+    variable: {
+      ...variable,
+      environments: updates.environments ?? variable.environments,
+      isSensitive: updates.isSensitive ?? variable.isSensitive,
+    },
+    userId: updatedBy,
+    action: auditAction,
+  });
 
   if (override && isProtectedWrite(project, touched)) {
     await createAuditLog(ctx, {
@@ -839,6 +872,12 @@ export async function removeCore(
     },
     involvesSensitiveData: variable.isSensitive,
     resourceType: "variable",
+  });
+  await auditSharedWrite(ctx, {
+    project,
+    variable,
+    userId: args.deletedBy,
+    action: "variable.deleted",
   });
 
   if (args.override && isProtectedWrite(project, variable.environments)) {
@@ -1185,10 +1224,17 @@ export async function restoreCore(
     projectId: variable.projectId,
     key: variable.key,
     environments: variable.environments,
+    appliesTo: variable.appliesTo,
   });
   if (envClashes.length > 0) {
+    const where = envClashes
+      .map(
+        (clash) =>
+          `${describeConflictSource(clash.source)} (${clash.environments.join(", ")})`
+      )
+      .join("; ");
     throw new ConvexError(
-      `Cannot restore: variable "${variable.key}" already exists in environment(s): ${envClashes.join(", ")}. Delete or re-scope the active variable first.`
+      `Cannot restore: variable "${variable.key}" already exists in ${where}. Delete or re-scope the active variable first.`
     );
   }
 

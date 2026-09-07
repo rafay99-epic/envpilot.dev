@@ -1,5 +1,6 @@
 import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
+import { activeProjectsQuery } from "../../lib/projectKind";
 import {
   bypassesAssignment,
   getActiveMembership,
@@ -20,12 +21,10 @@ export async function listWithStatsCore(
     userId: Id<"users">;
   }
 ) {
-  let projects = await ctx.db
-    .query("projects")
-    .withIndex("by_organization_and_deleted_at", (q) =>
-      q.eq("organizationId", args.organizationId).eq("deletedAt", undefined)
-    )
-    .collect();
+  let projects = await activeProjectsQuery(
+    ctx.db,
+    args.organizationId
+  ).collect();
 
   // Resolve org membership and project assignments for visibility.
   // Owners see all org projects; everyone else only sees projects they
@@ -113,13 +112,10 @@ export async function listForUserCore(ctx: QueryCtx, userId: Id<"users">) {
 
       // Owners see all projects in the org
       if (bypassesAssignment(await getRoleProfile(ctx, orgRole))) {
-        const projects = await ctx.db
-          .query("projects")
-          .withIndex("by_organization", (q) =>
-            q.eq("organizationId", membership.organizationId)
-          )
-          .collect()
-          .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
+        const projects = await activeProjectsQuery(
+          ctx.db,
+          membership.organizationId
+        ).collect();
 
         return projects.map((project) => ({
           ...project,
