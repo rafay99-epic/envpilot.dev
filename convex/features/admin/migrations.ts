@@ -27,6 +27,15 @@ export const listMigrations = query({
         runOnce: false,
       },
       {
+        name: "resync-shared-variables-tier-features",
+        description:
+          "Force-sets the five shared-variables tier values (workspaces, max_workspaces, max_projects_per_workspace, max_workspaces_per_project, max_variables_per_workspace) from TIER_CONFIGS. Run once after a deploy that changed them; seed-tier-features never overwrites.",
+        category: "Core",
+        priority: 8,
+        destructive: false,
+        runOnce: false,
+      },
+      {
         name: "backfill-value-hashes",
         description:
           "Writes a per-organization HMAC for every active variable that has none, so duplicate detection never reads the vault. Runs in the background in pages of 100. Idempotent.",
@@ -199,13 +208,13 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
     doc_sharing: "true",
     doc_public_links: "false",
     max_active_doc_links: "0",
-    // A taste of workspaces: one workspace, three projects in it, ten shared
-    // variables. Enough to solve one real duplication, small enough to convert.
-    workspaces: "true",
-    max_workspaces: "1",
-    max_projects_per_workspace: "3",
-    max_workspaces_per_project: "1",
-    max_variables_per_workspace: "10",
+    // Shared variables are Pro. The switch in org settings still exists on
+    // free but reads "Not available on this plan".
+    workspaces: "false",
+    max_workspaces: "0",
+    max_projects_per_workspace: "0",
+    max_workspaces_per_project: "0",
+    max_variables_per_workspace: "0",
   },
   pro: {
     max_projects: "null",
@@ -270,6 +279,40 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
   // Keeps the original `args.name` references below working untouched.
   const args = { name };
 
+  if (args.name === "resync-shared-variables-tier-features") {
+    const keys = [
+      "workspaces",
+      "max_workspaces",
+      "max_projects_per_workspace",
+      "max_workspaces_per_project",
+      "max_variables_per_workspace",
+    ] as const;
+    let updated = 0;
+    for (const [tierName, features] of Object.entries(TIER_CONFIGS)) {
+      for (const featureKey of keys) {
+        const value = features[featureKey];
+        const existing = await ctx.db
+          .query("tierFeatures")
+          .withIndex("by_tier_and_feature", (q) =>
+            q.eq("tierName", tierName).eq("featureKey", featureKey)
+          )
+          .first();
+        if (existing) {
+          await ctx.db.patch(existing._id, { value, updatedAt: Date.now() });
+        } else {
+          await ctx.db.insert("tierFeatures", {
+            tierName,
+            featureKey,
+            value,
+            updatedAt: Date.now(),
+          });
+        }
+        updated++;
+      }
+    }
+    return { success: true, updated };
+  }
+
   if (args.name === "backfill-value-hashes") {
     await ctx.scheduler.runAfter(0, internal.features.vault.hashes.backfill, {
       cursor: null,
@@ -329,6 +372,7 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
           "Version history & rollback",
           "Bulk .env import",
           "Granular permissions",
+          "Shared variables across projects",
           "Secret rotation & expiry",
           "365-day audit log retention",
           "Priority support",

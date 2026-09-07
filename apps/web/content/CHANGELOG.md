@@ -29,7 +29,7 @@ Safety follows the projects, not the group. You can edit a shared row only if yo
 
 Sharing is off until an owner turns it on in Organization settings, and turning it off never breaks a pull. The same settings tab lists every key that is identical across projects and merges them in one click: development and staging on the spot, production through approval, anything with a different value held back with the reason. Identity is decided by a per-organization hash written at save time, so no vault reads are needed to find duplicates. Run the `backfill-value-hashes` migration once for variables saved before this release.
 
-The CLI, the VS Code and JetBrains extensions, the REST API, the MCP server, the GitHub Action and the Docker image receive shared rows without an update. Groups are managed under Organization settings. Free organizations get one group with three projects and ten variables.
+The CLI, the VS Code and JetBrains extensions, the REST API, the MCP server, the GitHub Action and the Docker image receive shared rows without an update. Groups are managed under Organization settings. Shared variables are a Pro feature.
 
 <!-- entry -->
 ---

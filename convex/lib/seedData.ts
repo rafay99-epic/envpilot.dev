@@ -467,7 +467,7 @@ export const SEED_FEATURES = [
   // ceilings below bound.
   {
     key: "workspaces",
-    displayName: "Workspaces",
+    displayName: "Shared Variables",
     valueType: "boolean" as const,
     category: "Collaboration",
     defaultValue: "false",
@@ -476,7 +476,7 @@ export const SEED_FEATURES = [
   },
   {
     key: "max_workspaces",
-    displayName: "Max Workspaces per Organization",
+    displayName: "Max Shared Groups per Organization",
     valueType: "numeric" as const,
     category: "Collaboration",
     defaultValue: "0",
@@ -485,7 +485,7 @@ export const SEED_FEATURES = [
   },
   {
     key: "max_projects_per_workspace",
-    displayName: "Max Projects per Workspace",
+    displayName: "Max Projects per Shared Group",
     valueType: "numeric" as const,
     category: "Collaboration",
     defaultValue: "0",
@@ -494,7 +494,7 @@ export const SEED_FEATURES = [
   },
   {
     key: "max_workspaces_per_project",
-    displayName: "Max Workspaces per Project",
+    displayName: "Max Shared Groups per Project",
     valueType: "numeric" as const,
     category: "Collaboration",
     defaultValue: "0",
@@ -503,7 +503,7 @@ export const SEED_FEATURES = [
   },
   {
     key: "max_variables_per_workspace",
-    displayName: "Max Variables per Workspace",
+    displayName: "Max Variables per Shared Group",
     valueType: "numeric" as const,
     category: "Collaboration",
     defaultValue: "0",
