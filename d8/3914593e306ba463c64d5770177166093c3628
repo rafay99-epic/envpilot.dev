@@ -1,0 +1,112 @@
+apps/web/src/components/dashboard/home/expiring-secrets-panel.tsx
+  s_907ffcf933f32f::t_db63ec4768e778 1-71
+apps/web/src/components/project-variables/index.ts
+  s_907ffcf933f32f::t_0d306baf3952c5 11-12
+  s_907ffcf933f32f::t_89c81a855f3efa 1-10,13-17
+apps/web/src/components/trash/empty-trash-action.tsx
+  s_907ffcf933f32f::t_151c7d5be9909a 1-82
+apps/web/src/components/trash/restore-button.tsx
+  s_907ffcf933f32f::t_04a9e3b2e6802a 1-28
+apps/web/src/components/trash/deleted-timing.tsx
+  s_907ffcf933f32f::t_f2020788fcef90 1-24
+apps/web/src/components/dashboard/home/system-status-panel.tsx
+  s_907ffcf933f32f::t_ab6f199756826b 1-74
+apps/web/src/components/variables/variable-list-item.tsx
+  s_907ffcf933f32f::t_37daa069c0e4a6 109-114,360-426
+apps/web/src/components/project-variables/variables-list.tsx
+  s_907ffcf933f32f::t_d7ca4086195802 1-9,11-24,26-44,46-53,62-128
+  s_907ffcf933f32f::t_3ac43967c5810c 10,25,45,54-61
+apps/web/src/components/project-variables/variables-panel-body.tsx
+  s_907ffcf933f32f::t_3ac43967c5810c 13,30,49,58,140
+  s_907ffcf933f32f::t_aa316dd85c67ab 1-12,14-29,31-48,50-57,59-139,141-151
+apps/web/src/components/project-variables/project-not-found.tsx
+  s_907ffcf933f32f::t_cd81636a15e5ed 1-35
+apps/web/src/components/dashboard/home/recent-projects-panel.tsx
+  s_907ffcf933f32f::t_13193dca6ad82f 1-94
+apps/web/src/components/dashboard/home/getting-started-panel.tsx
+  s_907ffcf933f32f::t_1fedcb95a4fef8 1-107
+apps/web/src/components/project-variables/variables-filter-bar.tsx
+  s_907ffcf933f32f::t_9519d6c5a2e8fd 1-79
+apps/web/src/components/project-variables/variables-panel.tsx
+  s_907ffcf933f32f::t_362df890835ecd 1-12,14-24,26-43,45-55,58-160,162-186
+  s_907ffcf933f32f::t_3ac43967c5810c 13,25,44,56-57,161
+apps/web/src/components/trash/trash-accounts-section.tsx
+  s_907ffcf933f32f::t_f70bc0543e9075 1-102
+apps/web/src/components/dashboard/home/team-members-panel.tsx
+  s_907ffcf933f32f::t_0e363f7314dced 1-103
+apps/web/src/components/trash/retention.ts
+  s_907ffcf933f32f::t_a20058b344c4f7 1-18
+apps/web/src/components/trash/trash-section.tsx
+  s_907ffcf933f32f::t_c4ab830c7d3edd 1-28
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/trash/page.tsx
+  s_907ffcf933f32f::t_eeec9631fafce7 5-6,13-18,43-45,48,59,67,78-85,113-118,126-135
+apps/web/src/components/project-variables/variable-history-dialog.tsx
+  s_907ffcf933f32f::t_b5665d27bb64a3 1-54,56-114
+  s_907ffcf933f32f::t_681abfafe55e3a 55
+apps/web/src/components/trash/trash-items.ts
+  s_907ffcf933f32f::t_8b27b50ebdc47a 1-50
+apps/web/src/components/trash/trash-variables-section.tsx
+  s_907ffcf933f32f::t_a4621f4cf4f25d 1-101
+apps/web/src/components/trash/trash-files-section.tsx
+  s_907ffcf933f32f::t_c01518d1bf5a0a 1-94
+apps/web/src/components/trash/index.ts
+  s_907ffcf933f32f::t_5e3d6a4464fee3 1-2,4
+  s_907ffcf933f32f::t_329df8e7738524 3
+apps/web/src/components/trash/trash-docs-section.tsx
+  s_907ffcf933f32f::t_d566425619703d 1-66
+apps/web/src/components/project-variables/share-dialogs.tsx
+  s_907ffcf933f32f::t_b5665d27bb64a3 1-71
+apps/web/src/components/project-variables/variable-delete-dialog.tsx
+  s_907ffcf933f32f::t_46acded6f0f445 1-98
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_907ffcf933f32f::t_37d9da3b31445a 131-138
+  s_907ffcf933f32f::t_b5760c71ce1e24 6,16-24,26-27,46,107,112-120,149,151,154,156,159,161-162,164,166-167,170-171,173,177-184,187-190,192-194,196-199,202-212,214-215
+  s_907ffcf933f32f::t_0d306baf3952c5 3,25,47-49,56,73,123-130,139-148,155,163,174
+apps/web/src/components/project-variables/variables-panel-header.tsx
+  s_907ffcf933f32f::t_237e5d60f50b53 1-158
+apps/web/src/app/(dashboard)/dashboard/page.tsx
+  s_907ffcf933f32f::t_a938933747e857 15,18-27,103,109-123,140-144
+  s_907ffcf933f32f::t_329df8e7738524 126
+apps/web/src/components/project-variables/export-import-dialogs.tsx
+  s_907ffcf933f32f::t_46acded6f0f445 1-44
+apps/web/src/components/trash/trash-body.tsx
+  s_907ffcf933f32f::t_7e47cc50d77b1e 1-64
+apps/web/src/components/project-variables/project-detail-header.tsx
+  s_907ffcf933f32f::t_9519d6c5a2e8fd 1-79
+apps/web/src/components/project-variables/variables-search-input.tsx
+  s_907ffcf933f32f::t_5f29ed50b544c3 1-85
+apps/web/src/components/dashboard/home/index.ts
+  s_907ffcf933f32f::t_7f17514c23f4dc 1-7
+apps/web/src/components/project-variables/variable-create-dialog.tsx
+  s_907ffcf933f32f::t_544c6fd244df54 1-97
+apps/web/src/components/project-variables/types.ts
+  s_907ffcf933f32f::t_cd81636a15e5ed 1-29
+  s_907ffcf933f32f::t_3ac43967c5810c 30-39
+apps/web/src/components/project-variables/variables-empty-state.tsx
+  s_907ffcf933f32f::t_5f29ed50b544c3 1-42
+apps/web/src/components/dashboard/home/recent-activity-panel.tsx
+  s_907ffcf933f32f::t_92273f42b25c4f 1-148
+apps/web/src/components/dashboard/home/duplicate-keys-banner.tsx
+  s_907ffcf933f32f::t_89f74e2658e2e9 1-93
+apps/web/src/components/project-variables/variable-edit-dialog.tsx
+  s_907ffcf933f32f::t_544c6fd244df54 1-4,9-107
+  s_907ffcf933f32f::t_681abfafe55e3a 5-8
+apps/web/src/components/project-variables/bulk-action-bar.tsx
+  s_907ffcf933f32f::t_ab6f5830523c83 1-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "d83914593e306ba463c64d5770177166093c3628",
+  "prompts": {},
+  "sessions": {
+    "s_907ffcf933f32f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0837503-b2fa-4f7d-8244-7a3ebcd5dd60",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
