@@ -106,62 +106,12 @@ export function VariableListItem({
               />
             </div>
           )}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3">
-              <code className="font-mono text-sm font-semibold text-ink">
-                {variable.key}
-              </code>
-              {badge}
-              {variable.isSensitive && (
-                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
-                  Sensitive
-                </span>
-              )}
-              <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
-                v{variable.version}
-              </span>
-              {permissionLevel && (
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    permissionLevel === "write"
-                      ? "bg-warning-soft text-warning"
-                      : "bg-info-soft text-info"
-                  }`}
-                >
-                  {permissionLevel}
-                </span>
-              )}
-            </div>
-            {variable.description && (
-              <p className="mt-1 truncate text-sm text-ink-muted">
-                {variable.description}
-              </p>
-            )}
-            <div className="mt-2 flex items-center gap-3">
-              <div className="flex flex-wrap gap-1">
-                {variable.environments.map((env) => (
-                  <span
-                    key={env}
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      env === "production"
-                        ? "bg-danger-soft text-danger"
-                        : env === "staging"
-                          ? "bg-warning-soft text-warning"
-                          : "bg-accent-soft text-accent"
-                    }`}
-                  >
-                    {env}
-                  </span>
-                ))}
-                {variable.tags?.map((tag) => (
-                  <TagBadge key={tag._id} name={tag.name} color={tag.color} />
-                ))}
-              </div>
-              <span className="text-xs text-ink-subtle">
-                Updated {formatDateTimeShort(variable.updatedAt, timeZone)}
-              </span>
-            </div>
-          </div>
+          <RowSummary
+            variable={variable}
+            badge={badge}
+            permissionLevel={permissionLevel}
+            timeZone={timeZone}
+          />
         </div>
 
         <RowActions
@@ -407,3 +357,70 @@ function RevealActions({
     </>
   );
 }
+
+function RowSummary({
+  variable,
+  badge,
+  permissionLevel,
+  timeZone,
+}: Pick<VariableListItemProps, "variable" | "badge" | "permissionLevel"> & {
+  timeZone: string;
+}) {
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-3">
+        <code className="font-mono text-sm font-semibold text-ink">
+          {variable.key}
+        </code>
+        {badge}
+        {variable.isSensitive && (
+          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning">
+            Sensitive
+          </span>
+        )}
+        <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-surface-raised text-ink-muted">
+          v{variable.version}
+        </span>
+        {permissionLevel && (
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+              permissionLevel === "write"
+                ? "bg-warning-soft text-warning"
+                : "bg-info-soft text-info"
+            }`}
+          >
+            {permissionLevel}
+          </span>
+        )}
+      </div>
+      {variable.description && (
+        <p className="mt-1 truncate text-sm text-ink-muted">
+          {variable.description}
+        </p>
+      )}
+      <div className="mt-2 flex items-center gap-3">
+        <div className="flex flex-wrap gap-1">
+          {variable.environments.map((env) => (
+            <span
+              key={env}
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${ENV_PILL[env] ?? "bg-accent-soft text-accent"}`}
+            >
+              {env}
+            </span>
+          ))}
+          {variable.tags?.map((tag) => (
+            <TagBadge key={tag._id} name={tag.name} color={tag.color} />
+          ))}
+        </div>
+        <span className="text-xs text-ink-subtle">
+          Updated {formatDateTimeShort(variable.updatedAt, timeZone)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const ENV_PILL: Record<string, string> = {
+  production: "bg-danger-soft text-danger",
+  staging: "bg-warning-soft text-warning",
+};
