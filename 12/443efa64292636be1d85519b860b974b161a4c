@@ -1,0 +1,28 @@
+convex/features/admin/migrations.ts
+  s_907ffcf933f32f::t_0ade5c80e68176 30-37,211-217,282-315,375
+  s_907ffcf933f32f::t_92d7fba3aec31c 29
+apps/docs/content/dashboard/project.mdx
+  s_907ffcf933f32f::t_0ade5c80e68176 58
+apps/docs/content/limits/plans.mdx
+  s_907ffcf933f32f::t_0ade5c80e68176 40-49
+apps/web/content/CHANGELOG.md
+  s_907ffcf933f32f::t_0ade5c80e68176 32
+convex/lib/seedData.ts
+  s_907ffcf933f32f::t_0ade5c80e68176 470,479,488,497,506
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "12443efa64292636be1d85519b860b974b161a4c",
+  "prompts": {},
+  "sessions": {
+    "s_907ffcf933f32f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0837503-b2fa-4f7d-8244-7a3ebcd5dd60",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
