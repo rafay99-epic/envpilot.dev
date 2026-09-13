@@ -1,0 +1,51 @@
+packages/docker-image/scripts/smoke.sh
+  s_7f3c62d9f58f81::t_5b72851b55f255 14
+  s_7f3c62d9f58f81::t_1a8365b904900a 13,44-47,51-53
+packages/docker-image/main.go
+  s_7f3c62d9f58f81::t_28372101ec72dd 5,17-29,57-63,83,98
+packages/docker-image/Dockerfile
+  s_7f3c62d9f58f81::t_db481c9dc1d28e 16-17
+.github/workflows/smoke-docker-image.yml
+  s_7f3c62d9f58f81::t_699fd56fd0015f 69-75
+packages/docker-image/package.json
+  s_7f3c62d9f58f81::t_474fb096d7a798 3
+.github/workflows/deploy-docker-image.yml
+  s_7f3c62d9f58f81::t_b7c3b61a6095cc 112,117
+  s_7f3c62d9f58f81::t_bc0fba0c0df493 46-47
+packages/docker-image/api.go
+  s_7f3c62d9f58f81::t_ad7b0bd6c97bfd 5
+  s_7f3c62d9f58f81::t_9459f7e0e387f6 77
+  s_7f3c62d9f58f81::t_4573761c4e640b 32,37-40,76,78-79
+packages/docker-image/build.sh
+  s_7f3c62d9f58f81::t_2f939a341906ba 8,10-21
+apps/docs/content/docker/overview.mdx
+  s_7f3c62d9f58f81::t_35c3b5e6846593 82-83
+packages/docker-image/README.md
+  s_7f3c62d9f58f81::t_93856d9e33fe3b 29-30
+apps/web/content/CHANGELOG.md
+  s_7f3c62d9f58f81::t_b1be1f3c2419f0 17-33
+  s_7f3c62d9f58f81::t_db397b8ba43de8 16
+packages/docker-image/envpilot_test.go
+  s_7f3c62d9f58f81::t_717c968a1ac84b 243,261,273-291,293,295-322,328,332,366-389,397,408-421,423-424
+  s_7f3c62d9f58f81::t_a7dd7a0aa237ad 422,425
+packages/docker-image/args.go
+  s_7f3c62d9f58f81::t_3570a7e3e8c919 10-12,14
+packages/docker-image/files.go
+  s_7f3c62d9f58f81::t_ffded533892a88 19,42-60,67-68,72,77,143-145,147-149,151-154,192,208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "378b3a056b0a10cbd0e7d0ee0ac24fc019d1b8b9",
+  "prompts": {},
+  "sessions": {
+    "s_7f3c62d9f58f81": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d68744bb-83f9-44d3-a72d-20dba3a6d4a4",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
