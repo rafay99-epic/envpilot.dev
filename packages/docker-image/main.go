@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -12,19 +13,6 @@ var version = "dev"
 
 func main() {
 	os.Exit(run(os.Args[1:]))
-}
-
-func writeOut(path, content string) error {
-	_ = os.Remove(path)
-	handle, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-	if err != nil {
-		return err
-	}
-	if _, err := handle.WriteString(content); err != nil {
-		handle.Close()
-		return err
-	}
-	return handle.Close()
 }
 
 func run(argv []string) int {
@@ -54,13 +42,13 @@ func run(argv []string) int {
 		return 2
 	}
 
-	client := &http.Client{
-		Timeout: 120 * time.Second,
-		Transport: &http.Transport{
-			DialContext:         (&net.Dialer{Timeout: 10 * time.Second}).DialContext,
-			TLSHandshakeTimeout: 10 * time.Second,
-		},
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), overallTimeout)
+	defer cancel()
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = (&net.Dialer{Timeout: 10 * time.Second}).DialContext
+	transport.TLSHandshakeTimeout = 10 * time.Second
+	client := &http.Client{Timeout: 120 * time.Second, Transport: transport}
 
 	dir := args.Dir
 	if dir == "" {
@@ -68,7 +56,7 @@ func run(argv []string) int {
 	}
 
 	if args.Command == "files" {
-		written, err := pullSecretFiles(client, cfg, dir, warn)
+		written, err := pullSecretFiles(ctx, client, cfg, dir, warn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "envpilot: %s\n", err)
 			return 1
@@ -80,8 +68,8 @@ func run(argv []string) int {
 		return 0
 	}
 
-	vars, err := withRetry("variables",
-		func() ([]Variable, error) { return fetchVariables(client, cfg) },
+	vars, err := withRetry(ctx, "variables",
+		func() ([]Variable, error) { return fetchVariables(ctx, client, cfg) },
 		time.Sleep, warn)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "envpilot: %s\n", err)
@@ -95,7 +83,7 @@ func run(argv []string) int {
 			fmt.Fprint(os.Stdout, content)
 			return 0
 		}
-		if err := writeOut(args.Out, content); err != nil {
+		if err := writeAtomic(args.Out, []byte(content), 0o600); err != nil {
 			fmt.Fprintf(os.Stderr, "envpilot: could not write %s — %s\n", args.Out, err)
 			return 1
 		}
@@ -104,7 +92,7 @@ func run(argv []string) int {
 	}
 
 	if args.WithFiles {
-		written, err := pullSecretFiles(client, cfg, dir, warn)
+		written, err := pullSecretFiles(ctx, client, cfg, dir, warn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "envpilot: %s\n", err)
 			return 1

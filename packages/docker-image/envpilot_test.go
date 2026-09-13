@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
@@ -240,7 +241,7 @@ func TestBatchEmpty(t *testing.T) {
 func TestRetryHonorsServerCooldown(t *testing.T) {
 	var waits []time.Duration
 	calls := 0
-	got, err := withRetry("test", func() (string, error) {
+	got, err := withRetry(context.Background(), "test", func() (string, error) {
 		calls++
 		if calls == 1 {
 			return "", &APIError{Message: "slow down", Status: http.StatusTooManyRequests, RetryAfter: 3 * time.Second}
@@ -258,7 +259,7 @@ func TestRetryHonorsServerCooldown(t *testing.T) {
 func TestRetryCapsHostileCooldown(t *testing.T) {
 	var waits []time.Duration
 	calls := 0
-	_, _ = withRetry("test", func() (string, error) {
+	_, _ = withRetry(context.Background(), "test", func() (string, error) {
 		calls++
 		if calls == 1 {
 			return "", &APIError{Message: "slow down", Status: http.StatusTooManyRequests, RetryAfter: 99999 * time.Second}
@@ -274,7 +275,7 @@ func TestRetryIgnoresClientErrors(t *testing.T) {
 	for _, status := range []int{http.StatusBadRequest, http.StatusUnauthorized} {
 		calls := 0
 		sent := &APIError{Message: "denied", Status: status}
-		_, err := withRetry("test", func() (string, error) {
+		_, err := withRetry(context.Background(), "test", func() (string, error) {
 			calls++
 			return "", sent
 		}, func(time.Duration) {}, func(string) {})
@@ -290,7 +291,7 @@ func TestRetryIgnoresClientErrors(t *testing.T) {
 func TestRetryOn503ThenSucceeds(t *testing.T) {
 	var waits []time.Duration
 	calls := 0
-	got, err := withRetry("test", func() (string, error) {
+	got, err := withRetry(context.Background(), "test", func() (string, error) {
 		calls++
 		if calls <= 2 {
 			return "", &APIError{Message: "unavailable", Status: http.StatusServiceUnavailable}
@@ -308,7 +309,7 @@ func TestRetryOn503ThenSucceeds(t *testing.T) {
 func TestRetryOnTransientErrorThenSucceeds(t *testing.T) {
 	var waits []time.Duration
 	calls := 0
-	got, err := withRetry("test", func() (string, error) {
+	got, err := withRetry(context.Background(), "test", func() (string, error) {
 		calls++
 		if calls == 1 {
 			return "", &transientError{msg: "could not reach https://envpilot.internal"}
@@ -325,7 +326,7 @@ func TestRetryOnTransientErrorThenSucceeds(t *testing.T) {
 
 func TestRetryGivesUp(t *testing.T) {
 	calls := 0
-	_, err := withRetry("test", func() (string, error) {
+	_, err := withRetry(context.Background(), "test", func() (string, error) {
 		calls++
 		return "", &APIError{Message: "slow down", Status: http.StatusTooManyRequests, RetryAfter: time.Second}
 	}, func(time.Duration) {}, func(string) {})
@@ -336,7 +337,7 @@ func TestRetryGivesUp(t *testing.T) {
 
 func TestWritesAt0600AndCreatesParents(t *testing.T) {
 	dir := t.TempDir()
-	if err := writeSecretFile(dir, file("nested/deep/key.pem", 4), true); err != nil {
+	if _, err := writeSecretFiles(dir, []File{file("nested/deep/key.pem", 4)}); err != nil {
 		t.Fatal(err)
 	}
 	p := filepath.Join(dir, "nested/deep/key.pem")
@@ -354,7 +355,7 @@ func TestHonorsMode0400(t *testing.T) {
 	dir := t.TempDir()
 	f := file("ro.pem", 4)
 	f.Mode = "0400"
-	if err := writeSecretFile(dir, f, true); err != nil {
+	if _, err := writeSecretFiles(dir, []File{f}); err != nil {
 		t.Fatal(err)
 	}
 	info, _ := os.Stat(filepath.Join(dir, "ro.pem"))
@@ -367,7 +368,7 @@ func TestRejectsUnknownMode(t *testing.T) {
 	dir := t.TempDir()
 	f := file("x.pem", 4)
 	f.Mode = "0755"
-	err := writeSecretFile(dir, f, true)
+	_, err := writeSecretFiles(dir, []File{f})
 	if err == nil || !strings.Contains(err.Error(), `unsupported file mode "0755"`) {
 		t.Fatalf("got %v", err)
 	}
@@ -378,7 +379,7 @@ func TestRejectsUnknownMode(t *testing.T) {
 
 func TestSizeMismatchRefused(t *testing.T) {
 	dir := t.TempDir()
-	err := writeSecretFile(dir, file("y.pem", 5), true)
+	_, err := writeSecretFiles(dir, []File{file("y.pem", 5)})
 	if err == nil || !strings.Contains(err.Error(), "content is 4 bytes, metadata says 5") {
 		t.Fatalf("got %v", err)
 	}
@@ -395,7 +396,7 @@ func TestReplacesExistingFileAtRestrictiveMode(t *testing.T) {
 	}
 	f := file("k.pem", 3)
 	f.Content = "bmV3"
-	if err := writeSecretFile(dir, f, true); err != nil {
+	if _, err := writeSecretFiles(dir, []File{f}); err != nil {
 		t.Fatal(err)
 	}
 	body, _ := os.ReadFile(target)
@@ -410,7 +411,7 @@ func TestOutDoesNotInheritMode(t *testing.T) {
 	if err := os.WriteFile(target, []byte("OLD='1'\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeOut(target, "NEW='2'\n"); err != nil {
+	if err := writeAtomic(target, []byte("NEW='2'\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	body, err := os.ReadFile(target)
@@ -424,14 +425,14 @@ func TestOutDoesNotInheritMode(t *testing.T) {
 }
 
 func TestRefusesAbsolutePath(t *testing.T) {
-	if err := writeSecretFile(t.TempDir(), file("/etc/passwd", 4), true); err == nil ||
+	if _, err := writeSecretFiles(t.TempDir(), []File{file("/etc/passwd", 4)}); err == nil ||
 		!strings.Contains(err.Error(), "absolute path") {
 		t.Fatalf("got %v", err)
 	}
 }
 
 func TestRefusesTraversal(t *testing.T) {
-	if err := writeSecretFile(t.TempDir(), file("../../escaped", 4), true); err == nil ||
+	if _, err := writeSecretFiles(t.TempDir(), []File{file("../../escaped", 4)}); err == nil ||
 		!strings.Contains(err.Error(), "outside the output directory") {
 		t.Fatalf("got %v", err)
 	}
@@ -446,7 +447,7 @@ func TestRefusesSymlinkedDirectoryEscape(t *testing.T) {
 	if err := os.Symlink(outside, filepath.Join(dir, "holder", "link")); err != nil {
 		t.Fatal(err)
 	}
-	err := writeSecretFile(dir, file("holder/link/key.pem", 4), true)
+	_, err := writeSecretFiles(dir, []File{file("holder/link/key.pem", 4)})
 	if err == nil || !strings.Contains(err.Error(), "escapes through a symlink") {
 		t.Fatalf("got %v", err)
 	}
@@ -456,8 +457,22 @@ func TestRefusesSymlinkedDirectoryEscape(t *testing.T) {
 }
 
 func TestRefusesMetadataOnlyRow(t *testing.T) {
-	if err := writeSecretFile(t.TempDir(), file("k.pem", 4), false); err == nil ||
+	f := file("k.pem", 4)
+	f.Content = ""
+	if _, err := writeSecretFiles(t.TempDir(), []File{f}); err == nil ||
 		!strings.Contains(err.Error(), "no content") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestNothingWrittenWhenAnyFileInvalid(t *testing.T) {
+	dir := t.TempDir()
+	bad := file("b.pem", 4)
+	bad.Mode = "0755"
+	if _, err := writeSecretFiles(dir, []File{file("a.pem", 4), bad}); err == nil {
+		t.Fatal("expected an error")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "a.pem")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("a.pem was written before b.pem was validated: %v", err)
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
@@ -19,6 +20,8 @@ const maxBatchBytes int64 = 6 * 1024 * 1024
 const maxAttempts = 5
 
 const maxRetryAfter = 60 * time.Second
+
+const overallTimeout = 5 * time.Minute
 
 func batchByTotalSize(files []File, budget int64) [][]File {
 	var batches [][]File
@@ -57,7 +60,7 @@ func retryable(err error) (wait time.Duration, ok bool) {
 	return 0, false
 }
 
-func withRetry[T any](label string, attempt func() (T, error), sleep func(time.Duration), warn func(string)) (T, error) {
+func withRetry[T any](ctx context.Context, label string, attempt func() (T, error), sleep func(time.Duration), warn func(string)) (T, error) {
 	var zero T
 	for i := 1; ; i++ {
 		result, err := attempt()
@@ -74,6 +77,9 @@ func withRetry[T any](label string, attempt func() (T, error), sleep func(time.D
 		if wait > maxRetryAfter {
 			wait = maxRetryAfter
 		}
+		if deadline, has := ctx.Deadline(); has && time.Until(deadline) < wait {
+			return zero, fmt.Errorf("%s: gave up after %s, last error: %w", label, overallTimeout, err)
+		}
 		warn(fmt.Sprintf("retrying %s in %s (attempt %d/%d)", label, wait, i, maxAttempts))
 		sleep(wait)
 	}
@@ -87,26 +93,25 @@ func contained(root, candidate string) bool {
 	return rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 }
 
-func writeSecretFile(root string, f File, hasContent bool) error {
-	if filepath.IsAbs(f.Path) || strings.HasPrefix(f.Path, "/") || strings.HasPrefix(f.Path, `\`) {
-		return errors.New("refusing an absolute path")
-	}
-	if !hasContent {
-		return errors.New("server returned no content for this file")
-	}
+type stagedFile struct {
+	path    string
+	dest    string
+	content []byte
+	mode    fs.FileMode
+}
 
-	absoluteRoot, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return err
+func stageSecretFile(absoluteRoot string, f File) (stagedFile, error) {
+	var zero stagedFile
+	if filepath.IsAbs(f.Path) || strings.HasPrefix(f.Path, "/") || strings.HasPrefix(f.Path, `\`) {
+		return zero, errors.New("refusing an absolute path")
 	}
-	absoluteRoot, err = filepath.Abs(absoluteRoot)
-	if err != nil {
-		return err
+	if f.Content == "" {
+		return zero, errors.New("server returned no content for this file")
 	}
 
 	destination := filepath.Join(absoluteRoot, f.Path)
 	if !contained(absoluteRoot, destination) {
-		return errors.New("refusing a path outside the output directory")
+		return zero, errors.New("refusing a path outside the output directory")
 	}
 
 	ancestor := filepath.Dir(destination)
@@ -122,26 +127,26 @@ func writeSecretFile(root string, f File, hasContent bool) error {
 	if _, statErr := os.Lstat(ancestor); statErr == nil {
 		realAncestor, evalErr := filepath.EvalSymlinks(ancestor)
 		if evalErr != nil {
-			return evalErr
+			return zero, evalErr
 		}
 		if realAncestor != absoluteRoot && !contained(absoluteRoot, realAncestor) {
-			return errors.New("refusing a path that escapes through a symlink")
+			return zero, errors.New("refusing a path that escapes through a symlink")
 		}
 	}
 	if info, statErr := os.Lstat(destination); statErr == nil {
 		if info.Mode()&fs.ModeSymlink != 0 {
-			return errors.New("refusing to write through a symlink")
+			return zero, errors.New("refusing to write through a symlink")
 		}
 	} else if !errors.Is(statErr, fs.ErrNotExist) {
-		return statErr
+		return zero, statErr
 	}
 
 	content, err := base64.StdEncoding.DecodeString(f.Content)
 	if err != nil {
-		return errors.New("server returned unreadable content for this file")
+		return zero, errors.New("server returned unreadable content for this file")
 	}
 	if int64(len(content)) != f.Size {
-		return fmt.Errorf("content is %d bytes, metadata says %d", len(content), f.Size)
+		return zero, fmt.Errorf("content is %d bytes, metadata says %d", len(content), f.Size)
 	}
 
 	var mode fs.FileMode
@@ -151,18 +156,18 @@ func writeSecretFile(root string, f File, hasContent bool) error {
 	case "0600", "":
 		mode = 0o600
 	default:
-		return fmt.Errorf("unsupported file mode %q", f.Mode)
+		return zero, fmt.Errorf("unsupported file mode %q", f.Mode)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
-		return err
-	}
+	return stagedFile{path: f.Path, dest: destination, content: content, mode: mode}, nil
+}
 
+func writeAtomic(dest string, content []byte, mode fs.FileMode) error {
 	suffix := make([]byte, 8)
 	if _, err := rand.Read(suffix); err != nil {
 		return err
 	}
-	temp := fmt.Sprintf("%s.envpilot-%d-%s.tmp", destination, os.Getpid(), hex.EncodeToString(suffix))
+	temp := fmt.Sprintf("%s.envpilot-%d-%s.tmp", dest, os.Getpid(), hex.EncodeToString(suffix))
 
 	handle, err := os.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 	if err != nil {
@@ -181,16 +186,51 @@ func writeSecretFile(root string, f File, hasContent bool) error {
 		os.Remove(temp)
 		return err
 	}
-	if err := os.Rename(temp, destination); err != nil {
+	if err := os.Rename(temp, dest); err != nil {
 		os.Remove(temp)
 		return err
 	}
-	return os.Chmod(destination, mode)
+	return os.Chmod(dest, mode)
 }
 
-func pullSecretFiles(client *http.Client, c *Config, dir string, warn func(string)) ([]string, error) {
-	manifest, err := withRetry("file metadata",
-		func() ([]File, error) { return fetchFiles(client, c, nil) },
+func writeSecretFiles(root string, files []File) ([]string, error) {
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		return nil, err
+	}
+	absoluteRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return nil, err
+	}
+	absoluteRoot, err = filepath.Abs(absoluteRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	staged := make([]stagedFile, 0, len(files))
+	for _, f := range files {
+		s, err := stageSecretFile(absoluteRoot, f)
+		if err != nil {
+			return nil, fmt.Errorf("could not write %s — %w", f.Path, err)
+		}
+		staged = append(staged, s)
+	}
+
+	written := make([]string, 0, len(staged))
+	for _, s := range staged {
+		if err := os.MkdirAll(filepath.Dir(s.dest), 0o700); err != nil {
+			return written, fmt.Errorf("could not write %s — %w", s.path, err)
+		}
+		if err := writeAtomic(s.dest, s.content, s.mode); err != nil {
+			return written, fmt.Errorf("could not write %s — %w", s.path, err)
+		}
+		written = append(written, s.path)
+	}
+	return written, nil
+}
+
+func pullSecretFiles(ctx context.Context, client *http.Client, c *Config, dir string, warn func(string)) ([]string, error) {
+	manifest, err := withRetry(ctx, "file metadata",
+		func() ([]File, error) { return fetchFiles(ctx, client, c, nil) },
 		time.Sleep, warn)
 	if err != nil {
 		return nil, err
@@ -205,8 +245,8 @@ func pullSecretFiles(client *http.Client, c *Config, dir string, warn func(strin
 		for _, f := range batch {
 			paths = append(paths, f.Path)
 		}
-		chunk, err := withRetry("file contents",
-			func() ([]File, error) { return fetchFiles(client, c, paths) },
+		chunk, err := withRetry(ctx, "file contents",
+			func() ([]File, error) { return fetchFiles(ctx, client, c, paths) },
 			time.Sleep, warn)
 		if err != nil {
 			return nil, err
@@ -214,16 +254,5 @@ func pullSecretFiles(client *http.Client, c *Config, dir string, warn func(strin
 		files = append(files, chunk...)
 	}
 
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return nil, err
-	}
-
-	written := make([]string, 0, len(files))
-	for _, f := range files {
-		if err := writeSecretFile(dir, f, f.Content != ""); err != nil {
-			return nil, fmt.Errorf("could not write %s — %w", f.Path, err)
-		}
-		written = append(written, f.Path)
-	}
-	return written, nil
+	return writeSecretFiles(dir, files)
 }

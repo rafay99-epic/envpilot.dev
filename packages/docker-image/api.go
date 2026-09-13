@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -63,8 +64,8 @@ func errorFor(resp *http.Response) *APIError {
 	return &APIError{Message: msg, Status: resp.StatusCode, RetryAfter: retryAfterOf(resp)}
 }
 
-func (c *Config) get(client *http.Client, path string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, c.APIURL+path, nil)
+func (c *Config) get(ctx context.Context, client *http.Client, path string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.APIURL+path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -86,13 +87,13 @@ func (c *Config) get(client *http.Client, path string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func fetchVariables(client *http.Client, c *Config) ([]Variable, error) {
+func fetchVariables(ctx context.Context, client *http.Client, c *Config) ([]Variable, error) {
 	q := url.Values{}
 	q.Set("environment", c.Environment)
 	q.Set("surface", Surface)
 	path := "/api/v1/projects/" + url.PathEscape(c.Project) + "/variables?" + q.Encode()
 
-	body, err := c.get(client, path)
+	body, err := c.get(ctx, client, path)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +120,7 @@ func fetchVariables(client *http.Client, c *Config) ([]Variable, error) {
 	return parsed.Variables, nil
 }
 
-func fetchFiles(client *http.Client, c *Config, paths []string) ([]File, error) {
+func fetchFiles(ctx context.Context, client *http.Client, c *Config, paths []string) ([]File, error) {
 	q := url.Values{}
 	q.Set("project", c.Project)
 	q.Set("environment", c.Environment)
@@ -132,7 +133,7 @@ func fetchFiles(client *http.Client, c *Config, paths []string) ([]File, error) 
 		}
 	}
 
-	body, err := c.get(client, "/api/v1/files?"+q.Encode())
+	body, err := c.get(ctx, client, "/api/v1/files?"+q.Encode())
 	if err != nil {
 		return nil, err
 	}

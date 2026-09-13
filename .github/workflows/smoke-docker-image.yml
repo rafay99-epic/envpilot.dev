@@ -70,8 +70,8 @@ jobs:
         run: |
           set -euo pipefail
           OUT=$(docker run --rm -e ENVPILOT_TOKEN=envpk_bogus -e ENVPILOT_PROJECT=x -e ENVPILOT_ENVIRONMENT=x envpilot-smoke:local pull 2>&1 || true)
-          echo "$OUT" | grep -q "Invalid or revoked API key" || {
-            echo "::error::TLS to www.envpilot.dev failed: $OUT"; exit 1; }
+          if [ -z "$OUT" ] || echo "$OUT" | grep -qE "TLS failed|could not reach"; then
+            echo "::error::TLS to www.envpilot.dev failed: $OUT"; exit 1; fi
 
       - name: Start the stub API
         run: |

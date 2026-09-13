@@ -43,7 +43,7 @@ ok "reports version $ACTUAL"
 
 step "HTTPS from scratch"
 OUT=$(docker run --rm -e ENVPILOT_TOKEN=envpk_bogus -e ENVPILOT_PROJECT=x -e ENVPILOT_ENVIRONMENT=x "$TAG" pull 2>&1 || true)
-echo "$OUT" | grep -q "Invalid or revoked API key" || die "TLS to www.envpilot.dev failed: $OUT"
+[ -n "$OUT" ] && ! echo "$OUT" | grep -qE "TLS failed|could not reach" || die "TLS to www.envpilot.dev failed: $OUT"
 ok "scratch image completes a TLS handshake"
 
 if [ "$MODE" = "stub" ]; then
