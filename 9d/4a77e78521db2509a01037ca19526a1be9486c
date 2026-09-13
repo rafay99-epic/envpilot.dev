@@ -1,0 +1,31 @@
+packages/docker-image/envpilot_test.go
+  s_7f3c62d9f58f81::t_4148ff7fc42934 340,358,399
+  s_7f3c62d9f58f81::t_df919ad0b96c2a 4,244,262,278,294,312,329,371,382,414,428,435,450,460-462,467-477
+  s_7f3c62d9f58f81::t_b09dd418fc811e 478
+packages/docker-image/api.go
+  s_7f3c62d9f58f81::t_df919ad0b96c2a 4,67-68,90,96,123,136
+packages/docker-image/main.go
+  s_7f3c62d9f58f81::t_df919ad0b96c2a 4,45-51,59,71-72,86,95
+packages/docker-image/files.go
+  s_7f3c62d9f58f81::t_df919ad0b96c2a 4,24-25,63,80-82,96-101,103-106,108-109,114,130,133,138,141,146,149,159,162-163,165,170,189,193,196-233,248-249,257
+.github/workflows/smoke-docker-image.yml
+  s_7f3c62d9f58f81::t_4148ff7fc42934 73-74
+packages/docker-image/scripts/smoke.sh
+  s_7f3c62d9f58f81::t_4148ff7fc42934 46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9d4a77e78521db2509a01037ca19526a1be9486c",
+  "prompts": {},
+  "sessions": {
+    "s_7f3c62d9f58f81": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d68744bb-83f9-44d3-a72d-20dba3a6d4a4",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
