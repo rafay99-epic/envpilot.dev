@@ -79,6 +79,8 @@ ENTRYPOINT ["envpilot", "exec", "--"]
 
 Same binary, same flags, both cases.
 
+As of 1.0.1 the published image carries its own CA bundle, so running it directly works out of the box. When you `--mount=from=` or `COPY --from=` only the binary into your own image, the pull uses your image's trust store instead. `node:22-slim` and `debian:bookworm-slim` do not ship one, so install `ca-certificates` there or use `node:22`, `node:22-alpine`, or `oven/bun`.
+
 ## The three commands
 
 | Command                  | Does                                                          |

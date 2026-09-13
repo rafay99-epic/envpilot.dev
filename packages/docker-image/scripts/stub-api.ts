@@ -1,16 +1,3 @@
-/**
- * Throwaway Envpilot API, for testing the image without touching a real
- * deployment.
- *
- * It answers the two endpoints the binary reads with fixed, deliberately
- * awkward values — spaces, `#`, `?`, `&`, a multi-line PEM — because those are
- * exactly what naive dotenv quoting mangles. Every value here is fake.
- *
- * Used by `scripts/smoke.sh` locally and by
- * .github/workflows/smoke-docker-image.yml in CI. Nothing in this file ever
- * ships inside the image.
- */
-
 const PORT = Number(process.env.STUB_PORT ?? 41777);
 
 const VARIABLES = [
@@ -36,9 +23,6 @@ Bun.serve({
 
     if (url.pathname === "/healthz") return new Response("ok");
 
-    // Mirrors the real contract closely enough to be worth testing against:
-    // an unknown credential gets one uniform answer, never a hint about which
-    // part was wrong.
     const auth = request.headers.get("authorization") ?? "";
     if (!auth.startsWith("Bearer envpk_")) {
       return Response.json(
@@ -47,8 +31,6 @@ Bun.serve({
       );
     }
 
-    // Exercise the Retry-After backoff on demand rather than on a timer, so
-    // the test stays deterministic.
     if (url.searchParams.get("force") === "429") {
       return Response.json(
         { error: "Rate limit exceeded" },

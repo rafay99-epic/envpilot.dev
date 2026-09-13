@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/docker-image",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Statically linked Go binary that pulls Envpilot variables and secret files into a Docker build or a running container",
   "private": true,
   "license": "MIT",

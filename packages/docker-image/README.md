@@ -26,6 +26,8 @@ ENTRYPOINT ["envpilot", "exec", "--"]
 CMD ["python", "app.py"]
 ```
 
+As of 1.0.1 the published image carries its own CA bundle, so running it directly works out of the box. When you `COPY --from=` only the binary into your own image, the pull uses your image's trust store instead, and `node:22-slim` or `debian:bookworm-slim` do not ship one, so install `ca-certificates` there or use `node:22`, `node:22-alpine`, or `oven/bun`.
+
 **3. Pass the key at run time.**
 
 ```bash

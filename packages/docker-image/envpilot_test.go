@@ -31,8 +31,6 @@ func base(extra map[string]string) map[string]string {
 	return m
 }
 
-// ── config ──────────────────────────────────────────────────────────────
-
 func TestTokenFileWinsOverInline(t *testing.T) {
 	cfg, err := resolveConfig(&Args{}, envFrom(base(map[string]string{
 		"ENVPILOT_TOKEN":      "envpk_inline",
@@ -119,8 +117,6 @@ func TestMissingInputIsNamed(t *testing.T) {
 	}
 }
 
-// ── args ────────────────────────────────────────────────────────────────
-
 func TestParseRuntimeExec(t *testing.T) {
 	a, err := parseArgs([]string{"exec", "--project", "checkout", "-e", "production", "--files", "--", "node", "server.js"})
 	if err != nil {
@@ -182,8 +178,6 @@ func TestHelpAndVersionWinAnywhere(t *testing.T) {
 	}
 }
 
-// ── dotenv ──────────────────────────────────────────────────────────────
-
 func vars(pairs ...string) []Variable {
 	out := make([]Variable, 0, len(pairs)/2)
 	for i := 0; i < len(pairs); i += 2 {
@@ -219,8 +213,6 @@ func TestDotenvEmpty(t *testing.T) {
 	}
 }
 
-// ── batching ────────────────────────────────────────────────────────────
-
 func file(path string, size int64) File {
 	return File{Name: path, Path: path, Mode: "0600", Size: size, Content: "ZGF0YQ=="}
 }
@@ -245,12 +237,10 @@ func TestBatchEmpty(t *testing.T) {
 	}
 }
 
-// ── retry ───────────────────────────────────────────────────────────────
-
 func TestRetryHonorsServerCooldown(t *testing.T) {
 	var waits []time.Duration
 	calls := 0
-	got, err := withRateLimitRetry("test", func() (string, error) {
+	got, err := withRetry("test", func() (string, error) {
 		calls++
 		if calls == 1 {
 			return "", &APIError{Message: "slow down", Status: http.StatusTooManyRequests, RetryAfter: 3 * time.Second}
@@ -268,7 +258,7 @@ func TestRetryHonorsServerCooldown(t *testing.T) {
 func TestRetryCapsHostileCooldown(t *testing.T) {
 	var waits []time.Duration
 	calls := 0
-	_, _ = withRateLimitRetry("test", func() (string, error) {
+	_, _ = withRetry("test", func() (string, error) {
 		calls++
 		if calls == 1 {
 			return "", &APIError{Message: "slow down", Status: http.StatusTooManyRequests, RetryAfter: 99999 * time.Second}
@@ -280,29 +270,69 @@ func TestRetryCapsHostileCooldown(t *testing.T) {
 	}
 }
 
-func TestRetryIgnoresNon429(t *testing.T) {
+func TestRetryIgnoresClientErrors(t *testing.T) {
+	for _, status := range []int{http.StatusBadRequest, http.StatusUnauthorized} {
+		calls := 0
+		sent := &APIError{Message: "denied", Status: status}
+		_, err := withRetry("test", func() (string, error) {
+			calls++
+			return "", sent
+		}, func(time.Duration) {}, func(string) {})
+		if calls != 1 {
+			t.Fatalf("status %d was retried: calls=%d", status, calls)
+		}
+		if err != sent {
+			t.Fatalf("status %d: error was not returned unchanged: %v", status, err)
+		}
+	}
+}
+
+func TestRetryOn503ThenSucceeds(t *testing.T) {
+	var waits []time.Duration
 	calls := 0
-	_, err := withRateLimitRetry("test", func() (string, error) {
+	got, err := withRetry("test", func() (string, error) {
 		calls++
-		return "", &APIError{Message: "denied", Status: 403}
-	}, func(time.Duration) {}, func(string) {})
-	if err == nil || calls != 1 {
-		t.Fatalf("retried a non-429: calls=%d err=%v", calls, err)
+		if calls <= 2 {
+			return "", &APIError{Message: "unavailable", Status: http.StatusServiceUnavailable}
+		}
+		return "ok", nil
+	}, func(d time.Duration) { waits = append(waits, d) }, func(string) {})
+	if err != nil || got != "ok" {
+		t.Fatalf("got %q %v", got, err)
+	}
+	if len(waits) != 2 || waits[0] != 2*time.Second || waits[1] != 4*time.Second {
+		t.Fatalf("waits were %v", waits)
+	}
+}
+
+func TestRetryOnTransientErrorThenSucceeds(t *testing.T) {
+	var waits []time.Duration
+	calls := 0
+	got, err := withRetry("test", func() (string, error) {
+		calls++
+		if calls == 1 {
+			return "", &transientError{msg: "could not reach https://envpilot.internal"}
+		}
+		return "ok", nil
+	}, func(d time.Duration) { waits = append(waits, d) }, func(string) {})
+	if err != nil || got != "ok" {
+		t.Fatalf("got %q %v", got, err)
+	}
+	if len(waits) != 1 || waits[0] != 2*time.Second {
+		t.Fatalf("waits were %v", waits)
 	}
 }
 
 func TestRetryGivesUp(t *testing.T) {
 	calls := 0
-	_, err := withRateLimitRetry("test", func() (string, error) {
+	_, err := withRetry("test", func() (string, error) {
 		calls++
 		return "", &APIError{Message: "slow down", Status: http.StatusTooManyRequests, RetryAfter: time.Second}
 	}, func(time.Duration) {}, func(string) {})
-	if err == nil || calls != maxRateLimitAttempts {
+	if err == nil || calls != maxAttempts {
 		t.Fatalf("calls=%d err=%v", calls, err)
 	}
 }
-
-// ── safe file writes ────────────────────────────────────────────────────
 
 func TestWritesAt0600AndCreatesParents(t *testing.T) {
 	dir := t.TempDir()
@@ -333,6 +363,30 @@ func TestHonorsMode0400(t *testing.T) {
 	}
 }
 
+func TestRejectsUnknownMode(t *testing.T) {
+	dir := t.TempDir()
+	f := file("x.pem", 4)
+	f.Mode = "0755"
+	err := writeSecretFile(dir, f, true)
+	if err == nil || !strings.Contains(err.Error(), `unsupported file mode "0755"`) {
+		t.Fatalf("got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, "x.pem")); statErr == nil {
+		t.Fatal("wrote a file with an unsupported mode")
+	}
+}
+
+func TestSizeMismatchRefused(t *testing.T) {
+	dir := t.TempDir()
+	err := writeSecretFile(dir, file("y.pem", 5), true)
+	if err == nil || !strings.Contains(err.Error(), "content is 4 bytes, metadata says 5") {
+		t.Fatalf("got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, "y.pem")); statErr == nil {
+		t.Fatal("wrote a file whose size did not match its metadata")
+	}
+}
+
 func TestReplacesExistingFileAtRestrictiveMode(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "k.pem")
@@ -340,13 +394,31 @@ func TestReplacesExistingFileAtRestrictiveMode(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := file("k.pem", 3)
-	f.Content = "bmV3" // "new"
+	f.Content = "bmV3"
 	if err := writeSecretFile(dir, f, true); err != nil {
 		t.Fatal(err)
 	}
 	body, _ := os.ReadFile(target)
 	info, _ := os.Stat(target)
 	if string(body) != "new" || info.Mode().Perm() != 0o600 {
+		t.Fatalf("body %q mode %v — a world-readable file kept its mode", body, info.Mode().Perm())
+	}
+}
+
+func TestOutDoesNotInheritMode(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "out.env")
+	if err := os.WriteFile(target, []byte("OLD='1'\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeOut(target, "NEW='2'\n"); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, _ := os.Stat(target)
+	if string(body) != "NEW='2'\n" || info.Mode().Perm() != 0o600 {
 		t.Fatalf("body %q mode %v — a world-readable file kept its mode", body, info.Mode().Perm())
 	}
 }

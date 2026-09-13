@@ -2,24 +2,22 @@ package main
 
 import "strings"
 
-// Args is a parsed invocation.
 type Args struct {
 	Command   string
 	Project   string
 	Env       string
 	APIURL    string
-	Out       string // pull: write here instead of stdout
-	Dir       string // files/exec --files: output directory
-	WithFiles bool   // exec: materialize secret files before running
+	Out       string
+	Dir       string
+	WithFiles bool
 	Quiet     bool
-	Rest      []string // everything after --, for exec
+	Rest      []string
 	Help      bool
 	Version   bool
 }
 
 var commands = []string{"pull", "files", "exec"}
 
-// usage is printed by --help and by a bare invocation of the image.
 const usage = `envpilot — pull Envpilot variables and secret files into a Docker build or container
 
 Usage:
@@ -45,13 +43,9 @@ Credentials:
 There is no --token flag on purpose: a credential on a command line is
 visible in ps, in shell history, and in build logs.`
 
-// parseArgs reads argv. Hand-rolled rather than flag.Parse: three commands and
-// eight flags do not justify fighting the stdlib parser over `--` passthrough,
-// which is the one behaviour that has to be exact.
 func parseArgs(argv []string) (*Args, error) {
 	parsed := &Args{}
 
-	// --help and --version win from anywhere, including before a command.
 	for _, a := range argv {
 		if a == "--" {
 			break
@@ -95,7 +89,6 @@ func parseArgs(argv []string) (*Args, error) {
 	for i := 0; i < len(rest); i++ {
 		arg := rest[i]
 
-		// Everything past `--` belongs to the child command, untouched.
 		if arg == "--" {
 			parsed.Rest = rest[i+1:]
 			break

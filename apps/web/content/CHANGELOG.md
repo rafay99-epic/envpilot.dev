@@ -15,6 +15,24 @@
 
 <!-- entry -->
 ---
+title: Docker image 1.0.1
+version: v1.0.1
+date: 2026-09-14
+types: [fix, security]
+---
+
+The image now ships a CA bundle, so pulls over HTTPS work from scratch and from base images without one (`node:22-slim`, `debian:bookworm-slim`).
+
+The floating tag is now `ghcr.io/rafay99-epic/envpilot:1`, matching the docs. `:v1` is not updated further.
+
+Transient failures (502, 503, 504, connection errors) are retried with backoff; rate limits honor `Retry-After` as before.
+
+`pull --out` never inherits an existing file's mode; the file is recreated at `0600`.
+
+Secret files with an unsupported mode or a size that does not match their metadata are refused instead of written.
+
+<!-- entry -->
+---
 title: Share One Variable Across Projects
 version: v1.70.0
 date: 2026-09-06
