@@ -1,18 +1,5 @@
 name: Smoke Docker Image
 
-# Proves the image actually works, WITHOUT publishing anything.
-#
-# This is the gate that runs on pull requests. It never logs into a registry,
-# never touches production, and needs no secrets — the binary is exercised
-# against a throwaway stub API on localhost, so a fork PR can run it too.
-#
-# What it is really checking is the one claim the whole package makes: that a
-# single binary drops into ANY base image. Unit tests cannot prove that; only
-# running it inside alpine (musl), python/golang (glibc), distroless and
-# scratch can. That claim was false once already — a Bun-compiled binary needs
-# a dynamic loader and died with "exec: no such file or directory" in scratch,
-# which is exactly what this job now exists to catch.
-
 on:
   workflow_call:
   workflow_dispatch:
@@ -31,8 +18,6 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: "1.23"
-          # No go.sum: the fetcher uses the standard library only, so there is
-          # nothing to download and nothing to cache.
           cache: false
 
       - name: Vet and test
@@ -45,10 +30,6 @@ jobs:
         working-directory: packages/docker-image
         run: ./build.sh
 
-      # Fail here, with a readable message, rather than inside BuildKit. The
-      # first CI run died on "failed to compute cache key ... not found",
-      # which says nothing about the real cause (a stale .dockerignore had
-      # emptied the build context).
       - name: Binary exists and is in the build context
         working-directory: packages/docker-image
         run: |
@@ -58,8 +39,6 @@ jobs:
             [ -s "$F" ] || { echo "::error::$F is missing or empty — bun run build did not produce it"; exit 1; }
             echo "  $F $(du -h "$F" | cut -f1)"
           done
-          # A file on disk is not the same as a file BuildKit can see. Prove
-          # .dockerignore does not exclude it before the real build runs.
           docker build -q -f - . <<'PROBE' > /dev/null
           FROM scratch
           COPY build/linux/amd64/envpilot /envpilot
@@ -68,10 +47,6 @@ jobs:
 
       - uses: docker/setup-buildx-action@v4
 
-      # --load, not --push. Single platform because the runner is amd64 and a
-      # multi-arch manifest cannot be loaded into the local daemon anyway; the
-      # arm64 binary is still compiled above, so a cross-compile break is
-      # caught before this step.
       - name: Build the image locally
         uses: docker/build-push-action@v7
         with:
@@ -91,6 +66,13 @@ jobs:
           [ "$ACTUAL" = "$EXPECTED" ] || {
             echo "::error::image reports $ACTUAL, package.json says $EXPECTED"; exit 1; }
 
+      - name: HTTPS from scratch
+        run: |
+          set -euo pipefail
+          OUT=$(docker run --rm -e ENVPILOT_TOKEN=envpk_bogus -e ENVPILOT_PROJECT=x -e ENVPILOT_ENVIRONMENT=x envpilot-smoke:local pull 2>&1 || true)
+          if [ -z "$OUT" ] || echo "$OUT" | grep -qE "TLS failed|could not reach"; then
+            echo "::error::TLS to www.envpilot.dev failed: $OUT"; exit 1; fi
+
       - name: Start the stub API
         run: |
           nohup bun packages/docker-image/scripts/stub-api.ts > /tmp/stub.log 2>&1 &
@@ -100,14 +82,9 @@ jobs:
           done
           echo "::error::stub API never came up"; cat /tmp/stub.log; exit 1
 
-      # THE point of this job. If the binary is not genuinely static, one of
-      # these fails and the "works in any base image" promise is a lie.
       - name: Runs in every base image
         run: |
           set -euo pipefail
-          # scratch is FIRST and non-negotiable: it has no libc and no dynamic
-          # loader, so it is the case that proves the binary is genuinely
-          # static. alpine covers musl, the rest cover glibc.
           for BASE in scratch alpine:3 python:3.12-slim golang:1.23 gcr.io/distroless/base-debian12 gcr.io/distroless/static-debian12; do
             echo "── $BASE"
             printf 'FROM %s\nCOPY --from=envpilot-smoke:local /envpilot /usr/local/bin/envpilot\n' "$BASE" \
@@ -151,11 +128,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Written out in full, deliberately. A helper that interpolated the
-          # arguments BEFORE the image name made docker read the first one
-          # ("pull") as the image, which failed with exit 125 and was reported
-          # as the app returning the wrong code. `docker run` takes its own
-          # flags, THEN the image, THEN the command — never reorder that.
           expect_code() {
             local want="$1"; shift
             local label="$1"; shift
@@ -163,9 +135,6 @@ jobs:
             "$@"
             local code=$?
             set -e
-            # 125/126/127 come from the docker CLI itself (bad invocation,
-            # not executable, not found), never from the fetcher. Treat them
-            # as a broken test, not as a failing assertion.
             case "$code" in
               125|126|127)
                 echo "::error::$label: docker itself failed with $code — the test harness is wrong, not the binary"
@@ -229,7 +198,6 @@ jobs:
             -t buildtime:local -f /tmp/bt/Dockerfile /tmp/bt
           docker run --rm --entrypoint /bin/sh buildtime:local -c 'cat /built' | grep -q 'hello world'
 
-          # The credential must not have survived into the image.
           if docker history --no-trunc buildtime:local | grep -q 'envpk_smoke'; then
             echo "::error::the token leaked into image history"; exit 1
           fi

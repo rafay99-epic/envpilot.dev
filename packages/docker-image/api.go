@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,18 +13,11 @@ import (
 	"time"
 )
 
-// Client for the two public REST endpoints this image reads. Both authorize
-// through _authorizeRequest on the server, which checks the docker surface's
-// own tier gate (docker_image) rather than the REST API's.
-
-// Variable is one key/value pair.
 type Variable struct {
 	Key   string  `json:"key"`
 	Value *string `json:"value"`
 }
 
-// File is one secret file. Content is base64 and absent in metadata-only
-// replies.
 type File struct {
 	Name    string `json:"name"`
 	Path    string `json:"path"`
@@ -32,23 +27,18 @@ type File struct {
 	Content string `json:"content"`
 }
 
-// APIError is any non-2xx response. Message is the server's {error} body when
-// it sent one, which is safe to print as-is: the API never echoes the
-// credential.
 type APIError struct {
 	Message    string
 	Status     int
-	RetryAfter time.Duration // zero when the server sent no usable header
+	RetryAfter time.Duration
 }
 
 func (e *APIError) Error() string { return e.Message }
 
-// retryAfterOf parses Retry-After (seconds form).
-//
-// An empty header must NOT fall through to zero-as-a-value: that reads as
-// "retry immediately" and turns a malformed header into a hot loop against
-// the limiter. Callers treat a zero duration as "absent" and use their own
-// default.
+type transientError struct{ msg string }
+
+func (e *transientError) Error() string { return e.msg }
+
 func retryAfterOf(resp *http.Response) time.Duration {
 	raw := strings.TrimSpace(resp.Header.Get("Retry-After"))
 	if raw == "" {
@@ -67,8 +57,6 @@ func errorFor(resp *http.Response) *APIError {
 		var parsed struct {
 			Error string `json:"error"`
 		}
-		// A non-JSON body (a proxy error page, usually) leaves the status as
-		// the only signal, which is fine.
 		if json.Unmarshal(body, &parsed) == nil && parsed.Error != "" {
 			msg = parsed.Error
 		}
@@ -76,8 +64,8 @@ func errorFor(resp *http.Response) *APIError {
 	return &APIError{Message: msg, Status: resp.StatusCode, RetryAfter: retryAfterOf(resp)}
 }
 
-func (c *Config) get(client *http.Client, path string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, c.APIURL+path, nil)
+func (c *Config) get(ctx context.Context, client *http.Client, path string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.APIURL+path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -86,10 +74,10 @@ func (c *Config) get(client *http.Client, path string) ([]byte, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		// net/http embeds the full URL in its errors. The URL carries no
-		// credential (the key is a header), but it does carry the project and
-		// environment, so keep the message short rather than echoing it.
-		return nil, fmt.Errorf("could not reach %s", c.APIURL)
+		if strings.Contains(err.Error(), "x509") {
+			return nil, errors.New("TLS failed: this image has no CA certificates (" + c.APIURL + ")")
+		}
+		return nil, &transientError{msg: "could not reach " + c.APIURL}
 	}
 	defer resp.Body.Close()
 
@@ -99,15 +87,13 @@ func (c *Config) get(client *http.Client, path string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-// fetchVariables reads every variable for the configured project and
-// environment.
-func fetchVariables(client *http.Client, c *Config) ([]Variable, error) {
+func fetchVariables(ctx context.Context, client *http.Client, c *Config) ([]Variable, error) {
 	q := url.Values{}
 	q.Set("environment", c.Environment)
 	q.Set("surface", Surface)
 	path := "/api/v1/projects/" + url.PathEscape(c.Project) + "/variables?" + q.Encode()
 
-	body, err := c.get(client, path)
+	body, err := c.get(ctx, client, path)
 	if err != nil {
 		return nil, err
 	}
@@ -119,9 +105,6 @@ func fetchVariables(client *http.Client, c *Config) ([]Variable, error) {
 		return nil, fmt.Errorf("could not parse the variables response")
 	}
 
-	// A row without a value means the server declined to decrypt it. Writing
-	// an empty string there would silently hand the app a blank credential,
-	// so refuse the whole pull instead.
 	missing := 0
 	for _, v := range parsed.Variables {
 		if v.Value == nil {
@@ -137,10 +120,7 @@ func fetchVariables(client *http.Client, c *Config) ([]Variable, error) {
 	return parsed.Variables, nil
 }
 
-// fetchFiles reads secret files. With paths nil the reply is metadata only —
-// path, size and checksum, nothing decrypted — which is what makes batching
-// possible, since the caller otherwise has no way to know the sizes.
-func fetchFiles(client *http.Client, c *Config, paths []string) ([]File, error) {
+func fetchFiles(ctx context.Context, client *http.Client, c *Config, paths []string) ([]File, error) {
 	q := url.Values{}
 	q.Set("project", c.Project)
 	q.Set("environment", c.Environment)
@@ -153,7 +133,7 @@ func fetchFiles(client *http.Client, c *Config, paths []string) ([]File, error) 
 		}
 	}
 
-	body, err := c.get(client, "/api/v1/files?"+q.Encode())
+	body, err := c.get(ctx, client, "/api/v1/files?"+q.Encode())
 	if err != nil {
 		return nil, err
 	}

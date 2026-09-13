@@ -1,20 +1,4 @@
 #!/usr/bin/env bash
-#
-# Build the Envpilot image locally and prove it works, without publishing
-# anything and without touching any real Envpilot deployment.
-#
-#   ./scripts/smoke.sh              # against the throwaway stub API (default)
-#   ./scripts/smoke.sh --dev        # against your local dev server on :3000
-#
-# --dev needs a DEV API key exported as ENVPILOT_TOKEN plus ENVPILOT_PROJECT
-# and ENVPILOT_ENVIRONMENT. It talks to http://host.docker.internal:3000.
-# It never talks to www.envpilot.dev: the default --api-url is overridden on
-# every invocation below, so a missing flag fails loudly rather than silently
-# reaching production.
-#
-# Nothing here pushes to a registry. The image is only ever --load-ed into the
-# local daemon under a throwaway tag.
-
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -24,11 +8,10 @@ MODE="stub"
 
 TAG="envpilot-smoke:local"
 STUB_PORT="${STUB_PORT:-41777}"
-STUB_PID=""
 
 cleanup() {
-  [ -n "$STUB_PID" ] && kill "$STUB_PID" 2>/dev/null || true
-  docker image rm -f "$TAG" probe-sh:local buildtime:local >/dev/null 2>&1 || true
+  docker rm -f envpilot-stub >/dev/null 2>&1 || true
+  docker image rm -f "$TAG" probe:local probe-sh:local buildtime:local >/dev/null 2>&1 || true
   rm -rf /tmp/envpilot-smoke
 }
 trap cleanup EXIT
@@ -43,15 +26,12 @@ die() {
 command -v docker >/dev/null || die "docker is not installed or not running"
 command -v go >/dev/null || die "go is not installed — the fetcher is a Go binary"
 
-# ── Build ───────────────────────────────────────────────────────────────────
-
 step "Compiling the binary"
 ./build.sh
 ok "linux/amd64 and linux/arm64 built (static, no libc)"
 
 step "Building the image (local only, never pushed)"
 docker buildx build \
-  --platform linux/amd64 \
   --build-arg VERSION="$(jq -r '.version' package.json)" \
   --load -t "$TAG" .
 ok "$TAG loaded into the local daemon"
@@ -61,12 +41,16 @@ EXPECTED=$(jq -r '.version' package.json)
 [ "$ACTUAL" = "$EXPECTED" ] || die "image reports $ACTUAL, package.json says $EXPECTED"
 ok "reports version $ACTUAL"
 
-# ── Target API ──────────────────────────────────────────────────────────────
+step "HTTPS from scratch"
+OUT=$(docker run --rm -e ENVPILOT_TOKEN=envpk_bogus -e ENVPILOT_PROJECT=x -e ENVPILOT_ENVIRONMENT=x "$TAG" pull 2>&1 || true)
+[ -n "$OUT" ] && ! echo "$OUT" | grep -qE "TLS failed|could not reach" || die "TLS to www.envpilot.dev failed: $OUT"
+ok "scratch image completes a TLS handshake"
 
 if [ "$MODE" = "stub" ]; then
   step "Starting the stub API on :$STUB_PORT"
-  bun scripts/stub-api.ts &
-  STUB_PID=$!
+  docker rm -f envpilot-stub >/dev/null 2>&1 || true
+  docker run -d --name envpilot-stub -p "$STUB_PORT:$STUB_PORT" -e STUB_PORT="$STUB_PORT" \
+    -v "$PWD/scripts:/app:ro" -w /app oven/bun:1 bun stub-api.ts >/dev/null
   for _ in $(seq 1 30); do
     curl -sf -o /dev/null "http://127.0.0.1:$STUB_PORT/healthz" && break
     sleep 0.2
@@ -106,11 +90,8 @@ run() {
     "$@"
 }
 
-# ── The claim that matters: it runs in any base image ───────────────────────
-
 step "Running inside every base image"
 mkdir -p /tmp/envpilot-smoke
-# scratch first: no libc, no loader — the case that proves static linking.
 for BASE in scratch alpine:3 python:3.12-slim golang:1.23 gcr.io/distroless/base-debian12; do
   printf 'FROM %s\nCOPY --from=%s /envpilot /usr/local/bin/envpilot\n' "$BASE" "$TAG" \
     >/tmp/envpilot-smoke/Dockerfile
@@ -120,16 +101,11 @@ for BASE in scratch alpine:3 python:3.12-slim golang:1.23 gcr.io/distroless/base
   ok "$BASE"
 done
 
-# ── Behaviour ───────────────────────────────────────────────────────────────
-
 printf 'FROM alpine:3\nCOPY --from=%s /envpilot /usr/local/bin/envpilot\n' "$TAG" \
   >/tmp/envpilot-smoke/Dockerfile
 docker build -q -t probe-sh:local /tmp/envpilot-smoke >/dev/null
 
 step "exec behaviour"
-# Take the first key the server actually returned and assert the child sees it
-# set. Works against the stub and against a real dev project alike, without
-# hardcoding a variable name that only exists in one of them.
 FIRST_KEY=$(run --entrypoint /usr/local/bin/envpilot probe-sh:local pull --quiet |
   head -1 | cut -d= -f1)
 [ -n "$FIRST_KEY" ] || die "the project returned no variables to test with"
@@ -170,8 +146,6 @@ CODE=$?
 set -e
 [ "$CODE" = "2" ] || die "missing credential exited $CODE, expected 2"
 ok "missing credential exits 2"
-
-# ── Build-time mount, and proof the token does not survive ──────────────────
 
 step "Build-time mount pattern"
 printf '%s' "$TOKEN" >/tmp/envpilot-smoke/token

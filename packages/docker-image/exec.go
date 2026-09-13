@@ -9,20 +9,8 @@ import (
 	"syscall"
 )
 
-// forwardedSignals reach the child so `docker stop` gets to the real app.
 var forwardedSignals = []os.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT}
 
-// execWithVariables runs command with the pulled variables merged into its
-// environment and returns the exit code to use.
-//
-// Variables are passed straight to the child process — nothing decrypted is
-// ever written to a filesystem on this path. Existing environment entries are
-// overwritten, because a value set in the Dockerfile is a default and the one
-// in Envpilot is the source of truth.
-//
-// The child's exit code becomes this process's exit code, and a child killed
-// by a signal reports 128+signal the way a shell does, so health checks and
-// `docker wait` see what they would have seen without the wrapper.
 func execWithVariables(command []string, vars []Variable) (int, error) {
 	cmd := exec.Command(command[0], command[1:]...)
 	cmd.Stdin = os.Stdin
@@ -43,8 +31,6 @@ func execWithVariables(command []string, vars []Variable) (int, error) {
 		return 1, fmt.Errorf("could not run %s — %w", command[0], err)
 	}
 
-	// Relay signals until the child is reaped. Registered AFTER Start so a
-	// signal arriving before the child exists cannot be forwarded to nothing.
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, forwardedSignals...)
 	done := make(chan struct{})

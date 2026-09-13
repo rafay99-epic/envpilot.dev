@@ -1,29 +1,5 @@
 name: Deploy Docker Image
 
-# Builds the Envpilot Docker image and publishes it two places:
-#
-#   1. GHCR — ghcr.io/rafay99-epic/envpilot:X.Y.Z plus the floating major tag,
-#      as a multi-arch manifest (linux/amd64 + linux/arm64).
-#   2. The PUBLIC rafay99-epic/envpilot-docker repo — Dockerfile, README and
-#      LICENSE only, never monorepo source. Same rule the Action follows.
-#
-# Two DIFFERENT credentials, because they authenticate to two different things:
-#
-#   * GHCR uses the built-in GITHUB_TOKEN with `packages: write`. This is not a
-#     preference — GitHub Packages only supports personal access tokens
-#     (CLASSIC) for registry auth, so a fine-grained PAT physically cannot push
-#     here. GITHUB_TOKEN can, and the package lands in the rafay99-epic
-#     namespace linked to this repo. No long-lived registry credential exists.
-#
-#   * The public repo push uses DOCKER_PUBLISH_TOKEN from Envpilot: a
-#     fine-grained PAT with Contents read/write on rafay99-epic/envpilot-docker
-#     ONLY. The default GITHUB_TOKEN cannot push to a different repository.
-#     Packages permission is deliberately NOT needed on it.
-#
-# Tagging mirrors the Action exactly: every publish creates the exact tag
-# (v1.2.3) and force-moves the floating major tag (v1), so consumers pinning
-# `:1` receive non-breaking updates.
-
 on:
   workflow_call:
     secrets:
@@ -67,13 +43,12 @@ jobs:
         run: |
           VERSION=$(jq -r '.version' packages/docker-image/package.json)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "major=v${VERSION%%.*}" >> "$GITHUB_OUTPUT"
+          echo "image_major=${VERSION%%.*}" >> "$GITHUB_OUTPUT"
+          echo "git_major=v${VERSION%%.*}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-go@v7
         with:
           go-version: "1.23"
-          # No go.sum: the fetcher uses the standard library only, so there is
-          # nothing to download and nothing to cache.
           cache: false
 
       - name: Vet and test
@@ -82,12 +57,6 @@ jobs:
           go vet ./...
           go test ./...
 
-      # Cross-compile per target OUTSIDE Docker; buildx assembles the
-      # multi-arch manifest from these two static binaries.
-      #
-      # Built DIRECTLY, never through turbo — same rule as the CLI and the
-      # extension, where turbo once dropped build-time inputs and shipped a
-      # broken artifact.
       - name: Build binaries
         working-directory: packages/docker-image
         run: ./build.sh
@@ -104,10 +73,6 @@ jobs:
             exit 1
           fi
 
-      # Fail here, with a readable message, rather than inside BuildKit. The
-      # first CI run died on "failed to compute cache key ... not found",
-      # which says nothing about the real cause (a stale .dockerignore had
-      # emptied the build context).
       - name: Binary exists and is in the build context
         working-directory: packages/docker-image
         run: |
@@ -117,8 +82,6 @@ jobs:
             [ -s "$F" ] || { echo "::error::$F is missing or empty — bun run build did not produce it"; exit 1; }
             echo "  $F $(du -h "$F" | cut -f1)"
           done
-          # A file on disk is not the same as a file BuildKit can see. Prove
-          # .dockerignore does not exclude it before the real build runs.
           docker build -q -f - . <<'PROBE' > /dev/null
           FROM scratch
           COPY build/linux/amd64/envpilot /envpilot
@@ -128,10 +91,6 @@ jobs:
       - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
 
-      # GITHUB_TOKEN, not DOCKER_PUBLISH_TOKEN: GHCR rejects fine-grained PATs
-      # outright (GitHub Packages supports classic PATs only), and the job's
-      # `packages: write` permission is the supported path from inside a
-      # workflow. It also means no registry credential outlives this run.
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
@@ -150,12 +109,12 @@ jobs:
           build-args: VERSION=${{ steps.meta.outputs.version }}
           tags: |
             ghcr.io/rafay99-epic/envpilot:${{ steps.meta.outputs.version }}
-            ghcr.io/rafay99-epic/envpilot:${{ steps.meta.outputs.major }}
+            ghcr.io/rafay99-epic/envpilot:${{ steps.meta.outputs.image_major }}
 
       - name: Publish the source surface to the public repo
         env:
           VERSION: ${{ steps.meta.outputs.version }}
-          MAJOR: ${{ steps.meta.outputs.major }}
+          MAJOR: ${{ steps.meta.outputs.git_major }}
         run: |
           set -euo pipefail
           git clone "https://x-access-token:${DOCKER_PUBLISH_TOKEN}@github.com/rafay99-epic/envpilot-docker.git" /tmp/public-docker
@@ -163,7 +122,6 @@ jobs:
           git config user.name "envpilot-release-bot"
           git config user.email "hello@envpilot.dev"
 
-          # Sync ONLY the published surface — never monorepo source.
           rm -rf Dockerfile README.md LICENSE
           cp "$GITHUB_WORKSPACE/packages/docker-image/Dockerfile" Dockerfile
           cp "$GITHUB_WORKSPACE/packages/docker-image/README.md" README.md
@@ -177,7 +135,6 @@ jobs:
             git push origin HEAD
           fi
 
-          # Exact tag: only create if this version was never tagged.
           if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
             echo "Tag v${VERSION} already exists — skipping."
           else
@@ -185,7 +142,6 @@ jobs:
             git push origin "v${VERSION}"
           fi
 
-          # Floating major tag always moves to the newest release.
           git tag -f "$MAJOR"
           git push -f origin "$MAJOR"
 

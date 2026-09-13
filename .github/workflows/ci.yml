@@ -97,24 +97,36 @@ jobs:
           filters: |
             web:
               - 'apps/web/**'
+              - '.github/workflows/deploy-vercel.yml'
             blog:
               - 'apps/blog/**'
+              - '.github/workflows/deploy-vercel.yml'
             docs:
               - 'apps/docs/**'
+              - '.github/workflows/deploy-vercel.yml'
             admin:
               - 'apps/admin/**'
+              - '.github/workflows/deploy-vercel.yml'
             cli:
               - 'apps/cli/**'
+              - '.github/workflows/deploy-cli.yml'
+              - '.github/workflows/deploy-homebrew.yml'
             extension:
               - 'apps/vscode-extension/**'
+              - '.github/workflows/deploy-extension.yml'
             jetbrains:
               - 'apps/jetbrains-plugin/**'
+              - '.github/workflows/deploy-jetbrains.yml'
             action:
               - 'packages/github-action/**'
+              - '.github/workflows/deploy-action.yml'
             docker_image:
               - 'packages/docker-image/**'
+              - '.github/workflows/deploy-docker-image.yml'
+              - '.github/workflows/smoke-docker-image.yml'
             convex:
               - 'convex/**'
+              - '.github/workflows/deploy-convex.yml'
             # One filter per seed, so a deploy runs only the seeds whose
             # source data actually moved. seedData.ts feeds two of them
             # (SEED_FEATURES and SEED_ROLES both live there).
@@ -131,7 +143,11 @@ jobs:
               - 'bun.lock'
               - 'turbo.json'
               - 'packages/**'
+              - '!packages/docker-image/**'
+              - '!packages/github-action/**'
               - '.github/workflows/**'
+              - '!.github/workflows/deploy-*.yml'
+              - '!.github/workflows/smoke-docker-image.yml'
               - '.github/actions/**'
               - '.prettierignore'
             # Shared runtime code used by every Vercel app. Tooling and CI
