@@ -1,0 +1,47 @@
+apps/jetbrains-plugin/src/main/kotlin/dev/envpilot/jetbrains/convex/ConvexWire.kt
+  s_9eb576d029f8f3::t_3cda3d2ac54bab 16
+  s_9eb576d029f8f3::t_cd7992f386ecec 184-185,189-192
+apps/jetbrains-plugin/src/main/kotlin/dev/envpilot/jetbrains/convex/ConvexSocket.kt
+  s_9eb576d029f8f3::t_8c2b5ea96227db 348,350
+apps/web/content/CHANGELOG.md
+  s_9eb576d029f8f3::t_69b78b3f174752 17-27
+  s_3e3dfec32bf217::t_ce39ccfa3b653c 16
+apps/web/src/lib/versions.ts
+  s_9eb576d029f8f3::t_898102a63d884c 23
+apps/jetbrains-plugin/src/test/kotlin/dev/envpilot/jetbrains/ConvexWireTest.kt
+  s_9eb576d029f8f3::t_5804c84aaacb32 95-96,102
+apps/jetbrains-plugin/src/main/kotlin/dev/envpilot/jetbrains/errors/Errors.kt
+  s_9eb576d029f8f3::t_c1be7109f6190c 86
+  s_9eb576d029f8f3::t_2951d55c969f40 9-12
+  s_9eb576d029f8f3::t_4a86b04033e200 52-53
+  s_9eb576d029f8f3::t_ca94c0392b6e3d 47-48
+  s_9eb576d029f8f3::t_74ac41d0f88790 35
+apps/jetbrains-plugin/gradle.properties
+  s_9eb576d029f8f3::t_898102a63d884c 1
+apps/jetbrains-plugin/change-notes.html
+  s_9eb576d029f8f3::t_a89a5da4ab3041 1-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d792ee850a82ee5563c7d1f1df2aba53e2804677",
+  "prompts": {},
+  "sessions": {
+    "s_3e3dfec32bf217": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fc78b36b-49ba-4f4d-b965-573ed26d3610",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_9eb576d029f8f3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c416a0-53e5-4f47-90b9-5ab9399f0670",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
