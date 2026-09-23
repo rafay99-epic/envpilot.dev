@@ -345,9 +345,9 @@ class ConvexSocket(
                         listener.onQueryUpdated(id)
                     }
                 }
-                for (id in message.failedQueryIds) {
+                for ((id, reason) in message.failedQueries) {
                     pendingQueries.get()[id]?.completeExceptionally(
-                        IllegalStateException("query failed"),
+                        IllegalStateException("query failed: ${subscriptions.get()[id]}: $reason"),
                     )
                     listener.onQueryFailed(id)
                 }

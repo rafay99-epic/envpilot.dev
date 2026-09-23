@@ -92,13 +92,14 @@ class ConvexWireTest {
              "endVersion":{"querySet":2,"ts":"AAE=","identity":0},
              "modifications":[
                {"type":"QueryUpdated","queryId":0,"value":42,"logLines":[]},
-               {"type":"QueryFailed","queryId":1,"errorMessage":"boom","logLines":[]}
+               {"type":"QueryFailed","queryId":1,"errorMessage":"boom","logLines":[]},
+               {"type":"QueryFailed","queryId":2,"errorMessage":"Server Error","errorData":"Unauthenticated","logLines":[]}
              ]}
             """.trimIndent()
         val parsed = ConvexWire.parseServerMessage(message)
         assertTrue(parsed is ConvexWire.ServerMessage.Transition)
         assertEquals(listOf(0), (parsed as ConvexWire.ServerMessage.Transition).updatedQueryIds)
-        assertEquals(listOf(1), parsed.failedQueryIds)
+        assertEquals(mapOf(1 to "boom", 2 to "Unauthenticated"), parsed.failedQueries)
     }
 
     @Test

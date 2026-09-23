@@ -6,6 +6,10 @@ import dev.envpilot.jetbrains.auth.AuthKitLogin
 import dev.envpilot.jetbrains.version.VersionCheck
 import io.sentry.Sentry
 import io.sentry.SentryLevel
+import kotlinx.coroutines.TimeoutCancellationException
+import java.net.SocketException
+import java.net.UnknownHostException
+import java.net.http.HttpTimeoutException
 
 /**
  * The one error-handling entry point. Everything that fails reports through
@@ -28,6 +32,7 @@ object Errors {
             Sentry.init { options ->
                 options.dsn = BuildConfig.SENTRY_DSN
                 options.tracesSampleRate = 0.0
+                options.isEnableUncaughtExceptionHandler = false
                 options.release = "envpilot-jetbrains@${VersionCheck.currentVersion() ?: "unknown"}"
             }
         } catch (_: Exception) {
@@ -39,9 +44,13 @@ object Errors {
     /** Handled by the plugin itself; logged, never sent to Sentry. */
     private fun isExpected(e: Throwable): Boolean {
         if (e is AuthKitLogin.LoginCancelled && !e.transient) return true
+        if (e is SocketException || e is UnknownHostException || e is HttpTimeoutException) return true
+        if (e is TimeoutCancellationException) return true
         val msg = e.message ?: return false
         return msg.startsWith("auth error:") ||
             msg.startsWith("Convex socket not connected") ||
+            msg.startsWith("Not connected") ||
+            msg.contains("Unauthenticated") ||
             msg == "socket disconnected"
     }
 
@@ -74,7 +83,7 @@ object Errors {
                 "The server took too long to respond. Check your connection and retry."
             raw.contains("UnknownHost", true) || raw.contains("nodename nor servname", true) ->
                 "Can't reach the Envpilot server — check your internet connection."
-            Regex("401|auth error|unauthorized", RegexOption.IGNORE_CASE).containsMatchIn(raw) ->
+            Regex("401|auth error|unauthorized|unauthenticated", RegexOption.IGNORE_CASE).containsMatchIn(raw) ->
                 "Your session expired — sign in again from Tools ▸ Envpilot."
             Regex("403|permission|forbidden|access", RegexOption.IGNORE_CASE).containsMatchIn(raw) ->
                 "Your account doesn't have access to this resource."

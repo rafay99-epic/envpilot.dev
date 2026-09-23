@@ -15,6 +15,18 @@
 
 <!-- entry -->
 ---
+title: JetBrains plugin 0.1.8
+version: v0.1.8
+date: 2026-09-23
+types: [fix]
+---
+
+The plugin no longer installs a JVM-wide crash handler. Before this release it reported crashes from the IDE and from other plugins (Docker, Gradle, Junie and more) as Envpilot errors, and could get in the way of those plugins' own handlers. Only errors from Envpilot's code are reported now.
+
+Offline, timeout and expired-session failures are logged to `idea.log` instead of being sent as errors. A failed server query now carries the server's reason in the log.
+
+<!-- entry -->
+---
 title: Docker image 1.0.1
 version: v1.0.1
 date: 2026-09-14

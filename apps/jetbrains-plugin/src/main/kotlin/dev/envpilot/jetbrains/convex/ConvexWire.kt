@@ -13,7 +13,7 @@ object ConvexWire {
     sealed interface ServerMessage {
         data object Ping : ServerMessage
 
-        data class Transition(val updatedQueryIds: List<Int>, val failedQueryIds: List<Int>) : ServerMessage
+        data class Transition(val updatedQueryIds: List<Int>, val failedQueries: Map<Int, String>) : ServerMessage
 
         data class AuthError(val error: String) : ServerMessage
 
@@ -181,12 +181,15 @@ object ConvexWire {
 
     private fun parseTransition(obj: JsonObject): ServerMessage.Transition {
         val updated = mutableListOf<Int>()
-        val failed = mutableListOf<Int>()
-        for (mod in obj.getAsJsonArray("modifications") ?: return ServerMessage.Transition(emptyList(), emptyList())) {
+        val failed = mutableMapOf<Int, String>()
+        for (mod in obj.getAsJsonArray("modifications") ?: return ServerMessage.Transition(emptyList(), emptyMap())) {
             val m = mod.asJsonObject
             when (m.str("type")) {
                 "QueryUpdated" -> m.get("queryId")?.asInt?.let { updated.add(it) }
-                "QueryFailed" -> m.get("queryId")?.asInt?.let { failed.add(it) }
+                "QueryFailed" ->
+                    m.get("queryId")?.asInt?.let {
+                        failed[it] = m.str("errorData") ?: m.str("errorMessage") ?: "unknown error"
+                    }
             }
         }
         return ServerMessage.Transition(updated, failed)
