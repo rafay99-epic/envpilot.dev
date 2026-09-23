@@ -1,0 +1,19 @@
+apps/cli/scripts/update-homebrew-formula.sh
+  s_3e3dfec32bf217::t_062e5c53c59918 63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bcb2eb009d37487d67cc3f8d4b6f8ed45f14e02a",
+  "prompts": {},
+  "sessions": {
+    "s_3e3dfec32bf217": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fc78b36b-49ba-4f4d-b965-573ed26d3610",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
