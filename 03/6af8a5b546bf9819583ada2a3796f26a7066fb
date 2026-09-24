@@ -1,0 +1,28 @@
+apps/vscode-extension/src/services/sync.ts
+  s_c3907f4588bef1::t_df8abd7b2fce14 1021-1028,1031-1032,1036-1037
+apps/jetbrains-plugin/src/main/kotlin/dev/envpilot/jetbrains/editor/EnvEditorService.kt
+  s_c3907f4588bef1::t_04a9420acc8d4f 74,78-84
+  s_c3907f4588bef1::t_1117578d6e3dbc 85
+apps/jetbrains-plugin/src/test/kotlin/dev/envpilot/jetbrains/EnvEditorServiceTest.kt
+  s_c3907f4588bef1::t_4d808907f2146d 57,71-76,83,85
+apps/vscode-extension/src/services/sync.test.ts
+  s_c3907f4588bef1::t_2d9518d11ee741 29-33,195-207,210-212
+  s_c3907f4588bef1::t_c1436cb60d5688 208-209
+  s_c3907f4588bef1::t_6bf117ded80e97 213-214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "036af8a5b546bf9819583ada2a3796f26a7066fb",
+  "prompts": {},
+  "sessions": {
+    "s_c3907f4588bef1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7597882b-d045-4fcd-89d5-01fad7a757d2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
