@@ -1018,18 +1018,23 @@ export class SyncService {
       const rel = path.relative(normalizedDir, filePath);
       if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) continue;
       if (envFiles.has(rel)) continue;
-      const lastOwner = await releaseManagedFile(filePath, projectId);
-      if (!lastOwner) continue;
-
-      this.fileProtection?.unwatchFile(filePath);
-      this.clipboardGuard?.unprotectFile(filePath);
-
-      const content = await fs.readFile(filePath).catch(() => null);
-      if (!content) continue;
-      if (hashContent(content) !== entry.sha256) {
+      const read = await fs
+        .readFile(filePath)
+        .then((content) => ({ content }))
+        .catch((error: NodeJS.ErrnoException) => ({ error }));
+      if ("error" in read && read.error.code !== "ENOENT") {
         spared++;
         continue;
       }
+      const lastOwner = await releaseManagedFile(filePath, projectId);
+      if (!lastOwner) continue;
+      if ("error" in read) continue;
+      if (hashContent(read.content) !== entry.sha256) {
+        spared++;
+        continue;
+      }
+      this.fileProtection?.unwatchFile(filePath);
+      this.clipboardGuard?.unprotectFile(filePath);
       try {
         await fs.chmod(filePath, ENV_FILE_MODES.writable);
         await fs.unlink(filePath);

@@ -26,7 +26,11 @@ vi.mock("../utils/config", () => ({
 }));
 
 import { SyncService } from "./sync";
-import { recordManagedFile } from "../utils/managedFiles";
+import {
+  recordManagedFile,
+  readManifest,
+  getManifestPath,
+} from "../utils/managedFiles";
 import type { ApiService, SecretFileRow } from "./api";
 import type { StorageService } from "../utils/storage";
 import type {
@@ -186,6 +190,26 @@ describe("SyncService", () => {
     expect(await sync.cleanupAllDirectories(project)).toBe(1);
     expect(await fs.readFile(edited, "utf-8")).toBe("mine");
     await expect(fs.access(join(dir, "f1.pem"))).rejects.toThrow();
+  });
+
+  it("an unreadable secret file keeps its manifest record through cleanup", async () => {
+    const { sync, project, directory } = setup({
+      listSecretFiles: async () => [
+        { _id: "f1", path: "f1.pem", mode: "0600" } as SecretFileRow,
+      ],
+    });
+    await sync.syncDirectory(project, directory);
+    const locked = join(dir, "f1.pem");
+    await fs.chmod(locked, 0o000);
+    try {
+      expect(await sync.cleanupAllDirectories(project)).toBe(1);
+      await fs.access(locked);
+      const entries = await readManifest(getManifestPath());
+      const real = await fs.realpath(locked);
+      expect(entries.map((e) => e.path)).toContain(real);
+    } finally {
+      await fs.chmod(locked, 0o600);
+    }
   });
 
   it("does not write into a directory removed while values are in flight", async () => {

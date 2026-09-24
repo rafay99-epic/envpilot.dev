@@ -54,6 +54,7 @@ class EnvEditorServiceTest {
         Files.createSymbolicLink(link, real)
         val secret = link.resolve("id.pem").toString()
         val realSecret = real.resolve("id.pem").toString()
+        val realOlderSecret = real.resolve("legacy.pem").toString()
         val service = EnvEditorService()
         service.loadState(
             EnvEditorService.State().apply {
@@ -67,15 +68,21 @@ class EnvEditorServiceTest {
                                 secretHashes = mapOf(secret to "secret-hash"),
                             ),
                         real.resolve(".env.local").toString() to
-                            EnvEditorService.ManagedFileState(syncedHash = "old", syncedAtMs = 1),
+                            EnvEditorService.ManagedFileState(
+                                syncedHash = "old",
+                                syncedAtMs = 1,
+                                secretFilePaths = listOf(realOlderSecret),
+                                secretHashes = mapOf(realOlderSecret to "older-hash"),
+                            ),
                     )
             },
         )
 
         val managed = assertNotNull(service.managed(real.resolve(".env.local").toString()))
         assertEquals("new", managed.syncedHash)
-        assertEquals(listOf(realSecret), managed.secretFilePaths)
+        assertEquals(setOf(realSecret, realOlderSecret), managed.secretFilePaths.toSet())
         assertEquals("secret-hash", managed.secretHashes[realSecret])
+        assertEquals("older-hash", managed.secretHashes[realOlderSecret])
         assertEquals(1, service.managedPaths().size)
     }
 }

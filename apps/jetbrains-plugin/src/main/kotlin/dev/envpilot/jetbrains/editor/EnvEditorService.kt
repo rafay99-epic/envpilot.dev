@@ -71,9 +71,17 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
                         secretFilePaths = entry.value.secretFilePaths.map(::pathKey),
                         secretHashes = entry.value.secretHashes.mapKeys { pathKey(it.key) },
                     )
-                }.mapValues { (_, entries) -> entries.maxBy { it.syncedAtMs } },
+                }.mapValues { (_, entries) -> entries.sortedBy { it.syncedAtMs }.reduce(::mergeEntries) },
         )
     }
+
+    private fun mergeEntries(
+        older: ManagedFileState,
+        newer: ManagedFileState,
+    ) = newer.copy(
+        secretFilePaths = (older.secretFilePaths + newer.secretFilePaths).distinct(),
+        secretHashes = older.secretHashes + newer.secretHashes,
+    )
 
     @Synchronized
     fun recordSync(
