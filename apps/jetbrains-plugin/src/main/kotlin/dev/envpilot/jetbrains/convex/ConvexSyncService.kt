@@ -67,10 +67,16 @@ class ConvexSyncService(private val scope: CoroutineScope) : Disposable {
     @Synchronized
     fun unwatchProject(projectId: String) {
         val queryId = queryIdByProject.get()[projectId] ?: return
+        if (linkedProjects(projectId).isNotEmpty()) return
         queryIdByProject.updateAndGet { it - projectId }
         projectByQueryId.updateAndGet { it - queryId }
         socket.get()?.unsubscribe(queryId)
     }
+
+    private fun linkedProjects(projectId: String) =
+        ProjectManager.getInstance().openProjects.filter { project ->
+            LinkedProjectsService.getInstance(project).all().any { it.projectId == projectId }
+        }
 
     private fun start() {
         val deploymentUrl = EnvpilotSettings.getInstance().state.convexUrl.ifBlank { BuildConfig.CONVEX_URL }
@@ -88,11 +94,7 @@ class ConvexSyncService(private val scope: CoroutineScope) : Disposable {
             override fun onQueryUpdated(queryId: Int) {
                 val projectId = projectByQueryId.get()[queryId] ?: return
                 scope.launch(Dispatchers.IO) {
-                    val project =
-                        ProjectManager.getInstance().openProjects.firstOrNull { project ->
-                            LinkedProjectsService.getInstance(project).all().any { it.projectId == projectId }
-                        }
-                    project?.let { SyncScheduler.getInstance().runCycle(it) }
+                    linkedProjects(projectId).forEach { SyncScheduler.getInstance().runCycle(it) }
                 }
             }
 

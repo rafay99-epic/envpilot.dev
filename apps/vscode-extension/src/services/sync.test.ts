@@ -100,9 +100,9 @@ function setup(options: {
     getProjectRole: () => undefined,
     getUserRole: () => "owner",
     listSecretFiles: options.listSecretFiles ?? (async () => []),
-    getSecretFileContent: async () => ({
-      name: "key",
-      path: "key.pem",
+    getSecretFileContent: async (id: string) => ({
+      name: id,
+      path: `${id}.pem`,
       mode: "0600",
       size: 6,
       sha256: "",
@@ -165,10 +165,27 @@ describe("SyncService", () => {
     await atSecretFiles;
     const cleanup = sync.cleanupAllDirectories(project);
     expect(storage.removeLinkedProjectV2).toHaveBeenCalled();
-    release([{ _id: "f1", path: "key.pem", mode: "0600" } as SecretFileRow]);
+    release([{ _id: "f1", path: "f1.pem", mode: "0600" } as SecretFileRow]);
     await Promise.all([pending, cleanup]);
     await expect(fs.access(envPath)).rejects.toThrow();
-    await expect(fs.access(join(dir, "key.pem"))).rejects.toThrow();
+    await expect(fs.access(join(dir, "f1.pem"))).rejects.toThrow();
+  });
+
+  it("revocation cleanup deletes synced secret files but keeps an edited one", async () => {
+    const { sync, project, directory } = setup({
+      listSecretFiles: async () =>
+        ["f1", "f2"].map(
+          (id) =>
+            ({ _id: id, path: `${id}.pem`, mode: "0600" }) as SecretFileRow
+        ),
+    });
+    await sync.syncDirectory(project, directory);
+    const edited = join(dir, "f2.pem");
+    await fs.chmod(edited, 0o600);
+    await fs.writeFile(edited, "mine");
+    expect(await sync.cleanupAllDirectories(project)).toBe(1);
+    expect(await fs.readFile(edited, "utf-8")).toBe("mine");
+    await expect(fs.access(join(dir, "f1.pem"))).rejects.toThrow();
   });
 
   it("does not write into a directory removed while values are in flight", async () => {

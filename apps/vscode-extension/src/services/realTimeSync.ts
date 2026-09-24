@@ -355,7 +355,7 @@ export class RealTimeSyncService {
 
     const removed =
       spared > 0
-        ? `Synced .env files were removed, except ${spared} you edited locally.`
+        ? `Synced files were removed, except ${spared} you edited locally.`
         : "All synced .env files have been removed.";
     vscode.window.showWarningMessage(
       `Access revoked for "${project.projectName}": ${reason}. ${removed}`,

@@ -64,7 +64,15 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
 
     @Synchronized
     override fun loadState(s: State) {
-        state = s
+        write(
+            s.managed.entries
+                .groupBy({ pathKey(it.key) }) { entry ->
+                    entry.value.copy(
+                        secretFilePaths = entry.value.secretFilePaths.map(::pathKey),
+                        secretHashes = entry.value.secretHashes.mapKeys { pathKey(it.key) },
+                    )
+                }.mapValues { (_, entries) -> entries.maxBy { it.syncedAtMs } },
+        )
     }
 
     @Synchronized

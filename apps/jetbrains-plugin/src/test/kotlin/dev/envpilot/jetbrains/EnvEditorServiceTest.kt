@@ -46,4 +46,36 @@ class EnvEditorServiceTest {
         assertNotNull(service.managed(target.toRealPath().toString()))
         assertNotNull(service.managed(link.resolve(".env.local").toString()))
     }
+
+    @Test
+    fun `state persisted under a symlinked path is found by its real path after load`() {
+        val real = Files.createTempDirectory("envpilot-real").toRealPath()
+        val link = Files.createTempDirectory("envpilot-link").resolve("app")
+        Files.createSymbolicLink(link, real)
+        val secret = link.resolve("id.pem").toString()
+        val realSecret = real.resolve("id.pem").toString()
+        val service = EnvEditorService()
+        service.loadState(
+            EnvEditorService.State().apply {
+                managed =
+                    mutableMapOf(
+                        link.resolve(".env.local").toString() to
+                            EnvEditorService.ManagedFileState(
+                                syncedHash = "new",
+                                syncedAtMs = 2,
+                                secretFilePaths = listOf(secret),
+                                secretHashes = mapOf(secret to "secret-hash"),
+                            ),
+                        real.resolve(".env.local").toString() to
+                            EnvEditorService.ManagedFileState(syncedHash = "old", syncedAtMs = 1),
+                    )
+            },
+        )
+
+        val managed = assertNotNull(service.managed(real.resolve(".env.local").toString()))
+        assertEquals("new", managed.syncedHash)
+        assertEquals(listOf(realSecret), managed.secretFilePaths)
+        assertEquals("secret-hash", managed.secretHashes[realSecret])
+        assertEquals(1, service.managedPaths().size)
+    }
 }

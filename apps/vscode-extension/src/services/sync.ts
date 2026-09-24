@@ -28,6 +28,7 @@ import {
   readManifest,
   getManifestPath,
   purgeManagedFilesFiltered,
+  hashContent,
 } from "../utils/managedFiles";
 import {
   normalizeOrgRole,
@@ -975,7 +976,10 @@ export class SyncService {
 
     for (const directory of project.directories) {
       try {
-        await this.deleteSecretFilesFromDirectory(project.projectId, directory);
+        spared += await this.deleteSecretFilesFromDirectory(
+          project.projectId,
+          directory
+        );
         spared += await this.deleteEnvFileFromDirectory(directory);
       } catch (err) {
         errors.push(err instanceof Error ? err : new Error(String(err)));
@@ -993,7 +997,7 @@ export class SyncService {
   private async deleteSecretFilesFromDirectory(
     projectId: string,
     directory: LinkedDirectory
-  ): Promise<void> {
+  ): Promise<number> {
     const resolvedDir = path.resolve(toPlatformPath(directory.directoryPath));
     const normalizedDir = await fs
       .realpath(resolvedDir)
@@ -1005,9 +1009,10 @@ export class SyncService {
     try {
       entries = await readManifest(getManifestPath());
     } catch {
-      return;
+      return 0;
     }
 
+    let spared = 0;
     for (const entry of entries) {
       const filePath = path.resolve(entry.path);
       const rel = path.relative(normalizedDir, filePath);
@@ -1019,11 +1024,18 @@ export class SyncService {
       this.fileProtection?.unwatchFile(filePath);
       this.clipboardGuard?.unprotectFile(filePath);
 
+      const content = await fs.readFile(filePath).catch(() => null);
+      if (!content) continue;
+      if (hashContent(content) !== entry.sha256) {
+        spared++;
+        continue;
+      }
       try {
         await fs.chmod(filePath, ENV_FILE_MODES.writable);
         await fs.unlink(filePath);
       } catch {}
     }
+    return spared;
   }
 
   private async deleteEnvFileFromDirectory(
