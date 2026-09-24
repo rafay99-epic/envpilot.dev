@@ -1,0 +1,21 @@
+apps/jetbrains-plugin/src/test/kotlin/dev/envpilot/jetbrains/EnvEditorServiceTest.kt
+  s_c3907f4588bef1::t_c5ef7a7c8b49d7 76,87
+apps/jetbrains-plugin/src/main/kotlin/dev/envpilot/jetbrains/editor/EnvEditorService.kt
+  s_c3907f4588bef1::t_c5ef7a7c8b49d7 84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f7374f67218c8f29f87c9582dcf8b639ed50ab42",
+  "prompts": {},
+  "sessions": {
+    "s_c3907f4588bef1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7597882b-d045-4fcd-89d5-01fad7a757d2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
