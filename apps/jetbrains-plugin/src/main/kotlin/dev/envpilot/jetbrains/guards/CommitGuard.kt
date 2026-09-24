@@ -4,43 +4,51 @@ import com.intellij.openapi.diagnostic.logger
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 
-/**
- * Installs a git pre-commit hook that blocks commits touching the managed
- * env file unless ENVPILOT_ALLOW_COMMIT=1. Same hook block approach as the
- * VS Code extension — plain sh, zero platform coupling.
- */
 object CommitGuard {
     private val log = logger<CommitGuard>()
     const val START = "# >>> ENVPILOT COMMIT GUARD >>>"
     const val END = "# <<< ENVPILOT COMMIT GUARD <<<"
-    private const val BLOCK =
-        START + "\n" +
-            "if git diff --cached --name-only 2>/dev/null | grep -qE '(^|/)\\.env($|\\.)'; then\n" +
+    private const val STAGED = "git diff --cached --name-only --diff-filter=ACMR 2>/dev/null"
+    private const val ENV_CHECK = "$STAGED | grep -E '(^|/)\\.env($|\\.)' | grep -qvE '\\.env\\.(example|sample|template|dist)$'"
+
+    internal fun block(stagedPaths: List<String>): String {
+        val managed = stagedPaths.joinToString("") { " -e '${it.replace("'", "'\\''")}'" }
+        val check = if (stagedPaths.isEmpty()) ENV_CHECK else "$ENV_CHECK || $STAGED | grep -qxF$managed"
+        return START + "\n" +
+            "if $check; then\n" +
             "  if [ \"\$ENVPILOT_ALLOW_COMMIT\" != \"1\" ]; then\n" +
-            "    echo \"Envpilot commit guard: an .env file is staged.\"\n" +
+            "    echo \"Envpilot commit guard: an env or Envpilot-managed file is staged.\"\n" +
             "    echo \"Re-run with ENVPILOT_ALLOW_COMMIT=1 to commit it anyway.\"\n" +
             "    exit 1\n" +
             "  fi\n" +
             "fi\n" +
             END
+    }
 
-    /** @return true when the hook is (or already was) installed. */
-    fun install(projectRoot: String): Boolean {
-        val hook = hooksDir(Path.of(projectRoot))?.resolve("pre-commit") ?: return false
+    fun install(
+        projectRoot: String,
+        managedPaths: Collection<String>,
+    ): Boolean {
+        val root = Path.of(projectRoot)
+        val configured = configuredHooksDir(root)
+        if (configured != null && configured.none { it.toString() == ".git" }) return false
+        val hook = hooksDir(root)?.resolve("pre-commit") ?: return false
+        val block = block(repoRelative(root, managedPaths))
         Files.createDirectories(hook.parent)
         val existing = if (Files.exists(hook)) Files.readString(hook) else "#!/bin/sh\n"
         val markerStart = existing.indexOf(START)
         val markerEnd = existing.indexOf(END, markerStart.coerceAtLeast(0))
         if (markerStart >= 0 && markerEnd >= 0) {
-            val updated = existing.substring(0, markerStart) + BLOCK + existing.substring(markerEnd + END.length)
-            Files.writeString(hook, updated)
+            val updated = existing.substring(0, markerStart) + block + existing.substring(markerEnd + END.length)
+            if (updated != existing) Files.writeString(hook, updated)
             File(hook.toString()).setExecutable(true)
             return true
         }
         var content = existing
         if (!content.startsWith("#!")) content = "#!/bin/sh\n$content"
-        content += "\n$BLOCK\n"
+        content += "\n$block\n"
         Files.writeString(hook, content)
         File(hook.toString()).setExecutable(true)
         log.info("Commit guard installed at $hook")
@@ -84,17 +92,39 @@ object CommitGuard {
         return null
     }
 
-    private fun hooksDir(root: Path): Path? {
+    internal fun configuredHooksDir(root: Path): Path? =
+        git(root, "config", "--path", "core.hooksPath")?.let { root.toAbsolutePath().normalize().resolve(it).normalize() }
+
+    private fun hooksDir(root: Path): Path? =
+        git(root, "rev-parse", "--path-format=absolute", "--git-path", "hooks")?.let { Path.of(it).normalize() }
+            ?: findGitDir(root)?.resolve("hooks")
+
+    private fun repoRelative(
+        root: Path,
+        paths: Collection<String>,
+    ): List<String> {
+        val top = git(root, "rev-parse", "--show-toplevel")?.let { Path.of(it) } ?: return emptyList()
+        return paths.mapNotNull { path ->
+            runCatching { top.relativize(Path.of(path).toRealPath()) }.getOrNull()
+                ?.takeIf { !it.startsWith("..") }
+                ?.toString()
+                ?.replace('\\', '/')
+        }.sorted()
+    }
+
+    private fun git(
+        root: Path,
+        vararg args: String,
+    ): String? {
         val process =
             runCatching {
-                ProcessBuilder("git", "-C", root.toString(), "rev-parse", "--path-format=absolute", "--git-path", "hooks")
-                    .redirectErrorStream(true)
-                    .start()
-            }.getOrNull()
-        if (process != null && process.waitFor() == 0) {
-            val resolved = process.inputStream.bufferedReader().readText().trim()
-            if (resolved.isNotBlank()) return Path.of(resolved).normalize()
+                ProcessBuilder("git", "-C", root.toString(), *args).redirectErrorStream(true).start()
+            }.getOrNull() ?: return null
+        if (!process.waitFor(5, TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            return null
         }
-        return findGitDir(root)?.resolve("hooks")
+        val output = process.inputStream.bufferedReader().readText().trim()
+        return output.takeIf { process.exitValue() == 0 && it.isNotBlank() }
     }
 }

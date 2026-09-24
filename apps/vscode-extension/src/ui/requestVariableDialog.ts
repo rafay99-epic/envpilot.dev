@@ -10,30 +10,14 @@ export interface VariableRequestInput {
   isSensitive: boolean;
 }
 
-/**
- * Multi-step dialog for requesting a new environment variable.
- * Used by members who cannot create variables directly.
- */
 export class RequestVariableDialog {
-  /**
-   * Show the variable request dialog and collect all inputs.
-   * Returns undefined if the user cancels at any step.
-   *
-   * `project` is the request target chosen upstream; its name pins every step
-   * title so the user always sees which project they are requesting against.
-   * `allowedEnvironments` limits the environment picker for scoped
-   * developers (e.g. ["development"]); omitted = all environments.
-   */
   async showRequestDialog(
     project: Project,
     allowedEnvironments?: string[]
   ): Promise<VariableRequestInput | undefined> {
-    // Every step carries the project name for context (final confirmation is
-    // step 6/6, shown by the caller after this dialog returns).
     const title = (step: number) =>
       `Request Variable (${step}/5) · ${project.name}`;
 
-    // Step 1: Key name
     const key = await vscode.window.showInputBox({
       title: title(1),
       prompt: "Enter the variable key name",
@@ -55,7 +39,6 @@ export class RequestVariableDialog {
       return undefined;
     }
 
-    // Step 2: Value
     const value = await vscode.window.showInputBox({
       title: title(2),
       prompt: `Enter the value for ${key}`,
@@ -72,19 +55,15 @@ export class RequestVariableDialog {
       return undefined;
     }
 
-    // Step 3: Description (optional)
     const description = await vscode.window.showInputBox({
       title: title(3),
       prompt: "Enter a description (optional, press Enter to skip)",
       placeHolder: "What is this variable used for?",
     });
-    // Don't return on empty — description is optional
     if (description === undefined) {
-      return undefined; // User pressed Escape
+      return undefined;
     }
 
-    // Step 4: Environment selection — limited to the developer's permitted
-    // environments when they are scoped (server enforces this regardless).
     const allEnvChoices = [
       { label: "Development", value: "development" },
       { label: "Staging", value: "staging" },
@@ -114,7 +93,6 @@ export class RequestVariableDialog {
     }
     const environments = envItems.map((item) => item.value);
 
-    // Step 5: Sensitive flag
     const sensitiveChoice = await vscode.window.showQuickPick(
       [
         { label: "No", description: "Regular variable", value: false },

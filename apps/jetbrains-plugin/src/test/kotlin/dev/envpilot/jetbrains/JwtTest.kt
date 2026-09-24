@@ -29,7 +29,7 @@ class JwtTest {
     @Test
     fun `malformed token returns nulls`() {
         assertNull(Jwt.exp("not-a-jwt"))
-        assertNull(Jwt.decodePayload(""))
+        assertNull(Jwt.subject(""))
         assertNull(Jwt.sessionId(token(mapOf("exp" to 1L))))
     }
 

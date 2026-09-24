@@ -1,4 +1,4 @@
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
 import type {
   AuthSession,
   LinkedProject,
@@ -8,11 +8,6 @@ import type {
 import { normalizePath } from "./paths";
 
 const AUTH_SESSION_KEY = "envpilot.authSession";
-/**
- * Multi-account auth blob. Holds every signed-in account keyed by user id plus
- * a single active-account pointer, all inside one encrypted SecretStorage
- * entry. Supersedes the single-session AUTH_SESSION_KEY (migrated lazily).
- */
 const AUTH_ACCOUNTS_KEY = "envpilot.authAccounts";
 const LINKED_PROJECTS_KEY = "envpilot.linkedProjects";
 const LINKED_PROJECTS_V2_KEY = "envpilot.linkedProjectsV2";
@@ -21,9 +16,6 @@ const PROJECT_TOKEN_PREFIX = "envpilot.projectToken.";
 const STORAGE_VERSION_KEY = "envpilot.storageVersion";
 const CURRENT_STORAGE_VERSION = 2;
 
-/**
- * Linked project metadata (without access token) - V1 format
- */
 interface LinkedProjectMetadata {
   projectId: string;
   projectName: string;
@@ -35,9 +27,6 @@ interface LinkedProjectMetadata {
   workspacePath: string;
 }
 
-/**
- * Linked project metadata (without access token) - V2 format
- */
 interface LinkedProjectMetadataV2 {
   projectId: string;
   projectName: string;
@@ -48,62 +37,39 @@ interface LinkedProjectMetadataV2 {
   defaultEnvironment: string;
   createdAt: number;
   updatedAt: number;
-  /** Cached server-resolved unsync-on-close; absent = true (secure default). */
   autoUnsyncOnClose?: boolean;
 }
 
-/**
- * Multi-account auth storage blob (persisted under AUTH_ACCOUNTS_KEY).
- * `accounts` is keyed by user id; `activeAccountId` points at the account the
- * legacy single-session API (getAuthSession/setAuthSession/clearAuthSession)
- * operates on. Mirrors the CLI's `{ accounts, activeAccountId }` config shape.
- */
 interface AuthAccountsBlob {
   accounts: Record<string, AuthSession>;
   activeAccountId?: string;
 }
 
-/**
- * Storage service for persisting extension state securely
- * Access tokens are stored in VS Code's secret storage for security
- */
 export class StorageService {
   private context: vscode.ExtensionContext;
   private migrationComplete = false;
-  /**
-   * In-memory copy of the multi-account auth blob. Secret storage is an async
-   * IPC call and the API client reads the active session on every request —
-   * cache the whole blob and invalidate on every mutation. `undefined` means
-   * "not loaded yet"; a loaded-but-empty state is `{ accounts: {} }`.
-   */
   private cachedAccounts: AuthAccountsBlob | undefined = undefined;
-  /**
-   * De-dupes concurrent first-reads (which trigger legacy migration) so the
-   * blob is only loaded/migrated once even under a burst of parallel reads.
-   */
   private accountsLoadPromise: Promise<AuthAccountsBlob> | undefined;
-  /**
-   * Serializes account read-modify-write cycles (upsert/remove/switch) so two
-   * concurrent mutations can't clobber each other's copy of the blob.
-   */
-  private authWriteQueue: Promise<unknown> = Promise.resolve();
-  /** Serializes metadata read-modify-write cycles from concurrent syncs. */
-  private metadataWriteQueue: Promise<void> = Promise.resolve();
+  private accountsGeneration = 0;
+  private writeQueue: Promise<unknown> = Promise.resolve();
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
+    context.subscriptions.push(
+      context.secrets.onDidChange((e) => {
+        if (e.key === AUTH_ACCOUNTS_KEY) {
+          this.accountsGeneration++;
+          this.cachedAccounts = undefined;
+          this.accountsLoadPromise = undefined;
+        }
+      })
+    );
   }
 
-  /**
-   * Get the extension context (for device info)
-   */
   getContext(): vscode.ExtensionContext {
     return this.context;
   }
 
-  /**
-   * Migrate storage from V1 to V2 format if needed
-   */
   async migrateIfNeeded(): Promise<void> {
     if (this.migrationComplete) {
       return;
@@ -125,11 +91,8 @@ export class StorageService {
     this.migrationComplete = true;
   }
 
-  /**
-   * Migrate from V1 (single workspace per project) to V2 (multiple directories)
-   */
   private async migrateV1ToV2(): Promise<void> {
-    const oldProjects = this.getLinkedProjectsMetadata(); // V1 format
+    const oldProjects = this.getLinkedProjectsMetadata();
     const newProjects: LinkedProjectMetadataV2[] = [];
 
     for (const old of oldProjects) {
@@ -141,7 +104,6 @@ export class StorageService {
         createdAt: Date.now(),
       };
 
-      // Check if project already exists in new format
       const existingIndex = newProjects.findIndex(
         (p) => p.projectId === old.projectId
       );
@@ -152,7 +114,6 @@ export class StorageService {
           updatedAt: Date.now(),
         };
       } else {
-        // Get the old access token and migrate it to new format
         const oldToken = await this.getAccessToken(
           old.projectId,
           old.workspacePath
@@ -178,29 +139,25 @@ export class StorageService {
     await this.context.globalState.update(LINKED_PROJECTS_V2_KEY, newProjects);
   }
 
-  // ============================================
-  // Multi-account auth session management
-  // ============================================
-  //
-  // Every signed-in account lives in one encrypted SecretStorage blob keyed by
-  // user id, with a single active-account pointer. The legacy single-session
-  // API (getAuthSession/setAuthSession/clearAuthSession) is preserved verbatim
-  // and now operates on the ACTIVE account, so existing callers are unaffected.
-
-  /**
-   * Load the accounts blob (cached). On the very first read, if no blob exists
-   * yet but a legacy single-session AUTH_SESSION_KEY does, it is migrated in
-   * place (see {@link migrateLegacyAuth}). Concurrent first-reads share one
-   * load via `accountsLoadPromise` so migration runs at most once.
-   */
   private async loadAccounts(): Promise<AuthAccountsBlob> {
     if (this.cachedAccounts !== undefined) {
       return this.cachedAccounts;
     }
     if (!this.accountsLoadPromise) {
-      this.accountsLoadPromise = this.doLoadAccounts().finally(() => {
-        this.accountsLoadPromise = undefined;
-      });
+      const generation = this.accountsGeneration;
+      const load: Promise<AuthAccountsBlob> = this.doLoadAccounts()
+        .then((blob) => {
+          if (this.accountsGeneration === generation) {
+            this.cachedAccounts = blob;
+          }
+          return blob;
+        })
+        .finally(() => {
+          if (this.accountsLoadPromise === load) {
+            this.accountsLoadPromise = undefined;
+          }
+        });
+      this.accountsLoadPromise = load;
     }
     return this.accountsLoadPromise;
   }
@@ -209,44 +166,21 @@ export class StorageService {
     const raw = await this.context.secrets.get(AUTH_ACCOUNTS_KEY);
     if (raw) {
       try {
-        const blob = this.normalizeBlob(JSON.parse(raw) as AuthAccountsBlob);
-        this.cachedAccounts = blob;
-        return blob;
-      } catch {
-        // Corrupt blob — fall through to legacy migration / empty state.
-      }
+        return this.normalizeBlob(JSON.parse(raw) as AuthAccountsBlob);
+      } catch {}
     }
-
-    const blob = await this.migrateLegacyAuth();
-    this.cachedAccounts = blob;
-    return blob;
+    return this.migrateLegacyAuth();
   }
 
-  /**
-   * Repair an untrusted blob: guarantee an `accounts` object and an
-   * `activeAccountId` that actually points at a stored account (falling back to
-   * an arbitrary remaining account, or `undefined` when there are none).
-   */
   private normalizeBlob(blob: AuthAccountsBlob | null): AuthAccountsBlob {
     const accounts =
       blob && typeof blob.accounts === "object" && blob.accounts !== null
         ? blob.accounts
         : {};
-    let activeAccountId = blob?.activeAccountId;
-    if (!activeAccountId || !accounts[activeAccountId]) {
-      activeAccountId = Object.keys(accounts)[0];
-    }
-    return { accounts, activeAccountId };
+    const id = blob?.activeAccountId;
+    return { accounts, activeAccountId: id && accounts[id] ? id : undefined };
   }
 
-  /**
-   * Lazy, idempotent migration from the legacy single-session AUTH_SESSION_KEY
-   * to the multi-account blob. If a valid legacy session exists it is wrapped
-   * into an accounts map keyed by its user id, made active, persisted, and the
-   * legacy key is deleted. Lossless: the same AuthSession object is preserved
-   * byte-for-byte, only re-homed under `accounts[user.id]`. Safe to call when
-   * no legacy session exists (returns an empty blob without writing).
-   */
   private async migrateLegacyAuth(): Promise<AuthAccountsBlob> {
     const legacy = await this.context.secrets.get(AUTH_SESSION_KEY);
     if (!legacy) {
@@ -261,7 +195,6 @@ export class StorageService {
     }
 
     if (!session?.user?.id) {
-      // Legacy value is unusable — drop it so we don't retry every read.
       await this.context.secrets.delete(AUTH_SESSION_KEY);
       return { accounts: {}, activeAccountId: undefined };
     }
@@ -275,26 +208,17 @@ export class StorageService {
     return blob;
   }
 
-  /** Persist the blob and update the in-memory cache atomically. */
   private async persistAccounts(blob: AuthAccountsBlob): Promise<void> {
     this.cachedAccounts = blob;
     await this.context.secrets.store(AUTH_ACCOUNTS_KEY, JSON.stringify(blob));
   }
 
-  /** Serialize an account read-modify-write behind the auth write queue. */
-  private enqueueAuthWrite<T>(task: () => Promise<T>): Promise<T> {
-    const run = this.authWriteQueue.then(task, task);
-    this.authWriteQueue = run.catch(() => {});
+  private enqueueWrite<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.writeQueue.then(task, task);
+    this.writeQueue = run.catch(() => {});
     return run;
   }
 
-  /**
-   * Get the ACTIVE account's session (runs migration on first read). Returns
-   * null when signed out. An expired active account is removed (which may
-   * promote another account to active) but NEVER wipes other valid accounts;
-   * expired accounts are skipped until a valid active session is found or none
-   * remain.
-   */
   async getAuthSession(): Promise<AuthSession | null> {
     let blob = await this.loadAccounts();
 
@@ -306,8 +230,7 @@ export class StorageService {
 
       const session = blob.accounts[id];
       if (!session) {
-        // Pointer/accounts drifted out of sync — normalize and retry.
-        await this.enqueueAuthWrite(async () => {
+        await this.enqueueWrite(async () => {
           const current = await this.loadAccounts();
           await this.persistAccounts(this.normalizeBlob(current));
         });
@@ -316,7 +239,7 @@ export class StorageService {
       }
 
       if (session.expiresAt && Date.now() > session.expiresAt) {
-        await this.removeAccount(id);
+        await this.removeAccount(id, { promote: true });
         blob = await this.loadAccounts();
         continue;
       }
@@ -325,12 +248,8 @@ export class StorageService {
     }
   }
 
-  /**
-   * UPSERT an account by `session.user.id` and make it the active account. This
-   * is what makes signIn ADD an account without clobbering the others.
-   */
   async setAuthSession(session: AuthSession): Promise<void> {
-    await this.enqueueAuthWrite(async () => {
+    await this.enqueueWrite(async () => {
       const blob = await this.loadAccounts();
       await this.persistAccounts({
         accounts: { ...blob.accounts, [session.user.id]: session },
@@ -339,24 +258,15 @@ export class StorageService {
     });
   }
 
-  /**
-   * Patch an EXISTING account's rotated tokens in place, for the token-refresh
-   * path. Unlike setAuthSession this:
-   *   - does NOT change `activeAccountId` — a background refresh of account A
-   *     that finishes after the user switched to B must not flip active back to A;
-   *   - does NOT resurrect an account that was removed (signed out / switched
-   *     away) while its refresh was in flight — it is a no-op in that case,
-   *     instead of silently re-creating cleared credentials.
-   */
   async updateAccountTokens(
     userId: string,
     patch: { accessToken: string; refreshToken: string; sessionId?: string }
   ): Promise<void> {
-    await this.enqueueAuthWrite(async () => {
+    await this.enqueueWrite(async () => {
       const blob = await this.loadAccounts();
       const existing = blob.accounts[userId];
       if (!existing) {
-        return; // removed while the refresh was in flight — do not resurrect.
+        return;
       }
       await this.persistAccounts({
         accounts: {
@@ -366,44 +276,25 @@ export class StorageService {
             accessToken: patch.accessToken,
             refreshToken: patch.refreshToken,
             sessionId: patch.sessionId ?? existing.sessionId,
-            // Preserve the "never auto-evict" semantics.
             expiresAt: 0,
           },
         },
-        activeAccountId: blob.activeAccountId, // unchanged — no active flip.
+        activeAccountId: blob.activeAccountId,
       });
     });
   }
 
-  /**
-   * Single-account logout: remove the ACTIVE account. If other accounts remain,
-   * the active pointer moves to one of them; otherwise the blob becomes empty.
-   */
-  async clearAuthSession(): Promise<void> {
-    const activeId = (await this.loadAccounts()).activeAccountId;
-    if (!activeId) {
-      return;
-    }
-    await this.removeAccount(activeId);
-  }
-
-  /** List every signed-in account. */
   async listAccounts(): Promise<AuthSession[]> {
     const blob = await this.loadAccounts();
     return Object.values(blob.accounts);
   }
 
-  /** Get the active account's user id (undefined when signed out). */
   async getActiveAccountId(): Promise<string | undefined> {
     return (await this.loadAccounts()).activeAccountId;
   }
 
-  /**
-   * Switch the active account. Returns false (and changes nothing) when no
-   * account with the given id exists.
-   */
   async setActiveAccount(userId: string): Promise<boolean> {
-    return this.enqueueAuthWrite(async () => {
+    return this.enqueueWrite(async () => {
       const blob = await this.loadAccounts();
       if (!blob.accounts[userId]) {
         return false;
@@ -413,52 +304,32 @@ export class StorageService {
     });
   }
 
-  /**
-   * Remove a specific account. If it was the active one, the active pointer
-   * moves to another remaining account (or is cleared when none remain).
-   */
   async removeAccount(
-    userId: string
-  ): Promise<{ removedActive: boolean; newActiveId?: string }> {
-    return this.enqueueAuthWrite(async () => {
+    userId: string,
+    { promote }: { promote: boolean }
+  ): Promise<void> {
+    await this.enqueueWrite(async () => {
       const blob = await this.loadAccounts();
-      if (!blob.accounts[userId]) {
-        return { removedActive: false };
-      }
-
-      const wasActive = blob.activeAccountId === userId;
-      const accounts = { ...blob.accounts };
-      delete accounts[userId];
-
-      let activeAccountId = blob.activeAccountId;
-      let newActiveId: string | undefined;
-      if (wasActive) {
-        newActiveId = Object.keys(accounts)[0];
-        activeAccountId = newActiveId;
-      }
-
+      if (!blob.accounts[userId]) return;
+      const { [userId]: _removed, ...accounts } = blob.accounts;
+      const activeAccountId =
+        blob.activeAccountId !== userId
+          ? blob.activeAccountId
+          : promote
+            ? Object.keys(accounts)[0]
+            : undefined;
       await this.persistAccounts({ accounts, activeAccountId });
-      return { removedActive: wasActive, newActiveId };
     });
   }
 
-  /** Sign out of every account and clear the in-memory cache. */
   async clearAllAccounts(): Promise<void> {
-    await this.enqueueAuthWrite(async () => {
+    await this.enqueueWrite(async () => {
       this.cachedAccounts = { accounts: {}, activeAccountId: undefined };
       await this.context.secrets.delete(AUTH_ACCOUNTS_KEY);
-      // Also drop any un-migrated legacy session so nothing lingers.
       await this.context.secrets.delete(AUTH_SESSION_KEY);
     });
   }
 
-  // ============================================
-  // V1 Legacy Methods (kept for migration)
-  // ============================================
-
-  /**
-   * Get linked projects metadata - V1 format (legacy)
-   */
   getLinkedProjectsMetadata(): LinkedProjectMetadata[] {
     const projects =
       this.context.globalState.get<LinkedProjectMetadata[]>(
@@ -473,9 +344,6 @@ export class StorageService {
     await this.context.globalState.update(LINKED_PROJECTS_KEY, projects);
   }
 
-  /**
-   * Get access token for a project from secret storage - V1 format
-   */
   async getAccessToken(
     projectId: string,
     workspacePath: string
@@ -484,9 +352,6 @@ export class StorageService {
     return (await this.context.secrets.get(key)) || null;
   }
 
-  /**
-   * Store access token in secret storage - V1 format
-   */
   async setAccessToken(
     projectId: string,
     workspacePath: string,
@@ -496,9 +361,6 @@ export class StorageService {
     await this.context.secrets.store(key, token);
   }
 
-  /**
-   * Delete access token from secret storage - V1 format
-   */
   async deleteAccessToken(
     projectId: string,
     workspacePath: string
@@ -507,41 +369,9 @@ export class StorageService {
     await this.context.secrets.delete(key);
   }
 
-  /**
-   * Get all linked projects with their access tokens - V1 format (legacy)
-   */
-  async getLinkedProjects(): Promise<LinkedProject[]> {
-    const metadata = this.getLinkedProjectsMetadata();
-
-    const projects = await Promise.all(
-      metadata.map(async (m) => {
-        const accessToken = await this.getAccessToken(
-          m.projectId,
-          m.workspacePath
-        );
-        return {
-          ...m,
-          organizationId: "",
-          accessToken: accessToken || "",
-        };
-      })
-    );
-
-    // Filter out projects where token retrieval failed
-    return projects.filter((p) => p.accessToken);
-  }
-
-  /**
-   * Get linked projects metadata (synchronous, for quick checks) - V1 format
-   */
-  getLinkedProjectsSync(): LinkedProjectMetadata[] {
-    return this.getLinkedProjectsMetadata();
-  }
-
   async addLinkedProject(project: LinkedProject): Promise<void> {
     const metadata = this.getLinkedProjectsMetadata();
 
-    // Remove existing link for same project/workspace combo
     const filtered = metadata.filter(
       (p) =>
         !(
@@ -550,14 +380,12 @@ export class StorageService {
         )
     );
 
-    // Store access token separately in secrets
     await this.setAccessToken(
       project.projectId,
       project.workspacePath,
       project.accessToken
     );
 
-    // Store metadata without access token
     const { accessToken, ...metadataOnly } = project;
     filtered.push(metadataOnly);
     await this.setLinkedProjectsMetadata(filtered);
@@ -572,7 +400,6 @@ export class StorageService {
       (p) => !(p.projectId === projectId && p.workspacePath === workspacePath)
     );
 
-    // Delete the access token
     await this.deleteAccessToken(projectId, workspacePath);
 
     await this.setLinkedProjectsMetadata(filtered);
@@ -610,7 +437,6 @@ export class StorageService {
     );
 
     if (index !== -1) {
-      // If access token is being updated, store it separately
       if (updates.accessToken) {
         await this.setAccessToken(
           projectId,
@@ -619,28 +445,17 @@ export class StorageService {
         );
       }
 
-      // Update metadata (excluding accessToken)
       const { accessToken, ...metadataUpdates } = updates;
       metadata[index] = { ...metadata[index], ...metadataUpdates };
       await this.setLinkedProjectsMetadata(metadata);
     }
   }
 
-  // ============================================
-  // V2 Methods (multi-directory support)
-  // ============================================
-
-  /**
-   * Get access token for a project - V2 format (shared across directories)
-   */
   async getAccessTokenForProject(projectId: string): Promise<string | null> {
     const key = `${PROJECT_TOKEN_PREFIX}${projectId}`;
     return (await this.context.secrets.get(key)) || null;
   }
 
-  /**
-   * Store access token for a project - V2 format
-   */
   async setAccessTokenForProject(
     projectId: string,
     token: string
@@ -649,17 +464,11 @@ export class StorageService {
     await this.context.secrets.store(key, token);
   }
 
-  /**
-   * Delete access token for a project - V2 format
-   */
   async deleteAccessTokenForProject(projectId: string): Promise<void> {
     const key = `${PROJECT_TOKEN_PREFIX}${projectId}`;
     await this.context.secrets.delete(key);
   }
 
-  /**
-   * Get linked projects metadata - V2 format
-   */
   getLinkedProjectsMetadataV2(): LinkedProjectMetadataV2[] {
     return (
       this.context.globalState.get<LinkedProjectMetadataV2[]>(
@@ -668,33 +477,42 @@ export class StorageService {
     );
   }
 
-  /**
-   * Set linked projects metadata - V2 format
-   */
   async setLinkedProjectsMetadataV2(
     projects: LinkedProjectMetadataV2[]
   ): Promise<void> {
     await this.context.globalState.update(LINKED_PROJECTS_V2_KEY, projects);
   }
 
-  /**
-   * Cache the server-resolved unsync-on-close flag for a project. No-op when
-   * the project isn't linked or the value is unchanged (avoids globalState
-   * churn on every sync).
-   */
-  async setProjectUnsyncFlag(projectId: string, value: boolean): Promise<void> {
-    const metadata = this.getLinkedProjectsMetadataV2();
-    const index = metadata.findIndex((p) => p.projectId === projectId);
-    if (index === -1 || metadata[index].autoUnsyncOnClose === value) {
-      return;
-    }
-    metadata[index] = { ...metadata[index], autoUnsyncOnClose: value };
-    await this.setLinkedProjectsMetadataV2(metadata);
+  private updateProject(
+    projectId: string,
+    update: (project: LinkedProjectMetadataV2) => LinkedProjectMetadataV2 | null
+  ): Promise<boolean> {
+    return this.enqueueWrite(async () => {
+      await this.migrateIfNeeded();
+      const metadata = this.getLinkedProjectsMetadataV2();
+      const index = metadata.findIndex((p) => p.projectId === projectId);
+      if (index === -1) return false;
+      const next = update(metadata[index]);
+      if (next === metadata[index]) return true;
+      if (next) {
+        metadata[index] = { ...next, updatedAt: Date.now() };
+      } else {
+        await this.deleteAccessTokenForProject(projectId);
+        metadata.splice(index, 1);
+      }
+      await this.setLinkedProjectsMetadataV2(metadata);
+      return true;
+    });
   }
 
-  /**
-   * Get all linked projects with their access tokens - V2 format
-   */
+  async setProjectUnsyncFlag(projectId: string, value: boolean): Promise<void> {
+    await this.updateProject(projectId, (project) =>
+      project.autoUnsyncOnClose === value
+        ? project
+        : { ...project, autoUnsyncOnClose: value }
+    );
+  }
+
   async getLinkedProjectsV2(): Promise<LinkedProjectV2[]> {
     await this.migrateIfNeeded();
 
@@ -710,9 +528,6 @@ export class StorageService {
     return projects.filter((p) => p.accessToken);
   }
 
-  /**
-   * Get a single linked project by ID - V2 format
-   */
   async getLinkedProjectV2(projectId: string): Promise<LinkedProjectV2 | null> {
     await this.migrateIfNeeded();
 
@@ -731,9 +546,6 @@ export class StorageService {
     return { ...project, accessToken };
   }
 
-  /**
-   * Add a new linked project - V2 format
-   */
   async addLinkedProjectV2(
     projectId: string,
     projectName: string,
@@ -744,262 +556,106 @@ export class StorageService {
     directory: LinkedDirectory,
     defaultEnvironment: string
   ): Promise<void> {
-    await this.migrateIfNeeded();
+    return this.enqueueWrite(async () => {
+      await this.migrateIfNeeded();
 
-    const metadata = this.getLinkedProjectsMetadataV2();
+      const metadata = this.getLinkedProjectsMetadataV2();
 
-    // Check if project already exists
-    const existingIndex = metadata.findIndex((p) => p.projectId === projectId);
-
-    if (existingIndex !== -1) {
-      // Add directory to existing project
-      const normalizedPath = normalizePath(directory.directoryPath);
-      const existingDir = metadata[existingIndex].directories.find(
-        (d) => normalizePath(d.directoryPath) === normalizedPath
+      const existingIndex = metadata.findIndex(
+        (p) => p.projectId === projectId
       );
 
-      if (!existingDir) {
-        metadata[existingIndex] = {
-          ...metadata[existingIndex],
+      if (existingIndex !== -1) {
+        const normalizedPath = normalizePath(directory.directoryPath);
+        const existingDir = metadata[existingIndex].directories.find(
+          (d) => normalizePath(d.directoryPath) === normalizedPath
+        );
+
+        if (!existingDir) {
+          metadata[existingIndex] = {
+            ...metadata[existingIndex],
+            directories: [
+              ...metadata[existingIndex].directories,
+              { ...directory, directoryPath: normalizedPath },
+            ],
+            updatedAt: Date.now(),
+          };
+        }
+      } else {
+        await this.setAccessTokenForProject(projectId, accessToken);
+
+        metadata.push({
+          projectId,
+          projectName,
+          organizationId,
+          organizationName,
+          expiresAt,
           directories: [
-            ...metadata[existingIndex].directories,
-            { ...directory, directoryPath: normalizedPath },
+            {
+              ...directory,
+              directoryPath: normalizePath(directory.directoryPath),
+            },
           ],
+          defaultEnvironment,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
-        };
+        });
       }
-    } else {
-      // Create new project
-      await this.setAccessTokenForProject(projectId, accessToken);
 
-      metadata.push({
-        projectId,
-        projectName,
-        organizationId,
-        organizationName,
-        expiresAt,
-        directories: [
-          {
-            ...directory,
-            directoryPath: normalizePath(directory.directoryPath),
-          },
-        ],
-        defaultEnvironment,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-    }
-
-    await this.setLinkedProjectsMetadataV2(metadata);
+      await this.setLinkedProjectsMetadataV2(metadata);
+    });
   }
 
-  /**
-   * Add a directory to an existing project - V2 format
-   */
   async addDirectoryToProject(
     projectId: string,
     directory: LinkedDirectory
   ): Promise<void> {
-    await this.migrateIfNeeded();
-
-    const metadata = this.getLinkedProjectsMetadataV2();
-    const projectIndex = metadata.findIndex((p) => p.projectId === projectId);
-
-    if (projectIndex === -1) {
-      throw new Error("Project not found");
-    }
-
-    // Check for duplicate directory
-    const normalizedPath = normalizePath(directory.directoryPath);
-    const existingDir = metadata[projectIndex].directories.find(
-      (d) => normalizePath(d.directoryPath) === normalizedPath
-    );
-
-    if (existingDir) {
-      throw new Error("Directory already linked to this project");
-    }
-
-    metadata[projectIndex] = {
-      ...metadata[projectIndex],
-      directories: [
-        ...metadata[projectIndex].directories,
-        { ...directory, directoryPath: normalizedPath },
-      ],
-      updatedAt: Date.now(),
-    };
-
-    await this.setLinkedProjectsMetadataV2(metadata);
+    const directoryPath = normalizePath(directory.directoryPath);
+    const found = await this.updateProject(projectId, (project) => {
+      if (
+        project.directories.some(
+          (d) => normalizePath(d.directoryPath) === directoryPath
+        )
+      ) {
+        throw new Error("Directory already linked to this project");
+      }
+      return {
+        ...project,
+        directories: [...project.directories, { ...directory, directoryPath }],
+      };
+    });
+    if (!found) throw new Error("Project not found");
   }
 
-  /**
-   * Remove a directory from a project - V2 format
-   */
   async removeDirectoryFromProject(
     projectId: string,
     directoryPath: string
   ): Promise<void> {
-    await this.migrateIfNeeded();
-
-    const metadata = this.getLinkedProjectsMetadataV2();
-    const projectIndex = metadata.findIndex((p) => p.projectId === projectId);
-
-    if (projectIndex === -1) {
-      return;
-    }
-
     const normalizedPath = normalizePath(directoryPath);
-    metadata[projectIndex] = {
-      ...metadata[projectIndex],
-      directories: metadata[projectIndex].directories.filter(
+    await this.updateProject(projectId, (project) => {
+      const directories = project.directories.filter(
         (d) => normalizePath(d.directoryPath) !== normalizedPath
-      ),
-      updatedAt: Date.now(),
-    };
-
-    // If no directories left, remove the entire project
-    if (metadata[projectIndex].directories.length === 0) {
-      await this.deleteAccessTokenForProject(projectId);
-      metadata.splice(projectIndex, 1);
-    }
-
-    await this.setLinkedProjectsMetadataV2(metadata);
+      );
+      return directories.length > 0 ? { ...project, directories } : null;
+    });
   }
 
-  /**
-   * Get the project linked to a specific directory - V2 format
-   */
-  async getProjectForDirectory(
-    directoryPath: string
-  ): Promise<LinkedProjectV2 | null> {
-    await this.migrateIfNeeded();
-
-    const projects = await this.getLinkedProjectsV2();
-    const normalizedPath = normalizePath(directoryPath);
-
-    return (
-      projects.find((p) =>
-        p.directories.some(
-          (d) => normalizePath(d.directoryPath) === normalizedPath
-        )
-      ) || null
-    );
-  }
-
-  /**
-   * Get all directories for a project - V2 format
-   */
-  async getAllDirectoriesForProject(
-    projectId: string
-  ): Promise<LinkedDirectory[]> {
-    await this.migrateIfNeeded();
-
-    const metadata = this.getLinkedProjectsMetadataV2();
-    const project = metadata.find((p) => p.projectId === projectId);
-    return project?.directories || [];
-  }
-
-  /**
-   * Update a directory's sync timestamp - V2 format.
-   * Queued so concurrent directory syncs don't clobber each other's
-   * read-modify-write of the shared metadata array.
-   */
   async updateDirectorySyncTime(
     projectId: string,
     directoryPath: string
   ): Promise<void> {
-    const task = this.metadataWriteQueue.then(() =>
-      this.doUpdateDirectorySyncTime(projectId, directoryPath)
-    );
-    this.metadataWriteQueue = task.catch(() => {});
-    return task;
-  }
-
-  private async doUpdateDirectorySyncTime(
-    projectId: string,
-    directoryPath: string
-  ): Promise<void> {
-    await this.migrateIfNeeded();
-
-    const metadata = this.getLinkedProjectsMetadataV2();
-    const projectIndex = metadata.findIndex((p) => p.projectId === projectId);
-
-    if (projectIndex === -1) {
-      return;
-    }
-
     const normalizedPath = normalizePath(directoryPath);
-    const dirIndex = metadata[projectIndex].directories.findIndex(
-      (d) => normalizePath(d.directoryPath) === normalizedPath
-    );
-
-    if (dirIndex !== -1) {
-      const updatedDirectories = [...metadata[projectIndex].directories];
-      updatedDirectories[dirIndex] = {
-        ...updatedDirectories[dirIndex],
-        lastSyncedAt: Date.now(),
-      };
-      metadata[projectIndex] = {
-        ...metadata[projectIndex],
-        directories: updatedDirectories,
-        updatedAt: Date.now(),
-      };
-      await this.setLinkedProjectsMetadataV2(metadata);
-    }
+    await this.updateProject(projectId, (project) => ({
+      ...project,
+      directories: project.directories.map((d) =>
+        normalizePath(d.directoryPath) === normalizedPath
+          ? { ...d, lastSyncedAt: Date.now() }
+          : d
+      ),
+    }));
   }
 
-  /**
-   * Update project expiration - V2 format
-   */
-  async updateProjectExpiration(
-    projectId: string,
-    expiresAt: number
-  ): Promise<void> {
-    await this.migrateIfNeeded();
-
-    const metadata = this.getLinkedProjectsMetadataV2();
-    const projectIndex = metadata.findIndex((p) => p.projectId === projectId);
-
-    if (projectIndex !== -1) {
-      metadata[projectIndex] = {
-        ...metadata[projectIndex],
-        expiresAt,
-        updatedAt: Date.now(),
-      };
-      await this.setLinkedProjectsMetadataV2(metadata);
-    }
-  }
-
-  /**
-   * Remove an entire project and all its directories - V2 format
-   */
   async removeLinkedProjectV2(projectId: string): Promise<void> {
-    await this.migrateIfNeeded();
-
-    const metadata = this.getLinkedProjectsMetadataV2();
-    const filtered = metadata.filter((p) => p.projectId !== projectId);
-
-    await this.deleteAccessTokenForProject(projectId);
-    await this.setLinkedProjectsMetadataV2(filtered);
-  }
-
-  // Clear all stored data
-  async clearAll(): Promise<void> {
-    // Sign out of every account (clearAuthSession only drops the active one).
-    await this.clearAllAccounts();
-
-    // Delete all V1 access tokens
-    const metadata = this.getLinkedProjectsMetadata();
-    for (const m of metadata) {
-      await this.deleteAccessToken(m.projectId, m.workspacePath);
-    }
-
-    // Delete all V2 access tokens
-    const metadataV2 = this.getLinkedProjectsMetadataV2();
-    for (const m of metadataV2) {
-      await this.deleteAccessTokenForProject(m.projectId);
-    }
-
-    await this.setLinkedProjectsMetadata([]);
-    await this.setLinkedProjectsMetadataV2([]);
+    await this.updateProject(projectId, () => null);
   }
 }

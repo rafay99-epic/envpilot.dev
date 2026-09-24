@@ -44,7 +44,6 @@ describe("normalizePath", () => {
   it("normalizePath preserves case; pathKey folds it on case-insensitive platforms", () => {
     const mixed = path.join(tmpDir, "Mixed", "Case.ENV");
 
-    // Storage/IO identity never case-folds — the result is used as an fs path.
     expect(normalizePath(mixed).endsWith("Mixed/Case.ENV")).toBe(true);
 
     if (caseInsensitive) {
@@ -59,7 +58,6 @@ describe("normalizePath", () => {
     const parent = path.join(tmpDir, "repo");
     expect(isPathInside(path.join(parent, "apps", "web"), parent)).toBe(true);
     expect(isPathInside(parent, parent)).toBe(true);
-    // Sibling whose name shares a prefix must NOT count as inside.
     expect(isPathInside(path.join(tmpDir, "repo-two"), parent)).toBe(false);
     expect(isPathInside(tmpDir, parent)).toBe(false);
   });

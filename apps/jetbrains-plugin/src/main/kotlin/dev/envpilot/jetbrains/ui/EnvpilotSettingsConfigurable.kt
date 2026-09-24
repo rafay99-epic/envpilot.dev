@@ -52,7 +52,7 @@ class EnvpilotSettingsConfigurable : BoundConfigurable("Envpilot") {
                         .bindText(state::convexUrl)
                         .comment("Leave empty to use the build-baked default.")
                         .align(com.intellij.ui.dsl.builder.AlignX.FILL)
-                }.comment("Realtime updates use the same connection as pulls and fall back to interval polling.")
+                }.comment("Realtime updates over Convex, on the same connection as pulls. Requests queue while offline.")
             }
             group("Editor & security") {
                 row {

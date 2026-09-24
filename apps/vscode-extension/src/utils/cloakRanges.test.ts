@@ -5,18 +5,10 @@ import {
   type CloakFormat,
 } from "./cloakRanges";
 
-/**
- * Masking a secret file whole turns a service-account JSON into an
- * unreadable wall of bullets. These assert the opposite property: keys,
- * punctuation and indentation survive, values do not.
- */
-
-/** Render what the user would see: masked spans replaced with `*`. */
 function render(format: CloakFormat, source: string): string {
   const lines = source.split("\n");
   const ranges = computeCloakRanges(format, lines);
   const out = [...lines];
-  // Apply right-to-left so earlier offsets stay valid.
   for (const r of [...ranges].sort((a, b) => b.start - a.start)) {
     const line = out[r.line];
     out[r.line] =
@@ -66,7 +58,6 @@ describe("json", () => {
 
     const out = render("json", src);
 
-    // Structure and keys survive — that is the whole point.
     for (const kept of [
       "{",
       '"project_info"',
@@ -80,12 +71,10 @@ describe("json", () => {
       expect(out, `structure "${kept}" must stay visible`).toContain(kept);
     }
 
-    // Every value is gone.
     for (const secret of ["123456", "demo-app", "AIzaSyD-SECRET"]) {
       expect(out, `value "${secret}" must be masked`).not.toContain(secret);
     }
 
-    // Line count and indentation are preserved, so the file stays navigable.
     expect(out.split("\n")).toHaveLength(src.split("\n").length);
     expect(out).toContain('    "project_number": ');
   });
@@ -98,7 +87,6 @@ describe("json", () => {
   it("masks bare array elements", () => {
     const out = render("json", '    "com.example.app",');
     expect(out).not.toContain("com.example.app");
-    // Indentation and the trailing comma are structure and stay put.
     expect(out.startsWith("    ")).toBe(true);
     expect(out.endsWith(",")).toBe(true);
   });
@@ -112,12 +100,38 @@ describe("json", () => {
   });
 
   it("does not leak a value containing an escaped quote", () => {
-    // The naive "read to the next comma" approach truncates here and leaks
-    // the tail — the escaped quote must not end the string early.
     const out = render("json", '  "k": "a\\"b,c"');
     expect(out).toContain('"k": ');
     expect(out).not.toContain("b,c");
     expect(out).not.toContain("a\\");
+  });
+});
+
+describe("env", () => {
+  it("masks values, keeps keys, comments and export", () => {
+    const src = [
+      "# Envpilot",
+      "API_KEY=sk_live_1",
+      "export DB_URL=postgres://x",
+      "my-key = spaced",
+      "EMPTY=",
+    ].join("\n");
+    expect(render("env", src)).toBe(
+      [
+        "# Envpilot",
+        "API_KEY=*********",
+        "export DB_URL=************",
+        "my-key =*******",
+        "EMPTY=",
+      ].join("\n")
+    );
+  });
+
+  it("fails closed on a line that is not KEY=value", () => {
+    const src = 'MULTI="first\n  second-secret"\nnot a pair';
+    expect(render("env", src)).toBe(
+      "MULTI=******\n  **************\n**********"
+    );
   });
 });
 
@@ -146,14 +160,18 @@ describe("yaml", () => {
     expect(render("yaml", "database:")).toBe("database:");
   });
 
+  it("fails closed on plain multi-line scalars and keys with spaces", () => {
+    const src = "token: first\n  second-secret\nmy key: hunter2";
+    expect(render("yaml", src)).toBe(
+      "token: *****\n  *************\n***************"
+    );
+  });
+
   it("masks bare sequence items", () => {
-    // A YAML list can hold secrets directly ("- sk_live_..."), and those
-    // lines carry no key for the key:value rule to latch onto.
     const out = render("yaml", "tokens:\n  - sk_live_secret\n  - another");
     expect(out).toContain("tokens:");
     expect(out).not.toContain("sk_live_secret");
     expect(out).not.toContain("another");
-    // The dash and indentation are structure.
     expect(out).toContain("  - ");
   });
 });
@@ -206,8 +224,6 @@ describe("pem", () => {
 
 describe("leaks that review caught", () => {
   it("masks elements of an inline JSON array", () => {
-    // The keyed opener is structural, so the elements on the same line were
-    // sailing straight through.
     const out = render("json", '  "scopes": ["sk_live_aaa", "sk_live_bbb"],');
     expect(out).toContain('"scopes"');
     expect(out).toContain("[");
@@ -237,7 +253,6 @@ describe("leaks that review caught", () => {
     expect(out).toContain("private_key: |");
     expect(out).not.toContain("LINE-ONE-SECRET");
     expect(out).not.toContain("LINE-TWO-SECRET");
-    // The block ended, so the next key is parsed normally again.
     expect(out).toContain("alias:");
     expect(out).not.toContain("upload");
   });
@@ -267,8 +282,6 @@ describe("leaks that review caught", () => {
   });
 
   it("masks colon-separated .properties secrets", () => {
-    // .properties/.ini accept `:` as well as `=`; the TOML parser only took
-    // `=`, so these stayed fully visible.
     const out = render("properties", "db.password: hunter2\napi.key=sk_live_x");
     expect(out).toContain("db.password");
     expect(out).toContain("api.key");
@@ -290,7 +303,6 @@ describe("opaque", () => {
   });
 
   it("keeps indentation visible when masking a whole line", () => {
-    // Indentation is shape, not secret — masking it collapses the outline.
     expect(render("opaque", "    indented-secret")).toBe("    ***************");
   });
 
@@ -303,8 +315,6 @@ describe("opaque", () => {
 
 describe("regression: values that used to stay visible", () => {
   it("masks a TOML inline array that carries a trailing comment", () => {
-    // `# note` made the line stop looking like a closed array, so the parser
-    // opened continuation state and left the value on THIS line readable.
     const out = render("toml", 'tokens = ["secret"] # note');
     expect(out).not.toContain("secret");
     expect(out).toContain("tokens");
@@ -346,7 +356,6 @@ describe("regression: values that used to stay visible", () => {
   });
 
   it("fails closed on an unrecognised .properties line", () => {
-    // No `=`, no `:`, no whitespace separator after a key-shaped token.
     const out = render("properties", "bare-token-with-no-separator");
     expect(out).not.toContain("bare-token-with-no-separator");
   });
@@ -360,16 +369,9 @@ describe("regression: values that used to stay visible", () => {
 });
 
 describe("regression: TOML continuation state", () => {
-  // Every sentinel here is a COMMENT on purpose. A comment is READABLE when
-  // the parser is outside continuation state and MASKED while inside it, so
-  // it detects an early close. A bare string sentinel cannot: the
-  // fail-closed path masks it either way, which made the previous versions
-  // of these tests pass against a parser that closed on the wrong token.
   const SENTINEL = "# sentinel-inside-continuation";
 
   it("keeps masking past a nested array that closes on its own line", () => {
-    // The nested element must END the line with `]` — that is the exact
-    // shape a terminal-bracket test mistakes for the outer array closing.
     const out = render(
       "toml",
       ["a = [", "  [1, 2]", `  ${SENTINEL}`, "]"].join("\n")
@@ -402,7 +404,6 @@ describe("regression: TOML continuation state", () => {
   });
 
   it("does not close a basic-string body on an ESCAPED delimiter", () => {
-    // A backslash-escaped quote followed by two more is not a terminator.
     const out = render(
       "toml",
       ['k = """', 'escaped \\""" here', SENTINEL, '"""'].join("\n")
@@ -411,8 +412,6 @@ describe("regression: TOML continuation state", () => {
   });
 
   it("DOES stop masking once the array really closes", () => {
-    // The counterpart assertion: without it every test above would pass on a
-    // parser that simply never leaves continuation state.
     const out = render("toml", ["a = [", "  1", "]", SENTINEL].join("\n"));
     expect(out).toContain(SENTINEL);
   });
@@ -423,8 +422,6 @@ describe("regression: TOML continuation state", () => {
   });
 
   it("fails closed on a TOML line the key regex does not match", () => {
-    // Escaped quoted key — legal TOML, outside the regex. Leaving it in
-    // plaintext is not an acceptable default for a known-secret file.
     const out = render("toml", '"key\\"esc" = "secret-value"');
     expect(out).not.toContain("secret-value");
   });

@@ -1,10 +1,9 @@
 import * as vscode from "vscode";
 import { ApiService } from "../services/api";
 import { StorageService } from "../utils/storage";
-import { formatRoleLabel, normalizeOrgRole } from "../roles";
+import { formatRoleLabel } from "../roles";
 import type { EnvironmentVariable, LinkedProjectV2 } from "../types";
 
-/** Coalesce rapid-fire refresh() calls into a single tree-data event. */
 const REFRESH_DEBOUNCE_MS = 150;
 
 export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTreeItem> {
@@ -22,13 +21,6 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
     this.storage = storage;
   }
 
-  /**
-   * Requests a tree refresh. Multiple calls within REFRESH_DEBOUNCE_MS are
-   * coalesced into a single `onDidChangeTreeData` event — several call sites
-   * (auth changes, revocations, link/unlink, manual refresh) can fire in
-   * quick succession for what is effectively one user action, and each fire()
-   * makes VS Code re-invoke getChildren for the root and every expanded node.
-   */
   refresh(): void {
     if (this.refreshTimer) {
       return;
@@ -44,29 +36,24 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
   }
 
   async getChildren(element?: VariableTreeItem): Promise<VariableTreeItem[]> {
-    // Expanding a project node — show its variables
     if (element && element.type === "project" && element.linkedProject) {
       return this.getVariablesForProject(element.linkedProject);
     }
 
-    // Expanding any other node — no children
     if (element) {
       return [];
     }
 
-    // Root level
     const linkedProjects = await this.storage.getLinkedProjectsV2();
 
     if (linkedProjects.length === 0) {
       return [];
     }
 
-    // Single project — flat display (backward compatible)
     if (linkedProjects.length === 1) {
       return this.getVariablesForProject(linkedProjects[0]);
     }
 
-    // Multiple projects — show collapsible project nodes
     return linkedProjects.map(
       (project) =>
         new VariableTreeItem(
@@ -86,8 +73,6 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
     const env = linkedProject.defaultEnvironment || "development";
 
     try {
-      // Metadata only — the tree never displays values, so don't make the
-      // server decrypt every variable from the vault just to render names.
       const variables = await this.api.getVariablesMetadata(
         linkedProject.projectId,
         env
@@ -110,22 +95,11 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
 
       const items: VariableTreeItem[] = [];
 
-      // Environment & count header \u2014 always route the role through the
-      // unified normalizer/label formatter (never compare raw legacy
-      // strings) so the tree shows the same role vocabulary as web/CLI.
       const role = this.api.getUserRole(linkedProject.projectId);
-      const projectRole = this.api.getProjectRole(linkedProject.projectId);
-
-      let roleLabel = "";
-      if (role || projectRole) {
-        roleLabel = ` \u00b7 ${formatRoleLabel(role)}`;
-        // Legacy "viewer" project role means grant-only / not assigned to
-        // the project \u2014 formatRoleLabel only knows org-level tiers, so it
-        // can't express that distinction on its own; annotate it here.
-        if (projectRole === "viewer") {
-          roleLabel += " (view-only)";
-        }
-      }
+      const meta = this.api.getAccessMeta(linkedProject.projectId);
+      const roleLabel = role
+        ? ` \u00b7 ${formatRoleLabel(role)}${meta?.hasWriteAccess === false ? " (read-only)" : ""}`
+        : "";
 
       items.push(
         new VariableTreeItem(
@@ -137,7 +111,6 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
         )
       );
 
-      // Regular variables
       for (const variable of regularVars) {
         items.push(
           new VariableTreeItem(
@@ -149,7 +122,6 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
         );
       }
 
-      // Sensitive section
       if (sensitiveVars.length > 0) {
         items.push(
           new VariableTreeItem(
@@ -171,16 +143,7 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
         }
       }
 
-      // Pending requests for members/viewers — recognize the unified
-      // "developer" tier too (normalizeOrgRole maps legacy "member" onto
-      // it), so this keeps working if the server ever sends a unified role
-      // string in place of the legacy one. Guard on `role` being present so
-      // an unpopulated cache (normalizeOrgRole's "developer" default) doesn't
-      // spuriously trigger the extra pending-requests fetch below.
-      if (
-        (role && normalizeOrgRole(role) === "developer") ||
-        projectRole === "viewer"
-      ) {
+      if (meta?.capabilities?.["project.requests.submit"] === true) {
         try {
           const pendingRequests = await this.api.getVariableRequests(
             linkedProject.projectId,
@@ -208,9 +171,7 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
               );
             }
           }
-        } catch {
-          // Not critical
-        }
+        } catch {}
       }
 
       return items;
@@ -334,10 +295,11 @@ export class VariableTreeItem extends vscode.TreeItem {
           new vscode.ThemeColor("charts.orange")
         );
         this.description = description;
-        this.tooltip = new vscode.MarkdownString(
-          `$(git-pull-request) **${label}**\n\nStatus: *${description}*\n\nSubmitted via extension`
-        );
-        (this.tooltip as vscode.MarkdownString).supportThemeIcons = true;
+        this.tooltip = new vscode.MarkdownString("$(git-pull-request) ", true)
+          .appendText(label)
+          .appendMarkdown("\n\nStatus: ")
+          .appendText(description ?? "")
+          .appendMarkdown("\n\nSubmitted via extension");
         break;
     }
   }
@@ -349,31 +311,24 @@ export class VariableTreeItem extends vscode.TreeItem {
     if (!variable) return undefined;
 
     const md = new vscode.MarkdownString("", true);
-    md.supportThemeIcons = true;
-
-    md.appendMarkdown(`### $(symbol-variable) ${variable.key}\n\n`);
-
-    if (isSensitive) {
-      md.appendMarkdown("$(lock) *Sensitive \u2014 value hidden*\n\n");
-    } else {
-      md.appendMarkdown(
-        "$(cloud-download) *Value synced to your local .env file*\n\n"
-      );
-    }
-
-    if (variable.description) {
-      md.appendMarkdown(`${variable.description}\n\n`);
-    }
-
-    md.appendMarkdown("---\n\n");
+    md.appendMarkdown("### $(symbol-variable) ");
+    md.appendText(variable.key);
     md.appendMarkdown(
-      `**Environments:** ${variable.environments.join(", ")}  \n`
+      isSensitive
+        ? "\n\n$(lock) *Sensitive, value hidden*\n\n"
+        : "\n\n$(cloud-download) *Value synced to your local .env file*\n\n"
     );
-    md.appendMarkdown(`**Version:** ${variable.version}  \n`);
+    if (variable.description) {
+      md.appendText(variable.description);
+      md.appendMarkdown("\n\n");
+    }
+    md.appendMarkdown("---\n\n**Environments:** ");
+    md.appendText(variable.environments.join(", "));
+    md.appendMarkdown(`  \n**Version:** ${variable.version}  \n`);
     if (variable.tags && variable.tags.length > 0) {
-      md.appendMarkdown(
-        `**Tags:** ${variable.tags.map((t) => t.name).join(", ")}  \n`
-      );
+      md.appendMarkdown("**Tags:** ");
+      md.appendText(variable.tags.map((t) => t.name).join(", "));
+      md.appendMarkdown("  \n");
     }
     if (isSensitive) {
       md.appendMarkdown("**Sensitive:** $(lock) Yes");

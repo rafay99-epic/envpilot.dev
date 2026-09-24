@@ -1,5 +1,4 @@
 // Portions derived from DopplerHQ/vscode (https://github.com/DopplerHQ/vscode), Apache-2.0.
-
 import * as vscode from "vscode";
 import * as path from "path";
 import type { ApiService } from "../services/api";
@@ -14,17 +13,14 @@ export interface IntelliSenseDeps {
   storage: StorageService;
 }
 
-/**
- * Resolve the linked project (and the environments of the containing linked
- * directory) for a document, via directory containment against the locally
- * stored links. Purely local — no network.
- */
-export async function resolveProjectForDocument(
+export type LinkedProjectInfo = Omit<LinkedProjectV2, "accessToken">;
+
+export function resolveProjectForDocument(
   storage: StorageService,
   documentPath: string
-): Promise<{ project: LinkedProjectV2; environments: string[] } | null> {
+): { project: LinkedProjectInfo; environments: string[] } | null {
   const docDir = path.dirname(documentPath);
-  for (const project of await storage.getLinkedProjectsV2()) {
+  for (const project of storage.getLinkedProjectsMetadataV2()) {
     const dir = project.directories.find((d) =>
       isPathInside(docDir, d.directoryPath)
     );
@@ -39,15 +35,9 @@ export async function resolveProjectForDocument(
   return null;
 }
 
-/**
- * Unique variable key names across the given environments, mapped to the
- * environments each key exists in. Metadata-only (no values, no export audit);
- * ApiService caches responses for 30s with single-flight, so per-keystroke
- * calls never fan out into network requests.
- */
 export async function fetchKeyEnvironments(
   api: ApiService,
-  project: LinkedProjectV2,
+  project: LinkedProjectInfo,
   environments: string[]
 ): Promise<Map<string, string[]>> {
   const perEnv = await Promise.all(
@@ -90,10 +80,7 @@ async function autocomplete(
   if (!(await deps.auth.isAuthenticated())) {
     return null;
   }
-  const resolved = await resolveProjectForDocument(
-    deps.storage,
-    document.uri.fsPath
-  );
+  const resolved = resolveProjectForDocument(deps.storage, document.uri.fsPath);
   if (!resolved) {
     return null;
   }
@@ -105,8 +92,6 @@ async function autocomplete(
   );
 
   const ignoreTriggers = ["'", "`", '"', "."];
-  // JS-style `process.env.` references take no quotes; every other trigger
-  // (bracket/call syntax) re-inserts a quoted key.
   const quote = ignoreTriggers.includes(triggerCharacter) ? "" : '"';
   const items: vscode.CompletionItem[] = [];
 
@@ -120,14 +105,10 @@ async function autocomplete(
     );
     item.insertText = `${triggerCharacter}${quote}${key}${quote}`;
     item.filterText = `${triggerCharacter}${quote}${key}${quote}`;
-    // Range picks up the trigger character as prefix to fix VS Code's fuzzy
-    // scoring when sorting.
     item.range = new vscode.Range(
       new vscode.Position(position.line, position.character - 1),
       position
     );
-    // "0-" prefix sorts every secret above all other suggestions; VS Code
-    // then sorts alphabetically by label.
     item.sortText = `0-${resolved.project.projectName}.${key}`;
     items.push(item);
   }
@@ -135,21 +116,12 @@ async function autocomplete(
   return items;
 }
 
-interface LanguageSpec {
+export interface LanguageSpec {
   languages: string[];
   triggerCharacters: string[];
-  /** Trigger character to complete with, or null when the prefix doesn't match. */
   match: (linePrefix: string) => string | null;
 }
 
-/**
- * Matchers are anchored to the END of the line prefix and return the CAPTURED
- * delimiter (or the opening bracket/paren fallback), never `p.slice(-1)` —
- * completions fire only immediately after the opening delimiter/quote, and
- * the returned trigger always equals the char the item range replaces. An
- * unanchored test would also fire after a COMPLETED reference earlier on the
- * line, and a mismatched trigger corrupts the code on accept.
- */
 const anchored =
   (...regexes: RegExp[]) =>
   (fallback: string) =>
@@ -161,7 +133,7 @@ const anchored =
     return null;
   };
 
-const LANGUAGE_SPECS: LanguageSpec[] = [
+export const LANGUAGE_SPECS: LanguageSpec[] = [
   {
     languages: [
       "javascript",
@@ -216,11 +188,6 @@ const LANGUAGE_SPECS: LanguageSpec[] = [
     match: anchored(/std::env::(?:var|var_os)\((["'])?$/)("("),
   },
 ];
-
-/** Language ids the IntelliSense providers cover (shared with the hover). */
-export const INTELLISENSE_LANGUAGES = LANGUAGE_SPECS.flatMap(
-  (spec) => spec.languages
-);
 
 export function registerAutocomplete(
   context: vscode.ExtensionContext,

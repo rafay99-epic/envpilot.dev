@@ -1,12 +1,19 @@
 package dev.envpilot.jetbrains
 
 import dev.envpilot.jetbrains.auth.AuthKitLogin
+import dev.envpilot.jetbrains.auth.AuthService
 import dev.envpilot.jetbrains.auth.Session
+import dev.envpilot.jetbrains.auth.TokenStore
+import dev.envpilot.jetbrains.auth.adoptableToken
 import dev.envpilot.jetbrains.auth.needsRefresh
 import dev.envpilot.jetbrains.auth.toSession
 import dev.envpilot.jetbrains.auth.withRefresh
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Base64
@@ -60,6 +67,37 @@ class AuthSessionTest {
         assertTrue(needsRefresh(fresh, force = true))
         assertTrue(needsRefresh(stale, force = false))
     }
+
+    @Test
+    fun `a stored token newer than the cache is adopted instead of refreshed`() {
+        val cached = Session("user_1", "a@example.com", token(mapOf("exp" to System.currentTimeMillis() / 1000 - 10)), "r1", null)
+        val stored = cached.copy(accessToken = token(mapOf("exp" to System.currentTimeMillis() / 1000 + 600)), refreshToken = "r2")
+
+        assertEquals(stored.accessToken, adoptableToken(cached, stored))
+        assertNull(adoptableToken(cached, cached))
+    }
+
+    @Test
+    fun `getFreshToken adopts a newer stored token instead of refreshing`() =
+        runBlocking {
+            val cached = Session("user_1", "a@example.com", token(mapOf("exp" to System.currentTimeMillis() / 1000 - 10)), "r1", null)
+            val stored = cached.copy(accessToken = token(mapOf("exp" to System.currentTimeMillis() / 1000 + 600)), refreshToken = "r2")
+            var saves = 0
+            val service = AuthService(CoroutineScope(Dispatchers.Unconfined))
+            service.store =
+                object : TokenStore() {
+                    override fun load(userId: String?): Session = stored
+
+                    override fun save(session: Session) {
+                        saves++
+                    }
+                }
+            service.cached.set(cached)
+
+            assertEquals(stored.accessToken, service.getFreshToken())
+            assertEquals(stored, service.cached.get())
+            assertEquals(0, saves)
+        }
 
     @Test
     fun `only retryable WorkOS failures are transient`() {

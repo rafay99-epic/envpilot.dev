@@ -1,12 +1,12 @@
 package dev.envpilot.jetbrains
 
 import dev.envpilot.jetbrains.sync.PullService
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assume
 import org.junit.Test
 import java.nio.file.Files
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class PathSafetyTest {
     private fun tempDir(): java.nio.file.Path = Files.createTempDirectory("envpilot-path")
@@ -14,9 +14,8 @@ class PathSafetyTest {
     @Test
     fun `normal relative path resolves inside`() {
         val dir = tempDir()
-        val resolved = PullService.resolveWithin(dir, "sub/keystore.jks")
-        assertNotNull(resolved)
-        assertEquals(dir.toAbsolutePath().normalize().toString(), resolved!!.parent.parent.toString())
+        val resolved = assertNotNull(PullService.resolveWithin(dir, "sub/keystore.jks"))
+        assertEquals(dir.toAbsolutePath().normalize().toString(), resolved.parent.parent.toString())
     }
 
     @Test
@@ -42,8 +41,25 @@ class PathSafetyTest {
     @Test
     fun `backslash separators are normalized`() {
         val dir = tempDir()
-        val resolved = PullService.resolveWithin(dir, "a\\b.txt")
-        assertNotNull(resolved)
-        assertEquals(dir.toAbsolutePath().normalize().resolve("a/b.txt").toString(), resolved!!.toString())
+        val resolved = assertNotNull(PullService.resolveWithin(dir, "a\\b.txt"))
+        assertEquals(dir.toAbsolutePath().normalize().resolve("a/b.txt").toString(), resolved.toString())
+    }
+
+    @Test
+    fun `env file, repo metadata and hooks dir are rejected`() {
+        val dir = tempDir()
+        val root = dir.toAbsolutePath().normalize()
+        val blocked = listOf(root.resolve(".env.local"), root.resolve("githooks"))
+        assertNull(PullService.resolveWithin(dir, ".env.local", blocked))
+        assertNull(PullService.resolveWithin(dir, "githooks/pre-commit", blocked))
+        assertNull(PullService.resolveWithin(dir, ".git/hooks/pre-commit", blocked))
+        assertNull(PullService.resolveWithin(dir, "sub/.GIT/config", blocked))
+        assertNull(PullService.resolveWithin(dir, ".husky/pre-commit", blocked))
+        assertNull(PullService.resolveWithin(dir, ".idea/workspace.xml", blocked))
+        assertNull(PullService.resolveWithin(dir, "a/.VSCODE/settings.json", blocked))
+        assertNull(PullService.resolveWithin(dir, ".envpilot/state", blocked))
+        assertNull(PullService.resolveWithin(dir, "config/.env.production", blocked))
+        assertNull(PullService.resolveWithin(dir, "prod.env", blocked))
+        assertNotNull(PullService.resolveWithin(dir, "certs/.envrc.pem", blocked))
     }
 }

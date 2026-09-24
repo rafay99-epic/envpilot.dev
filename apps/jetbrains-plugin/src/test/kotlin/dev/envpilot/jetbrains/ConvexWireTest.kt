@@ -7,10 +7,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Wire-format fixtures pinned to the shapes convex-js puts on the WebSocket
- * (src/browser/sync/protocol.ts). If these break, real-time sync breaks.
- */
 class ConvexWireTest {
     @Test
     fun `connect message shape matches protocol`() {
@@ -116,6 +112,22 @@ class ConvexWireTest {
         assertEquals("Mutation", message.get("type").asString)
         assertEquals(7, message.get("requestId").asInt)
         assertEquals("p1", message.getAsJsonArray("args")[0].asJsonObject.get("id").asString)
+    }
+
+    @Test
+    fun `failed function responses prefer errorData`() {
+        val withObject =
+            ConvexWire.parseFunctionResponse(
+                """{"type":"ActionResponse","requestId":1,"success":false,"errorData":{"message":"Limit reached"}}""",
+            )
+        val withString =
+            ConvexWire.parseFunctionResponse(
+                """{"type":"MutationResponse","requestId":2,"success":false,"result":"Server Error","errorData":"Denied"}""",
+            )
+        val withoutData = ConvexWire.parseFunctionResponse("""{"type":"MutationResponse","requestId":3,"success":false,"result":"boom"}""")
+        assertEquals("Limit reached", withObject?.error)
+        assertEquals("Denied", withString?.error)
+        assertEquals("boom", withoutData?.error)
     }
 
     @Test

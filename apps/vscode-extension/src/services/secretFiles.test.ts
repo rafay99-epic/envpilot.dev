@@ -17,14 +17,6 @@ import {
 } from "./secretFiles";
 import type { ApiService, SecretFileRow } from "./api";
 
-/**
- * The guards a synced secret file must carry are registered through the
- * `onWritten` callback. The regression these tests exist for: registration
- * used to fire only for files this run actually WROTE, so every sync after
- * the first — and every window reload — left a decrypted secret in the
- * workspace with no clipboard guard and no edit protection.
- */
-
 let root: string;
 
 beforeEach(() => {
@@ -34,7 +26,6 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-/** sha256(salt || plaintext) in base64 — the server's digest construction. */
 async function digestOf(contents: Buffer, salt: string): Promise<string> {
   const { createHash } = await import("node:crypto");
   return createHash("sha256")
@@ -94,8 +85,6 @@ describe("guard registration", () => {
   });
 
   it("registers a file that is ALREADY in sync", async () => {
-    // The regression: a second sync writes nothing, and used to return before
-    // attaching any guard — leaving the secret copyable.
     const contents = Buffer.from("keystore");
     const salt = Buffer.from("0123456789abcdef").toString("base64");
     const file = row({ sha256: await digestOf(contents, salt) });
@@ -123,7 +112,6 @@ describe("guard registration", () => {
   });
 
   it("registers a locally-modified file it refused to overwrite", async () => {
-    // A conflicted file is still a secret sitting in the workspace.
     const file = row({ sha256: "does-not-match" });
     writeFileSync(join(root, "local.key"), "tampered");
     const modified = row({ path: "local.key", sha256: "does-not-match" });
@@ -151,7 +139,6 @@ describe("guard registration", () => {
       root,
       { onWritten: async (f) => void registered.push(f) }
     );
-    // 0444 would be world-readable — looser than what the file was pulled at.
     expect(registered[0].numericMode).toBe(0o400);
     expect(registered[0].numericMode).not.toBe(0o444);
   });
@@ -183,5 +170,25 @@ describe("guard registration", () => {
 
     expect(statSync(target).mode & 0o777).toBe(0o400);
     expect(readFileSync(target).toString()).toBe("keystore");
+  });
+});
+
+describe("path denylist", () => {
+  it("refuses stored paths inside git and editor directories", async () => {
+    const files = [
+      row({ path: ".husky/pre-commit" }),
+      row({ path: "x/.git/hooks/post-checkout" }),
+    ];
+    const result = await materialiseSecretFiles(
+      fakeApi(files, "#!/bin/sh\n"),
+      "p1",
+      "development",
+      root
+    );
+    expect(result.failed.map((f) => f.path)).toEqual([
+      ".husky/pre-commit",
+      "x/.git/hooks/post-checkout",
+    ]);
+    expect(() => statSync(join(root, ".husky"))).toThrow();
   });
 });

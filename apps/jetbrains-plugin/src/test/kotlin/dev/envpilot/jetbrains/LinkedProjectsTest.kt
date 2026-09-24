@@ -22,25 +22,27 @@ class LinkedProjectsTest {
     private fun service(vararg links: LinkedProject) = LinkedProjectsService().also { svc -> links.forEach { svc.add(it) } }
 
     @Test
-    fun `two projects sharing one directory get distinct target files`() {
+    fun `remove matches a link taken before normalization`() {
         val a = link("p1", "development")
-        val b = link("p2", "staging")
-        service(a, b).normalize("acct")
-        assertEquals(".env.local", a.targetFile)
-        assertEquals(".env.staging", b.targetFile)
-        assertTrue(a.includeSecretFiles)
-        assertFalse(b.includeSecretFiles)
+        val svc = service(a, link("p1", "staging"))
+        svc.normalize("acct")
+
+        assertNotEquals(a, svc.getState().links.first())
+        assertTrue(svc.remove(a))
+        assertFalse(svc.remove(a))
     }
 
     @Test
-    fun `remove matches a copy taken before normalization`() {
-        val a = link("p1", "development")
-        val svc = service(a, link("p2", "staging"))
-        val stale = a.copy()
-        svc.normalize("acct")
+    fun `a state handed to the serializer is never mutated by later writes`() {
+        val svc = service(link("p1", "development"))
+        val saved = svc.getState()
+        val before = saved.links.toList()
 
-        assertNotEquals(stale, a)
-        assertTrue(svc.remove(stale))
-        assertFalse(svc.remove(stale))
+        svc.add(link("p1", "staging"))
+        svc.normalize("acct")
+        svc.recordDevice(before.first(), "device_1")
+
+        assertEquals(before, saved.links)
+        assertEquals("device_1", svc.getState().links.first().deviceId)
     }
 }

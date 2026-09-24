@@ -3,12 +3,6 @@ package dev.envpilot.jetbrains.convex
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 
-/**
- * Convex WebSocket sync-protocol wire encoding (boundary).
- * Message shapes mirror convex-js src/browser/sync/protocol.ts exactly:
- * JSON objects over text frames; timestamps are base64 little-endian u64
- * which we never need to construct (only Connect omits it).
- */
 object ConvexWire {
     sealed interface ServerMessage {
         data object Ping : ServerMessage
@@ -52,11 +46,6 @@ object ConvexWire {
             ),
         )
 
-    /**
-     * Add/remove query subscriptions in one message. Args are a JSON array
-     * with a single object — the shape convex-js puts on the wire for
-     * single-argument queries.
-     */
     fun modifyQuerySetMessage(
         baseVersion: Int,
         newVersion: Int,
@@ -116,7 +105,6 @@ object ConvexWire {
 
     data class ActionResponse(val requestId: Int, val success: Boolean, val result: String?, val error: String?)
 
-    /** Parse action/mutation responses; null for any other message type. */
     fun parseFunctionResponse(text: String): ActionResponse? =
         try {
             val obj = JsonParser.parseString(text).asJsonObject
@@ -125,7 +113,7 @@ object ConvexWire {
             } else if (obj.get("success").asBoolean) {
                 ActionResponse(obj.get("requestId").asInt, true, obj.get("result")?.toString() ?: "null", null)
             } else {
-                ActionResponse(obj.get("requestId").asInt, false, null, obj.str("result") ?: "action failed")
+                ActionResponse(obj.get("requestId").asInt, false, null, obj.errorData() ?: obj.str("result") ?: "action failed")
             }
         } catch (_: Exception) {
             null
@@ -145,11 +133,6 @@ object ConvexWire {
             ServerMessage.Other
         }
 
-    /**
-     * Raw JSON value of a QueryUpdated modification, or null when the
-     * transition has none for [queryId]. One-shot queries await this; live
-     * subscribers ignore it.
-     */
     fun queryValueFromTransition(
         text: String,
         queryId: Int,
@@ -188,7 +171,7 @@ object ConvexWire {
                 "QueryUpdated" -> m.get("queryId")?.asInt?.let { updated.add(it) }
                 "QueryFailed" ->
                     m.get("queryId")?.asInt?.let {
-                        failed[it] = m.str("errorData") ?: m.str("errorMessage") ?: "unknown error"
+                        failed[it] = m.errorData() ?: m.str("errorMessage") ?: "unknown error"
                     }
             }
         }
@@ -198,4 +181,13 @@ object ConvexWire {
     private val gson = com.google.gson.GsonBuilder().serializeNulls().create()
 
     private fun JsonObject.str(key: String): String? = get(key)?.takeIf { it.isJsonPrimitive }?.asString
+
+    private fun JsonObject.errorData(): String? {
+        val data = get("errorData") ?: return null
+        return when {
+            data.isJsonPrimitive -> data.asString
+            data.isJsonObject -> data.asJsonObject.str("message")
+            else -> null
+        }
+    }
 }

@@ -1,9 +1,3 @@
-/**
- * Sentry implementation, bundled as a separate chunk (dist/sentry.js).
- * Loaded lazily by ./sentry.ts so @sentry/node (the bulk of the extension
- * bundle) never blocks activation. Do not import this module directly —
- * go through ./sentry.ts.
- */
 import * as path from "path";
 import * as vscode from "vscode";
 import * as Sentry from "@sentry/node";
@@ -13,10 +7,14 @@ declare const __EXTENSION_VERSION__: string;
 
 let initialized = false;
 
-// dist/sentry.js -> parent is the installed extension folder.
 const EXTENSION_ROOT = path.dirname(__dirname);
 
-// The extension host is shared; drop unhandled errors that are not ours.
+export function scrubHomePath(filename: string): string {
+  return filename
+    .replace(/\/(?:Users|home)\/[^/]+/g, "/~")
+    .replace(/C:\\Users\\[^\\]+/gi, "C:\\~");
+}
+
 function isForeignUnhandled(event: Sentry.ErrorEvent): boolean {
   const values = event.exception?.values ?? [];
   const unhandled = values.some((exc) => exc.mechanism?.handled === false);
@@ -29,9 +27,6 @@ function isForeignUnhandled(event: Sentry.ErrorEvent): boolean {
 }
 
 export function initSentry(): void {
-  // Respect VS Code's global telemetry opt-out — this is a hard requirement
-  // for marketplace listings. When the user has telemetry disabled we must
-  // never initialize Sentry (or send anything to it).
   if (!vscode.env.isTelemetryEnabled) return;
 
   const dsn =
@@ -48,20 +43,10 @@ export function initSentry(): void {
         ? __EXTENSION_VERSION__
         : "0.0.0",
 
-    // All EnvPilot surfaces (web, CLI, extension) share one Sentry project —
-    // this tag is how events are told apart.
     initialScope: { tags: { surface: "extension" } },
 
-    // Free tier: disable performance monitoring
     tracesSampleRate: 0,
 
-    // VS Code lifecycle noise, not actionable application errors:
-    // - CancellationError ("Canceled") fires whenever a pending operation is
-    //   cancelled, e.g. a window reload or the extension host shutting down.
-    // - "Channel has been closed" fires when an IPC channel to the extension
-    //   host is torn down mid-request during shutdown/reload.
-    // Anchored regex so we only drop the exact VS Code message, not any
-    // error that happens to mention "Canceled" as part of a longer message.
     ignoreErrors: [
       /^Canceled$/,
       "Channel has been closed",
@@ -70,30 +55,22 @@ export function initSentry(): void {
       "Client network socket disconnected",
       /\b(ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN)\b/,
       "You are not signed in.",
+      "TransientAuthError",
     ],
 
     beforeSend(event) {
       if (isForeignUnhandled(event)) return null;
-      // Strip home directory paths from stack frames for privacy
       if (event.exception?.values) {
         for (const exc of event.exception.values) {
           if (exc.stacktrace?.frames) {
             for (const frame of exc.stacktrace.frames) {
               if (frame.filename) {
-                frame.filename = frame.filename.replace(
-                  /\/Users\/[^/]+/g,
-                  "/~"
-                );
-                frame.filename = frame.filename.replace(
-                  /C:\\Users\\[^\\]+/g,
-                  "C:\\~"
-                );
+                frame.filename = scrubHomePath(frame.filename);
               }
             }
           }
         }
       }
-      // Never send request bodies (may contain env variable values)
       if (event.request?.data) {
         event.request.data = "[REDACTED]";
       }
@@ -111,9 +88,9 @@ export function captureError(
   Sentry.captureException(error, { extra: context });
 }
 
-export function setSentryUser(userId: string, email?: string): void {
+export function setSentryUser(userId: string): void {
   if (!initialized) return;
-  Sentry.setUser({ id: userId, email });
+  Sentry.setUser({ id: userId });
 }
 
 export function clearSentryUser(): void {
@@ -123,9 +100,6 @@ export function clearSentryUser(): void {
 
 export async function closeSentry(): Promise<void> {
   if (!initialized) return;
-  // Reset the guard so a later initSentry() call (e.g. the user re-enables
-  // telemetry mid-session) actually re-initializes the client instead of
-  // silently no-oping forever.
   initialized = false;
   await Sentry.close(2000);
 }

@@ -52,7 +52,7 @@ describe("unsyncState", () => {
 
       const result = await reapDeadSessionMarkers(
         sessionsDir,
-        (pid) => pid === 222 // only 222 is "alive"
+        (pid) => pid === 222
       );
 
       expect(result.crashed).toBe(true);
@@ -127,6 +127,14 @@ describe("unsyncState", () => {
       ...overrides,
     });
 
+    const collect = async (): Promise<UnsyncReport[]> => {
+      const sent: UnsyncReport[] = [];
+      await drainUnsyncReports(async (r) => {
+        sent.push(...r);
+      }, reportsPath);
+      return sent;
+    };
+
     it("append + drain round-trips and empties the queue", async () => {
       await appendUnsyncReport(report(), reportsPath);
       await appendUnsyncReport(
@@ -134,16 +142,35 @@ describe("unsyncState", () => {
         reportsPath
       );
 
-      const drained = await drainUnsyncReports(reportsPath);
+      const drained = await collect();
       expect(drained).toHaveLength(2);
       expect(drained[0].projectId).toBe("proj_1");
       expect(drained[1].trigger).toBe("crash-sweep");
 
-      expect(await drainUnsyncReports(reportsPath)).toEqual([]);
+      expect(await collect()).toEqual([]);
     });
 
-    it("drain returns [] for a missing file", async () => {
-      expect(await drainUnsyncReports(reportsPath)).toEqual([]);
+    it("drain keeps the queue when send fails", async () => {
+      await appendUnsyncReport(report(), reportsPath);
+      await expect(
+        drainUnsyncReports(
+          () => Promise.reject(new Error("offline")),
+          reportsPath
+        )
+      ).rejects.toThrow("offline");
+      expect(await collect()).toHaveLength(1);
+    });
+
+    it("drain keeps a report appended while the send is in flight", async () => {
+      await appendUnsyncReport(report(), reportsPath);
+      await drainUnsyncReports(async () => {
+        await appendUnsyncReport(report({ projectId: "late" }), reportsPath);
+      }, reportsPath);
+      expect((await collect()).map((r) => r.projectId)).toEqual(["late"]);
+    });
+
+    it("drain sends nothing for a missing file", async () => {
+      expect(await collect()).toEqual([]);
     });
 
     it("drain filters malformed entries and tolerates corrupt JSON", async () => {
@@ -151,10 +178,10 @@ describe("unsyncState", () => {
         reportsPath,
         JSON.stringify([report(), { junk: true }, "nope"])
       );
-      expect(await drainUnsyncReports(reportsPath)).toHaveLength(1);
+      expect(await collect()).toHaveLength(1);
 
       await fs.writeFile(reportsPath, "corrupt{{{");
-      expect(await drainUnsyncReports(reportsPath)).toEqual([]);
+      expect(await collect()).toEqual([]);
     });
   });
 });

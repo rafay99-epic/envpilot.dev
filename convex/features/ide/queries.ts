@@ -1,41 +1,56 @@
 import { query } from "../../_generated/server";
 import { v } from "convex/values";
 import { requireAuthedUser } from "../../lib/identity";
-import { getActiveMembership } from "../../lib/authz";
-import type { Id } from "../../_generated/dataModel";
-import { resolveEffectiveVariables } from "../variables/resolve";
+import { resolveProjectAccessContext } from "../variables/helpers";
+import {
+  MAX_WORKSPACES_PER_PROJECT,
+  resolveEffectiveVariables,
+} from "../variables/resolve";
 
-/**
- * Lightweight change signal for IDE real-time sync: the max updatedAt across
- * a project's active variables and files. Authenticated + membership-checked;
- * contains no secrets. Clients subscribe over the Convex WebSocket and pull
- * via their normal data plane when this changes.
- */
 export const projectVersion = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
     const user = await requireAuthedUser(ctx);
-
-    const project = await ctx.db.get(args.projectId);
-    if (!project) return null;
-
-    const membership = await getActiveMembership(
+    const resolved = await resolveProjectAccessContext(
       ctx,
-      project.organizationId as Id<"organizations">,
+      args.projectId,
       user._id
     );
-    if (!membership) return null;
+    if (!resolved) return null;
+    const { access } = resolved;
+    if (
+      !access.isOwner &&
+      !access.assigned &&
+      access.grantByVariable.size === 0
+    ) {
+      return null;
+    }
 
-    // Link and unlink touch the project row, so membership changes move
-    // the version even when every shared row is older than the project.
-    let latest = project.updatedAt;
-    // Resolved, not own rows only: an edit to a workspace variable has to
-    // move every linked project's version or the IDE never re-pulls it.
+    let latest = resolved.project.updatedAt;
     for (const row of await resolveEffectiveVariables(ctx, {
       projectId: args.projectId,
     })) {
       latest = Math.max(latest, row.updatedAt);
     }
+
+    const workspaces = await ctx.db
+      .query("workspaceProjects")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .take(MAX_WORKSPACES_PER_PROJECT);
+    for (const projectId of [
+      args.projectId,
+      ...workspaces.map((w) => w.workspaceId),
+    ]) {
+      const lastDeleted = await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project_deleted", (q) =>
+          q.eq("projectId", projectId).gt("deletedAt", 0)
+        )
+        .order("desc")
+        .first();
+      latest = Math.max(latest, lastDeleted?.updatedAt ?? 0);
+    }
+
     for (const row of await ctx.db
       .query("projectFiles")
       .withIndex("by_project_deleted", (q) =>
@@ -44,6 +59,13 @@ export const projectVersion = query({
       .collect()) {
       latest = Math.max(latest, row.updatedAt);
     }
-    return latest;
+    const lastDeletedFile = await ctx.db
+      .query("projectFiles")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).gt("deletedAt", 0)
+      )
+      .order("desc")
+      .first();
+    return Math.max(latest, lastDeletedFile?.updatedAt ?? 0);
   },
 });

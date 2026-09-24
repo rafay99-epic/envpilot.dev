@@ -1,5 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
     id("java")
@@ -12,8 +13,6 @@ plugins {
 group = "dev.envpilot"
 version = providers.gradleProperty("pluginVersion").get()
 
-// Build-time constants, mirroring how the VS Code extension embeds
-// __WORKOS_CLIENT_ID__ / __DEFAULT_SERVER_URL__ at bundle time.
 val workosClientId: String = System.getenv("WORKOS_CLIENT_ID") ?: ""
 val defaultServerUrl: String =
     System.getenv("ENVPILOT_SERVER_URL") ?: "https://www.envpilot.dev"
@@ -32,26 +31,33 @@ val generateBuildConfig =
         inputs.property("convexUrl", convexUrl)
         outputs.file(outFile)
         doLast {
+            fun raw(value: String): String {
+                require("\"\"\"" !in value) { "Build values must not contain triple quotes" }
+                return "\"\"\"" + value.replace("$", "\${'$'}") + "\"\"\""
+            }
+            val fields =
+                mapOf(
+                    "PLUGIN_VERSION" to version.toString(),
+                    "WORKOS_CLIENT_ID" to workosClientId,
+                    "DEFAULT_SERVER_URL" to defaultServerUrl,
+                    "SENTRY_DSN" to sentryDsn,
+                    "CONVEX_URL" to convexUrl,
+                )
             outFile.parentFile.mkdirs()
             outFile.writeText(
-                """
-                package dev.envpilot.jetbrains
-
-                object BuildConfig {
-                    val PLUGIN_VERSION = "${version.toString().replace("\"", "\\\"")}"
-                    val WORKOS_CLIENT_ID = "${workosClientId.replace("\"", "\\\"")}"
-                    val DEFAULT_SERVER_URL = "${defaultServerUrl.replace("\"", "\\\"")}"
-                    val SENTRY_DSN = "${sentryDsn.replace("\"", "\\\"")}"
-                    val CONVEX_URL = "${convexUrl.replace("\"", "\\\"")}"
-                }
-                """.trimIndent() + "\n",
+                "package dev.envpilot.jetbrains\n\nobject BuildConfig {\n" +
+                    fields.entries.joinToString("") { (name, value) -> "    val $name = ${raw(value)}\n" } +
+                    "}\n",
             )
         }
     }
 
 kotlin {
     jvmToolchain(21)
-    compilerOptions.jvmDefault = JvmDefaultMode.NO_COMPATIBILITY
+    compilerOptions {
+        jvmDefault = JvmDefaultMode.NO_COMPATIBILITY
+        apiVersion = KotlinVersion.KOTLIN_2_1
+    }
 }
 
 sourceSets.main {
@@ -67,10 +73,6 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        // Build target only — runtime compatibility comes from sinceBuild in
-        // plugin.xml (251.*), which keeps Android Studio builds on 2025.1+
-        // platform bases in range. Community carries all platform APIs the
-        // plugin uses; no need for the much larger Ultimate download.
         intellijIdeaCommunity("2025.1")
     }
     implementation("com.google.code.gson:gson:2.11.0")
@@ -84,7 +86,6 @@ intellijPlatform {
         id = "dev.envpilot"
         name = "Envpilot"
         version = project.version.toString()
-        // Marketplace "What's New" per release; edit change-notes.html with each bump.
         changeNotes = layout.projectDirectory.file("change-notes.html").asFile.readText()
         ideaVersion {
             sinceBuild = "251"
@@ -116,19 +117,15 @@ tasks {
         dependsOn(generateBuildConfig)
     }
 
-    // Not needed until publishing; saves minutes on every local build.
     buildSearchableOptions {
         enabled = false
     }
 }
 
-// ktlint scans the generated source dir too — declare the ordering.
 tasks.named("runKtlintCheckOverMainSourceSet") { dependsOn(generateBuildConfig) }
 tasks.named("runKtlintFormatOverMainSourceSet") { dependsOn(generateBuildConfig) }
 tasks.named("runKtlintCheckOverKotlinScripts") { dependsOn(generateBuildConfig) }
 
-// Quality gate: detekt (lint) + ktlint (format checks) run as part of
-// `build`/`check`, so CI's existing Gradle job enforces them.
 detekt {
     config.setFrom(files("detekt.yml"))
     buildUponDefaultConfig = true

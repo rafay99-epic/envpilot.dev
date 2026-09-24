@@ -16,7 +16,7 @@ class EnvpilotSettings : PersistentStateComponent<EnvpilotSettings.State> {
         var autocompleteEnabled: Boolean = true
         var hoverEnabled: Boolean = true
         var commitGuardEnabled: Boolean = false
-        var commitGuardAutoInstall: Boolean = false
+        var commitGuardAutoInstall: Boolean = true
         var autoUnsyncOnClose: Boolean = true
         var conflictResolution: String = "merge"
         var idlePauseMinutes: Int = 0
@@ -31,7 +31,6 @@ class EnvpilotSettings : PersistentStateComponent<EnvpilotSettings.State> {
         state = s
     }
 
-    /** Effective server URL: user override wins over the build-baked default. */
     fun effectiveServerUrl(): String = state.serverUrl.trimEnd('/').ifBlank { dev.envpilot.jetbrains.BuildConfig.DEFAULT_SERVER_URL }
 
     companion object {

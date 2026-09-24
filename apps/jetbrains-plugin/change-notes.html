@@ -1,3 +1,29 @@
+<p><b>0.1.9</b></p>
+<ul>
+  <li>
+    File drift detection runs again; it was registered under an extension point
+    the platform does not have. Cloaking, the copy guard and hover work on
+    Windows.
+  </li>
+  <li>
+    "Delete unchanged pulled files when the IDE closes" is honored, and plugin
+    updates no longer delete synced files. Link state moved out of .idea into
+    the workspace file and existing links are migrated automatically.
+  </li>
+  <li>
+    Variable requests no longer fail on submit. Focus no longer triggers a full
+    pull when auto-sync is off.
+  </li>
+  <li>
+    The Convex connection sends in order, queues calls while offline,
+    re-authenticates before the token expires and shuts down on unload. Sign-in
+    polling can be cancelled and the device code is shown.
+  </li>
+  <li>
+    Secret file paths under .git, .husky, .idea, .vscode or named like an env
+    file are rejected.
+  </li>
+</ul>
 <p><b>0.1.8</b></p>
 <ul>
   <li>
@@ -7,6 +33,13 @@
   <li>
     Offline, timeout and expired-session failures stay in idea.log instead of
     being reported as errors.
+  </li>
+</ul>
+<p><b>0.1.7</b></p>
+<ul>
+  <li>
+    Expected failures (offline, timeouts, expired sessions) are no longer
+    reported to error tracking.
   </li>
 </ul>
 <p><b>0.1.6</b></p>

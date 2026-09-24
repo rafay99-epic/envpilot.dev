@@ -14,7 +14,7 @@ class EnvFilesTest {
     }
 
     @Test
-    fun `merge into empty produces sorted key value lines`() {
+    fun `merge into empty keeps pulled key order`() {
         val out = EnvFiles.merge(null, linkedMapOf("B" to "2", "A" to "1"))
         assertEquals("B=2\nA=1\n", out)
     }
@@ -31,23 +31,10 @@ class EnvFilesTest {
     }
 
     @Test
-    fun `parse skips comments blanks and malformed lines`() {
-        val entries =
-            EnvFiles.parse(
-                """
-                # comment
-                A=1
-
-                not a pair
-                B=2
-                123bad=3
-                export C=4
-                """.trimIndent(),
-            )
-        assertEquals(
-            listOf(EnvFiles.Entry("A", "1"), EnvFiles.Entry("B", "2"), EnvFiles.Entry("C", "4")),
-            entries,
-        )
+    fun `merge rewrites only valid key lines`() {
+        val existing = "# comment\nA=1\nnot a pair\n123bad=3\nexport C=4\n"
+        val out = EnvFiles.merge(existing, mapOf("A" to "9", "C" to "8"))
+        assertEquals("# comment\nA=9\nnot a pair\n123bad=3\nexport C=8\n", out)
     }
 
     @Test
@@ -63,29 +50,9 @@ class EnvFilesTest {
     }
 
     @Test
-    fun `quote and parse round trip hostile values`() {
-        val values =
-            mapOf(
-                "MULTI" to "line1\nline2",
-                "HASH" to "pa#ss",
-                "QUOTED" to "say \"hi\"",
-                "BACKSLASH" to "c:\\tmp\\x",
-                "SPACED" to "  padded  ",
-                "DOLLAR" to "\$HOME`x`",
-                "CR" to "a\rb",
-            )
-        assertEquals(values.entries.map { EnvFiles.Entry(it.key, it.value) }, EnvFiles.parse(EnvFiles.merge(null, values)))
-    }
-
-    @Test
     fun `merge in place quotes values and keeps the export prefix`() {
         val out = EnvFiles.merge("export A=old\nB=old\n", mapOf("A" to "a b", "B" to "plain"))
         assertEquals(listOf("export A=\"a b\"", "B=plain", ""), out.lines())
-    }
-
-    @Test
-    fun `single quoted values are read literally`() {
-        assertEquals(listOf(EnvFiles.Entry("A", "a\\nb")), EnvFiles.parse("A='a\\nb'"))
     }
 
     @Test

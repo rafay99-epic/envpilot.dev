@@ -3,67 +3,8 @@ import * as vscode from "vscode";
 let channel: vscode.OutputChannel | null = null;
 
 function getChannel(): vscode.OutputChannel {
-  if (!channel) {
-    channel = vscode.window.createOutputChannel("Envpilot");
-  }
+  channel ??= vscode.window.createOutputChannel("Envpilot");
   return channel;
-}
-
-function timestamp(): string {
-  return new Date().toISOString().slice(11, 23);
-}
-
-export function log(message: string): void {
-  getChannel().appendLine(`[${timestamp()}] ${message}`);
-}
-
-export function warn(message: string): void {
-  getChannel().appendLine(`[${timestamp()}] WARN: ${message}`);
-}
-
-export function error(message: string): void {
-  getChannel().appendLine(`[${timestamp()}] ERROR: ${message}`);
-}
-
-/**
- * Structured log entry — writes the event + key/value fields on one line.
- * Example: logEvent("poll", { attempt: 3, status: 404, duration_ms: 212 })
- *   → [12:34:56.789] poll attempt=3 status=404 duration_ms=212
- *
- * Use this for auth flow observability instead of raw `log()` so field
- * names stay consistent and lines are greppable.
- */
-export function logEvent(
-  event: string,
-  fields: Record<string, unknown> = {}
-): void {
-  const parts = Object.entries(fields).map(
-    ([k, v]) => `${k}=${formatValue(v)}`
-  );
-  const line = parts.length ? `${event} ${parts.join(" ")}` : event;
-  getChannel().appendLine(`[${timestamp()}] ${line}`);
-}
-
-export function warnEvent(
-  event: string,
-  fields: Record<string, unknown> = {}
-): void {
-  const parts = Object.entries(fields).map(
-    ([k, v]) => `${k}=${formatValue(v)}`
-  );
-  const line = parts.length ? `${event} ${parts.join(" ")}` : event;
-  getChannel().appendLine(`[${timestamp()}] WARN: ${line}`);
-}
-
-export function errorEvent(
-  event: string,
-  fields: Record<string, unknown> = {}
-): void {
-  const parts = Object.entries(fields).map(
-    ([k, v]) => `${k}=${formatValue(v)}`
-  );
-  const line = parts.length ? `${event} ${parts.join(" ")}` : event;
-  getChannel().appendLine(`[${timestamp()}] ERROR: ${line}`);
 }
 
 function formatValue(v: unknown): string {
@@ -73,6 +14,36 @@ function formatValue(v: unknown): string {
   }
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
+}
+
+function write(
+  prefix: string,
+  event: string,
+  fields: Record<string, unknown>
+): void {
+  const parts = Object.entries(fields).map(
+    ([k, v]) => `${k}=${formatValue(v)}`
+  );
+  const time = new Date().toISOString().slice(11, 23);
+  getChannel().appendLine(`[${time}] ${prefix}${[event, ...parts].join(" ")}`);
+}
+
+export function log(event: string, fields: Record<string, unknown> = {}): void {
+  write("", event, fields);
+}
+
+export function warn(
+  event: string,
+  fields: Record<string, unknown> = {}
+): void {
+  write("WARN: ", event, fields);
+}
+
+export function error(
+  event: string,
+  fields: Record<string, unknown> = {}
+): void {
+  write("ERROR: ", event, fields);
 }
 
 export function show(): void {

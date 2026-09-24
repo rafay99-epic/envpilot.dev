@@ -28,30 +28,8 @@ import {
   validateVariableCreateFields,
 } from "./helpers";
 
-/**
- * Environment Variable Queries
- */
-
-// ==========================================
-// QUERIES
-// ==========================================
-
-/**
- * Read window shared by the take()-based list queries below. Reading
- * LIST_READ_CAP + 1 rows is how a capped read is detected at all: if the extra
- * row comes back, the window was too small and the tail is missing.
- */
 const LIST_READ_CAP = 500;
 
-/**
- * Every active variable in a project (optionally narrowed to one environment).
- *
- * Backs the push/import diff in values.ts, so a short read is not a cosmetic
- * bug: a missing key looks like "not created yet" and the write path either
- * duplicates it or, in replace mode, leaves it behind. Same refuse-partial
- * contract as features/api/reads.ts. A project past the window fails loudly
- * rather than handing back a set that looks complete.
- */
 export const listByProject = query({
   args: {
     projectId: v.id("projects"),
@@ -70,8 +48,6 @@ export const listByProject = query({
     }
     const limit = args.limit ?? LIST_READ_CAP;
 
-    // Own rows only: push and import diff against this list, and a shared
-    // row must never be deleted or rewritten from a member project.
     const rows = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_deleted", (q) =>
@@ -89,24 +65,6 @@ export const listByProject = query({
   },
 });
 
-/**
- * Access-aware org-wide variable listing for the global Variables page.
- *
- * Enumerates only the projects the caller can see (owner → all; everyone
- * else → assigned projects), applies environment scope for developers, and
- * returns vaultRef ONLY for variables the caller can actually access.
- * Variables the caller has no access to are omitted entirely — the page
- * shows keys/metadata only for what they may touch.
- *
- * Row shape is the variable's fields plus projectName/projectSlug and a
- * `hasAccess`/`permission` pair, so the page's filtering/search keeps
- * working. vaultRef is present only when hasAccess.
- *
- * (This used to have an org-wide, access-unfiltered sibling —
- * `listByOrganization` — that duplicated this query without the access
- * filtering or vaultRef trimming. It had no live callers and was removed as
- * dead code; this query has always been the correct one to use.)
- */
 export const listOrgVariablesWithAccess = query({
   args: {
     organizationId: v.id("organizations"),
@@ -114,8 +72,6 @@ export const listOrgVariablesWithAccess = query({
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    // Resolve the caller's org role — non-members (and suspended members) get
-    // nothing.
     const membership = await getActiveMembership(
       ctx,
       args.organizationId,
@@ -127,7 +83,6 @@ export const listOrgVariablesWithAccess = query({
     const profile = await getRoleProfile(ctx, orgRole);
     const isOwner = bypassesAssignment(profile);
 
-    // Determine accessible projects and (for scoped roles) their env scope.
     const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
@@ -136,7 +91,6 @@ export const listOrgVariablesWithAccess = query({
       .collect();
     const liveProjects = allProjects.filter((p) => p.deletedAt === undefined);
 
-    // Env scope per assigned project (only constrains developers).
     const scopeByProject = new Map<string, string[] | undefined>();
     const assignedProjectIds = new Set<string>();
     if (!isOwner) {
@@ -154,14 +108,10 @@ export const listOrgVariablesWithAccess = query({
       ? liveProjects
       : liveProjects.filter((p) => assignedProjectIds.has(p._id as string));
 
-    // Owners and assigned PMs/TLs have blanket write; developers depend on
-    // per-variable grants (resolved below).
     const roleWrite =
       isOwner || hasCapability(profile, "project.variables.update");
     const roleRead = hasCapability(profile, "access.blanket_read");
 
-    // Prefetch the caller's active grants ONCE (only developers consult them,
-    // but a single indexed query is far cheaper than one per variable).
     const grantByVariable = buildActiveGrantMap(
       await ctx.db
         .query("variablePermissions")
@@ -196,7 +146,6 @@ export const listOrgVariablesWithAccess = query({
         )
         .take(perProjectLimit);
 
-      // Scoped developers never receive out-of-scope variables at all.
       const variables = allVariables.filter(
         (variable) =>
           variable.deletedAt === undefined &&
@@ -208,10 +157,8 @@ export const listOrgVariablesWithAccess = query({
         if (roleWrite) {
           access = "write";
         } else if (roleRead) {
-          // Auditor class — blanket read, no grants involved
           access = "read";
         } else {
-          // Grant-fallback roles — resolve from the prefetched map
           const grant = grantByVariable.get(variable._id as string) ?? null;
           if (grant) {
             access =
@@ -224,8 +171,6 @@ export const listOrgVariablesWithAccess = query({
         }
 
         const hasAccess = access !== null;
-        // Developers only ever see variables they can access; owners/PMs/TLs
-        // see everything in their accessible projects (with write access).
         if (!hasAccess) continue;
 
         const { vaultRef, ...metadata } = variable;
@@ -244,25 +189,6 @@ export const listOrgVariablesWithAccess = query({
   },
 });
 
-/**
- * Cross-project, cursor-paginated variant of listOrgVariablesWithAccess for the
- * global variables page. Paginates variables across ALL of a caller's accessible
- * projects using a COMPOSITE cursor, without any schema change (no org index on
- * environmentVariables) and without depending on any data migration.
- *
- * Access resolution mirrors listOrgVariablesWithAccess (owner → all live org
- * projects; else assigned projects via projectMembers; developer env-scope;
- * per-variable grant via the prefetched by_user_active map). Non-accessible
- * variables are skipped entirely, exactly like the non-paginated sibling.
- *
- * COMPOSITE CURSOR FORMAT: JSON.stringify({ pi, ic }) where
- *   - pi = index into the deterministically ordered accessibleProjects list
- *   - ic = the inner per-project Convex cursor (string) or null to start a project
- * Empty string ("") means the stream is exhausted (isDone). Because pi indexes a
- * snapshot-ordered project list (stable sort by _id), adding/removing projects
- * between calls can shift the index — the same limitation as any snapshot
- * pagination; it is accepted here rather than encoding ids in the cursor.
- */
 export const listOrgVariablesWithAccessPaginated = query({
   args: {
     organizationId: v.id("organizations"),
@@ -272,8 +198,6 @@ export const listOrgVariablesWithAccessPaginated = query({
     const actor = await requireAuthedUser(ctx);
     const empty = { page: [], isDone: true, continueCursor: "" };
 
-    // Resolve the caller's org role — non-members (and suspended members) get
-    // nothing.
     const membership = await getActiveMembership(
       ctx,
       args.organizationId,
@@ -285,7 +209,6 @@ export const listOrgVariablesWithAccessPaginated = query({
     const profile = await getRoleProfile(ctx, orgRole);
     const isOwner = bypassesAssignment(profile);
 
-    // Determine accessible projects and (for scoped roles) their env scope.
     const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
@@ -294,7 +217,6 @@ export const listOrgVariablesWithAccessPaginated = query({
       .collect();
     const liveProjects = allProjects.filter((p) => p.deletedAt === undefined);
 
-    // Env scope per assigned project (only constrains developers).
     const scopeByProject = new Map<string, string[] | undefined>();
     const assignedProjectIds = new Set<string>();
     if (!isOwner) {
@@ -308,8 +230,6 @@ export const listOrgVariablesWithAccessPaginated = query({
       }
     }
 
-    // Deterministic, stable order so the cursor's pi points at the same project
-    // on every call: sort by _id string.
     const accessibleProjects = (
       isOwner
         ? liveProjects
@@ -322,8 +242,6 @@ export const listOrgVariablesWithAccessPaginated = query({
         return ai < bi ? -1 : ai > bi ? 1 : 0;
       });
 
-    // For a non-owner, every accessible project is an assigned project (the list
-    // above is filtered to assignedProjectIds). Owners are never "assigned".
     const assigned = !isOwner;
     const roleAccess =
       isOwner ||
@@ -334,7 +252,6 @@ export const listOrgVariablesWithAccessPaginated = query({
       (assigned && hasCapability(profile, "project.permissions.manage"));
     const projectRole = profileToLegacyProjectRole(profile, assigned);
 
-    // Prefetch the caller's active grants ONCE (only developers consult them).
     const grantByVariable = buildActiveGrantMap(
       await ctx.db
         .query("variablePermissions")
@@ -359,8 +276,6 @@ export const listOrgVariablesWithAccessPaginated = query({
     const numItems = args.paginationOpts.numItems;
     const page: Row[] = [];
 
-    // Parse the incoming composite cursor. Defensive: any malformed cursor or
-    // out-of-range pi is treated as an exhausted stream.
     let pi = 0;
     let ic: string | null = null;
     const rawCursor = args.paginationOpts.cursor;
@@ -387,17 +302,10 @@ export const listOrgVariablesWithAccessPaginated = query({
       }
     }
 
-    // Convex allows only ONE `.paginate()` per query execution, so we paginate
-    // exactly one project per call. When the current project is exhausted the
-    // returned cursor points at the NEXT project (isDone stays false), and
-    // usePaginatedQuery calls again — walking project by project. Pages may be
-    // smaller than numItems (or empty) after access filtering; that is expected
-    // and the cursor always advances, so there is no empty-page stall.
     let isDone = false;
     let continueCursor = "";
 
     if (pi >= accessibleProjects.length) {
-      // Cursor already past the last project — nothing left.
       isDone = true;
     } else {
       const project = accessibleProjects[pi];
@@ -415,13 +323,10 @@ export const listOrgVariablesWithAccessPaginated = query({
         .paginate({ numItems, cursor: ic });
 
       for (const variable of inner.page) {
-        // Scoped developers never receive out-of-scope variables at all.
         if (variable.deletedAt !== undefined) continue;
         if (!isEnvironmentScopeAllowed(environmentScope, variable.environments))
           continue;
 
-        // Mirrors listOrgVariablesWithAccess: owner/PM/TL → write; developers
-        // per grant; unassigned grant holders capped at read.
         const grant = grantByVariable.get(variable._id as string) ?? null;
         let access: "write" | "read" | null = null;
         if (roleAccess) {
@@ -437,14 +342,12 @@ export const listOrgVariablesWithAccessPaginated = query({
                 : "read";
         }
 
-        // Not accessible → skip entirely (identical to the non-paginated list).
         if (access === null) continue;
 
         const effectivePermission = canManagePermissions ? "admin" : access;
         const { vaultRef, ...metadata } = variable;
         page.push({
           ...metadata,
-          // Only accessible rows reach here, so the vault ref is always kept.
           vaultRef,
           hasAccess: true,
           permission: effectivePermission,
@@ -458,12 +361,10 @@ export const listOrgVariablesWithAccessPaginated = query({
       }
 
       if (inner.isDone) {
-        // Current project exhausted — resume at the next project next call.
         const nextPi = pi + 1;
         isDone = nextPi >= accessibleProjects.length;
         continueCursor = isDone ? "" : JSON.stringify({ pi: nextPi, ic: null });
       } else {
-        // More variables remain in this project — resume from its inner cursor.
         continueCursor = JSON.stringify({ pi, ic: inner.continueCursor });
       }
     }
@@ -488,16 +389,11 @@ export const getVersionHistory = query({
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    // Check if version history is enabled for this org
     const variable = await ctx.db.get(args.variableId);
     if (!variable) return [];
     const project = await ctx.db.get(variable.projectId);
     if (!project) return [];
 
-    // Access control: version rows carry per-version vaultRefs, so a caller
-    // must have effective access to the parent variable (owner / assigned
-    // PM/TL / developer with a grant, env-scope respected). Never leak
-    // history for variables outside the caller's access.
     const access = await getVariableAccess(ctx, actor._id, variable);
     if (access === null) {
       throw new Error("No access to this variable");
@@ -532,17 +428,6 @@ export const getVersionHistory = query({
   },
 });
 
-/**
- * List variables with unified-role and per-variable access information
- *
- * Access rules (unified model — see convex/authz.ts):
- * - Owners: write access to every variable
- * - Project managers / team leads assigned to the project: write access
- * - Developers assigned to the project: value access via per-variable
- *   grants; they still see metadata (no vault refs) for ungranted variables
- * - Unassigned org members: read-only on variables explicitly shared with
- *   them via an active grant (per-variable viewer sharing)
- */
 async function listWithAccessCore(
   ctx: QueryCtx,
   args: { projectId: Id<"projects">; userId: Id<"users">; limit?: number }
@@ -560,21 +445,8 @@ async function listWithAccessCore(
   }
   const { access } = resolved;
 
-  // Read one past the window so a capped read is detectable. The extra row is
-  // dropped and reported as `truncatedAt` instead of silently vanishing.
-  // Access filtering below makes row counts unreliable as a cap signal.
   const limit = args.limit ?? LIST_READ_CAP;
 
-  // Own rows PLUS everything inherited from the project's workspaces. This is
-  // the read the CLI and the VS Code extension pull through (values.ts
-  // pullValues -> _listWithAccessCapped), so leaving it on the raw index is
-  // what would make workspaces invisible to both of them.
-  //
-  // mapVariableRow decides access from the row's projectId, and an inherited
-  // row's projectId is the WORKSPACE. Presenting it as this project's row is
-  // correct: access to a shared value comes from membership of a project that
-  // reads it, which is the same rule resolve.ts documents and vault/reveal.ts
-  // enforces.
   const resolvedRows = (
     await resolveEffectiveVariables(ctx, { projectId: args.projectId })
   ).map((row) =>
@@ -587,13 +459,10 @@ async function listWithAccessCore(
   const truncatedAt = resolvedRows.length > limit ? limit : undefined;
   const allVariables = resolvedRows.slice(0, limit);
 
-  // Scoped developers never receive out-of-scope variables at all —
-  // not even their metadata/keys
   const variables = allVariables.filter((variable) =>
     isEnvironmentScopeAllowed(access.environmentScope, variable.environments)
   );
 
-  // A shared row is never writable from a member project's list.
   const variablesWithAccess = variables.map((variable) => {
     const mapped = mapVariableRow(variable, access);
     return inherited.has(variable._id)
@@ -605,8 +474,6 @@ async function listWithAccessCore(
       : mapped;
   });
 
-  // Assigned members (and owners) may list metadata for every variable;
-  // grant-only viewers see just the variables shared with them.
   if (!access.isOwner && !access.assigned) {
     return {
       variables: variablesWithAccess.filter((v) => v.hasAccess),
@@ -632,12 +499,6 @@ export const listWithAccess = query({
   },
 });
 
-/**
- * Keys invisible to the caller because they fall outside their environment
- * scope — variables listWithAccess silently omits. KEYS ONLY, never values;
- * a doctor-style visibility aid, bounded to 100 so a large project never
- * turns this into an unbounded scan result.
- */
 export const hiddenByScope = query({
   args: { projectId: v.id("projects") },
   returns: v.object({
@@ -678,14 +539,6 @@ export const hiddenByScope = query({
   },
 });
 
-/**
- * listWithAccess plus the cap signal, for pullValues.
- *
- * listWithAccess itself must keep returning a bare array, since the CLI and
- * the Playwright suite call it by name, so the truncation report rides on
- * this internal sibling. `truncatedAt` is the window that was hit; absent
- * means the whole project fit, which clients read as "you got everything".
- */
 export const _listWithAccessCapped = internalQuery({
   args: {
     projectId: v.id("projects"),
@@ -697,25 +550,6 @@ export const _listWithAccessCapped = internalQuery({
   },
 });
 
-/**
- * Cursor-paginated variant of listWithAccess for "load more on scroll".
- *
- * Reads exactly one page of the project's variables at a time via Convex
- * `.paginate()` on the by_project index, instead of the take(limit) window
- * listWithAccess uses. Authorization, environment scope, the ONE prefetched
- * grant map, and the per-row access computation are IDENTICAL to
- * listWithAccess — the returned row shape matches exactly (variable fields
- * with vaultRef present only when hasAccess, plus hasAccess/permission/
- * roleAccess/userRole/projectRole/canManagePermissions).
- *
- * IMPORTANT: for grant-only viewers (not owner, not assigned) inaccessible
- * rows are filtered out of the page — exactly as listWithAccess does. That
- * can yield fewer than paginationOpts.numItems rows in a page; that is
- * expected with usePaginatedQuery (it requests more). isDone/continueCursor
- * are taken verbatim from the raw paginate result so the cursor stays valid.
- * Env-scoped developers never receive out-of-scope variables at all (the
- * scope filter also shrinks the page, same as listWithAccess).
- */
 export const listWithAccessPaginated = query({
   args: {
     projectId: v.id("projects"),
@@ -737,8 +571,6 @@ export const listWithAccessPaginated = query({
     }
     const { access } = resolved;
 
-    // Paginate the project's variables. isDone/continueCursor come straight
-    // from this result and are never recomputed after filtering.
     const result = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_deleted", (q) =>
@@ -747,8 +579,6 @@ export const listWithAccessPaginated = query({
       .order("desc")
       .paginate(args.paginationOpts);
 
-    // Scoped developers never receive out-of-scope variables at all —
-    // not even their metadata/keys (identical to listWithAccess).
     const pageVariables = result.page.filter(
       (variable) =>
         variable.deletedAt === undefined &&
@@ -762,9 +592,6 @@ export const listWithAccessPaginated = query({
       mapVariableRow(variable, access)
     );
 
-    // Assigned members (and owners) may list metadata for every variable;
-    // grant-only viewers see just the variables shared with them. Filtering
-    // shrinks the page but the cursor from paginate() stays valid.
     const finalPage =
       !access.isOwner && !access.assigned
         ? mappedPage.filter((v) => v.hasAccess)
@@ -778,24 +605,6 @@ export const listWithAccessPaginated = query({
   },
 });
 
-/**
- * Per-project variable search — access-aware and COMPLETE.
- *
- * Reuses listWithAccessPaginated's exact access model
- * (resolveProjectAccessContext + mapVariableRow) so a hit can never surface a
- * variable the caller couldn't see in the list: env-scoped developers only
- * match in-scope variables, and grant-only viewers only see variables shared
- * with them. Unlike the paginated list this walks the project's ENTIRE active
- * variable set (bounded — hundreds at most) and matches in memory on
- * key/description substring plus tag NAMES, so a hit is never hidden behind an
- * unloaded page. Deliberately NO Convex searchIndex — the candidate set is
- * small enough that collect + predicate is the right tool.
- *
- * Returns the same row shape as the list (mapVariableRow) so the existing row
- * component renders results unchanged (env badges / tags / updated-at per hit).
- * Capped at 100 rows sorted by key; `truncated` tells the UI to suggest
- * narrowing. `environment` (the selected env tab) narrows to that env's copy.
- */
 export const searchInProject = query({
   args: {
     projectId: v.id("projects"),
@@ -822,8 +631,6 @@ export const searchInProject = query({
       )
       .collect();
 
-    // Resolve every tag referenced by this project's variables ONCE, so tag-name
-    // matching is a map lookup rather than a db.get per (variable, tag).
     const tagIds = new Set<string>();
     for (const variable of variables) {
       for (const id of variable.tagIds ?? []) tagIds.add(id as string);
@@ -837,8 +644,6 @@ export const searchInProject = query({
     );
 
     const matches = variables.filter((variable) => {
-      // Same env-scope gate as listWithAccessPaginated: scoped developers never
-      // even see out-of-scope keys.
       if (
         !isEnvironmentScopeAllowed(
           access.environmentScope,
@@ -847,7 +652,6 @@ export const searchInProject = query({
       ) {
         return false;
       }
-      // Env tab narrows to variables holding that environment's copy.
       if (
         args.environment &&
         !variable.environments.includes(args.environment)
@@ -866,8 +670,6 @@ export const searchInProject = query({
 
     const mapped = matches
       .map((variable) => mapVariableRow(variable, access))
-      // Grant-only viewers see only variables shared with them — identical to
-      // listWithAccessPaginated's page filter.
       .filter((v) => access.isOwner || access.assigned || v.hasAccess)
       .sort((a, b) => a.key.localeCompare(b.key));
 
@@ -879,15 +681,6 @@ export const searchInProject = query({
   },
 });
 
-/**
- * List variable metadata (keys, versions, environments) WITHOUT vault refs.
- * Used by the VS Code extension via WebSocket subscription to detect changes
- * reactively, then fetch decrypted values via HTTP only when needed.
- *
- * The subscription drives what the extension believes exists, so a short read
- * makes missing keys indistinguishable from deleted ones. Refuses a partial
- * read for the same reason listByProject does.
- */
 export const listMetadataByProject = query({
   args: {
     projectId: v.id("projects"),
@@ -901,9 +694,10 @@ export const listMetadataByProject = query({
       args.projectId,
       actor._id
     );
-    if (!resolved || !(resolved.access.isOwner || resolved.access.assigned)) {
+    if (!resolved) {
       return [];
     }
+    const { access } = resolved;
     const limit = args.limit ?? LIST_READ_CAP;
     const variables = await resolveEffectiveVariables(ctx, {
       projectId: args.projectId,
@@ -916,15 +710,23 @@ export const listMetadataByProject = query({
       );
     }
 
-    return variables.map((v) => ({
-      _id: v._id,
-      key: v.key,
-      environments: v.environments,
-      isSensitive: v.isSensitive,
-      version: v.version,
-      updatedAt: v.updatedAt,
-      description: v.description,
-    }));
+    return variables
+      .filter(
+        (v) =>
+          isEnvironmentScopeAllowed(access.environmentScope, v.environments) &&
+          (access.isOwner ||
+            access.assigned ||
+            access.grantByVariable.has(v._id))
+      )
+      .map((v) => ({
+        _id: v._id,
+        key: v.key,
+        environments: v.environments,
+        isSensitive: v.isSensitive,
+        version: v.version,
+        updatedAt: v.updatedAt,
+        description: v.description,
+      }));
   },
 });
 
@@ -935,21 +737,9 @@ export const globalSearchWithAccess = query({
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
 
-    // Overall result budget AND per-project read cap (mirrors the `search`
-    // query's resultLimit pattern just above): bounds both how much this
-    // query ever returns and — critically — how many rows it ever reads out
-    // of a single project, so a large org with an active-editor project can
-    // never turn "type two characters" into an unbounded scan of every
-    // non-deleted variable in every accessible project.
     const RESULT_LIMIT = 50;
 
     const searchLower = args.searchTerm.toLowerCase();
-    // Light shape only — trimmed to exactly the fields the command palette
-    // (apps/web/src/components/command-palette/command-palette.tsx, the sole
-    // consumer via useGlobalSearch) renders. vaultRef was never included here
-    // even before this fix; description/tagIds(raw)/projectId/projectIcon/
-    // organizationId/organizationSlug are computed internally but not part of
-    // the public shape since nothing reads them.
     const results: Array<{
       _id: string;
       key: string;
@@ -962,16 +752,11 @@ export const globalSearchWithAccess = query({
       organizationName: string;
     }> = [];
 
-    // Pre-fetch tag cache for resolving tag names during search
     const tagCache = new Map<
       string,
       { _id: string; name: string; color: string }
     >();
 
-    // Batch tag resolution: collect the union of not-yet-cached tag ids across
-    // a set of variables and fetch each unique tag exactly once (in parallel)
-    // instead of a sequential get per (variable, tag). tagCache dedupes across
-    // the whole search so a shared tag is never fetched twice.
     const preloadTags = async (vars: Doc<"environmentVariables">[]) => {
       const missing = new Set<string>();
       for (const variable of vars) {
@@ -1023,8 +808,6 @@ export const globalSearchWithAccess = query({
       );
     };
 
-    // Get all ACTIVE org memberships for this user — a suspended org is
-    // excluded so its variables never surface in cross-org search.
     const memberships = (
       await ctx.db
         .query("organizationMembers")
@@ -1032,14 +815,11 @@ export const globalSearchWithAccess = query({
         .collect()
     ).filter((m) => !isSuspendedMembership(m));
 
-    // Pre-fetch project assignments once. projectMembers is a pure scope
-    // assignment — its legacy role field is never consulted.
     const allProjectMemberships = await ctx.db
       .query("projectMembers")
       .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect();
 
-    // Group project assignments by org (resolved lazily)
     const assignedProjectsByOrg = new Map<string, Array<Id<"projects">>>();
     const resolvedProjects = new Map<
       string,
@@ -1054,7 +834,6 @@ export const globalSearchWithAccess = query({
       }
     >();
 
-    // Environment scope per assignment (constrains developers only)
     const scopeByProject = new Map<string, string[] | undefined>();
 
     for (const pm of allProjectMemberships) {
@@ -1083,8 +862,6 @@ export const globalSearchWithAccess = query({
       }
     }
 
-    // Projects already covered by role/assignment access (used to avoid
-    // double-processing in the grant-holder pass below)
     const coveredProjectIds = new Set<string>();
 
     for (const membership of memberships) {
@@ -1092,13 +869,9 @@ export const globalSearchWithAccess = query({
       if (!org) continue;
 
       const orgRole = normalizeOrgRole(membership.role);
-      // Per-ORG resolution (multi-org search loop) — bounded by the caller's
-      // org count, not by rows.
       const searchProfile = await getRoleProfile(ctx, orgRole);
       const isOwner = bypassesAssignment(searchProfile);
 
-      // Metadata visibility: owners see all org projects, everyone else
-      // sees the projects they are assigned to.
       let accessibleProjects: Array<{
         _id: Id<"projects">;
         name: string;
@@ -1143,19 +916,6 @@ export const globalSearchWithAccess = query({
       for (const project of accessibleProjects) {
         coveredProjectIds.add(project._id as string);
 
-        // Read the project's full (non-deleted) variable set. A per-project
-        // .take() cap was tried for cost, but it broke search correctness:
-        // .take(n) returns rows in creation order, so a project's NEWEST
-        // variables silently fall out of search once it exceeds the cap —
-        // a user couldn't find a variable they just created. Search must see
-        // every candidate; the overall RESULT_LIMIT still bounds what's
-        // RETURNED. (If per-keystroke search cost becomes a problem on very
-        // large orgs, the right fix is a Convex search index on `key`, not a
-        // correctness-breaking read cap.)
-        //
-        // by_project_deleted skips soft-deleted rows AT THE INDEX — trash
-        // can dwarf the active set (hundreds of dead docs per project) and
-        // was previously read on every keystroke just to be filtered out.
         const variables = await ctx.db
           .query("environmentVariables")
           .withIndex("by_project_deleted", (q) =>
@@ -1163,11 +923,8 @@ export const globalSearchWithAccess = query({
           )
           .collect();
 
-        // Resolve tags for variables in this project batch (one batched fetch)
         await preloadTags(variables);
 
-        // Scoped developers never receive out-of-scope variables at all —
-        // not even their metadata/keys
         const environmentScope = effectiveEnvironments(
           searchProfile,
           scopeByProject.get(project._id as string)
@@ -1182,7 +939,6 @@ export const globalSearchWithAccess = query({
         );
 
         for (const variable of matches) {
-          // Owners and assigned project members may list variable metadata
           const resolvedTags = resolveTagsFor(variable);
 
           results.push({
@@ -1204,8 +960,6 @@ export const globalSearchWithAccess = query({
       if (results.length >= RESULT_LIMIT) break;
     }
 
-    // Per-variable viewer sharing: grant holders may list metadata for
-    // variables explicitly shared with them, even without an assignment.
     if (results.length < RESULT_LIMIT) {
       const grants = await ctx.db
         .query("variablePermissions")
@@ -1260,17 +1014,6 @@ export const globalSearchWithAccess = query({
   },
 });
 
-/**
- * List a project's soft-deleted variables that are still within the
- * PURGE_RETENTION_DAYS restore window (vaultGc purges anything older, so
- * those are excluded here rather than surfaced as "restorable").
- *
- * Authorization mirrors restore: only owners / assigned PM / team lead
- * ("project:delete_variable") may see the trash list. Like the other
- * list-style queries in this file (listWithAccess, listMetadataByProject)
- * this returns [] rather than throwing when the project is gone or the
- * caller lacks access, so the UI can render nothing instead of erroring.
- */
 export const getDeleted = query({
   args: {
     projectId: v.id("projects"),
@@ -1295,14 +1038,6 @@ export const getDeleted = query({
 
     const cutoff = Date.now() - PURGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-    // by_project_deleted reads exactly this project's soft-deleted rows in
-    // the restore window — never-deleted rows (deletedAt undefined, which
-    // sorts below all numbers) fall outside the gte range, and active rows
-    // never inflate the read like a by_project scan would (a project with
-    // >500 active variables previously hid its trash entirely).
-    // desc: newest deletions first, so when the trash exceeds the 100-row
-    // cap it's the OLDEST (closest to auto-purge) that fall off — an
-    // ascending take(100) hid a just-deleted item behind old trash.
     const deletedVariables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_deleted", (q) =>
@@ -1319,8 +1054,6 @@ export const getDeleted = query({
       sharedFrom: undefined as string | undefined,
     }));
 
-    // Shared rows this project read live in the workspace's trash. Listing
-    // them here means "restore for all" is reachable from any member.
     const memberships = await ctx.db
       .query("workspaceProjects")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -1328,8 +1061,6 @@ export const getDeleted = query({
     for (const membership of memberships) {
       const workspace = await ctx.db.get(membership.workspaceId);
       if (!workspace || workspace.deletedAt) continue;
-      // Listed only where restore would be allowed: delete rights in every
-      // project the group reaches.
       try {
         await authorizeVariableAccess(ctx, {
           userId: actor._id,
@@ -1367,22 +1098,6 @@ export const getDeleted = query({
   },
 });
 
-/**
- * Internal: which of the proposed environments already carry an ACTIVE
- * variable with this key? Used by actions (createWithValue) to reject
- * clashes BEFORE writing the secret value to the vault — checking only
- * inside the create mutation leaked an orphaned vault secret per clash.
- * Empty array = the create is allowed (same key across disjoint
- * environments is legal).
- */
-/**
- * Internal: everything the create mutation validates about a create's
- * non-secret fields (rotation window and gating, tag ownership), run by
- * createWithValue BEFORE it mints a vault object. A protected create files a
- * change request instead of reaching the mutation, so without this an
- * invalid rotation window or a foreign tag would only fail at approval,
- * leaving a stuck proposal with a staged secret.
- */
 export const validateCreateFieldsInternal = internalQuery({
   args: {
     projectId: v.id("projects"),

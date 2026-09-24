@@ -17,9 +17,6 @@ import { envFileNamesFor } from "../utils/envFiles";
 
 const AVAILABLE_ENVIRONMENTS = ["development", "staging", "production"];
 
-/**
- * Dialog for linking projects with enhanced directory selection
- */
 export class LinkProjectDialog {
   private syncService: SyncService;
 
@@ -27,9 +24,6 @@ export class LinkProjectDialog {
     this.syncService = syncService;
   }
 
-  /**
-   * Show directory selection dialog
-   */
   async selectDirectory(): Promise<string | undefined> {
     const options: vscode.OpenDialogOptions = {
       canSelectFiles: false,
@@ -39,7 +33,6 @@ export class LinkProjectDialog {
       title: "Select Project Directory",
     };
 
-    // Default to current workspace if available
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders && workspaceFolders.length > 0) {
       options.defaultUri = workspaceFolders[0].uri;
@@ -52,9 +45,6 @@ export class LinkProjectDialog {
     return undefined;
   }
 
-  /**
-   * Show environment selection dialog
-   */
   async selectEnvironments(): Promise<string[] | undefined> {
     const defaultEnv = getEnvironment();
     const items = AVAILABLE_ENVIRONMENTS.map((env) => ({
@@ -76,9 +66,6 @@ export class LinkProjectDialog {
     return selected.map((s) => s.description);
   }
 
-  /**
-   * Show target file name input
-   */
   async getTargetFileName(): Promise<string | undefined> {
     const defaultFile = getTargetFile();
 
@@ -104,21 +91,12 @@ export class LinkProjectDialog {
     return result;
   }
 
-  /**
-   * Derive the per-environment filenames for a multi-env selection (dev →
-   * .env.local, else .env.<env>). `targetFile` is ignored for multi-env, so
-   * any placeholder is fine here.
-   */
   private derivedFileNames(environments: string[]): string[] {
     return Array.from(
       envFileNamesFor({ environments, targetFile: getTargetFile() }).values()
     );
   }
 
-  /**
-   * For a multi-environment selection, confirm the per-env filenames Envpilot
-   * will create instead of prompting for a single target filename.
-   */
   async confirmDerivedFiles(environments: string[]): Promise<boolean> {
     const files = this.derivedFileNames(environments);
     const choice = await vscode.window.showInformationMessage(
@@ -129,12 +107,6 @@ export class LinkProjectDialog {
     return choice === "Continue";
   }
 
-  /**
-   * Resolve the target filename for a selection. Single-env keeps the existing
-   * filename prompt (back-compat); multi-env skips it, confirms the derived
-   * names, and returns a placeholder (ignored downstream by envFileNamesFor).
-   * Returns undefined if the user cancels.
-   */
   private async resolveTargetFile(
     environments: string[]
   ): Promise<string | undefined> {
@@ -143,44 +115,42 @@ export class LinkProjectDialog {
       if (!confirmed) {
         return undefined;
       }
-      // Placeholder — multi-env directories derive filenames per environment
-      // and ignore this value.
       return getTargetFile();
     }
     return this.getTargetFileName();
   }
 
-  /**
-   * Show conflict resolution dialog
-   */
   async resolveConflict(
     conflict: ConflictCheckResult
   ): Promise<ConflictStrategy | undefined> {
-    // Honor the configured default and skip the prompt entirely
     const configured = getDefaultConflictResolution();
     if (configured !== "prompt") {
       return configured;
     }
 
-    const items: vscode.QuickPickItem[] = [
+    const items: Array<vscode.QuickPickItem & { value: ConflictStrategy }> = [
       {
+        value: "overwrite",
         label: "$(replace) Overwrite",
         description: "Replace the existing file completely",
         detail:
           "All existing variables will be removed and replaced with synced variables",
       },
       {
+        value: "backup",
         label: "$(copy) Backup & Overwrite",
         description: "Create a backup before replacing",
         detail: `Existing file will be saved as ${conflict.existingFile}.backup-<timestamp>`,
       },
       {
+        value: "merge",
         label: "$(merge) Merge",
         description: "Combine existing and new variables",
         detail:
           "Synced variables will override existing ones with same key; others preserved",
       },
       {
+        value: "skip",
         label: "$(close) Skip",
         description: "Do not sync to this directory",
         detail: "The existing file will remain unchanged",
@@ -192,50 +162,28 @@ export class LinkProjectDialog {
       placeHolder: `${conflict.existingFile} has ${conflict.existingVariableCount} variables`,
     });
 
-    if (!selected) {
-      return undefined;
-    }
-
-    if (
-      selected.label.includes("Overwrite") &&
-      !selected.label.includes("Backup")
-    ) {
-      return "overwrite";
-    } else if (selected.label.includes("Backup")) {
-      return "backup";
-    } else if (selected.label.includes("Merge")) {
-      return "merge";
-    } else {
-      return "skip";
-    }
+    return selected?.value;
   }
 
-  /**
-   * Show full link project workflow
-   */
   async showLinkDialog(
     project: Project,
     organization: Organization
   ): Promise<LinkDirectoryOptions | undefined> {
-    // Step 1: Select directory
     const directoryPath = await this.selectDirectory();
     if (!directoryPath) {
       return undefined;
     }
 
-    // Step 2: Select environments
     const environments = await this.selectEnvironments();
     if (!environments) {
       return undefined;
     }
 
-    // Step 3: Get target filename (single-env) or confirm derived names (multi-env)
     const targetFile = await this.resolveTargetFile(environments);
     if (!targetFile) {
       return undefined;
     }
 
-    // Step 4: Check for conflicts across every file this directory will write
     const conflict = await this.syncService.checkForConflicts(
       directoryPath,
       targetFile,
@@ -255,7 +203,6 @@ export class LinkProjectDialog {
       conflictStrategy = strategy;
     }
 
-    // Step 5: Optional display name
     const displayName = await vscode.window.showInputBox({
       title: "Directory Display Name (Optional)",
       prompt: "Enter a friendly name for this directory",
@@ -271,9 +218,6 @@ export class LinkProjectDialog {
     };
   }
 
-  /**
-   * Show dialog to add another directory to an existing project
-   */
   async showAddDirectoryDialog(
     projectName: string
   ): Promise<LinkDirectoryOptions | undefined> {
@@ -287,7 +231,6 @@ export class LinkProjectDialog {
       return undefined;
     }
 
-    // Reuse the same flow
     const directoryPath = await this.selectDirectory();
     if (!directoryPath) {
       return undefined;
@@ -329,39 +272,6 @@ export class LinkProjectDialog {
       environments,
       conflictStrategy,
       displayName: displayName || undefined,
-    };
-  }
-
-  /**
-   * Show quick link dialog (minimal prompts, uses defaults)
-   */
-  async showQuickLinkDialog(): Promise<LinkDirectoryOptions | undefined> {
-    const directoryPath = await this.selectDirectory();
-    if (!directoryPath) {
-      return undefined;
-    }
-
-    const targetFile = getTargetFile();
-    const conflict = await this.syncService.checkForConflicts(
-      directoryPath,
-      targetFile,
-      [getEnvironment()]
-    );
-    let conflictStrategy: ConflictStrategy = "overwrite";
-
-    if (conflict.hasConflict) {
-      const strategy = await this.resolveConflict(conflict);
-      if (!strategy || strategy === "skip") {
-        return undefined;
-      }
-      conflictStrategy = strategy;
-    }
-
-    return {
-      directoryPath: normalizePath(directoryPath),
-      targetFile,
-      environments: [getEnvironment()],
-      conflictStrategy,
     };
   }
 }

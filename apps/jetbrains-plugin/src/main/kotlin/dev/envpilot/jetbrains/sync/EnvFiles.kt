@@ -4,23 +4,14 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.PosixFilePermission
 
-/**
- * .env file merging and atomic writes.
- * Merge preserves comments and unknown keys; pulled keys are updated in place
- * or appended. Port of the extension's env-file semantics (simplified to the
- * KEY=VALUE subset both clients share).
- */
 object EnvFiles {
-    data class Entry(val key: String, val value: String)
-
     private val KEY_REGEX = Regex("[A-Za-z_][A-Za-z0-9_.]*")
 
-    // Same rule as the VS Code extension's formatValue: anything that dotenv
-    // parsers would mis-read has to be double-quoted and escaped.
     private val NEEDS_QUOTING = Regex("[\\s#\"'`\$\\\\]|[\\x00-\\x1f]")
 
-    private data class ParsedLine(val key: String, val value: String, val exported: Boolean)
+    private data class ParsedLine(val key: String, val exported: Boolean)
 
     fun quote(value: String): String =
         if (NEEDS_QUOTING.containsMatchIn(value)) {
@@ -36,12 +27,6 @@ object EnvFiles {
             value
         }
 
-    fun parse(content: String): List<Entry> =
-        content.lineSequence()
-            .mapNotNull { parseLine(it) }
-            .map { Entry(it.key, it.value) }
-            .toList()
-
     private fun parseLine(line: String): ParsedLine? {
         val trimmed = line.trim()
         if (trimmed.isEmpty() || trimmed.startsWith("#")) return null
@@ -51,37 +36,7 @@ object EnvFiles {
         val exported = rawKey.startsWith("export ")
         val key = if (exported) rawKey.removePrefix("export ").trim() else rawKey
         if (!key.matches(KEY_REGEX)) return null
-        return ParsedLine(key, unquote(trimmed.substring(eq + 1).trim()), exported)
-    }
-
-    private fun unquote(raw: String): String =
-        when {
-            raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"') -> unescape(raw.substring(1, raw.length - 1))
-            raw.length >= 2 && raw.startsWith('\'') && raw.endsWith('\'') -> raw.substring(1, raw.length - 1)
-            else -> raw
-        }
-
-    private fun unescape(s: String): String {
-        val out = StringBuilder(s.length)
-        var i = 0
-        while (i < s.length) {
-            val c = s[i]
-            if (c == '\\' && i + 1 < s.length) {
-                i++
-                out.append(
-                    when (val next = s[i]) {
-                        'n' -> '\n'
-                        'r' -> '\r'
-                        't' -> '\t'
-                        else -> next
-                    },
-                )
-            } else {
-                out.append(c)
-            }
-            i++
-        }
-        return out.toString()
+        return ParsedLine(key, exported)
     }
 
     fun merge(
@@ -101,8 +56,6 @@ object EnvFiles {
                     i++
                     continue
                 }
-            // Update every occurrence: dotenv semantics let the LAST duplicate
-            // win, so leaving a stale later line would resurrect old values.
             if (entry.key in pulled) {
                 val prefix = if (entry.exported) "export " else ""
                 lines[i] = "$prefix${entry.key}=${quote(pulled.getValue(entry.key))}"
@@ -129,12 +82,6 @@ object EnvFiles {
         }
     }
 
-    /**
-     * Resolve existing file content against pulled values per mode:
-     *  - merge: preserve comments/unknown keys, update managed keys (default)
-     *  - overwrite: file becomes exactly the pulled set
-     *  - backup: like merge, but the previous content is kept as <file>.envpilot-bak
-     */
     fun resolve(
         existingContent: String?,
         pulled: Map<String, String>,
@@ -149,16 +96,24 @@ object EnvFiles {
 
     fun backupPath(target: Path): Path = target.resolveSibling(target.fileName.toString() + ".envpilot-bak")
 
-    /** Atomic temp+rename write; skips the write when content is unchanged. */
     fun atomicWrite(
         target: Path,
         content: String,
     ) {
         if (readIfExists(target) == content) return
+        atomicWrite(target, content.toByteArray(StandardCharsets.UTF_8), null)
+    }
+
+    fun atomicWrite(
+        target: Path,
+        bytes: ByteArray,
+        permissions: Set<PosixFilePermission>?,
+    ) {
         target.parent?.let { Files.createDirectories(it) }
         val tmp = Files.createTempFile(target.parent, ".envpilot-", ".tmp")
         try {
-            Files.write(tmp, content.toByteArray(StandardCharsets.UTF_8))
+            Files.write(tmp, bytes)
+            permissions?.let { Files.setPosixFilePermissions(tmp, it) }
             try {
                 Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
             } catch (_: Exception) {

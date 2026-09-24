@@ -4,24 +4,23 @@ Securely sync environment variables from Envpilot to your local projects. This e
 
 ## Features
 
-- **Secure Authentication**: Sign in with your Envpilot account using OAuth
+- **Secure Authentication**: Sign in with your Envpilot account in the browser (device code flow); several accounts can be signed in at once
 - **Project Linking**: Link your workspace to an Envpilot project
 - **Automatic Sync**: Environment variables are synced to your local `.env` file
 - **Real-time Revocation**: When permissions are revoked, synced files are instantly removed via WebSocket
-- **Clipboard Protection**: Copy/paste of secrets is blocked for read-only variables
+- **Clipboard Protection**: Copy/cut is blocked in every Envpilot-managed file by default (`envpilot.clipboardGuard.scope`)
 - **File Protection**: Read-only `.env` files are automatically reverted if edited
-- **Commit Guard**: Dual-layer protection prevents accidental `.env` commits (VS Code staging guard + pre-commit hook)
+- **Commit Guard**: Dual-layer protection prevents accidental `.env` commits (VS Code staging guard + pre-commit hook in repositories that contain a linked directory). `.env.example`, `.env.sample`, `.env.template` and `.env.dist` are allowed
 - **Multi-Environment**: Sync variables for development, staging, or production
 - **Multi-Directory**: Link multiple directories within the same project
 - **CodeLens Annotations**: Inline sync status and actions above `.env` files
-- **Dashboard Panel**: Built-in webview dashboard for project overview
-- **Role-Based Access**: Admin, Team Lead, and Member roles with granular permissions
+- **Role-Based Access**: Owner, project manager, team lead, developer and custom roles; what you can do (write, request, reveal) follows the capabilities your organization gives your role
 - **Real-time Updates**: Convex WebSocket subscriptions for instant change detection
 
 ## Requirements
 
 - VS Code 1.85.0 or higher (or Cursor)
-- An Envpilot account with Pro tier (extension access is a Pro feature)
+- An Envpilot organization whose plan includes extension access
 - A project in Envpilot with environment variables
 
 ## Installation
@@ -66,28 +65,29 @@ Variables are synced automatically, but you can manually pull:
 
 Open VS Code settings and search for "Envpilot" to configure:
 
-| Setting                                | Description                                        | Default       |
-| -------------------------------------- | -------------------------------------------------- | ------------- |
-| `envpilot.serverUrl`                   | Envpilot server URL                                | Set at build  |
-| `envpilot.autoSync`                    | Auto-sync on workspace open                        | `true`        |
-| `envpilot.syncInterval`                | Permission check interval (seconds)                | `300`         |
-| `envpilot.targetFile`                  | Target file for synced variables                   | `.env.local`  |
-| `envpilot.environment`                 | Default environment                                | `development` |
-| `envpilot.preventCopyOnRevoke`         | Delete .env when permissions revoked               | `true`        |
-| `envpilot.defaultConflictResolution`   | Action when existing .env files found              | `prompt`      |
-| `envpilot.clipboardGuard.scope`        | Which managed files block clipboard copy/cut       | `all-managed` |
-| `envpilot.cloakValues`                 | Mask secret values in open .env editors            | `true`        |
-| `envpilot.autocomplete.enable`         | Env key autocomplete in code                       | `true`        |
-| `envpilot.hover.enable`                | Env key hover info in code                         | `true`        |
-| `envpilot.enableCodeLens`              | Show CodeLens annotations above .env files         | `true`        |
-| `envpilot.commitGuard.enabled`         | Enable dual-layer .env commit protection           | `true`        |
-| `envpilot.commitGuard.autoInstallHook` | Auto-install pre-commit hook to block .env commits | `true`        |
+| Setting                                | Description                                                                                                | Default       |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------- |
+| `envpilot.serverUrl`                   | Envpilot server URL (machine scope)                                                                        | Set at build  |
+| `envpilot.autoSync`                    | Sync variables when the workspace opens                                                                    | `true`        |
+| `envpilot.targetFile`                  | Default target file for synced variables                                                                   | `.env.local`  |
+| `envpilot.environment`                 | Default environment for synced variables                                                                   | `development` |
+| `envpilot.preventCopyOnRevoke`         | Delete synced .env files when permissions are revoked                                                      | `true`        |
+| `envpilot.defaultConflictResolution`   | Action when existing .env files are found                                                                  | `prompt`      |
+| `envpilot.convexUrl`                   | Convex deployment URL for real-time sync (machine scope, build-time URL if empty)                          | empty         |
+| `envpilot.enableCodeLens`              | Show CodeLens annotations above .env files                                                                 | `true`        |
+| `envpilot.commitGuard.enabled`         | Enable dual-layer .env commit protection (user setting only)                                               | `true`        |
+| `envpilot.commitGuard.autoInstallHook` | Install the pre-commit hook in repositories containing a linked directory (user setting only)              | `true`        |
+| `envpilot.clipboardGuard.scope`        | Which managed files block clipboard copy/cut: `all-managed`, `readonly-roles` or `off` (user setting only) | `all-managed` |
+| `envpilot.cloakValues`                 | Mask values in managed .env editors (user setting only)                                                    | `true`        |
+| `envpilot.autocomplete.enable`         | Suggest variable names from the linked project in code                                                     | `true`        |
+| `envpilot.hover.enable`                | Masked hover on env references, with a role-checked reveal                                                 | `true`        |
+| `envpilot.idlePauseMinutes`            | Minutes unfocused before real-time sync pauses (0 disables)                                                | `10`          |
 
 ## Security
 
 - **No plaintext secrets in storage**: Authentication tokens are stored securely in VS Code's secret storage
 - **Real-time revocation**: When access is revoked, synced `.env` files are instantly deleted via WebSocket
-- **Clipboard protection**: Copy/paste is blocked for read-only environment files
+- **Clipboard protection**: Copy/cut is blocked in Envpilot-managed files (all of them by default, or only read-only ones with `readonly-roles`)
 - **File protection**: Unauthorized edits to read-only `.env` files are automatically reverted
 - **Commit guard**: Dual-layer protection prevents committing `.env` files to git
 - **Token expiration**: Access tokens expire after 30 days and are automatically refreshed
@@ -111,29 +111,31 @@ The status bar shows:
 
 ## Commands
 
-| Command                          | Description                         |
-| -------------------------------- | ----------------------------------- |
-| `Envpilot: Sign In`              | Authenticate with Envpilot          |
-| `Envpilot: Sign Out`             | Sign out and clear credentials      |
-| `Envpilot: Link Project`         | Link current workspace to a project |
-| `Envpilot: Unlink Project`       | Unlink and remove synced variables  |
-| `Envpilot: Pull Variables`       | Manually sync variables             |
-| `Envpilot: Refresh`              | Refresh the project tree            |
-| `Envpilot: Open Dashboard`       | Open Envpilot in browser            |
-| `Envpilot: Open Dashboard Panel` | Open built-in dashboard panel       |
-| `Envpilot: Show Status`          | Show status and quick actions       |
-| `Envpilot: Add Directory`        | Add a sync directory to a project   |
-| `Envpilot: Remove Directory`     | Remove a sync directory             |
-| `Envpilot: Select Environments`  | Choose environments to sync         |
-| `Envpilot: Request Variable`     | Request access to a variable        |
-| `Envpilot: Install Commit Guard` | Install pre-commit hook             |
-| `Envpilot: Remove Commit Guard`  | Remove pre-commit hook              |
+| Command                                  | Description                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------- |
+| `Envpilot: Sign In`                      | Sign in, or add another account                                           |
+| `Envpilot: Sign Out`                     | Sign out of the active account; other signed-in accounts stay             |
+| `Envpilot: Sign Out of All Accounts`     | Sign out of every account on this machine                                 |
+| `Envpilot: Switch Account`               | Switch between signed-in accounts                                         |
+| `Envpilot: Link Project`                 | Link a directory to a project                                             |
+| `Envpilot: Unlink Project`               | Unlink a project and remove its synced files                              |
+| `Envpilot: Add Directory`                | Add a sync directory to a linked project                                  |
+| `Envpilot: Remove Directory`             | Remove a sync directory                                                   |
+| `Envpilot: Pull Variables`               | Sync variables now                                                        |
+| `Envpilot: Refresh`                      | Reload projects and variables from the server                             |
+| `Envpilot: Request Variable`             | Ask for a new variable to be added (roles that can submit requests)       |
+| `Envpilot: Show Status`                  | Show status and quick actions                                             |
+| `Envpilot: Open Dashboard`               | Open Envpilot in the browser                                              |
+| `Envpilot: Install Commit Guard Hook`    | Install the pre-commit hook in repositories containing a linked directory |
+| `Envpilot: Remove Commit Guard Hook`     | Remove the pre-commit hook                                                |
+| `Envpilot: Toggle Value Cloaking`        | Turn value masking on or off                                              |
+| `Envpilot: Reveal Values for 30 Seconds` | Unmask values briefly (roles that can reveal secrets)                     |
 
 ## Troubleshooting
 
 ### "Extension access requires Pro tier"
 
-Extension access is only available for Pro tier organizations. Upgrade your organization to Pro to use this feature.
+Your organization's plan does not include extension access. An organization owner can change the plan from the dashboard.
 
 ### "Token has been revoked"
 
@@ -159,8 +161,8 @@ If the browser fails to open, the sign-in URL is automatically copied to your cl
 When you uninstall the extension, a cleanup hook runs on the next VS Code
 launch and deletes every synced `.env` file that hasn't been modified since
 its last sync (locally edited files are never touched). For a complete
-offboarding — especially on shared or organization machines — run
-`Envpilot: Sign Out` **before** uninstalling: VS Code does not let extensions
+offboarding, especially on shared or organization machines, run
+`Envpilot: Sign Out of All Accounts` **before** uninstalling: VS Code does not let extensions
 clear their secure token storage during uninstall, so signing out first is
 what removes the stored credentials. Organization admins can additionally
 revoke a machine's access at any time from the dashboard (device sessions).

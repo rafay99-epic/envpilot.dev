@@ -1,11 +1,11 @@
 package dev.envpilot.jetbrains.editor
 
-/**
- * The Envpilot-managed key the caret sits on. In a .env file the whole line
- * resolves to its `KEY=` (column-independent, matching the folding model);
- * anywhere else only a code reference (`process.env.X`, `os.getenv("X")`, …)
- * counts. Shared by the reveal-at-caret action and the hover hint.
- */
+import com.intellij.openapi.project.Project
+import dev.envpilot.jetbrains.sync.LinkedProject
+import dev.envpilot.jetbrains.sync.LinkedProjectsService
+import dev.envpilot.jetbrains.sync.targetFileFor
+import java.nio.file.Path
+
 fun resolveManagedKey(
     lineText: String,
     column: Int,
@@ -24,4 +24,16 @@ private fun envKeyOf(lineText: String): String? {
         .removePrefix("export ")
         .trim()
         .takeIf { it.isNotEmpty() }
+}
+
+fun linkForKey(
+    project: Project,
+    filePath: String,
+    key: String,
+): LinkedProject? {
+    val service = EnvEditorService.getInstance(project)
+    return LinkedProjectsService.getInstance(project).all().firstOrNull {
+        runCatching { Path.of(filePath).startsWith(Path.of(it.directoryPath)) }.getOrDefault(false) &&
+            key in service.managed(Path.of(it.directoryPath, targetFileFor(it)).toString())?.keys.orEmpty()
+    }
 }

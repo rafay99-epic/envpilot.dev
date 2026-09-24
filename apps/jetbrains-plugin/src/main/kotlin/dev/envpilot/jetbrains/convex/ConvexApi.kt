@@ -2,6 +2,9 @@ package dev.envpilot.jetbrains.convex
 
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import dev.envpilot.jetbrains.auth.AuthService
+import dev.envpilot.jetbrains.errors.Errors
+import dev.envpilot.jetbrains.model.AccessMeta
 import dev.envpilot.jetbrains.model.Org
 import dev.envpilot.jetbrains.model.Project
 import dev.envpilot.jetbrains.model.PullMeta
@@ -9,16 +12,11 @@ import dev.envpilot.jetbrains.model.PullResult
 import dev.envpilot.jetbrains.model.PulledVariable
 import dev.envpilot.jetbrains.model.SecretFileMeta
 
-/**
- * Typed data-plane client over the Convex socket. Same functions the web app,
- * CLI and extension use — one enforcement core, no separate REST surface.
- */
 object ConvexApi {
-    private val gson = com.google.gson.Gson()
-
-    private fun socket(): ConvexSocket =
-        ConvexSyncService.getInstance().socketOrNull()
-            ?: error("Not connected — real-time sync is offline")
+    private fun socket(): ConvexSocket {
+        check(!AuthService.outdated) { Errors.UPDATE_REQUIRED }
+        return ConvexSyncService.getInstance().socketOrNull() ?: error("Not signed in to Envpilot")
+    }
 
     suspend fun orgs(): List<Org> {
         val body = socket().query("features/organizations/queries:listForUser", emptyMap())
@@ -54,7 +52,7 @@ object ConvexApi {
         return obj.get("allowed")?.takeIf { it.isJsonPrimitive }?.asBoolean == true
     }
 
-    suspend fun accessMeta(projectId: String): PullMeta {
+    suspend fun accessMeta(projectId: String): AccessMeta {
         val obj =
             parseObject(
                 socket().query(
@@ -62,12 +60,8 @@ object ConvexApi {
                     mapOf("projectId" to projectId),
                 ),
             )
-        return PullMeta(
-            decryptionFailures = null,
-            role = obj.str("role"),
+        return AccessMeta(
             environmentScope = obj.stringArray("environmentScope"),
-            truncatedAt = null,
-            autoUnsyncOnClose = true,
             capabilities =
                 obj.getAsJsonObject("capabilities")?.entrySet()
                     ?.associate { (key, value) -> key to value.asBoolean }.orEmpty(),
@@ -205,8 +199,6 @@ object ConvexApi {
             mapOf("projectId" to projectId, "deviceId" to deviceId),
         )
     }
-
-    // ── Parsing helpers (wire boundary) ──────────────────────────────────────
 
     private fun parseArray(body: String): List<JsonObject> {
         val parsed = JsonParser.parseString(body)

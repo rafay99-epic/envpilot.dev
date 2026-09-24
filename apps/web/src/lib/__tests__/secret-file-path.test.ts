@@ -1,12 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { normalizeFilePath } from "@convex/features/files/helpers";
 
-/**
- * Destination-path validation is the trust boundary for secret files: the
- * value travels from an upload form to `writeFileSync` on a developer's
- * machine and in CI. Everything rejected here is something a pull would
- * otherwise write.
- */
 describe("normalizeFilePath", () => {
   it("canonicalizes without resolving anything away", () => {
     expect(normalizeFilePath("./android//app/upload.jks")).toBe(
@@ -30,10 +24,6 @@ describe("normalizeFilePath", () => {
   });
 
   it("refuses reserved paths in ANY case", () => {
-    // macOS/Windows filesystems are case-insensitive: ".GIT/config" and
-    // ".git/config" are the same file, so a case-sensitive check let a
-    // secret file overwrite git's config on exactly the platforms most
-    // developers use.
     for (const bad of [
       ".git",
       ".GIT/config",
@@ -47,10 +37,26 @@ describe("normalizeFilePath", () => {
     }
   });
 
+  it("refuses tooling directories at any depth and env files", () => {
+    for (const bad of [
+      ".husky/pre-commit",
+      "packages/api/.git/hooks/post-checkout",
+      "apps/web/.HUSKY/pre-push",
+      ".idea/workspace.xml",
+      "tools/.vscode/tasks.json",
+      "nested/.envpilot/config.json",
+      ".env",
+      "apps/web/.env.local",
+      "config/production.ENV",
+    ]) {
+      expect(() => normalizeFilePath(bad)).toThrow();
+    }
+    expect(normalizeFilePath("config/environment.json")).toBe(
+      "config/environment.json"
+    );
+  });
+
   it("refuses segments ending in a space or a period", () => {
-    // Win32 strips both before touching the filesystem, so ".. /outside.pem"
-    // escapes the repo and ".git./config" lands in .git — after passing
-    // every other check.
     for (const bad of [
       ".. /outside.pem",
       ".git./config",

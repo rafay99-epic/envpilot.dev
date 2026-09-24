@@ -70,20 +70,13 @@ class EnvpilotWidget(private val project: Project) : StatusBarWidget, StatusBarW
                     }
                 },
             )
-        ApplicationManager.getApplication().executeOnPooledThread {
-            AuthService.getInstance()
-            ApplicationManager.getApplication().invokeLater {
-                statusBar.updateWidget(ID)
-            }
-        }
     }
 
     override fun getText(): String {
-        // Outdated wins over every other state, the way getTooltipText() reads it.
         if (AuthService.outdated) return "Envpilot: Update Required"
         val email = AuthService.getInstance().email ?: return "Envpilot: Sign In"
-        if (SyncState.syncing(project)) return "Envpilot: ⟳ Syncing…"
-        val err = SyncState.lastError(project)
+        if (SyncState.syncing(project.locationHash)) return "Envpilot: Syncing…"
+        val err = SyncState.lastError(project.locationHash)
         if (err != null) return "Envpilot: Sync Error"
         return "Envpilot: $email"
     }
@@ -93,15 +86,15 @@ class EnvpilotWidget(private val project: Project) : StatusBarWidget, StatusBarW
     override fun getTooltipText(): String =
         when {
             AuthService.outdated ->
-                "Envpilot: update required — your plugin version no longer works with the server."
+                "Envpilot: update required. This plugin version no longer works with the server."
             else ->
                 buildString {
-                    append("Envpilot — click for sign-in options")
+                    append("Envpilot: click for sign-in options")
                     append(
                         "\nReal-time: " +
-                            if (SyncState.realtimeConnected) "connected" else "off (interval polling)",
+                            if (SyncState.realtimeConnected) "connected" else "offline, requests queue until reconnected",
                     )
-                    SyncState.lastError(project)?.let { append("\nLast sync error: $it") }
+                    SyncState.lastError(project.locationHash)?.let { append("\nLast sync error: $it") }
                 }
         }
 

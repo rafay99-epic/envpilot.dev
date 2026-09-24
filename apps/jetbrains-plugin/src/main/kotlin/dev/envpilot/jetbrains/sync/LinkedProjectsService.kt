@@ -4,6 +4,7 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
+import com.intellij.openapi.components.StoragePathMacros
 import com.intellij.openapi.project.Project
 
 data class LinkedProject(
@@ -20,7 +21,10 @@ data class LinkedProject(
 )
 
 @Service(Service.Level.PROJECT)
-@State(name = "EnvpilotLinkedProjects", storages = [Storage("EnvpilotPlugin.xml")])
+@State(
+    name = "EnvpilotLinkedProjects",
+    storages = [Storage(StoragePathMacros.WORKSPACE_FILE), Storage(value = "EnvpilotPlugin.xml", deprecated = true)],
+)
 class LinkedProjectsService : PersistentStateComponent<LinkedProjectsService.State> {
     class State {
         var links: MutableList<LinkedProject> = mutableListOf()
@@ -28,71 +32,83 @@ class LinkedProjectsService : PersistentStateComponent<LinkedProjectsService.Sta
 
     private var state = State()
 
-    // Which account's rows were last normalized; each account de-conflicts its own.
     private var normalizedFor: String? = null
 
+    @Synchronized
     override fun getState(): State = state
 
+    @Synchronized
     override fun loadState(s: State) {
         state = s
         normalizedFor = null
     }
 
+    @Synchronized
     fun all(): List<LinkedProject> {
         val accountId = dev.envpilot.jetbrains.auth.AuthService.getInstance().userId ?: return emptyList()
         if (normalizedFor != accountId) normalize(accountId)
         return state.links.filter { it.accountId == accountId }
     }
 
-    /** Back-fill and de-conflict persisted rows once per change, never on every read. */
+    @Synchronized
     internal fun normalize(accountId: String) {
-        state.links.filter { it.accountId.isBlank() }.forEach { it.accountId = accountId }
-        normalizeDirectories(state.links.filter { it.accountId == accountId })
+        val claimed = state.links.map { if (it.accountId.isBlank()) it.copy(accountId = accountId) else it }
+        val byDirectory = claimed.filter { it.accountId == accountId }.groupBy { it.directoryPath }
+        write(
+            claimed.map { link ->
+                val group = byDirectory[link.directoryPath]?.takeIf { link.accountId == accountId } ?: return@map link
+                link.copy(
+                    includeSecretFiles = group.first() === link,
+                    targetFile = if (group.size > 1) conventionalTargetFileFor(link.environment, group.size) else link.targetFile,
+                )
+            },
+        )
         normalizedFor = accountId
     }
 
+    @Synchronized
     fun contains(link: LinkedProject): Boolean {
         val accountId = link.accountId.ifBlank { dev.envpilot.jetbrains.auth.AuthService.getInstance().userId ?: return false }
-        return state.links.any {
-            it.accountId == accountId && it.projectId == link.projectId && it.environment == link.environment &&
-                it.directoryPath == link.directoryPath
-        }
+        return state.links.any { same(it, link.copy(accountId = accountId)) }
     }
 
+    @Synchronized
     fun add(link: LinkedProject): Boolean {
-        if (link.accountId.isBlank()) {
-            link.accountId = dev.envpilot.jetbrains.auth.AuthService.getInstance().userId ?: return false
-        }
-        if (contains(link)) return false
-        state.links.add(link)
+        val accountId = link.accountId.ifBlank { dev.envpilot.jetbrains.auth.AuthService.getInstance().userId ?: return false }
+        val owned = link.copy(accountId = accountId)
+        if (contains(owned)) return false
+        write(state.links + owned)
         normalizedFor = null
         return true
     }
 
-    // Match on the stable key: callers routinely hold a copy taken before
-    // normalization rewrote targetFile/includeSecretFiles.
+    @Synchronized
     fun remove(link: LinkedProject): Boolean {
-        val removed =
-            state.links.removeAll {
-                it.projectId == link.projectId && it.directoryPath == link.directoryPath &&
-                    it.environment == link.environment && it.accountId == link.accountId
-            }
-        if (removed) normalizedFor = null
-        return removed
+        val kept = state.links.filterNot { same(it, link) }
+        if (kept.size == state.links.size) return false
+        write(kept)
+        normalizedFor = null
+        return true
     }
 
-    // Grouped by directory, not by project: two different projects sharing one
-    // folder still have to land in different files and only one may own the
-    // secret files.
-    private fun normalizeDirectories(links: List<LinkedProject>) {
-        links.groupBy { it.directoryPath to it.accountId }.values.forEach { directoryLinks ->
-            directoryLinks.forEachIndexed { index, link -> link.includeSecretFiles = index == 0 }
-            if (directoryLinks.size > 1) {
-                directoryLinks.forEach { link ->
-                    link.targetFile = conventionalTargetFileFor(link.environment, directoryLinks.size)
-                }
-            }
-        }
+    @Synchronized
+    fun recordDevice(
+        link: LinkedProject,
+        deviceId: String,
+    ): LinkedProject {
+        val updated = link.copy(deviceId = deviceId)
+        write(state.links.map { if (same(it, link)) it.copy(deviceId = deviceId) else it })
+        return updated
+    }
+
+    private fun same(
+        a: LinkedProject,
+        b: LinkedProject,
+    ) = a.accountId == b.accountId && a.projectId == b.projectId && a.environment == b.environment &&
+        a.directoryPath == b.directoryPath
+
+    private fun write(links: List<LinkedProject>) {
+        state = State().also { it.links = links.toMutableList() }
     }
 
     companion object {

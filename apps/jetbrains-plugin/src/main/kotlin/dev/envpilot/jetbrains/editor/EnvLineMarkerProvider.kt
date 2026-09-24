@@ -9,26 +9,23 @@ import com.intellij.psi.PsiPlainTextFile
 import dev.envpilot.jetbrains.sync.SyncScheduler
 import javax.swing.Icon
 
-/**
- * Gutter marker at the top of .env* files — the CodeLens analog. Click runs a
- * sync cycle; the tooltip explains the file is Envpilot-managed.
- */
 class EnvLineMarkerProvider : LineMarkerProvider {
     override fun getLineMarkerInfo(element: PsiElement): LineMarkerInfo<*>? {
         val file = element.containingFile as? PsiPlainTextFile ?: return null
-        if (!file.name.startsWith(".env")) return null
         if (element.textRange.startOffset != 0) return null
+        val path = file.virtualFile?.path ?: return null
+        if (EnvEditorService.getInstance(file.project).managed(path) == null) return null
 
         return LineMarkerInfo(
             element,
             element.textRange,
             ICON,
-            { "Envpilot-managed env file — click to sync now" },
+            { "Envpilot-managed file. Click to sync now." },
             { _, psiElement ->
                 SyncScheduler.getInstance().launch { SyncScheduler.getInstance().runCycle(psiElement.project) }
             },
             GutterIconRenderer.Alignment.LEFT,
-        ) { "Envpilot env file" }
+        ) { "Envpilot-managed file" }
     }
 
     private companion object {

@@ -24,8 +24,8 @@ import { GitCommitGuardService } from "./services/gitCommitGuard";
 import { EnvCodeLensProvider } from "./providers/envCodeLensProvider";
 import { registerAutocomplete } from "./providers/autocomplete";
 import { registerEnvHover, revealHoverValue } from "./providers/envHover";
-import { DashboardPanelProvider } from "./providers/dashboardPanel";
 import {
+  MARKETPLACE_URI,
   VersionCheckService,
   isExtensionOutdated,
 } from "./services/versionCheck";
@@ -43,6 +43,7 @@ import {
   getConvexUrl,
   shouldAutoSync,
   isCommitGuardEnabled,
+  shouldAutoInstallHook,
   getIdlePauseMinutes,
 } from "./utils/config";
 import { getDisplayPath, isPathInside } from "./utils/paths";
@@ -61,34 +62,26 @@ import {
   appendUnsyncReport,
   drainUnsyncReports,
 } from "./utils/unsyncState";
-import { roleLevel, ROLE_LEVEL, normalizeOrgRole } from "./roles";
+import { roleLevel, ROLE_LEVEL } from "./roles";
 import {
   groupProjectsForPicker,
   isRequestEligible,
 } from "./utils/requestTarget";
-import type { Project } from "./types";
+import type { AuthSession, Project } from "./types";
 import * as output from "./utils/outputChannel";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function wrapCommand(
-  fn: (...args: any[]) => Promise<any>
-): (...args: any[]) => Promise<void> {
-  return async (...args: any[]) => {
-    /* eslint-enable @typescript-eslint/no-explicit-any */
-    // Hard-block every command when the extension is below the server's minimum
-    // supported version — older builds hit auth/Convex contracts that no longer
-    // exist and fail confusingly. The version check sets this latch shortly
-    // after activation; direct the user to update instead of running anything.
+function wrapCommand<A extends unknown[]>(
+  fn: (...a: A) => Promise<unknown>
+): (...a: A) => Promise<void> {
+  return async (...args: A) => {
     if (isExtensionOutdated()) {
       const action = await vscode.window.showErrorMessage(
-        "Envpilot must be updated before you can use it — your version no longer works with the server.",
+        "Envpilot must be updated before you can use it. Your version no longer works with the server.",
         { modal: true },
         "Update"
       );
       if (action === "Update") {
-        void vscode.env.openExternal(
-          vscode.Uri.parse("vscode:extension/envpilot.envpilot")
-        );
+        void vscode.env.openExternal(vscode.Uri.parse(MARKETPLACE_URI));
       }
       return;
     }
@@ -98,7 +91,7 @@ function wrapCommand(
       captureError(err);
       const message = err instanceof Error ? err.message : String(err);
       output.error(message);
-      vscode.window.showErrorMessage(`Envpilot: ${message}`);
+      void vscode.window.showErrorMessage(`Envpilot: ${message}`);
     }
   };
 }
@@ -109,105 +102,155 @@ let tokenManager: TokenManager;
 let syncService: SyncService;
 let realTimeSyncService: RealTimeSyncService;
 let convexService: ConvexService | null = null;
+let convexReady: Promise<void> = Promise.resolve();
 let storageService: StorageService;
 let fileProtectionService: FileProtectionService;
 let clipboardGuardService: ClipboardGuardService;
 let cloakService: CloakService;
 let gitCommitGuardService: GitCommitGuardService;
 let envCodeLensProvider: EnvCodeLensProvider;
-let dashboardPanelProvider: DashboardPanelProvider;
 let projectsTreeProvider: ProjectsTreeProvider;
 let variablesTreeProvider: VariablesTreeProvider;
 let statusBarProvider: StatusBarProvider;
 let linkProjectDialog: LinkProjectDialog;
 let requestVariableDialog: RequestVariableDialog;
-/** Pending idle-grace timer armed on window blur; cleared on focus or re-blur. */
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
-/** True once the idle timer has actually paused real-time sync — distinct
- * from "window is blurred" so focus-return only calls resume() when WE were
- * the ones who paused it (never resurrects a sync the user explicitly
- * stopped, e.g. via sign-out, while idle). */
+let syncRunning = false;
 let isIdlePaused = false;
+let activeSessionId: string | null = null;
+let sessionChanges: Promise<void> = Promise.resolve();
 
-/** Update context flags used by menu when-clauses and welcome views */
-async function updateContextFlags(): Promise<void> {
-  const linkedProjects = await syncService.getAllLinkedProjectsV2();
-  const hasLinked = linkedProjects.length > 0;
-  vscode.commands.executeCommand(
-    "setContext",
-    "envpilot.hasLinkedProject",
-    hasLinked
+function canRevealSecrets(): boolean {
+  return syncService.canRevealSecrets(
+    storageService.getLinkedProjectsMetadataV2().map((p) => p.projectId)
   );
-  if (hasLinked) {
-    // Use first project's role for context flags
-    const firstProject = linkedProjects[0];
-    const role = apiService.getUserRole(firstProject.projectId);
-    const projectRole = apiService.getProjectRole(firstProject.projectId);
+}
+
+async function updateContextFlags(): Promise<void> {
+  const [authenticated, linkedProjects] = await Promise.all([
+    authService.isAuthenticated(),
+    syncService.getAllLinkedProjectsV2(),
+  ]);
+  const canSubmitRequests = linkedProjects.some(
+    (p) =>
+      apiService.getAccessMeta(p.projectId)?.capabilities?.[
+        "project.requests.submit"
+      ] === true
+  );
+  await Promise.all([
     vscode.commands.executeCommand(
       "setContext",
-      "envpilot.userRole",
-      role || ""
-    );
+      "envpilot.isAuthenticated",
+      authenticated
+    ),
     vscode.commands.executeCommand(
       "setContext",
-      "envpilot.projectRole",
-      projectRole || ""
-    );
-    // Normalized flag for menu when-clauses. Capability-driven when the
-    // server sent a capability map (registry roles, incl. custom ones);
-    // legacy role comparison otherwise.
-    const meta = apiService.getAccessMeta(firstProject.projectId);
+      "envpilot.hasLinkedProject",
+      linkedProjects.length > 0
+    ),
     vscode.commands.executeCommand(
       "setContext",
-      "envpilot.isDeveloper",
-      meta?.capabilities
-        ? meta.capabilities["project.requests.submit"] === true
-        : normalizeOrgRole(meta?.unifiedRole ?? role) === "developer"
+      "envpilot.canSubmitRequests",
+      canSubmitRequests
+    ),
+    vscode.commands.executeCommand(
+      "setContext",
+      "envpilot.canRevealSecrets",
+      canRevealSecrets()
+    ),
+  ]);
+}
+
+async function startSyncPipeline(): Promise<void> {
+  if (!vscode.workspace.isTrusted) {
+    output.log(
+      "Envpilot: workspace is in Restricted Mode, sync is paused until you trust it (cleanup still runs)."
     );
+    return;
+  }
+  if (!shouldAutoSync() || !(await authService.isAuthenticated())) return;
+
+  syncRunning = true;
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  for (const project of await syncService.getAllLinkedProjectsV2()) {
+    const inWorkspace = project.directories.some((dir) =>
+      folders.some((folder) =>
+        isPathInside(dir.directoryPath, folder.uri.fsPath)
+      )
+    );
+    if (inWorkspace) {
+      void syncService.syncAllDirectories(project).catch(captureError);
+    }
+  }
+
+  await convexReady;
+  if (!syncRunning) return;
+  syncService.startPeriodicSync();
+  await realTimeSyncService.startRealTimeSync();
+}
+
+function stopSyncPipeline(): void {
+  syncRunning = false;
+  isIdlePaused = false;
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
+  syncService.stopPeriodicSync();
+  realTimeSyncService.stopRealTimeSync();
+}
+
+function onSessionChanged(session: AuthSession | null): void {
+  sessionChanges = sessionChanges
+    .then(() => applySession(session))
+    .catch(captureError);
+}
+
+async function applySession(session: AuthSession | null): Promise<void> {
+  const sessionId = session?.user.id ?? null;
+  if (sessionId === activeSessionId) return;
+  activeSessionId = sessionId;
+  apiService.clearCache();
+  convexService?.reauthenticate();
+  if (session) {
+    setSentryUser(session.user.id);
   } else {
-    // No linked projects — clear stale role flags from a previous link
-    vscode.commands.executeCommand(
-      "setContext",
-      "envpilot.userRole",
-      undefined
-    );
-    vscode.commands.executeCommand(
-      "setContext",
-      "envpilot.projectRole",
-      undefined
-    );
-    vscode.commands.executeCommand("setContext", "envpilot.isDeveloper", false);
+    clearSentryUser();
+  }
+  projectsTreeProvider.setAuthenticated(session !== null);
+  variablesTreeProvider.refresh();
+  envCodeLensProvider.refresh();
+  void statusBarProvider.update();
+  await updateContextFlags();
+
+  stopSyncPipeline();
+  if (session) {
+    await startSyncPipeline();
   }
 }
 
-/**
- * Initialize the Convex WebSocket service.
- * Tries: 1) envpilot.convexUrl setting, 2) GET /api/extension/config from server.
- */
+async function onLinksChanged(): Promise<void> {
+  if (syncRunning && !isIdlePaused) {
+    await syncService.refreshSubscriptions();
+    await realTimeSyncService.refreshSubscriptions();
+  }
+  if (isCommitGuardEnabled() && shouldAutoInstallHook()) {
+    void gitCommitGuardService.installHooks().catch(captureError);
+  }
+  projectsTreeProvider.refresh();
+  variablesTreeProvider.refresh();
+  envCodeLensProvider.refresh();
+  void statusBarProvider.update();
+  await updateContextFlags();
+}
+
 async function initializeConvexService(): Promise<void> {
+  const convexUrl = getConvexUrl();
+  if (!convexUrl) {
+    output.warn("No Convex URL available, WebSocket sync disabled");
+    return;
+  }
   try {
-    let convexUrl = getConvexUrl();
-
-    // Auto-detect from server if not configured
-    if (!convexUrl) {
-      try {
-        const axios = (await import("axios")).default;
-        const response = await axios.get(
-          `${getServerUrl()}/api/extension/config`,
-          { timeout: 5000 }
-        );
-        convexUrl = response.data?.convexUrl || "";
-      } catch (err) {
-        captureError(err, { phase: "convex-url-autodetect" });
-        output.warn("Failed to auto-detect Convex URL from server");
-      }
-    }
-
-    if (!convexUrl) {
-      output.warn("No Convex URL available — WebSocket sync disabled");
-      return;
-    }
-
     convexService = new ConvexService(convexUrl, tokenManager.getFreshToken);
     syncService.setConvexService(convexService);
     realTimeSyncService.setConvexService(convexService);
@@ -219,49 +262,15 @@ async function initializeConvexService(): Promise<void> {
   }
 }
 
-/**
- * Fire-and-forget removal of a crash-leftover atomic-write temp, but only
- * when it is old enough that no live window can still be mid-write on it.
- */
-/**
- * Whether the signed-in user may unmask secrets, across every linked project.
- *
- * Fails closed: no linked projects, or any project whose capability map is
- * missing or denies, means no reveal.
- */
-async function canRevealSecrets(): Promise<boolean> {
-  try {
-    const projects = await storageService.getLinkedProjectsV2();
-    return syncService.canRevealSecrets(projects.map((p) => p.projectId));
-  } catch {
-    return false;
-  }
-}
-
-/** Keep the palette entry in step with the capability. */
-async function refreshRevealContext(): Promise<void> {
-  await vscode.commands.executeCommand(
-    "setContext",
-    "envpilot.canRevealSecrets",
-    await canRevealSecrets()
-  );
-}
-
 async function sweepStaleTemp(targetPath: string): Promise<void> {
-  // Temp names are `<file>.tmp-envpilot.<pid>.<n>` (unique per write, so two
-  // syncs writing the same file cannot clobber each other's temp). Scan the
-  // directory for every leftover belonging to this file rather than stat-ing
-  // one fixed name. Each still holds plaintext, so none may be left behind.
   const dir = path.dirname(targetPath);
-  // Include the separator that begins the generated suffix so a user's own
-  // file merely starting with this name is never swept.
   const prefix = `${path.basename(targetPath)}.tmp-envpilot.`;
 
   let entries: string[];
   try {
     entries = await readdir(dir);
   } catch {
-    return; // Directory gone — nothing to sweep.
+    return;
   }
 
   for (const entry of entries) {
@@ -269,104 +278,32 @@ async function sweepStaleTemp(targetPath: string): Promise<void> {
     const tmpPath = path.join(dir, entry);
     try {
       const s = await stat(tmpPath);
-      // Age-gated: the manifest is shared across extension hosts, and another
-      // live window may be mid-atomic-write on this very path — its temp is
-      // milliseconds old, a crash leftover is minutes+.
       if (Date.now() - s.mtimeMs > 60_000) {
         await unlink(tmpPath);
       }
-    } catch {
-      // Raced with the owning write finishing — fine.
-    }
+    } catch {}
   }
 }
 
 export async function activate(context: vscode.ExtensionContext) {
   initSentry();
 
-  // Sentry must be torn down/brought back up if the user flips VS Code's
-  // global telemetry setting mid-session — initSentry() already checks
-  // vscode.env.isTelemetryEnabled, but that check only runs when init is
-  // called, so a live toggle needs its own listener.
-  context.subscriptions.push(
-    vscode.env.onDidChangeTelemetryEnabled((enabled) => {
-      if (enabled) {
-        initSentry();
-        // setSentryUser() was a no-op while telemetry was off, so a
-        // sign-in that happened in the meantime never tagged the user —
-        // reapply the current identity on opt-in.
-        void authService
-          ?.getCurrentUser()
-          .then((user) => {
-            if (user) setSentryUser(user.id, user.email);
-          })
-          .catch(() => {});
-      } else {
-        void closeSentry();
-      }
-    })
-  );
-
-  // Initialize storage
   storageService = new StorageService(context);
-
-  // Run storage migration if needed
-  await storageService.migrateIfNeeded();
-
-  // Unsync-on-close crash detection: a session marker left by a dead
-  // extension host means that session never ran its deactivate() purge
-  // (crash, force-quit, power loss) — sweep the CRASHED session's recorded
-  // workspace folders NOW, before anything can trigger a fresh sync, so the
-  // purge never races a new write (the sweep would otherwise delete a
-  // just-written file whose hash matches the manifest). The sweep targets
-  // the dead session's folders, not this window's — a crash in project X
-  // must be cleaned up even when the next launch opens project Y.
-  const { crashed, deadFolders } = await reapDeadSessionMarkers();
-  await writeSessionMarker(
-    process.pid,
-    vscode.workspace.workspaceFolders?.map((folder) =>
-      path.resolve(folder.uri.fsPath)
-    ) ?? []
-  );
-  if (crashed && deadFolders.length > 0) {
-    await runUnsyncPurge("crash-sweep", deadFolders);
-  }
-
-  // Initialize services. The TokenManager owns WorkOS access-token freshness
-  // and is shared by every surface that authenticates to Convex or the vault
-  // HTTP routes (Convex WS setAuth, one-shot Convex calls, vault requests).
   tokenManager = new TokenManager(storageService);
   authService = new AuthService(storageService, tokenManager);
   apiService = new ApiService(tokenManager);
   fileProtectionService = new FileProtectionService();
   clipboardGuardService = new ClipboardGuardService();
   clipboardGuardService.activate();
-  // Re-arm the clipboard guard from the managed-files manifest BEFORE the
-  // first sync — a managed file must never sit unguarded between window
-  // reload and the sync that would re-register it. Gated on an auth session
-  // so a signed-out reload doesn't re-lock files releaseAllProtection() just
-  // released. Entries recorded by older builds lack `mode` — fail closed
-  // with the restrictive default; the next sync corrects it.
-  const rearmAuthenticated = await authService.isAuthenticated();
-  for (const entry of await readManifest(getManifestPath())) {
-    // Sweep a stale atomic-write temp a crash may have left beside the file
-    // (it holds plaintext secrets and is not itself in the manifest).
-    // Age-gated: the manifest is shared across extension hosts, and another
-    // live window may be mid-atomic-write on this very path — its temp is
-    // milliseconds old, a crash leftover is minutes+.
-    void sweepStaleTemp(entry.path);
-    if (rearmAuthenticated && existsSync(entry.path)) {
-      clipboardGuardService.protectFile(
-        entry.path,
-        entry.mode ?? "readonly-with-request"
-      );
-    }
-  }
   cloakService = new CloakService((fsPath) =>
     clipboardGuardService.isManaged(fsPath)
   );
   cloakService.activate();
-  gitCommitGuardService = new GitCommitGuardService();
+  gitCommitGuardService = new GitCommitGuardService(() =>
+    storageService
+      .getLinkedProjectsMetadataV2()
+      .flatMap((p) => p.directories.map((d) => d.directoryPath))
+  );
   syncService = new SyncService(apiService, storageService);
   syncService.setFileProtection(fileProtectionService);
   syncService.setClipboardGuard(clipboardGuardService);
@@ -375,38 +312,6 @@ export async function activate(context: vscode.ExtensionContext) {
     storageService,
     tokenManager.getFreshToken
   );
-
-  // Initialize Convex WebSocket connection in the background — the
-  // auto-detect path makes an HTTP call (up to 5s) that must not block
-  // activation. Subscriptions are wired up once it resolves.
-  const convexReady = initializeConvexService();
-
-  // Initialize commit guard in the background if enabled — it activates the
-  // Git extension and spawns git processes, which is too slow for activation.
-  if (isCommitGuardEnabled()) {
-    void gitCommitGuardService
-      .initialize()
-      .then(() => {
-        // Show one-time notification about commit guard
-        const guardNotified = context.globalState.get<boolean>(
-          "envpilot.commitGuardNotified"
-        );
-        if (!guardNotified) {
-          vscode.window.showInformationMessage(
-            "Envpilot: .env commit guard is active. A pre-commit hook has been installed to protect your secrets."
-          );
-          context.globalState.update("envpilot.commitGuardNotified", true);
-        }
-      })
-      .catch((err) => {
-        captureError(err);
-        output.error(
-          `Commit guard initialization failed: ${err instanceof Error ? err.message : String(err)}`
-        );
-      });
-  }
-
-  // Initialize UI providers
   projectsTreeProvider = new ProjectsTreeProvider(apiService, storageService);
   variablesTreeProvider = new VariablesTreeProvider(apiService, storageService);
   statusBarProvider = new StatusBarProvider(
@@ -415,18 +320,23 @@ export async function activate(context: vscode.ExtensionContext) {
     storageService
   );
   envCodeLensProvider = new EnvCodeLensProvider(storageService);
-  dashboardPanelProvider = new DashboardPanelProvider(
-    context.extensionUri,
-    authService,
-    apiService,
-    syncService,
-    storageService
-  );
   linkProjectDialog = new LinkProjectDialog(syncService);
   requestVariableDialog = new RequestVariableDialog();
 
-  // Register tree views and CodeLens provider
   context.subscriptions.push(
+    vscode.env.onDidChangeTelemetryEnabled((enabled) => {
+      if (enabled) {
+        initSentry();
+        void authService
+          .getCurrentUser()
+          .then((user) => {
+            if (user) setSentryUser(user.id);
+          })
+          .catch(captureError);
+      } else {
+        void closeSentry();
+      }
+    }),
     vscode.window.registerTreeDataProvider(
       "envpilot.projects",
       projectsTreeProvider
@@ -438,21 +348,7 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.languages.registerCodeLensProvider(
       { pattern: "**/.env*" },
       envCodeLensProvider
-    )
-  );
-
-  // Secret-name autocomplete + masked hover (both check their enable setting
-  // on every invocation, so toggling applies live without a reload).
-  const intelliSenseDeps = {
-    api: apiService,
-    auth: authService,
-    storage: storageService,
-  };
-  registerAutocomplete(context, intelliSenseDeps);
-  registerEnvHover(context, intelliSenseDeps);
-
-  // Register commands
-  context.subscriptions.push(
+    ),
     vscode.commands.registerCommand(
       "envpilot.signIn",
       wrapCommand(handleSignIn)
@@ -483,7 +379,7 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand(
       "envpilot.refresh",
-      wrapCommand(async () => handleRefresh())
+      wrapCommand(handleRefresh)
     ),
     vscode.commands.registerCommand(
       "envpilot.openDashboard",
@@ -493,7 +389,6 @@ export async function activate(context: vscode.ExtensionContext) {
       "envpilot.showStatus",
       wrapCommand(handleShowStatus)
     ),
-    // New V2 commands
     vscode.commands.registerCommand(
       "envpilot.addDirectory",
       wrapCommand(handleAddDirectory)
@@ -503,14 +398,9 @@ export async function activate(context: vscode.ExtensionContext) {
       wrapCommand(handleRemoveDirectory)
     ),
     vscode.commands.registerCommand(
-      "envpilot.selectEnvironments",
-      wrapCommand(handleSelectEnvironments)
-    ),
-    vscode.commands.registerCommand(
       "envpilot.requestVariable",
       wrapCommand(handleRequestVariable)
     ),
-    // Commit guard commands
     vscode.commands.registerCommand(
       "envpilot.installCommitGuard",
       wrapCommand(handleInstallCommitGuard)
@@ -519,23 +409,10 @@ export async function activate(context: vscode.ExtensionContext) {
       "envpilot.removeCommitGuard",
       wrapCommand(handleRemoveCommitGuard)
     ),
-    // Dashboard panel command
-    vscode.commands.registerCommand(
-      "envpilot.openDashboardPanel",
-      wrapCommand(async () => {
-        dashboardPanelProvider.show();
-      })
-    ),
-    // Value cloaking commands
     vscode.commands.registerCommand(
       "envpilot.toggleCloaking",
       wrapCommand(async () => {
-        // Gate the UNMASKING direction only. Turning cloaking off unmasks
-        // every managed file indefinitely — strictly more permissive than a
-        // 30-second reveal, so it needs the same capability. Turning it back
-        // ON is strictly more restrictive: someone who lost the capability
-        // while cloaking was off must still be able to re-mask.
-        if (cloakService.isEnabled() && !(await canRevealSecrets())) {
+        if (cloakService.isEnabled() && !canRevealSecrets()) {
           vscode.window.showWarningMessage(
             "Envpilot: your role does not allow unmasking secret values."
           );
@@ -547,11 +424,7 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "envpilot.revealValues",
       wrapCommand(async () => {
-        // Role-gated: unmasking is a capability an admin grants per role, not
-        // something every synced user gets. Checked HERE as well as via the
-        // palette's `when` clause — a context key only hides the entry, it
-        // does not stop the command being invoked by keybinding or by URI.
-        if (!(await canRevealSecrets())) {
+        if (!canRevealSecrets()) {
           vscode.window.showWarningMessage(
             "Envpilot: your role does not allow revealing secret values. Ask an organization owner if you need this."
           );
@@ -560,182 +433,47 @@ export async function activate(context: vscode.ExtensionContext) {
         cloakService.reveal();
       })
     ),
-    // Hover "Reveal value" link (role-checked; not surfaced in the palette)
     vscode.commands.registerCommand(
       "envpilot.revealHoverValue",
-      wrapCommand(async (args) => {
-        // The hover link reveals a single value, which is the same
-        // disclosure the palette command performs — gate it identically or
-        // the role restriction is bypassable one value at a time.
-        if (!(await canRevealSecrets())) {
-          vscode.window.showWarningMessage(
-            "Envpilot: your role does not allow revealing secret values."
-          );
-          return;
-        }
-        return revealHoverValue(apiService, args);
-      })
-    )
-  );
-
-  // Keep clipboard protection attached to a guarded file when it is
-  // renamed/moved (fileProtection's onDidDelete on the old path already
-  // triggers a resync of the original).
-  context.subscriptions.push(
+      wrapCommand(
+        (args?: {
+          key?: unknown;
+          projectId?: unknown;
+          environment?: unknown;
+        }) => revealHoverValue(apiService, storageService, args)
+      )
+    ),
     vscode.workspace.onDidRenameFiles((e) => {
       for (const { oldUri, newUri } of e.files) {
         clipboardGuardService.handleRename(oldUri.fsPath, newUri.fsPath);
-        // Re-key the manifest too, or the renamed file's protection is lost
-        // on reload (re-arm) and never cleaned up by purge/release.
-        void renameManagedFile(oldUri.fsPath, newUri.fsPath);
+        void renameManagedFile(oldUri.fsPath, newUri.fsPath).catch(
+          captureError
+        );
       }
-    })
-  );
-
-  // Subscribe to auth state changes
-  authService.onAuthStateChanged(async (session) => {
-    const authenticated = !!session;
-    vscode.commands.executeCommand(
-      "setContext",
-      "envpilot.isAuthenticated",
-      authenticated
-    );
-    projectsTreeProvider.setAuthenticated(authenticated);
-    variablesTreeProvider.refresh();
-    statusBarProvider.update();
-    dashboardPanelProvider.refresh();
-    await updateContextFlags();
-  });
-
-  // Check initial auth state
-  const isAuthenticated = await authService.isAuthenticated();
-  vscode.commands.executeCommand(
-    "setContext",
-    "envpilot.isAuthenticated",
-    isAuthenticated
-  );
-  projectsTreeProvider.setAuthenticated(isAuthenticated);
-  if (isAuthenticated) {
-    const currentUser = await authService.getCurrentUser();
-    if (currentUser) {
-      setSentryUser(currentUser.id, currentUser.email);
-    }
-  }
-
-  // Send unsync audit reports queued at previous shutdowns (fire-and-forget;
-  // only drain when signed in so an unauthenticated launch keeps the queue).
-  if (isAuthenticated) {
-    void (async () => {
-      const reports = await drainUnsyncReports();
-      await apiService.reportUnsync(reports);
-    })();
-  }
-
-  // Start reactive sync if authenticated and auto-sync enabled. In a
-  // Restricted Mode (untrusted) window we never write secrets, so sync and
-  // the write-triggering subscriptions stay off until trust is granted —
-  // the unsync purge and crash sweep above still ran, so previously synced
-  // files are cleaned up even in Restricted Mode.
-  const startSyncPipeline = async () => {
-    // Sync every linked project with a directory inside ANY workspace folder
-    // (multi-root aware). Projects are unique, so no directory syncs twice;
-    // syncDirectory's per-directory single-flight is the backstop.
-    const folders = vscode.workspace.workspaceFolders ?? [];
-    const linkedProjects = await syncService.getAllLinkedProjectsV2();
-    for (const project of linkedProjects) {
-      const inWorkspace = project.directories.some((dir) =>
-        folders.some((folder) =>
-          isPathInside(dir.directoryPath, folder.uri.fsPath)
-        )
-      );
-      if (inWorkspace) {
-        void syncService.syncAllDirectories(project);
-      }
-    }
-
-    await updateContextFlags();
-
-    // WebSocket subscriptions need the Convex connection — start them as
-    // soon as it's ready instead of holding up activation.
-    void convexReady.then(() => {
-      syncService.startPeriodicSync();
-      realTimeSyncService.startRealTimeSync();
-    });
-  };
-  if (isAuthenticated && shouldAutoSync()) {
-    if (vscode.workspace.isTrusted) {
-      await startSyncPipeline();
-    } else {
-      output.log(
-        "Envpilot: workspace is in Restricted Mode — sync is paused until you trust it (cleanup still runs)."
-      );
-      context.subscriptions.push(
-        vscode.workspace.onDidGrantWorkspaceTrust(() => {
-          void startSyncPipeline();
-        })
-      );
-    }
-  }
-
-  // Check for extension updates (non-blocking), then hourly — a window left
-  // open for days must still learn about a new hard block. refreshManifest's
-  // own hourly throttle keeps the actual fetches bounded.
-  const versionCheckService = new VersionCheckService(context);
-  versionCheckService.checkForUpdate();
-  const versionCheckTimer = setInterval(
-    () => void versionCheckService.checkForUpdate(),
-    60 * 60 * 1000
-  );
-  versionCheckTimer.unref?.();
-  context.subscriptions.push({
-    dispose: () => clearInterval(versionCheckTimer),
-  });
-
-  // Subscribe to real-time revocation events for UI updates
-  realTimeSyncService.onRevocationDetected(({ project, reason }) => {
-    // Drop every ApiService cache (responses, access metadata, roles) so a
-    // hover/reveal opened pre-revocation can't pass its role check or read
-    // variables from a stale cache — the refetch hits the server, which
-    // denies the revoked caller.
-    apiService.clearCache();
-    // Capabilities just went stale — re-resolve the reveal gate so a previous
-    // account's permission cannot linger in the palette.
-    void refreshRevealContext();
-    projectsTreeProvider.refresh();
-    variablesTreeProvider.refresh();
-    statusBarProvider.update();
-    dashboardPanelProvider.refresh();
-
-    output.log(`Revocation detected for ${project.projectName}: ${reason}`);
-  });
-
-  // Refresh CodeLens and dashboard when sync completes
-  syncService.onSyncComplete(() => {
-    envCodeLensProvider.refresh();
-    dashboardPanelProvider.notifySyncCompleted();
-    // Sync may have registered new managed files — re-apply cloaking.
-    cloakService.refresh();
-    // Capabilities arrive with the variables response, so the reveal gate can
-    // only be resolved once a sync has landed.
-    void refreshRevealContext();
-    void maybeShowUnsyncNotice(context);
-  });
-
-  // Listen for workspace changes
-  context.subscriptions.push(
+    }),
+    authService.onAuthStateChanged(onSessionChanged),
+    realTimeSyncService.onRevocationDetected(({ project, reason }) => {
+      apiService.clearCache();
+      projectsTreeProvider.refresh();
+      variablesTreeProvider.refresh();
+      void statusBarProvider.update();
+      void updateContextFlags().catch(captureError);
+      output.log(`Revocation detected for ${project.projectName}: ${reason}`);
+    }),
+    syncService.onSyncComplete(() => {
+      envCodeLensProvider.refresh();
+      cloakService.refresh();
+      void updateContextFlags().catch(captureError);
+      void maybeShowUnsyncNotice(context);
+    }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       variablesTreeProvider.refresh();
-      statusBarProvider.update();
-      dashboardPanelProvider.refresh();
-    })
-  );
-
-  // Pause real-time Convex subscriptions after the window sits unfocused for
-  // envpilot.idlePauseMinutes, resume them the moment focus returns. Inert
-  // when signed out or auto-sync is off — a forgotten, unfocused window
-  // should stop holding a live WebSocket + reconnect timer all day.
-  context.subscriptions.push(
-    vscode.window.onDidChangeWindowState(async (windowState) => {
+      void statusBarProvider.update();
+    }),
+    vscode.workspace.onDidGrantWorkspaceTrust(() => {
+      void startSyncPipeline().catch(captureError);
+    }),
+    vscode.window.onDidChangeWindowState((windowState) => {
       if (idleTimer) {
         clearTimeout(idleTimer);
         idleTimer = null;
@@ -744,27 +482,19 @@ export async function activate(context: vscode.ExtensionContext) {
       if (windowState.focused) {
         if (!isIdlePaused) return;
         isIdlePaused = false;
-        const authenticated = await authService.isAuthenticated();
-        if (!authenticated || !shouldAutoSync()) return;
-        realTimeSyncService.resume();
+        void realTimeSyncService.resume().catch(captureError);
         syncService.resume();
         output.log("Envpilot: real-time sync resumed");
         return;
       }
 
-      // Window just lost focus — arm the idle-grace timer. Re-read the
-      // setting on every blur so a config change applies without reload.
       const idleMinutes = getIdlePauseMinutes();
-      if (idleMinutes <= 0) return; // 0 disables idle-pausing
-
-      const authenticated = await authService.isAuthenticated();
-      if (!authenticated || !shouldAutoSync()) return;
+      if (idleMinutes <= 0 || !syncRunning) return;
 
       idleTimer = setTimeout(
-        async () => {
+        () => {
           idleTimer = null;
-          const stillAuthenticated = await authService.isAuthenticated();
-          if (!stillAuthenticated || !shouldAutoSync()) return;
+          if (vscode.window.state.focused || !syncRunning) return;
           realTimeSyncService.pause();
           syncService.pause();
           isIdlePaused = true;
@@ -774,164 +504,160 @@ export async function activate(context: vscode.ExtensionContext) {
         },
         idleMinutes * 60 * 1000
       );
-    })
+    }),
+    {
+      dispose: () => {
+        if (idleTimer) {
+          clearTimeout(idleTimer);
+          idleTimer = null;
+        }
+        authService.dispose();
+        syncService.dispose();
+        realTimeSyncService.dispose();
+        convexService?.dispose();
+        fileProtectionService.dispose();
+        clipboardGuardService.dispose();
+        cloakService.dispose();
+        gitCommitGuardService.dispose();
+        envCodeLensProvider.dispose();
+        projectsTreeProvider.dispose();
+        variablesTreeProvider.dispose();
+        statusBarProvider.dispose();
+        output.dispose();
+      },
+    }
   );
 
-  // Add cleanup to subscriptions
-  context.subscriptions.push({
-    dispose: () => {
-      if (idleTimer) {
-        clearTimeout(idleTimer);
-        idleTimer = null;
+  const intelliSenseDeps = {
+    api: apiService,
+    auth: authService,
+    storage: storageService,
+  };
+  registerAutocomplete(context, intelliSenseDeps);
+  registerEnvHover(context, intelliSenseDeps);
+
+  try {
+    await storageService.migrateIfNeeded();
+
+    const { crashed, deadFolders } = await reapDeadSessionMarkers();
+    await writeSessionMarker(
+      process.pid,
+      vscode.workspace.workspaceFolders?.map((folder) =>
+        path.resolve(folder.uri.fsPath)
+      ) ?? []
+    );
+    if (crashed && deadFolders.length > 0) {
+      await runUnsyncPurge("crash-sweep", deadFolders);
+    }
+
+    convexReady = initializeConvexService();
+
+    const session = await authService.getSession();
+    activeSessionId = session?.user.id ?? null;
+    for (const entry of await readManifest(getManifestPath())) {
+      void sweepStaleTemp(entry.path).catch(captureError);
+      if (session && existsSync(entry.path)) {
+        clipboardGuardService.protectFile(
+          entry.path,
+          entry.mode ?? "readonly-with-request"
+        );
       }
-      authService.dispose();
-      syncService.dispose();
-      realTimeSyncService.dispose();
-      convexService?.dispose();
-      fileProtectionService.dispose();
-      clipboardGuardService.dispose();
-      cloakService.dispose();
-      gitCommitGuardService.dispose();
-      envCodeLensProvider.dispose();
-      dashboardPanelProvider.dispose();
-      projectsTreeProvider.dispose();
-      variablesTreeProvider.dispose();
-      statusBarProvider.dispose();
-      output.dispose();
-    },
-  });
+    }
+
+    projectsTreeProvider.setAuthenticated(session !== null);
+    await updateContextFlags();
+
+    if (session) {
+      setSentryUser(session.user.id);
+      void drainUnsyncReports((reports) =>
+        apiService.reportUnsync(reports)
+      ).catch(captureError);
+    }
+
+    if (isCommitGuardEnabled()) {
+      void gitCommitGuardService
+        .initialize()
+        .then(() =>
+          shouldAutoInstallHook() ? gitCommitGuardService.installHooks() : 0
+        )
+        .then((installed) => {
+          if (
+            installed > 0 &&
+            !context.globalState.get<boolean>("envpilot.commitGuardNotified")
+          ) {
+            void vscode.window.showInformationMessage(
+              "Envpilot: .env commit guard is active. A pre-commit hook has been installed to protect your secrets."
+            );
+            void context.globalState.update(
+              "envpilot.commitGuardNotified",
+              true
+            );
+          }
+        })
+        .catch(captureError);
+    }
+
+    void startSyncPipeline().catch(captureError);
+
+    const versionCheckService = new VersionCheckService(context);
+    void versionCheckService.checkForUpdate().catch(captureError);
+    const versionCheckTimer = setInterval(
+      () => void versionCheckService.checkForUpdate().catch(captureError),
+      60 * 60 * 1000
+    );
+    versionCheckTimer.unref?.();
+    context.subscriptions.push({
+      dispose: () => clearInterval(versionCheckTimer),
+    });
+  } catch (err) {
+    captureError(err, { phase: "activate" });
+  }
 }
 
 async function handleSignIn(): Promise<void> {
-  const success = await authService.signIn();
-  if (success) {
-    // The Convex socket may still be authenticated as a previous account (or
-    // unauthenticated) — force it to re-run the token fetch before any
-    // subscriptions start, same as switchToAccount.
-    convexService?.reauthenticate();
-    // If sign-in added a new account alongside existing ones, point the user
-    // at the switcher — AuthService.signIn() already showed the plain
-    // "Signed in as <email>" toast for the single-account case.
-    const user = await authService.getCurrentUser();
-    if (user) {
-      setSentryUser(user.id, user.email);
-    }
-    const accounts = await storageService.listAccounts();
-    if (user && accounts.length > 1) {
-      vscode.window.showInformationMessage(
-        `Signed in as ${user.email}. You have ${accounts.length} accounts — use "Envpilot: Switch Account" to switch.`
-      );
-    }
-
-    // Show progress while loading initial data
-    await vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Notification,
-        title: "Envpilot: Setting up...",
-      },
-      async (progress) => {
-        progress.report({ message: "Loading projects and variables..." });
-        projectsTreeProvider.refresh();
-        variablesTreeProvider.refresh();
-
-        if (shouldAutoSync()) {
-          progress.report({ message: "Starting sync..." });
-          syncService.startPeriodicSync();
-          realTimeSyncService.startRealTimeSync();
-        }
-      }
+  if (!(await authService.signIn())) return;
+  const [user, accounts] = await Promise.all([
+    authService.getCurrentUser(),
+    authService.listAccounts(),
+  ]);
+  if (user && accounts.length > 1) {
+    vscode.window.showInformationMessage(
+      `Signed in as ${user.email}. You have ${accounts.length} accounts, use "Envpilot: Switch Account" to switch.`
     );
   }
 }
 
-/**
- * Release every managed file's local locks after a FULL sign-out: stop the
- * revert watcher, restore normal permissions, drop the clipboard guard. Files
- * stay on disk — sign-out is not revocation — but a signed-out user must not
- * be left with read-only, clipboard-blocked files and no way to release them.
- */
 async function releaseAllProtection(): Promise<void> {
   for (const entry of await readManifest(getManifestPath())) {
     fileProtectionService.unwatchFile(entry.path);
-    try {
-      await chmod(entry.path, 0o644);
-    } catch {
-      // File may already be gone.
-    }
+    await chmod(entry.path, 0o600).catch(() => {});
     clipboardGuardService.unprotectFile(entry.path);
   }
-  // Unmask already-open editors immediately — cloaking keys off the guard's
-  // managed map, which the loop above just emptied.
   cloakService.refresh();
 }
 
 async function handleSignOut(): Promise<void> {
   await authService.signOut();
-  clearSentryUser();
-  apiService.clearCache();
-  // Capabilities just went stale — re-resolve the reveal gate so a previous
-  // account's permission cannot linger in the palette.
-  void refreshRevealContext();
-  syncService.stopPeriodicSync();
-  realTimeSyncService.stopRealTimeSync();
-  projectsTreeProvider.refresh();
-  variablesTreeProvider.refresh();
-
-  // authService.signOut() only ever removes the active account, so another
-  // account may now be active. Restore the "signed in" UI state for it
-  // instead of leaving things in the signed-out state the auth-state-changed
-  // handler just applied.
-  const remainingSession = await storageService.getAuthSession();
-  if (remainingSession) {
-    // The Convex socket is still authenticated as the signed-out account —
-    // force a token re-fetch before subscriptions restart under the new one.
-    convexService?.reauthenticate();
-    setSentryUser(remainingSession.user.id, remainingSession.user.email);
-    vscode.commands.executeCommand(
-      "setContext",
-      "envpilot.isAuthenticated",
-      true
-    );
-    projectsTreeProvider.setAuthenticated(true);
-    statusBarProvider.update();
-    dashboardPanelProvider.refresh();
-    await updateContextFlags();
-
-    if (shouldAutoSync()) {
-      // refreshSubscriptions() already sets up the metadata subscriptions.
-      await syncService.refreshSubscriptions();
-      await realTimeSyncService.refreshSubscriptions();
-      realTimeSyncService.startRealTimeSync();
-    }
-
+  const remaining = await authService.getCurrentUser();
+  if (remaining) {
     vscode.window.showInformationMessage(
-      `Envpilot: Now signed in as ${remainingSession.user.email}.`
+      `Envpilot: Now signed in as ${remaining.email}.`
     );
   } else {
     await releaseAllProtection();
-    vscode.window.showInformationMessage("Signed out.");
   }
 }
 
-/**
- * Switch the active account among all accounts signed in to this machine.
- * Mirrors the post-auth refresh handleSignIn performs (tree/status bar/
- * dashboard refresh + subscription restart) since switching accounts changes
- * which organization/project data and access tokens are in scope, just like
- * a fresh sign-in does.
- */
 async function handleSwitchAccount(): Promise<void> {
-  const accounts = await storageService.listAccounts();
+  const accounts = await authService.listAccounts();
 
-  // Nothing to switch between yet — go straight to sign-in.
   if (accounts.length === 0) {
     await handleSignIn();
     return;
   }
 
-  const activeAccountId = await storageService.getActiveAccountId();
+  const activeAccountId = await authService.getActiveAccountId();
 
-  const ADD_ACCOUNT = "$(add) Add Account";
   type AccountPick = vscode.QuickPickItem & {
     accountId?: string;
     isAdd?: boolean;
@@ -952,7 +678,7 @@ async function handleSwitchAccount(): Promise<void> {
   items.push(
     { label: "", kind: vscode.QuickPickItemKind.Separator },
     {
-      label: ADD_ACCOUNT,
+      label: "$(add) Add Account",
       description: "Sign in to another account",
       isAdd: true,
     }
@@ -975,69 +701,22 @@ async function handleSwitchAccount(): Promise<void> {
     return;
   }
 
-  // Selecting the account already active is a no-op.
   if (!picked.accountId || picked.accountId === activeAccountId) {
     return;
   }
 
-  await switchToAccount(picked.accountId);
-}
-
-/**
- * Make `accountId` the active account and refresh every surface (tree, status
- * bar, dashboard, subscriptions). Shared by the account picker and any other
- * caller that needs to switch the active session.
- */
-async function switchToAccount(accountId: string): Promise<void> {
-  const switched = await storageService.setActiveAccount(accountId);
-  if (!switched) {
+  if (!(await authService.switchAccount(picked.accountId))) {
     vscode.window.showErrorMessage("Envpilot: Failed to switch account.");
     return;
   }
-
-  apiService.clearCache();
-  // Capabilities just went stale — re-resolve the reveal gate so a previous
-  // account's permission cannot linger in the palette.
-  void refreshRevealContext();
-  // The Convex socket is still authenticated as the PREVIOUS account — force
-  // it to re-run the token fetch so subscriptions come up under the new one.
-  convexService?.reauthenticate();
-
-  await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: "Envpilot: Switching account...",
-    },
-    async (progress) => {
-      progress.report({ message: "Loading projects and variables..." });
-      projectsTreeProvider.refresh();
-      variablesTreeProvider.refresh();
-      statusBarProvider.update();
-      dashboardPanelProvider.refresh();
-      await updateContextFlags();
-
-      if (shouldAutoSync()) {
-        progress.report({ message: "Starting sync..." });
-        // refreshSubscriptions() already sets up the metadata subscriptions.
-        await syncService.refreshSubscriptions();
-        await realTimeSyncService.refreshSubscriptions();
-        realTimeSyncService.startRealTimeSync();
-      }
-    }
-  );
-
   const active = await authService.getCurrentUser();
-  if (active) {
-    setSentryUser(active.id, active.email);
-  }
   vscode.window.showInformationMessage(
     `Switched to ${active?.email ?? "account"}.`
   );
 }
 
-/** Sign out of every account stored on this machine. */
 async function handleSignOutAll(): Promise<void> {
-  const accounts = await storageService.listAccounts();
+  const accounts = await authService.listAccounts();
 
   if (accounts.length === 0) {
     vscode.window.showInformationMessage("Envpilot: Not signed in.");
@@ -1056,40 +735,13 @@ async function handleSignOutAll(): Promise<void> {
     return;
   }
 
-  // Best-effort remote revoke of every account's WorkOS session before the
-  // local credentials are wiped.
-  await authService.revokeAllSessions();
-  await storageService.clearAllAccounts();
-  clearSentryUser();
-
-  // Mirror handleSignOut's teardown plus the context/UI refresh that
-  // AuthService.onAuthStateChanged normally drives, since clearAllAccounts()
-  // bypasses authService.signOut() (which only removes the active account
-  // and shows a single-account message).
-  apiService.clearCache();
-  // Capabilities just went stale — re-resolve the reveal gate so a previous
-  // account's permission cannot linger in the palette.
-  void refreshRevealContext();
-  syncService.stopPeriodicSync();
-  realTimeSyncService.stopRealTimeSync();
-  vscode.commands.executeCommand(
-    "setContext",
-    "envpilot.isAuthenticated",
-    false
-  );
-  projectsTreeProvider.setAuthenticated(false);
-  variablesTreeProvider.refresh();
-  statusBarProvider.update();
-  dashboardPanelProvider.refresh();
-  await updateContextFlags();
+  await authService.signOutAll();
   await releaseAllProtection();
-
   vscode.window.showInformationMessage("Signed out of all Envpilot accounts.");
 }
 
 async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
-  const isAuthenticated = await authService.isAuthenticated();
-  if (!isAuthenticated) {
+  if (!(await authService.isAuthenticated())) {
     const shouldSignIn = await vscode.window.showWarningMessage(
       "You need to sign in to link a project.",
       "Sign In"
@@ -1112,27 +764,22 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
     | undefined;
 
   if (item?.project) {
-    projectId = item.project._id;
-    projectName = item.project.name;
-    organizationId =
-      item.organization?._id || item.project.organizationId || "";
+    const itemProject = item.project;
+    projectId = itemProject._id;
+    projectName = itemProject.name;
+    organizationId = item.organization?._id || itemProject.organizationId || "";
     organizationName = item.organizationName || "Unknown";
-    project = item.project;
+    project = itemProject;
     organization = item.organization;
 
-    // Fallback: if organization is missing from the tree item, resolve it from
-    // the project's organizationId via the organizations API
-    if (!organization && item.project.organizationId) {
+    if (!organization && itemProject.organizationId) {
       const orgs = await apiService.getOrganizations();
-      organization = orgs.find(
-        (org) => org._id === item.project!.organizationId
-      );
+      organization = orgs.find((org) => org._id === itemProject.organizationId);
       if (organization) {
         organizationName = organization.name;
       }
     }
   } else {
-    // Show project picker
     const organizations = await apiService.getOrganizations();
 
     if (organizations.length === 0) {
@@ -1140,7 +787,6 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
       return;
     }
 
-    // Pick organization
     const orgPick = await vscode.window.showQuickPick(
       organizations.map((org) => ({
         label: org.name,
@@ -1154,7 +800,6 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
       return;
     }
 
-    // Check tier access
     const accessCheck = await apiService.checkExtensionAccess(
       orgPick.organization._id
     );
@@ -1165,7 +810,6 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
       return;
     }
 
-    // Get projects
     const projects = await apiService.getProjects(orgPick.organization._id);
 
     if (projects.length === 0) {
@@ -1175,7 +819,6 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
       return;
     }
 
-    // Pick project
     const projectPick = await vscode.window.showQuickPick(
       projects.map((p) => ({
         label: p.name,
@@ -1197,11 +840,9 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
     organization = orgPick.organization;
   }
 
-  // Check if this specific project is already linked
   const existingProject = await storageService.getLinkedProjectV2(projectId);
 
   if (existingProject) {
-    // Same project — offer to add another directory
     const choice = await vscode.window.showInformationMessage(
       `"${projectName}" is already linked. Add another directory?`,
       "Add Directory",
@@ -1213,39 +854,19 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
         await linkProjectDialog.showAddDirectoryDialog(projectName);
       if (!linkOptions) return;
 
-      try {
-        await syncService.addDirectoryToProject(existingProject, linkOptions);
-
-        vscode.window.showInformationMessage(
-          `Added ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`
-        );
-
-        projectsTreeProvider.refresh();
-        variablesTreeProvider.refresh();
-        statusBarProvider.update();
-
-        // Refresh WebSocket subscriptions so the new directory is reactive.
-        await syncService.refreshSubscriptions();
-        await realTimeSyncService.refreshSubscriptions();
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
-        vscode.window.showErrorMessage(`Failed to add directory: ${message}`);
-      }
+      await syncService.addDirectoryToProject(existingProject, linkOptions);
+      vscode.window.showInformationMessage(
+        `Added ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`
+      );
+      await onLinksChanged();
     }
     return;
   }
 
-  // Check if other projects are already linked — enforce role-based limit
   const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
   if (allLinkedProjects.length > 0) {
-    // Warm the role cache before gating — getUserRole() reads a lazily
-    // populated map, so a cold cache would false-negative for legit
-    // admins/team-leads. getProjects() populates roles as a side effect.
     await apiService.getProjects();
 
-    // Check whether the user is team-lead-or-above in ANY linked project.
-    // roleLevel/normalizeOrgRole handle legacy role strings transparently.
     const canLinkMultiple = allLinkedProjects.some(
       (p) =>
         roleLevel(apiService.getUserRole(p.projectId)) >= ROLE_LEVEL.team_lead
@@ -1259,82 +880,62 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
     }
   }
 
-  // Show link dialog for new project
   if (!project || !organization) {
     vscode.window.showErrorMessage("Project or organization not found");
     return;
   }
 
-  const projectForDialog = {
-    _id: projectId,
-    name: projectName,
-    slug: projectName.toLowerCase().replace(/\s+/g, "-"),
-    description: project.description || null,
-    organizationId: organization._id,
-    icon: null,
-    color: null,
-  };
-
-  const organizationForDialog = {
-    _id: organization._id,
-    name: organizationName,
-    slug: organizationName.toLowerCase().replace(/\s+/g, "-"),
-    tier: organization.tier,
-  };
-
   const linkOptions = await linkProjectDialog.showLinkDialog(
-    projectForDialog,
-    organizationForDialog
+    {
+      _id: projectId,
+      name: projectName,
+      slug: projectName.toLowerCase().replace(/\s+/g, "-"),
+      description: project.description || null,
+      organizationId: organization._id,
+      icon: null,
+      color: null,
+    },
+    {
+      _id: organization._id,
+      name: organizationName,
+      slug: organizationName.toLowerCase().replace(/\s+/g, "-"),
+      tier: organization.tier,
+    }
   );
   if (!linkOptions) return;
 
-  // Link the extension
-  try {
-    const deviceInfo = await getDeviceInfo(storageService.getContext());
-    const access = await apiService.linkExtension(projectId, deviceInfo);
+  const deviceInfo = await getDeviceInfo(storageService.getContext());
+  const access = await apiService.linkExtension(projectId, deviceInfo);
 
-    await syncService.linkProjectWithDirectory(
-      projectId,
-      projectName,
-      organizationId,
-      organizationName,
-      access.accessToken,
-      access.expiresAt,
-      linkOptions
-    );
+  await syncService.linkProjectWithDirectory(
+    projectId,
+    projectName,
+    organizationId,
+    organizationName,
+    access.accessToken,
+    access.expiresAt,
+    linkOptions
+  );
 
-    vscode.window.showInformationMessage(
-      `Linked ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`
-    );
-    projectsTreeProvider.refresh();
-    variablesTreeProvider.refresh();
-    statusBarProvider.update();
-    await updateContextFlags();
-
-    // Refresh WebSocket subscriptions to include new project
-    await realTimeSyncService.refreshSubscriptions();
-    await syncService.refreshSubscriptions();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    vscode.window.showErrorMessage(`Failed to link project: ${message}`);
-  }
+  vscode.window.showInformationMessage(
+    `Linked ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`
+  );
+  await onLinksChanged();
 }
 
 async function handleAddDirectory(item?: ProjectTreeItem): Promise<void> {
-  const isAuthenticated = await authService.isAuthenticated();
-  if (!isAuthenticated) {
+  if (!(await authService.isAuthenticated())) {
     vscode.window.showWarningMessage("Please sign in first");
     return;
   }
 
-  let projectId: string | undefined;
-  let projectName: string | undefined;
+  let projectId: string;
+  let projectName: string;
 
   if (item?.project) {
     projectId = item.project._id;
     projectName = item.project.name;
   } else {
-    // Get linked projects and let user choose
     const linkedProjects = await storageService.getLinkedProjectsV2();
     if (linkedProjects.length === 0) {
       vscode.window.showWarningMessage(
@@ -1358,34 +959,21 @@ async function handleAddDirectory(item?: ProjectTreeItem): Promise<void> {
     projectName = projectPick.label;
   }
 
-  const project = await storageService.getLinkedProjectV2(projectId!);
+  const project = await storageService.getLinkedProjectV2(projectId);
   if (!project) {
     vscode.window.showWarningMessage("Project not found");
     return;
   }
 
-  const linkOptions = await linkProjectDialog.showAddDirectoryDialog(
-    projectName!
-  );
+  const linkOptions =
+    await linkProjectDialog.showAddDirectoryDialog(projectName);
   if (!linkOptions) return;
 
-  try {
-    await syncService.addDirectoryToProject(project, linkOptions);
-
-    vscode.window.showInformationMessage(
-      `Added ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`
-    );
-
-    projectsTreeProvider.refresh();
-    variablesTreeProvider.refresh();
-
-    // Refresh WebSocket subscriptions so the new directory is reactive.
-    await syncService.refreshSubscriptions();
-    await realTimeSyncService.refreshSubscriptions();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    vscode.window.showErrorMessage(`Failed to add directory: ${message}`);
-  }
+  await syncService.addDirectoryToProject(project, linkOptions);
+  vscode.window.showInformationMessage(
+    `Added ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`
+  );
+  await onLinksChanged();
 }
 
 async function handleRemoveDirectory(
@@ -1407,7 +995,6 @@ async function handleRemoveDirectory(
   }
 
   if (!projectId || !directoryPath) {
-    // No usable context — let the user pick from all linked directories
     const linked = await storageService.getLinkedProjectsV2();
     const picks = linked.flatMap((p) =>
       p.directories.map((d) => ({
@@ -1441,37 +1028,17 @@ async function handleRemoveDirectory(
     return;
   }
 
-  try {
-    await syncService.removeDirectoryFromProject(projectId, directoryPath);
-
-    vscode.window.showInformationMessage("Directory removed");
-    projectsTreeProvider.refresh();
-    variablesTreeProvider.refresh();
-    statusBarProvider.update();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    vscode.window.showErrorMessage(`Failed to remove directory: ${message}`);
-  }
-}
-
-async function handleSelectEnvironments(item?: ProjectTreeItem): Promise<void> {
-  // This would allow updating which environments sync to a specific directory
-  // For now, show a message that this feature requires relinking
-  vscode.window.showInformationMessage(
-    "To change environments, remove and re-add the directory with different environment settings."
-  );
+  await syncService.removeDirectoryFromProject(projectId, directoryPath);
+  vscode.window.showInformationMessage("Directory removed");
+  await onLinksChanged();
 }
 
 async function handleRequestVariable(): Promise<void> {
-  const isAuth = await authService.isAuthenticated();
-  if (!isAuth) {
+  if (!(await authService.isAuthenticated())) {
     vscode.window.showWarningMessage("Please sign in first");
     return;
   }
 
-  // Fetch every accessible project (no org arg = all orgs) plus org names for
-  // grouping, the active account email for the title, and the workspace's
-  // linked project so it can lead as the default. All are cached + coalesced.
   const [projects, orgs, currentUser, currentLinked] = await Promise.all([
     apiService.getProjects(),
     apiService.getOrganizations(),
@@ -1480,16 +1047,13 @@ async function handleRequestVariable(): Promise<void> {
   ]);
 
   const rows = groupProjectsForPicker(projects, orgs, currentLinked?.projectId);
-  const hasEligible = rows.some((r) => r.kind === "project");
-  if (!hasEligible) {
-    // Owners/PMs/team leads have direct write access — requests aren't for them.
+  if (!rows.some((r) => r.kind === "project")) {
     vscode.window.showInformationMessage(
-      "You have direct write access in your projects — create variables from the dashboard."
+      "You have direct write access in your projects. Create variables from the dashboard."
     );
     return;
   }
 
-  // Map the pure rows onto QuickPickItems, carrying the Project on each pick.
   type ProjectQuickPickItem = vscode.QuickPickItem & { project?: Project };
   const items: ProjectQuickPickItem[] = rows.map((row) =>
     row.kind === "separator"
@@ -1503,7 +1067,7 @@ async function handleRequestVariable(): Promise<void> {
 
   const email = currentUser?.email ?? "unknown";
   const pick = await vscode.window.showQuickPick(items, {
-    title: `Request Variable — choose project (signed in as ${email})`,
+    title: `Request Variable: choose project (signed in as ${email})`,
     placeHolder: "Select the project this variable request targets",
   });
   if (!pick?.project) {
@@ -1511,9 +1075,6 @@ async function handleRequestVariable(): Promise<void> {
   }
   const project = pick.project;
 
-  // Defense-in-depth: re-derive the eligibility guard from the PICKED project.
-  // groupProjectsForPicker already filtered to eligible projects, so this only
-  // fires if that invariant is ever violated.
   if (!isRequestEligible(project)) {
     vscode.window.showInformationMessage(
       "As an owner, project manager, or team lead you can create variables directly on the dashboard."
@@ -1521,9 +1082,6 @@ async function handleRequestVariable(): Promise<void> {
     return;
   }
 
-  // Scope-aware environments come from the picked project. An explicit empty
-  // scope means the developer has no environment access here — bail before the
-  // dialog offers an impossible pick.
   const scope = project.environmentScope;
   if (scope && scope.length === 0) {
     vscode.window.showWarningMessage(
@@ -1531,17 +1089,15 @@ async function handleRequestVariable(): Promise<void> {
     );
     return;
   }
-  const allowedEnvironments = scope && scope.length > 0 ? scope : undefined;
 
   const input = await requestVariableDialog.showRequestDialog(
     project,
-    allowedEnvironments
+    scope && scope.length > 0 ? scope : undefined
   );
   if (!input) {
     return;
   }
 
-  // Step 6/6: modal confirmation summarizing the request before submitting.
   const orgName =
     orgs.find((o) => o._id === project.organizationId)?.name ??
     project.organizationId;
@@ -1551,7 +1107,7 @@ async function handleRequestVariable(): Promise<void> {
       modal: true,
       detail: [
         `Key: ${input.key}`,
-        `Project: ${project.name} — ${orgName}`,
+        `Project: ${project.name} (${orgName})`,
         `Environments: ${input.environments.join(", ")}`,
         `Sensitive: ${input.isSensitive ? "Yes" : "No"}`,
       ].join("\n"),
@@ -1562,38 +1118,36 @@ async function handleRequestVariable(): Promise<void> {
     return;
   }
 
-  try {
-    await vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Notification,
-        title: "Envpilot: Submitting variable request...",
-      },
-      async () => {
-        await apiService.submitVariableRequest(input);
-      }
-    );
-    vscode.window.showInformationMessage(
-      `Variable request "${input.key}" submitted for ${project.name} (${orgName}) — pending review.`
-    );
-    variablesTreeProvider.refresh();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    vscode.window.showErrorMessage(
-      `Failed to submit variable request: ${message}`
-    );
-  }
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Envpilot: Submitting variable request...",
+    },
+    () => apiService.submitVariableRequest(input)
+  );
+  vscode.window.showInformationMessage(
+    `Variable request "${input.key}" submitted for ${project.name} (${orgName}), pending review.`
+  );
+  variablesTreeProvider.refresh();
 }
 
 async function handleUnlinkProject(item?: ProjectTreeItem): Promise<void> {
-  // Try V2 first
   const allLinkedV2 = await syncService.getAllLinkedProjectsV2();
 
   if (allLinkedV2.length > 0) {
-    let targetProject = item?.project?._id
-      ? allLinkedV2.find((p) => p.projectId === item.project!._id) || null
-      : null;
+    const itemProjectId = item?.project?._id;
+    let targetProject = itemProjectId
+      ? allLinkedV2.find((p) => p.projectId === itemProjectId)
+      : undefined;
 
-    // If no tree item context and multiple projects, show picker
+    if (itemProjectId && !targetProject) {
+      vscode.window.showWarningMessage(
+        "Envpilot: this project is no longer linked."
+      );
+      await onLinksChanged();
+      return;
+    }
+
     if (!targetProject && allLinkedV2.length > 1) {
       const pick = await vscode.window.showQuickPick(
         allLinkedV2.map((p) => ({
@@ -1605,9 +1159,8 @@ async function handleUnlinkProject(item?: ProjectTreeItem): Promise<void> {
       );
       if (!pick) return;
       targetProject = pick.project;
-    } else if (!targetProject) {
-      targetProject = allLinkedV2[0];
     }
+    targetProject ??= allLinkedV2[0];
 
     const confirm = await vscode.window.showWarningMessage(
       `Unlink "${targetProject.projectName}"? This will remove all synced .env files (${targetProject.directories.length} director${targetProject.directories.length === 1 ? "y" : "ies"}).`,
@@ -1619,35 +1172,18 @@ async function handleUnlinkProject(item?: ProjectTreeItem): Promise<void> {
       return;
     }
 
-    try {
-      const deviceInfo = await getDeviceInfo(storageService.getContext());
-      await apiService.unlinkExtension(
-        targetProject.projectId,
-        deviceInfo.deviceId
-      );
+    const deviceInfo = await getDeviceInfo(storageService.getContext());
+    await apiService.unlinkExtension(
+      targetProject.projectId,
+      deviceInfo.deviceId
+    );
+    await syncService.cleanupAllDirectories(targetProject);
 
-      // Clean up all directories
-      await syncService.cleanupAllDirectories(targetProject);
-      await storageService.removeLinkedProjectV2(targetProject.projectId);
-
-      // Tear down the unlinked project's WebSocket subscriptions so no stale
-      // subscription lingers on the now-revoked access token.
-      await syncService.refreshSubscriptions();
-      await realTimeSyncService.refreshSubscriptions();
-
-      vscode.window.showInformationMessage("Project unlinked");
-      projectsTreeProvider.refresh();
-      variablesTreeProvider.refresh();
-      statusBarProvider.update();
-      await updateContextFlags();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      vscode.window.showErrorMessage(`Failed to unlink project: ${message}`);
-    }
+    vscode.window.showInformationMessage("Project unlinked");
+    await onLinksChanged();
     return;
   }
 
-  // Fallback to V1
   const linkedProject = await syncService.getLinkedProject();
 
   if (!linkedProject) {
@@ -1667,106 +1203,74 @@ async function handleUnlinkProject(item?: ProjectTreeItem): Promise<void> {
     return;
   }
 
-  try {
-    const deviceInfo = await getDeviceInfo(storageService.getContext());
-    await apiService.unlinkExtension(projectId, deviceInfo.deviceId);
-    await syncService.unlinkProject(projectId);
+  const deviceInfo = await getDeviceInfo(storageService.getContext());
+  await apiService.unlinkExtension(projectId, deviceInfo.deviceId);
+  await syncService.unlinkProject(projectId);
 
-    vscode.window.showInformationMessage("Project unlinked");
-    projectsTreeProvider.refresh();
-    variablesTreeProvider.refresh();
-    statusBarProvider.update();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    vscode.window.showErrorMessage(`Failed to unlink project: ${message}`);
-  }
+  vscode.window.showInformationMessage("Project unlinked");
+  await onLinksChanged();
 }
 
 async function handlePullVariables(): Promise<void> {
-  const isAuthenticated = await authService.isAuthenticated();
-  if (!isAuthenticated) {
+  if (!(await authService.isAuthenticated())) {
     vscode.window.showWarningMessage("Please sign in first");
     return;
   }
 
-  try {
-    await vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Notification,
-        title: "Envpilot: Pulling variables...",
-      },
-      async () => {
-        statusBarProvider.setSyncing(true);
-        dashboardPanelProvider.notifySyncStarted();
-
-        // Sync all linked projects (V2) in parallel
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Envpilot: Pulling variables...",
+    },
+    async () => {
+      statusBarProvider.setSyncing(true);
+      try {
         const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
-        if (allLinkedProjects.length > 0) {
-          const resultsPerProject = await Promise.all(
-            allLinkedProjects.map((project) =>
-              syncService.syncAllDirectories(project)
-            )
-          );
-
-          let totalSuccessful = 0;
-          let totalDirs = 0;
-          for (const results of resultsPerProject) {
-            totalSuccessful += results.filter((r) => r.success).length;
-            totalDirs += results.length;
-          }
-
-          statusBarProvider.setSyncing(false);
-
-          if (totalDirs > 0) {
-            const projectCount = allLinkedProjects.length;
-            const projectLabel =
-              projectCount > 1 ? ` across ${projectCount} projects` : "";
-            if (totalSuccessful === totalDirs) {
-              vscode.window.showInformationMessage(
-                `Synced ${totalSuccessful} director${totalSuccessful === 1 ? "y" : "ies"}${projectLabel}`
-              );
-            } else {
-              vscode.window.showWarningMessage(
-                `Synced ${totalSuccessful}/${totalDirs} directories${projectLabel}. Some failed.`
-              );
-            }
+        if (allLinkedProjects.length === 0) {
+          if (await syncService.syncCurrentWorkspace()) {
             variablesTreeProvider.refresh();
           }
           return;
         }
 
-        // Fallback to V1
-        const result = await syncService.syncCurrentWorkspace();
+        const results = (
+          await Promise.all(
+            allLinkedProjects.map((project) =>
+              syncService.syncAllDirectories(project)
+            )
+          )
+        ).flat();
+        if (results.length === 0) return;
 
-        statusBarProvider.setSyncing(false);
-
-        if (result) {
-          variablesTreeProvider.refresh();
+        const successful = results.filter((r) => r.success).length;
+        const projectLabel =
+          allLinkedProjects.length > 1
+            ? ` across ${allLinkedProjects.length} projects`
+            : "";
+        if (successful === results.length) {
+          vscode.window.showInformationMessage(
+            `Synced ${successful} director${successful === 1 ? "y" : "ies"}${projectLabel}`
+          );
+        } else {
+          vscode.window.showWarningMessage(
+            `Synced ${successful}/${results.length} directories${projectLabel}. Some failed.`
+          );
         }
+        variablesTreeProvider.refresh();
+      } finally {
+        statusBarProvider.setSyncing(false);
       }
-    );
-  } finally {
-    // A pull that ends without an onSyncComplete firing (no dirs, early
-    // return, error) must still clear the dashboard spinner — idempotent.
-    dashboardPanelProvider.notifySyncCompleted();
-  }
+    }
+  );
 }
 
-function handleRefresh(): void {
-  // Manual refresh should always hit the server, not the response cache
+async function handleRefresh(): Promise<void> {
   apiService.clearCache();
-  // Capabilities just went stale — re-resolve the reveal gate so a previous
-  // account's permission cannot linger in the palette.
-  void refreshRevealContext();
-  projectsTreeProvider.refresh();
-  variablesTreeProvider.refresh();
-  statusBarProvider.update();
+  await onLinksChanged();
 }
 
 async function handleOpenDashboard(): Promise<void> {
-  const serverUrl = getServerUrl();
-  const opened = await openUrlReliably(serverUrl);
-  if (!opened) {
+  if (!(await openUrlReliably(getServerUrl()))) {
     vscode.window.showInformationMessage(
       "Dashboard URL copied to clipboard. Paste it in your browser."
     );
@@ -1774,9 +1278,7 @@ async function handleOpenDashboard(): Promise<void> {
 }
 
 async function handleShowStatus(): Promise<void> {
-  const isAuthenticated = await authService.isAuthenticated();
-
-  if (!isAuthenticated) {
+  if (!(await authService.isAuthenticated())) {
     const action = await vscode.window.showInformationMessage(
       "Envpilot: Not signed in",
       "Sign In"
@@ -1787,18 +1289,19 @@ async function handleShowStatus(): Promise<void> {
     return;
   }
 
-  const user = await authService.getCurrentUser();
-  const accounts = await storageService.listAccounts();
+  const [user, accounts, allLinkedProjects] = await Promise.all([
+    authService.getCurrentUser(),
+    authService.listAccounts(),
+    syncService.getAllLinkedProjectsV2(),
+  ]);
 
-  // Get all linked projects (V2)
-  const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
-
-  const items: vscode.QuickPickItem[] = [
+  type StatusItem = vscode.QuickPickItem & { action?: () => Promise<void> };
+  const items: StatusItem[] = [
     {
       label: "$(account) Signed in as",
       description:
         (user?.email || "Unknown") +
-        (accounts.length > 1 ? ` — ${accounts.length} accounts` : ""),
+        (accounts.length > 1 ? `, ${accounts.length} accounts` : ""),
       alwaysShow: true,
     },
   ];
@@ -1807,6 +1310,7 @@ async function handleShowStatus(): Promise<void> {
     items.push({
       label: "$(arrow-swap) Switch Account",
       description: "Switch to another signed-in account",
+      action: handleSwitchAccount,
     });
   }
 
@@ -1840,7 +1344,6 @@ async function handleShowStatus(): Promise<void> {
       }
     }
   } else {
-    // Fallback to V1
     const linkedProject = await syncService.getLinkedProject();
 
     if (linkedProject) {
@@ -1866,110 +1369,77 @@ async function handleShowStatus(): Promise<void> {
           label: linkedProject.lastSyncedAt
             ? `$(clock) Last synced: ${new Date(linkedProject.lastSyncedAt).toLocaleString()}`
             : "$(clock) Never synced",
-          description: "",
         }
       );
     }
   }
 
+  const linked = allLinkedProjects.length > 0;
   items.push(
     { kind: vscode.QuickPickItemKind.Separator, label: "Actions" },
     {
       label: "$(sync) Pull Variables",
       description: "Sync variables now",
+      action: handlePullVariables,
     },
-    {
-      label:
-        allLinkedProjects.length > 0
-          ? "$(add) Add Directory"
-          : "$(link) Link Project",
-      description:
-        allLinkedProjects.length > 0
-          ? "Add another directory"
-          : "Connect to a project",
-    },
-    {
-      label:
-        allLinkedProjects.length > 0 ? "$(link-external) Unlink Project" : "",
-      description:
-        allLinkedProjects.length > 0 ? "Disconnect from project" : "",
-    },
+    linked
+      ? {
+          label: "$(add) Add Directory",
+          description: "Add another directory",
+          action: () => handleAddDirectory(),
+        }
+      : {
+          label: "$(link) Link Project",
+          description: "Connect to a project",
+          action: () => handleLinkProject(),
+        }
+  );
+  if (linked) {
+    items.push({
+      label: "$(link-external) Unlink Project",
+      description: "Disconnect from project",
+      action: () => handleUnlinkProject(),
+    });
+  }
+  items.push(
     {
       label: "$(globe) Open Dashboard",
       description: "Open Envpilot in browser",
+      action: handleOpenDashboard,
     },
     {
       label: "$(sign-out) Sign Out",
       description: "Sign out of Envpilot",
+      action: handleSignOut,
     }
   );
 
-  // Filter out empty items
-  const filteredItems = items.filter((i) => i.label);
-
-  const selected = await vscode.window.showQuickPick(filteredItems, {
+  const selected = await vscode.window.showQuickPick(items, {
     title: "Envpilot Status",
     placeHolder: "Select an action",
   });
-
-  if (!selected) {
-    return;
-  }
-
-  if (selected.label.includes("Switch Account")) {
-    await handleSwitchAccount();
-  } else if (selected.label.includes("Pull Variables")) {
-    await handlePullVariables();
-  } else if (selected.label.includes("Unlink Project")) {
-    await handleUnlinkProject();
-  } else if (selected.label.includes("Link Project")) {
-    await handleLinkProject();
-  } else if (selected.label.includes("Add Directory")) {
-    await handleAddDirectory();
-  } else if (selected.label.includes("Open Dashboard")) {
-    handleOpenDashboard();
-  } else if (selected.label.includes("Sign Out")) {
-    await handleSignOut();
-  }
+  await selected?.action?.();
 }
 
 async function handleInstallCommitGuard(): Promise<void> {
   await gitCommitGuardService.initialize();
+  const installed = await gitCommitGuardService.installHooks();
   vscode.window.showInformationMessage(
-    "Envpilot: Commit guard hook installed successfully."
+    installed > 0
+      ? `Envpilot: commit guard hook installed in ${installed} ${installed === 1 ? "repository" : "repositories"}.`
+      : "Envpilot: no repository with a linked directory needs a commit guard hook."
   );
 }
 
 async function handleRemoveCommitGuard(): Promise<void> {
-  await gitCommitGuardService.removeHooks();
-  vscode.window.showInformationMessage("Envpilot: Commit guard hook removed.");
+  const removed = await gitCommitGuardService.removeHooks();
+  vscode.window.showInformationMessage(
+    removed > 0
+      ? `Envpilot: commit guard hook removed from ${removed} ${removed === 1 ? "repository" : "repositories"}.`
+      : "Envpilot: no commit guard hook found."
+  );
 }
 
-/**
- * Unsync-on-close: delete this window's synced .env files for opted-in
- * projects. Runs at deactivate ("close") and, when a dead session marker is
- * found at activation, as a crash sweep ("crash-sweep").
- *
- * Safety invariants (the old unconditional delete-on-deactivate destroyed
- * hand-edited files and was removed in PR #73 — these guards are what make
- * reintroducing it safe):
- *  - HASH GUARD: only files whose on-disk sha256 still matches the managed-
- *    files manifest are deleted; hand-edited files are always spared.
- *  - OPT-OUT: projects whose cached server flag is false are skipped, and
- *    their directories are EXCLUDED from every other project's purge — a
- *    linked directory of an opted-out project nested inside an opted-in
- *    project's tree keeps its files (flag = member override ?? project
- *    default ?? true, resolved server-side, cached at sync time so this
- *    works offline).
- *  - SCOPE: "close" purges only under THIS window's workspace folders;
- *    "crash-sweep" purges only under the crashed session's recorded folders.
- *  - LIVE-WINDOW GUARD: folders recorded by other still-running extension
- *    hosts (session markers) are excluded — closing one window never
- *    deletes files another live window is using, even for overlapping
- *    workspaces (/repo open in A, /repo/apps/web open in B).
- * Purge outcomes are queued as counts-only audit reports, sent on the next
- * activation (network at shutdown is unreliable).
- */
 async function runUnsyncPurge(
   trigger: "close" | "crash-sweep",
   scopeFolders?: string[]
@@ -1987,9 +1457,6 @@ async function runUnsyncPurge(
 
     const projects = storageService.getLinkedProjectsMetadataV2();
 
-    // Exclusions: opted-out projects' directories (their opt-out must win
-    // even when nested inside an opted-in project's tree) and any folder a
-    // still-live extension host has claimed.
     const excludedDirs = projects
       .filter((project) => project.autoUnsyncOnClose === false)
       .flatMap((project) =>
@@ -2036,18 +1503,12 @@ async function runUnsyncPurge(
       }
     }
   } catch (err) {
-    // Purge is best-effort — never break shutdown or activation over it.
     captureError(err, { phase: "unsync-purge", trigger });
   }
 }
 
 const UNSYNC_NOTICE_KEY = "envpilot.unsyncNoticeShown";
 
-/**
- * One-time heads-up that unsync-on-close is active — the default flipped ON
- * for everyone with this release, and silently vanishing .env files would
- * read as a bug without it.
- */
 async function maybeShowUnsyncNotice(
   context: vscode.ExtensionContext
 ): Promise<void> {
@@ -2059,42 +1520,17 @@ async function maybeShowUnsyncNotice(
     if (!armed) return;
     await context.globalState.update(UNSYNC_NOTICE_KEY, true);
     vscode.window.showInformationMessage(
-      "Envpilot: Unsync on close is active — synced .env files are removed when VS Code closes and restored on the next sync. Hand-edited files are never touched. Configure this per project in Project Settings on the web."
+      "Envpilot: Unsync on close is active. Synced .env files are removed when VS Code closes and restored on the next sync. Hand-edited files are never touched. Configure this per project in Project Settings on the web."
     );
-  } catch {
-    // Purely informational — never let the notice break a sync callback.
-  }
+  } catch {}
 }
 
 export async function deactivate() {
-  // Unsync-on-close purge — hash-guarded, opt-out aware, window-scoped, and
-  // live-window aware (see runUnsyncPurge above; the PR #73 data-loss
-  // incident is why deletion here must never be unconditional). Note this
-  // fires on EVERY extension-host shutdown — window close, Reload Window,
-  // extension update — which is the intended security semantics: files never
-  // outlive the session, and the next activation's auto-sync restores them.
-  // Sign-out / explicit unlink still delete through their own gated paths
-  // (shouldPreventCopyOnRevoke in sync.ts). Remaining resource cleanup is
-  // handled by dispose subscriptions.
-  // TEAR DOWN EVERY FILE WRITER FIRST. FileProtection's anti-tamper watcher
-  // treats any deletion of a protected file as an unauthorized edit and
-  // re-syncs it (fileProtection.ts onDidDelete → 500ms debounce →
-  // resyncCallback) — without this, the purge deletes a file and the watcher
-  // restores it before the host dies, silently defeating unsync-on-close
-  // (observed in testing: purge reported deleted=1, file was back seconds
-  // later). Periodic sync and real-time subscriptions can rewrite too.
-  // These dispose() calls are idempotent; the context.subscriptions cleanup
-  // runs them again harmlessly.
   try {
     fileProtectionService?.dispose();
     realTimeSyncService?.dispose();
     syncService?.dispose();
-  } catch {
-    // Never let teardown stop the purge.
-  }
-  // Marker is cleared LAST: if the purge dies mid-shutdown the marker
-  // survives, so the next activation's crash sweep retries the cleanup
-  // (sweeping an already-purged folder is a no-op).
+  } catch {}
   await runUnsyncPurge("close");
   await clearSessionMarker(process.pid);
   await closeSentry();

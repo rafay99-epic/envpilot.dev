@@ -18,7 +18,6 @@ export type ProjectTreeItemType =
   | "message"
   | "error";
 
-/** Coalesce rapid-fire refresh() calls into a single tree-data event. */
 const REFRESH_DEBOUNCE_MS = 150;
 
 export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTreeItem> {
@@ -42,16 +41,10 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
 
   setAuthenticated(authenticated: boolean): void {
     this.isAuthenticated = authenticated;
+    this.usageCache.clear();
     this.refresh();
   }
 
-  /**
-   * Requests a tree refresh. Multiple calls within REFRESH_DEBOUNCE_MS are
-   * coalesced into a single `onDidChangeTreeData` event — link/unlink,
-   * add/remove-directory, and auth-state changes can each fire several
-   * refreshes back-to-back for one user action, and every fire() makes VS
-   * Code re-invoke getChildren for the root and every expanded node.
-   */
   refresh(): void {
     if (this.refreshTimer) {
       return;
@@ -66,12 +59,26 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
     return element;
   }
 
+  async resolveTreeItem(
+    item: vscode.TreeItem,
+    element: ProjectTreeItem
+  ): Promise<vscode.TreeItem> {
+    const org = element.organization;
+    if (element.type !== "organization" || !org) return item;
+    let usage = this.usageCache.get(org._id);
+    if (!usage) {
+      usage = (await this.api.getUsage(org._id)) ?? undefined;
+      if (usage) this.usageCache.set(org._id, usage);
+    }
+    item.tooltip = createOrgTooltip(org, usage);
+    return item;
+  }
+
   async getChildren(element?: ProjectTreeItem): Promise<ProjectTreeItem[]> {
     if (!this.isAuthenticated) {
       return [];
     }
 
-    // Root level - show organizations
     if (!element) {
       try {
         this.organizations = await this.api.getOrganizations();
@@ -86,28 +93,13 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
           ];
         }
 
-        // Fetch usage data for all orgs in parallel (non-blocking)
-        const usageResults = await Promise.allSettled(
-          this.organizations.map((org) => this.api.getUsage(org._id))
-        );
-        for (let i = 0; i < this.organizations.length; i++) {
-          const result = usageResults[i];
-          if (result.status === "fulfilled" && result.value) {
-            this.usageCache.set(this.organizations[i]._id, result.value);
-          }
-        }
-
         return this.organizations.map(
           (org) =>
             new ProjectTreeItem(
               org.name,
               vscode.TreeItemCollapsibleState.Collapsed,
               "organization",
-              org,
-              undefined,
-              undefined,
-              undefined,
-              this.usageCache.get(org._id)
+              org
             )
         );
       } catch (error) {
@@ -123,7 +115,6 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
       }
     }
 
-    // Organization level - show projects
     if (element.type === "organization" && element.organization) {
       try {
         const projects = await this.api.getProjects(element.organization._id);
@@ -141,7 +132,11 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
 
         const linkedProjectsV2 = await this.storage.getLinkedProjectsV2();
 
-        return projects.map((project) => {
+        return projects.map((listed) => {
+          const project = {
+            ...listed,
+            hasWriteAccess: this.api.getAccessMeta(listed._id)?.hasWriteAccess,
+          };
           const linkedV2 = linkedProjectsV2.find(
             (lp) => lp.projectId === project._id
           );
@@ -179,7 +174,6 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
       }
     }
 
-    // Linked project level - show directories
     if (element.type === "linkedProject" && element.project) {
       const linkedProject = await this.storage.getLinkedProjectV2(
         element.project._id
@@ -227,7 +221,6 @@ export class ProjectTreeItem extends vscode.TreeItem {
   project?: Project;
   organizationName?: string;
   directory?: LinkedDirectory;
-  usage?: UsageInfo;
 
   constructor(
     label: string,
@@ -236,8 +229,7 @@ export class ProjectTreeItem extends vscode.TreeItem {
     organization?: Organization,
     project?: Project,
     organizationName?: string,
-    directory?: LinkedDirectory,
-    usage?: UsageInfo
+    directory?: LinkedDirectory
   ) {
     super(label, collapsibleState);
     this.type = type;
@@ -245,7 +237,6 @@ export class ProjectTreeItem extends vscode.TreeItem {
     this.project = project;
     this.organizationName = organizationName;
     this.directory = directory;
-    this.usage = usage;
     this.contextValue = type;
 
     switch (type) {
@@ -257,7 +248,6 @@ export class ProjectTreeItem extends vscode.TreeItem {
             : undefined
         );
         this.description = this.buildOrgDescription(organization);
-        this.tooltip = this.createOrgTooltip(organization, usage);
         break;
 
       case "project":
@@ -310,9 +300,6 @@ export class ProjectTreeItem extends vscode.TreeItem {
     if (!org) return undefined;
     const parts: string[] = [];
     parts.push(org.tier === "pro" ? "Pro" : "Free");
-    // Prefer the unified role once the server sends it; fall back to the
-    // legacy string. Either way, run it through formatRoleLabel \u2014 never
-    // compare/display raw "admin"/"member" strings directly.
     if (org.unifiedRole || org.role) {
       parts.push(formatRoleLabel(org.unifiedRole ?? org.role));
     }
@@ -328,16 +315,13 @@ export class ProjectTreeItem extends vscode.TreeItem {
     if (isLinked) {
       parts.push("Linked");
     }
-    // Prefer the unified role; fall back to the legacy org role for this
-    // project. Legacy "viewer" project role means grant-only / not assigned
-    // \u2014 formatRoleLabel only knows org-level tiers, so annotate that here.
     const roleSource = project.unifiedRole ?? project.userRole;
-    if (roleSource || project.projectRole) {
-      let label = formatRoleLabel(roleSource);
-      if (project.projectRole === "viewer") {
-        label += " (view-only)";
-      }
-      parts.push(label);
+    if (roleSource) {
+      parts.push(
+        project.hasWriteAccess === false
+          ? `${formatRoleLabel(roleSource)} (read-only)`
+          : formatRoleLabel(roleSource)
+      );
     }
     if (parts.length === 0 && project.description) {
       return project.description;
@@ -350,116 +334,37 @@ export class ProjectTreeItem extends vscode.TreeItem {
     return `${dir.environments.join(", ")} \u2192 ${dir.targetFile}`;
   }
 
-  private formatUsageRatio(current: number, limit: number | null): string {
-    if (limit === null) return `${current} / unlimited`;
-    return `${current} / ${limit}`;
-  }
-
-  private createOrgTooltip(
-    org?: Organization,
-    usage?: UsageInfo
-  ): vscode.MarkdownString | undefined {
-    if (!org) return undefined;
-    const md = new vscode.MarkdownString("", true);
-    md.supportThemeIcons = true;
-    md.appendMarkdown(`### $(organization) ${org.name}\n\n`);
-    md.appendMarkdown(
-      `**Tier:** ${org.tier === "pro" ? "$(star-full) Pro" : "Free"}\n\n`
-    );
-    if (org.unifiedRole || org.role) {
-      md.appendMarkdown(
-        `**Your Role:** ${formatRoleLabel(org.unifiedRole ?? org.role)}\n\n`
-      );
-    }
-    md.appendMarkdown(`**Slug:** \`${org.slug}\`\n\n`);
-
-    // Usage data
-    if (usage) {
-      md.appendMarkdown("---\n\n");
-
-      if (!usage.enforcementEnabled) {
-        md.appendMarkdown("$(info) *Pre-alpha — all limits bypassed*\n\n");
-      }
-
-      md.appendMarkdown("**Usage**\n\n");
-      md.appendMarkdown(
-        `- Projects: ${this.formatUsageRatio(usage.usage.projects, usage.limits.projects)}\n`
-      );
-      md.appendMarkdown(
-        `- Team Members: ${this.formatUsageRatio(usage.usage.teamMembers, usage.limits.teamMembers)}\n`
-      );
-      md.appendMarkdown(
-        `- Variables (max): ${this.formatUsageRatio(usage.usage.maxVariablesInProject, usage.limits.variablesPerProject)}\n`
-      );
-      md.appendMarkdown(`- Total Variables: ${usage.usage.totalVariables}\n\n`);
-
-      md.appendMarkdown("**Features**\n\n");
-      const check = "$(check)";
-      const x = "$(x)";
-      md.appendMarkdown(
-        `- Version History: ${usage.features.versionHistory ? check : x}\n`
-      );
-      md.appendMarkdown(
-        `- Bulk Import: ${usage.features.bulkImport ? check : x}\n`
-      );
-      md.appendMarkdown(
-        `- Granular Permissions: ${usage.features.granularPermissions ? check : x}\n`
-      );
-      md.appendMarkdown(
-        `- Audit Retention: ${usage.features.auditLogRetentionDays} days\n`
-      );
-    }
-
-    return md;
-  }
-
   private createProjectTooltip(
     project?: Project,
     isLinked?: boolean
   ): vscode.MarkdownString | undefined {
     if (!project) return undefined;
     const md = new vscode.MarkdownString("", true);
-    md.supportThemeIcons = true;
-    md.appendMarkdown(
-      `### ${project.icon || "$(symbol-package)"} ${project.name}\n\n`
-    );
+    md.appendMarkdown("### $(symbol-package) ");
+    md.appendText(project.name);
+    md.appendMarkdown("\n\n");
     if (isLinked) {
       md.appendMarkdown("$(check) **Linked to this workspace**\n\n");
     }
     if (project.description) {
-      md.appendMarkdown(`${project.description}\n\n`);
+      md.appendText(project.description);
+      md.appendMarkdown("\n\n");
     }
-    md.appendMarkdown(`**Slug:** \`${project.slug}\`\n\n`);
+    md.appendMarkdown("**Slug:** ");
+    md.appendText(project.slug);
+    md.appendMarkdown("\n\n");
 
-    // Unified role + description — keyed off the normalized label (never a
-    // raw legacy string), with the legacy "viewer" project role folded in
-    // as a view-only annotation since formatRoleLabel can't express
-    // assigned-vs-grant-only on its own.
     const roleSource = project.unifiedRole ?? project.userRole;
-    if (roleSource || project.projectRole) {
-      const label = formatRoleLabel(roleSource);
-      const isViewOnly = project.projectRole === "viewer";
-      const roleDescriptions: Record<string, string> = {
-        Owner: "$(shield) Owner (full access)",
-        "Project Manager":
-          "Project Manager (manage members, variables, and permissions)",
-        "Team Lead": "Team Lead (manage members, variables, and permissions)",
-        Developer: isViewOnly
-          ? "Developer — view-only (view explicitly permitted variables only)"
-          : "Developer (view and edit variables)",
-      };
-      md.appendMarkdown(
-        `**Your Role:** ${roleDescriptions[label] || label}\n\n`
-      );
-      if (
-        project.environmentScope &&
-        project.environmentScope.length > 0 &&
-        label === "Developer"
-      ) {
-        md.appendMarkdown(
-          `**Scoped to:** ${project.environmentScope.join(", ")}\n\n`
-        );
-      }
+    if (roleSource) {
+      md.appendMarkdown("**Your Role:** ");
+      md.appendText(formatRoleLabel(roleSource));
+      if (project.hasWriteAccess === false) md.appendMarkdown(" (read-only)");
+      md.appendMarkdown("\n\n");
+    }
+    if (project.environmentScope && project.environmentScope.length > 0) {
+      md.appendMarkdown("**Scoped to:** ");
+      md.appendText(project.environmentScope.join(", "));
+      md.appendMarkdown("\n\n");
     }
     return md;
   }
@@ -475,23 +380,69 @@ export class ProjectTreeItem extends vscode.TreeItem {
   ): vscode.MarkdownString | undefined {
     if (!directory) return undefined;
     const md = new vscode.MarkdownString("", true);
-    md.supportThemeIcons = true;
+    md.appendMarkdown("### $(folder-opened) ");
+    md.appendText(directory.displayName || "Directory");
+    md.appendMarkdown("\n\n**Path:** ");
+    md.appendText(directory.directoryPath);
+    md.appendMarkdown("\n\n**Target:** ");
+    md.appendText(directory.targetFile);
+    md.appendMarkdown("\n\n**Environments:** ");
+    md.appendText(directory.environments.join(", "));
+    md.appendMarkdown("\n\n---\n\n");
     md.appendMarkdown(
-      `### $(folder-opened) ${directory.displayName || "Directory"}\n\n`
+      directory.lastSyncedAt
+        ? `$(sync) Last synced ${new Date(directory.lastSyncedAt).toLocaleString()}`
+        : "$(sync) Never synced"
     );
-    md.appendMarkdown(`**Path:** \`${directory.directoryPath}\`\n\n`);
-    md.appendMarkdown(`**Target:** \`${directory.targetFile}\`\n\n`);
-    md.appendMarkdown(
-      `**Environments:** ${directory.environments.join(", ")}\n\n`
-    );
-    md.appendMarkdown("---\n\n");
-    if (directory.lastSyncedAt) {
-      md.appendMarkdown(
-        `$(sync) Last synced ${new Date(directory.lastSyncedAt).toLocaleString()}`
-      );
-    } else {
-      md.appendMarkdown("$(sync) Never synced");
-    }
     return md;
   }
+}
+
+function formatUsageRatio(current: number, limit: number | null): string {
+  return `${current} / ${limit ?? "unlimited"}`;
+}
+
+function createOrgTooltip(
+  org: Organization,
+  usage?: UsageInfo
+): vscode.MarkdownString {
+  const md = new vscode.MarkdownString("", true);
+  md.appendMarkdown("### $(organization) ");
+  md.appendText(org.name);
+  md.appendMarkdown(
+    `\n\n**Tier:** ${org.tier === "pro" ? "$(star-full) Pro" : "Free"}\n\n`
+  );
+  if (org.unifiedRole || org.role) {
+    md.appendMarkdown("**Your Role:** ");
+    md.appendText(formatRoleLabel(org.unifiedRole ?? org.role));
+    md.appendMarkdown("\n\n");
+  }
+  md.appendMarkdown("**Slug:** ");
+  md.appendText(org.slug);
+  md.appendMarkdown("\n\n");
+
+  if (usage) {
+    md.appendMarkdown("---\n\n");
+    if (!usage.enforcementEnabled) {
+      md.appendMarkdown("$(info) *Pre-alpha: all limits bypassed*\n\n");
+    }
+    md.appendMarkdown(
+      [
+        "**Usage**",
+        "",
+        `- Projects: ${formatUsageRatio(usage.usage.projects, usage.limits.projects)}`,
+        `- Team Members: ${formatUsageRatio(usage.usage.teamMembers, usage.limits.teamMembers)}`,
+        `- Variables (max): ${formatUsageRatio(usage.usage.maxVariablesInProject, usage.limits.variablesPerProject)}`,
+        `- Total Variables: ${usage.usage.totalVariables}`,
+        "",
+        "**Features**",
+        "",
+        `- Version History: ${usage.features.versionHistory ? "$(check)" : "$(x)"}`,
+        `- Bulk Import: ${usage.features.bulkImport ? "$(check)" : "$(x)"}`,
+        `- Granular Permissions: ${usage.features.granularPermissions ? "$(check)" : "$(x)"}`,
+        `- Audit Retention: ${usage.features.auditLogRetentionDays} days`,
+      ].join("\n")
+    );
+  }
+  return md;
 }

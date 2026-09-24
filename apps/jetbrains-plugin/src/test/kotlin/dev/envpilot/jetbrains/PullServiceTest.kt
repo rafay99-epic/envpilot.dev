@@ -37,7 +37,6 @@ class PullServiceTest {
         values: Map<String, String> = mapOf("A" to "1"),
     ) = PullResult(values.map { PulledVariable(it.key, it.value, listOf("development"), false) }, meta)
 
-    /** Mirrors pull()'s order: guard first, write second. */
     private fun guardThenWrite(
         root: Path,
         pulled: PullResult,
@@ -114,5 +113,23 @@ class PullServiceTest {
 
         assertEquals("ours", Files.readString(secret))
         assertEquals("theirs", Files.readString(root.resolve("keystore.jks.envpilot-bak")))
+    }
+
+    @Test
+    fun `a secret without a vault mode is never readable by others`() {
+        val root = dir()
+        Assume.assumeTrue(root.fileSystem.supportedFileAttributeViews().contains("posix"))
+        val secret = root.resolve("id.pem")
+
+        PullService.writeFiles(
+            root.resolve(".env.local"),
+            "A=1\n",
+            null,
+            EnvFiles.ConflictMode.MERGE,
+            listOf(PullService.SecretWrite("key".toByteArray(), secret, null)),
+            null,
+        )
+
+        assertEquals("rw-------", PosixFilePermissions.toString(Files.getPosixFilePermissions(secret)))
     }
 }

@@ -1,41 +1,38 @@
 package dev.envpilot.jetbrains.convex
 
 import com.intellij.openapi.diagnostic.logger
+import dev.envpilot.jetbrains.auth.Jwt
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.future.await
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.WebSocket
 import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.CompletionStage
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
 
-/**
- * Convex WebSocket lifecycle: connect → Connect → Authenticate → subscribe,
- * with reconnect/backoff and a 60s server-inactivity watchdog (the server
- * pings every 15s when healthy — same thresholds as convex-js).
- *
- * Pure transport: callers decide what subscriptions mean.
- */
 class ConvexSocket(
     private val deploymentUrl: String,
     private val tokenProvider: suspend () -> String?,
     private val listener: Listener,
 ) : WebSocket.Listener {
     interface Listener {
-        /** A subscribed query produced an updated result. */
         fun onQueryUpdated(queryId: Int)
 
-        /** A subscribed query failed server-side. */
         fun onQueryFailed(queryId: Int)
 
         fun onAuthError(error: String)
@@ -48,132 +45,147 @@ class ConvexSocket(
     private val log = logger<ConvexSocket>()
     private val http: HttpClient =
         HttpClient.newBuilder()
-            .version(java.net.http.HttpClient.Version.HTTP_1_1)
+            .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(10))
             .build()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val watchdog =
-        Executors.newSingleThreadScheduledExecutor { r ->
-            Thread(r, "envpilot-convex-watchdog").apply { isDaemon = true }
-        }
+    private val lock = Any()
+    private val sessionId = UUID.randomUUID().toString()
 
-    private val webSocket = AtomicReference<WebSocket?>(null)
-    private val connectionCount = AtomicInteger(0)
-    private val identityVersion = AtomicInteger(0)
-    private val querySetVersion = AtomicInteger(0)
-    private val queryIdCounter = AtomicInteger(0)
-    private val subscriptions = AtomicReference<Map<Int, String>>(emptyMap())
-    private val argsByQueryId = AtomicReference<Map<Int, Map<String, Any?>>>(emptyMap())
-    private val stopped = AtomicBoolean(false)
-    private val actionRequestId = AtomicInteger(0)
-    private val pendingActions = AtomicReference<Map<Int, kotlinx.coroutines.CompletableDeferred<ConvexWire.ActionResponse>>>(emptyMap())
-    private val pendingQueries = AtomicReference<Map<Int, kotlinx.coroutines.CompletableDeferred<String>>>(emptyMap())
+    private var webSocket: WebSocket? = null
+    private var outbound: Channel<String>? = null
+    private var reauthJob: Job? = null
+    private var connectionCount = 0
+    private var identityVersion = 0
+    private var querySetVersion = 0
+    private var nextQueryId = 0
+    private var nextRequestId = 0
+    private val subscriptions = LinkedHashMap<Int, ConvexWire.QueryAdd>()
+    private val pendingQueries = HashMap<Int, CompletableDeferred<String>>()
+    private val pendingMutations = HashMap<Int, Pair<String, CompletableDeferred<ConvexWire.ActionResponse>>>()
+    private val pendingActions = HashMap<Int, Pair<String, CompletableDeferred<ConvexWire.ActionResponse>>>()
+    private val incomingText = StringBuilder()
+
+    @Volatile private var stopped = false
     private val lastServerMessageAt = AtomicLong(0)
     private val reconnectAttempt = AtomicInteger(0)
-    private val incomingText = StringBuilder()
 
     val connected = AtomicBoolean(false)
 
-    /** Subscribe (or re-subscribe) to a query; assigns and returns its query id. */
     fun subscribe(
         udfPath: String,
         args: Map<String, String>,
-    ): Int {
-        val queryId = queryIdCounter.getAndIncrement()
-        subscriptions.updateAndGet { it + (queryId to udfPath) }
-        argsByQueryId.updateAndGet { it + (queryId to args) }
-        sendQueryChanges(
-            adds = listOf(ConvexWire.QueryAdd(queryId, udfPath, args)),
-            removes = emptyList(),
-        )
-        return queryId
-    }
+    ): Int =
+        synchronized(lock) {
+            val add = ConvexWire.QueryAdd(nextQueryId++, udfPath, args)
+            subscriptions[add.queryId] = add
+            sendQueryChangesLocked(listOf(add), emptyList())
+            add.queryId
+        }
 
     fun unsubscribe(queryId: Int) {
-        val existed = subscriptions.get().containsKey(queryId)
-        subscriptions.updateAndGet { it - queryId }
-        argsByQueryId.updateAndGet { it - queryId }
-        if (existed) sendQueryChanges(emptyList(), listOf(queryId))
+        synchronized(lock) {
+            if (subscriptions.remove(queryId) != null) sendQueryChangesLocked(emptyList(), listOf(queryId))
+        }
     }
 
     fun start() {
-        stopped.set(false)
         connect()
-        startWatchdog()
+        scope.launch { watchInactivity() }
     }
 
     fun stop() {
-        stopped.set(true)
+        val ws =
+            synchronized(lock) {
+                stopped = true
+                val error = IllegalStateException("Convex socket stopped")
+                pendingQueries.values.forEach { it.completeExceptionally(error) }
+                pendingQueries.clear()
+                failLocked(pendingMutations, error)
+                failLocked(pendingActions, error)
+                outbound?.close()
+                outbound = null
+                connected.set(false)
+                webSocket.also { webSocket = null }
+            }
         scope.cancel()
-        watchdog.shutdownNow()
-        webSocket.getAndSet(null)?.sendClose(WebSocket.NORMAL_CLOSURE, "bye")
+        ws?.sendClose(WebSocket.NORMAL_CLOSURE, "bye")
+        http.shutdown()
     }
 
-    /**
-     * One-shot action call over the socket (e.g. pullValues). Fails fast when
-     * the socket is down — callers fall back or surface the error.
-     */
     suspend fun action(
         udfPath: String,
         args: Map<String, Any?>,
-    ): String = executeFunction(ConvexWire::actionMessage, udfPath, args)
+    ): String = executeFunction(pendingActions, ConvexWire::actionMessage, udfPath, args)
 
     suspend fun mutation(
         udfPath: String,
         args: Map<String, Any?>,
-    ): String = executeFunction(ConvexWire::mutationMessage, udfPath, args)
+    ): String = executeFunction(pendingMutations, ConvexWire::mutationMessage, udfPath, args)
 
     private suspend fun executeFunction(
+        pending: MutableMap<Int, Pair<String, CompletableDeferred<ConvexWire.ActionResponse>>>,
         message: (Int, String, Map<String, Any?>) -> String,
         udfPath: String,
         args: Map<String, Any?>,
     ): String {
-        val ws = webSocket.get()?.takeIf { connected.get() } ?: error("Convex socket not connected")
-        val requestId = actionRequestId.getAndIncrement()
-        val deferred = kotlinx.coroutines.CompletableDeferred<ConvexWire.ActionResponse>()
-        pendingActions.updateAndGet { it + (requestId to deferred) }
+        val deferred = CompletableDeferred<ConvexWire.ActionResponse>()
+        val requestId =
+            synchronized(lock) {
+                check(!stopped) { "Convex socket stopped" }
+                val id = nextRequestId++
+                val text = message(id, udfPath, args)
+                pending[id] = text to deferred
+                if (connected.get()) outbound?.trySend(text)
+                id
+            }
         try {
-            ws.sendText(message(requestId, udfPath, args), true)
-            val response = kotlinx.coroutines.withTimeout(30_000) { deferred.await() }
+            val response = withTimeout(30_000) { deferred.await() }
             if (!response.success) error(response.error ?: "action failed")
             return response.result ?: error("action returned no result")
         } finally {
-            pendingActions.updateAndGet { it - requestId }
+            synchronized(lock) { pending.remove(requestId) }
         }
     }
 
-    /**
-     * One-shot query: subscribe, take the first result, unsubscribe. The
-     * result is the raw JSON value (plain JSON — Convex numbers are doubles).
-     */
     suspend fun query(
         udfPath: String,
         args: Map<String, String>,
     ): String {
-        webSocket.get()?.takeIf { connected.get() } ?: error("Convex socket not connected")
-        val queryId = queryIdCounter.getAndIncrement()
-        val deferred = kotlinx.coroutines.CompletableDeferred<String>()
-        pendingQueries.updateAndGet { it + (queryId to deferred) }
-        subscriptions.updateAndGet { it + (queryId to udfPath) }
-        argsByQueryId.updateAndGet { it + (queryId to args) }
+        val deferred = CompletableDeferred<String>()
+        val queryId =
+            synchronized(lock) {
+                check(!stopped) { "Convex socket stopped" }
+                subscribe(udfPath, args).also { pendingQueries[it] = deferred }
+            }
         try {
-            sendQueryChanges(
-                adds = listOf(ConvexWire.QueryAdd(queryId, udfPath, args)),
-                removes = emptyList(),
-            )
-            return kotlinx.coroutines.withTimeout(30_000) { deferred.await() }
+            return withTimeout(30_000) { deferred.await() }
         } finally {
-            pendingQueries.updateAndGet { it - queryId }
+            synchronized(lock) { pendingQueries.remove(queryId) }
             unsubscribe(queryId)
         }
     }
 
     fun reauthenticate(token: String) {
-        send(ConvexWire.authenticateMessage(token, identityVersion.getAndIncrement()))
+        synchronized(lock) {
+            if (!connected.get()) return
+            outbound?.trySend(ConvexWire.authenticateMessage(token, identityVersion++))
+        }
+        scheduleReauth(token)
+    }
+
+    private fun scheduleReauth(token: String) {
+        val exp = Jwt.exp(token) ?: return
+        val job =
+            scope.launch {
+                delay((exp * 1000 - System.currentTimeMillis() - 60_000).coerceAtLeast(30_000))
+                tokenProvider()?.let(::reauthenticate)
+            }
+        synchronized(lock) { reauthJob.also { reauthJob = job } }?.cancel()
     }
 
     private fun connect() {
-        if (stopped.get()) return
+        if (stopped) return
         val wsUrl =
             deploymentUrl
                 .replace("https://", "wss://")
@@ -183,11 +195,9 @@ class ConvexSocket(
             .connectTimeout(Duration.ofSeconds(10))
             .buildAsync(URI.create(wsUrl), this)
             .whenComplete { ws, error ->
-                if (stopped.get()) {
+                if (stopped) {
                     ws?.sendClose(WebSocket.NORMAL_CLOSURE, "bye")
-                    return@whenComplete
-                }
-                if (error != null) {
+                } else if (error != null) {
                     log.warn("Convex socket connect failed: ${error.message}")
                     scheduleReconnect()
                 }
@@ -195,123 +205,129 @@ class ConvexSocket(
     }
 
     private fun handleOpen(ws: WebSocket) {
-        webSocket.set(ws)
-        reconnectAttempt.set(0)
-        querySetVersion.set(0)
-        identityVersion.set(0)
-        lastServerMessageAt.set(System.currentTimeMillis())
-        val count = connectionCount.incrementAndGet()
-        ws.sendText(
-            ConvexWire.connectMessage(
-                sessionId = UUID.randomUUID().toString(),
-                connectionCount = count,
-            ),
-            true,
-        )
-        // Authenticate before subscribing: convex-js sends Authenticate first,
-        // and queries sent before auth can come back as unauthenticated
-        // failures on some deployments. The token can need a network refresh,
-        // so it runs off the socket's own I/O thread; `connected` only flips
-        // once auth is out, which is what keeps other senders behind it.
-        scope.launch {
-            try {
-                val token = tokenProvider()
-                // A reconnect may have replaced this socket while the token was fetched.
-                if (webSocket.get() !== ws) return@launch
-                if (token == null) {
-                    log.warn("Convex socket has no token — auth skipped")
-                } else {
-                    ws.sendText(ConvexWire.authenticateMessage(token, identityVersion.getAndIncrement()), true)
-                }
-                if (webSocket.get() !== ws) return@launch
-                connected.set(true)
-                sendFullQuerySet()
-                listener.onConnected()
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // A failed handshake must not leave a half-open socket: abort so
-                // onError runs the normal disconnect + backoff path.
-                log.warn("Convex socket auth failed: ${e.message}")
+        val channel = Channel<String>(Channel.UNLIMITED)
+        synchronized(lock) {
+            if (stopped) {
                 ws.abort()
+                return
             }
+            webSocket = ws
+            outbound = channel
+            querySetVersion = 0
+            identityVersion = 0
+            incomingText.setLength(0)
+            lastServerMessageAt.set(System.currentTimeMillis())
+            channel.trySend(ConvexWire.connectMessage(sessionId, ++connectionCount))
         }
+        scope.launch { drain(ws, channel) }
+        scope.launch { handshake(ws, channel) }
         ws.request(1)
     }
 
-    @Synchronized
-    private fun sendQueryChanges(
+    private suspend fun drain(
+        ws: WebSocket,
+        channel: Channel<String>,
+    ) {
+        try {
+            for (text in channel) ws.sendText(text, true).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("Convex socket send failed: ${e.message}")
+            abort(ws)
+        }
+    }
+
+    private suspend fun handshake(
+        ws: WebSocket,
+        channel: Channel<String>,
+    ) {
+        val token =
+            try {
+                tokenProvider()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.warn("Convex socket token fetch failed: ${e.message}")
+                null
+            }
+        if (token == null) {
+            log.warn("Convex socket has no token; reconnecting")
+            abort(ws)
+            return
+        }
+        synchronized(lock) {
+            if (webSocket !== ws) return
+            channel.trySend(ConvexWire.authenticateMessage(token, identityVersion++))
+            connected.set(true)
+            channel.trySend(ConvexWire.modifyQuerySetMessage(0, 1, subscriptions.values.toList(), emptyList()))
+            querySetVersion = 1
+            (pendingMutations + pendingActions).toSortedMap().values.forEach { channel.trySend(it.first) }
+        }
+        scheduleReauth(token)
+        listener.onConnected()
+    }
+
+    private fun sendQueryChangesLocked(
         adds: List<ConvexWire.QueryAdd>,
         removes: List<Int>,
     ) {
-        val ws = webSocket.get()?.takeIf { connected.get() } ?: return
-        val base = querySetVersion.get()
-        val newVersion = base + 1
-        ws.sendText(
-            ConvexWire.modifyQuerySetMessage(
-                baseVersion = base,
-                newVersion = newVersion,
-                adds = adds,
-                removes = removes,
-            ),
-            true,
-        )
-        querySetVersion.set(newVersion)
+        if (!connected.get()) return
+        val message = ConvexWire.modifyQuerySetMessage(querySetVersion, querySetVersion + 1, adds, removes)
+        if (outbound?.trySend(message)?.isSuccess == true) querySetVersion++
     }
 
-    private fun sendFullQuerySet() {
-        sendQueryChanges(
-            adds =
-                subscriptions.get().map { (id, path) ->
-                    ConvexWire.QueryAdd(id, path, argsByQueryId.get()[id] ?: emptyMap())
-                },
-            removes = emptyList(),
-        )
+    private fun failLocked(
+        requests: MutableMap<Int, Pair<String, CompletableDeferred<ConvexWire.ActionResponse>>>,
+        error: Throwable,
+    ) {
+        requests.values.forEach { it.second.completeExceptionally(error) }
+        requests.clear()
     }
 
-    private fun send(text: String) {
-        webSocket.get()?.sendText(text, true)
+    private fun abort(ws: WebSocket) {
+        handleDisconnect(ws)
+        ws.abort()
     }
 
     private fun handleDisconnect(ws: WebSocket) {
-        if (!webSocket.compareAndSet(ws, null)) return
-        // Never leave callers awaiting a response from a dead socket.
-        for (deferred in pendingActions.get().values) {
-            deferred.complete(
-                ConvexWire.ActionResponse(-1, false, null, "socket disconnected"),
-            )
-        }
-        for (deferred in pendingQueries.get().values) {
-            deferred.completeExceptionally(IllegalStateException("socket disconnected"))
-        }
-        if (connected.getAndSet(false)) {
-            listener.onDisconnected()
-        }
+        val wasConnected =
+            synchronized(lock) {
+                if (webSocket !== ws) return
+                webSocket = null
+                outbound?.close()
+                outbound = null
+                incomingText.setLength(0)
+                reauthJob?.cancel()
+                if (connected.get()) {
+                    failLocked(pendingActions, IllegalStateException("Connection lost while action was in flight"))
+                }
+                connected.getAndSet(false)
+            }
+        if (wasConnected) listener.onDisconnected()
         scheduleReconnect()
     }
 
     private fun scheduleReconnect() {
-        if (stopped.get()) return
+        if (stopped) return
         val attempt = reconnectAttempt.getAndIncrement()
-        val delayMs = minOf(30_000L, 1000L * (1 shl attempt.coerceAtMost(5)))
-        watchdog.schedule({ connect() }, delayMs, TimeUnit.MILLISECONDS)
+        scope.launch {
+            delay(minOf(30_000L, 1000L shl attempt.coerceAtMost(5)))
+            connect()
+        }
     }
 
-    /** Reconnect if the server has been silent past the inactivity threshold. */
-    private fun startWatchdog() {
-        watchdog.scheduleWithFixedDelay({
-            if (stopped.get()) return@scheduleWithFixedDelay
+    private suspend fun watchInactivity() {
+        while (scope.isActive) {
+            delay(60_000)
+            val ws = synchronized(lock) { webSocket?.takeIf { connected.get() } } ?: continue
             val silentFor = System.currentTimeMillis() - lastServerMessageAt.get()
-            if (connected.get() && silentFor > 60_000) {
-                log.warn("Convex socket inactive ${silentFor}ms — reconnecting")
-                val ws = webSocket.get() ?: return@scheduleWithFixedDelay
-                handleDisconnect(ws)
-                ws.abort()
+            if (silentFor > 60_000) {
+                log.warn("Convex socket inactive ${silentFor}ms; reconnecting")
+                abort(ws)
             }
-        }, 60, 60, TimeUnit.SECONDS)
+        }
     }
-
-    // ── WebSocket.Listener ───────────────────────────────────────────────────
 
     override fun onOpen(ws: WebSocket) {
         handleOpen(ws)
@@ -324,20 +340,26 @@ class ConvexSocket(
     ): CompletionStage<*>? {
         lastServerMessageAt.set(System.currentTimeMillis())
         val text = completeTextMessage(data, last)
-        if (text == null) {
-            ws.request(1)
-            return null
-        }
+        if (text != null) handleMessage(ws, text)
+        ws.request(1)
+        return null
+    }
+
+    private fun handleMessage(
+        ws: WebSocket,
+        text: String,
+    ) {
         ConvexWire.parseFunctionResponse(text)?.let { response ->
-            pendingActions.get()[response.requestId]?.complete(response)
-            ws.request(1)
-            return null
+            synchronized(lock) {
+                pendingMutations.remove(response.requestId) ?: pendingActions.remove(response.requestId)
+            }?.second?.complete(response)
+            return
         }
         when (val message = ConvexWire.parseServerMessage(text)) {
-            is ConvexWire.ServerMessage.Ping -> Unit // resets inactivity timer only
             is ConvexWire.ServerMessage.Transition -> {
+                reconnectAttempt.set(0)
                 for (id in message.updatedQueryIds) {
-                    val deferred = pendingQueries.get()[id]
+                    val deferred = synchronized(lock) { pendingQueries[id] }
                     val value = ConvexWire.queryValueFromTransition(text, id)
                     if (deferred != null && value != null) {
                         deferred.complete(value)
@@ -346,29 +368,29 @@ class ConvexSocket(
                     }
                 }
                 for ((id, reason) in message.failedQueries) {
-                    pendingQueries.get()[id]?.completeExceptionally(
-                        IllegalStateException("query failed: ${subscriptions.get()[id]}: $reason"),
-                    )
+                    synchronized(lock) {
+                        pendingQueries[id]?.completeExceptionally(
+                            IllegalStateException("query failed: ${subscriptions[id]?.udfPath}: $reason"),
+                        )
+                    }
                     listener.onQueryFailed(id)
                 }
             }
             is ConvexWire.ServerMessage.AuthError -> {
-                pendingActions.get().values.forEach {
-                    it.complete(ConvexWire.ActionResponse(-1, false, null, "auth error: ${message.error}"))
-                }
-                pendingQueries.get().values.forEach {
-                    it.completeExceptionally(IllegalStateException("auth error: ${message.error}"))
+                val error = IllegalStateException("auth error: ${message.error}")
+                synchronized(lock) {
+                    pendingQueries.values.forEach { it.completeExceptionally(error) }
+                    failLocked(pendingMutations, error)
+                    failLocked(pendingActions, error)
                 }
                 listener.onAuthError(message.error)
             }
             is ConvexWire.ServerMessage.FatalError -> {
                 log.warn("Convex socket fatal error: ${message.error}")
-                ws.abort()
+                abort(ws)
             }
-            ConvexWire.ServerMessage.Other -> Unit
+            ConvexWire.ServerMessage.Ping, ConvexWire.ServerMessage.Other -> Unit
         }
-        ws.request(1)
-        return null
     }
 
     override fun onError(
@@ -388,13 +410,12 @@ class ConvexSocket(
         return null
     }
 
-    @Synchronized
     private fun completeTextMessage(
         data: CharSequence,
         last: Boolean,
-    ): String? {
-        incomingText.append(data)
-        if (!last) return null
-        return incomingText.toString().also { incomingText.setLength(0) }
-    }
+    ): String? =
+        synchronized(lock) {
+            incomingText.append(data)
+            if (last) incomingText.toString().also { incomingText.setLength(0) } else null
+        }
 }

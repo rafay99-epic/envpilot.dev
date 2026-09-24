@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { StorageService } from "../utils/storage";
+import { pathsEqual } from "../utils/paths";
+import { formatTime } from "./statusBar";
 
 const ENVPILOT_HEADER = "# Envpilot";
 
@@ -18,9 +20,7 @@ export class EnvCodeLensProvider implements vscode.CodeLensProvider {
     this._onDidChangeCodeLenses.fire();
   }
 
-  async provideCodeLenses(
-    document: vscode.TextDocument
-  ): Promise<vscode.CodeLens[]> {
+  provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
     const config = vscode.workspace.getConfiguration("envpilot");
     if (!config.get<boolean>("enableCodeLens", true)) {
       return [];
@@ -29,7 +29,6 @@ export class EnvCodeLensProvider implements vscode.CodeLensProvider {
     const filePath = document.uri.fsPath;
     const fileName = path.basename(filePath);
 
-    // Only apply to .env files
     if (!fileName.startsWith(".env")) {
       return [];
     }
@@ -41,7 +40,6 @@ export class EnvCodeLensProvider implements vscode.CodeLensProvider {
     const isManaged = firstLine.includes(ENVPILOT_HEADER);
 
     if (isManaged) {
-      // Parse header for info
       const headerInfo = this.parseHeader(document);
 
       const infoText = [
@@ -49,7 +47,7 @@ export class EnvCodeLensProvider implements vscode.CodeLensProvider {
         headerInfo.varCount !== null ? `${headerInfo.varCount} vars` : null,
         headerInfo.environment,
         headerInfo.syncTime
-          ? `Synced ${this.formatTime(headerInfo.syncTime)}`
+          ? `Synced ${formatTime(headerInfo.syncTime)}`
           : null,
       ]
         .filter(Boolean)
@@ -68,26 +66,20 @@ export class EnvCodeLensProvider implements vscode.CodeLensProvider {
           command: "envpilot.pullVariables",
         })
       );
+    } else if (this.isLinkedDir(path.dirname(filePath))) {
+      lenses.push(
+        new vscode.CodeLens(topRange, {
+          title: "$(cloud-download) Sync from Envpilot",
+          command: "envpilot.pullVariables",
+        })
+      );
     } else {
-      // Check if this directory is linked
-      const dirPath = path.dirname(filePath);
-      const linkedProject = await this.findLinkedProjectForDir(dirPath);
-
-      if (linkedProject) {
-        lenses.push(
-          new vscode.CodeLens(topRange, {
-            title: "$(cloud-download) Sync from Envpilot",
-            command: "envpilot.pullVariables",
-          })
-        );
-      } else {
-        lenses.push(
-          new vscode.CodeLens(topRange, {
-            title: "$(link) Link this directory to Envpilot",
-            command: "envpilot.linkProject",
-          })
-        );
-      }
+      lenses.push(
+        new vscode.CodeLens(topRange, {
+          title: "$(link) Link this directory to Envpilot",
+          command: "envpilot.linkProject",
+        })
+      );
     }
 
     return lenses;
@@ -102,7 +94,6 @@ export class EnvCodeLensProvider implements vscode.CodeLensProvider {
     let environment: string | null = null;
     let syncTime: number | null = null;
 
-    // Scan header comment lines (first ~10 lines)
     const maxLines = Math.min(document.lineCount, 10);
     for (let i = 0; i < maxLines; i++) {
       const line = document.lineAt(i).text;
@@ -118,7 +109,6 @@ export class EnvCodeLensProvider implements vscode.CodeLensProvider {
       }
     }
 
-    // Count non-comment, non-empty lines for variable count
     let count = 0;
     for (let i = 0; i < document.lineCount; i++) {
       const line = document.lineAt(i).text.trim();
@@ -131,27 +121,14 @@ export class EnvCodeLensProvider implements vscode.CodeLensProvider {
     return { varCount, environment, syncTime };
   }
 
-  private async findLinkedProjectForDir(dirPath: string): Promise<boolean> {
-    const linkedProjects = await this.storage.getLinkedProjectsV2();
-    for (const project of linkedProjects) {
-      for (const dir of project.directories) {
-        if (path.normalize(dir.directoryPath) === path.normalize(dirPath)) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  private formatTime(timestamp: number): string {
-    const diff = Date.now() - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-
-    if (minutes < 1) return "just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return new Date(timestamp).toLocaleDateString();
+  private isLinkedDir(dirPath: string): boolean {
+    return this.storage
+      .getLinkedProjectsMetadataV2()
+      .some((project) =>
+        project.directories.some((dir) =>
+          pathsEqual(dir.directoryPath, dirPath)
+        )
+      );
   }
 
   dispose(): void {

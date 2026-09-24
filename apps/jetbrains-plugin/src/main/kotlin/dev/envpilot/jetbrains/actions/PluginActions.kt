@@ -9,6 +9,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import dev.envpilot.jetbrains.config.EnvpilotSettings
 import dev.envpilot.jetbrains.convex.ConvexApi
 import dev.envpilot.jetbrains.editor.EnvEditorService
+import dev.envpilot.jetbrains.editor.linkForKey
 import dev.envpilot.jetbrains.editor.resolveManagedKey
 import dev.envpilot.jetbrains.errors.Errors
 import dev.envpilot.jetbrains.guards.CommitGuard
@@ -18,10 +19,10 @@ import dev.envpilot.jetbrains.sync.SyncScheduler
 import dev.envpilot.jetbrains.sync.SyncState
 import dev.envpilot.jetbrains.ui.notifyBalloon
 import dev.envpilot.jetbrains.ui.refreshOpenEnvEditors
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
-import java.nio.file.Path
 
 class PullNowAction : DumbAwareAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
@@ -32,7 +33,7 @@ class PullNowAction : DumbAwareAction() {
             val ok = SyncScheduler.getInstance().runCycle(project)
             notifyBalloon(
                 project,
-                if (ok) "Pull complete." else "Pull failed: ${SyncState.lastError(project) ?: "unknown error"}",
+                if (ok) "Pull complete." else "Pull failed: ${SyncState.lastError(project.locationHash) ?: "unknown error"}",
                 if (ok) NotificationType.INFORMATION else NotificationType.ERROR,
             )
             refreshOpenEnvEditors(project)
@@ -53,10 +54,10 @@ class ShowStatusAction : DumbAwareAction() {
         val state =
             if (dev.envpilot.jetbrains.auth.AuthService.getInstance().email == null) {
                 "Signed out"
-            } else if (SyncState.lastError(project) == null) {
+            } else if (SyncState.lastError(project.locationHash) == null) {
                 "Connected"
             } else {
-                "Last pull failed: ${SyncState.lastError(project)}"
+                "Last pull failed: ${SyncState.lastError(project.locationHash)}"
             }
         notifyBalloon(project, "Envpilot: $state. ${links.size} environment link(s).", NotificationType.INFORMATION)
     }
@@ -72,6 +73,12 @@ class OpenDashboardAction : DumbAwareAction() {
 
 class ToggleCloakingAction : DumbAwareAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
+
+    override fun update(e: AnActionEvent) {
+        val project = e.project
+        e.presentation.isEnabled =
+            project != null && (!EnvpilotSettings.getInstance().state.cloakValues || canReveal(project))
+    }
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -101,6 +108,10 @@ class ToggleCloakingAction : DumbAwareAction() {
 class RevealValuesAction : DumbAwareAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
+    override fun update(e: AnActionEvent) {
+        e.presentation.isEnabled = e.project?.let(::canReveal) == true
+    }
+
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         SyncScheduler.getInstance().launch {
@@ -122,6 +133,10 @@ class RevealValuesAction : DumbAwareAction() {
 
 class RevealValueAtCaretAction : DumbAwareAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
+
+    override fun update(e: AnActionEvent) {
+        e.presentation.isEnabled = e.project?.let(::canReveal) == true
+    }
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -149,12 +164,15 @@ class RevealValueAtCaretAction : DumbAwareAction() {
                 val variable =
                     result.variables.firstOrNull { it.key == match.key }
                         ?: error("${match.key} was not found in ${match.link.environment}")
-                // The notification hub persists balloons — never print the raw
-                // secret there. Clipboard keeps it out of the scrollback.
                 CopyPasteManager.getInstance().setContents(StringSelection(variable.value))
                 notifyBalloon(project, "${match.key} copied to clipboard.", NotificationType.INFORMATION)
-                delay(30_000)
-                clearClipboardIfHolding(variable.value)
+                try {
+                    delay(30_000)
+                } finally {
+                    clearClipboardIfHolding(variable.value)
+                }
+            } catch (error: CancellationException) {
+                throw error
             } catch (error: Exception) {
                 Errors.report(error, mapOf("surface" to "reveal-at-caret"))
                 notifyBalloon(project, Errors.friendly(error), NotificationType.ERROR)
@@ -166,28 +184,39 @@ class RevealValueAtCaretAction : DumbAwareAction() {
 class InstallCommitGuardAction : DumbAwareAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
+    override fun update(e: AnActionEvent) {
+        e.presentation.isEnabled = e.project?.let { linkedRoots(it).isNotEmpty() } == true
+    }
+
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val roots = linkedRoots(project)
-        val installed = roots.count { CommitGuard.install(it) }
-        EnvpilotSettings.getInstance().state.commitGuardEnabled = installed > 0
-        notifyBalloon(
-            project,
-            if (installed > 0) "Commit guard installed in $installed Git repository root(s)." else "No linked Git repository found.",
-            if (installed > 0) NotificationType.INFORMATION else NotificationType.WARNING,
-        )
+        SyncScheduler.getInstance().launch {
+            val managed = EnvEditorService.getInstance(project).expectedHashes().keys
+            val installed = linkedRoots(project).count { runCatching { CommitGuard.install(it, managed) }.getOrDefault(false) }
+            EnvpilotSettings.getInstance().state.commitGuardEnabled = installed > 0
+            notifyBalloon(
+                project,
+                if (installed > 0) "Commit guard installed in $installed Git repository root(s)." else GUARD_SKIPPED,
+                if (installed > 0) NotificationType.INFORMATION else NotificationType.WARNING,
+            )
+        }
     }
 }
 
 class RemoveCommitGuardAction : DumbAwareAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
+    override fun update(e: AnActionEvent) {
+        e.presentation.isEnabled = e.project?.let { linkedRoots(it).isNotEmpty() } == true
+    }
+
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val roots = linkedRoots(project)
-        val removed = roots.count { CommitGuard.remove(it) }
-        EnvpilotSettings.getInstance().state.commitGuardEnabled = false
-        notifyBalloon(project, "Commit guard removed from $removed Git repository root(s).", NotificationType.INFORMATION)
+        SyncScheduler.getInstance().launch {
+            val removed = linkedRoots(project).count { runCatching { CommitGuard.remove(it) }.getOrDefault(false) }
+            EnvpilotSettings.getInstance().state.commitGuardEnabled = false
+            notifyBalloon(project, "Commit guard removed from $removed Git repository root(s).", NotificationType.INFORMATION)
+        }
     }
 }
 
@@ -201,21 +230,23 @@ private fun valueAtCaret(project: com.intellij.openapi.project.Project): CaretVa
     val start = editor.document.getLineStartOffset(line)
     val end = editor.document.getLineEndOffset(line)
     val text = editor.document.charsSequence.subSequence(start, end).toString()
-    val managed = EnvEditorService.getInstance(project)
     val key =
         resolveManagedKey(
             text,
             offset - start,
             file.name.startsWith(".env"),
-            managed.managed(file.path)?.keys.orEmpty(),
+            EnvEditorService.getInstance(project).managed(file.path)?.keys.orEmpty(),
         ) ?: return null
-    val link =
-        LinkedProjectsService.getInstance(project).all().firstOrNull {
-            runCatching { Path.of(file.path).startsWith(Path.of(it.directoryPath)) }.getOrDefault(false) &&
-                key in managed.managed(Path.of(it.directoryPath, dev.envpilot.jetbrains.sync.targetFileFor(it)).toString())?.keys.orEmpty()
-        } ?: return null
-    return CaretValue(key, link)
+    return linkForKey(project, file.path, key)?.let { CaretValue(key, it) }
 }
+
+const val GUARD_SKIPPED =
+    "Commit guard skipped: no Git repository found, or the repository manages its own hooks (core.hooksPath, for example husky)."
+
+private fun canReveal(project: com.intellij.openapi.project.Project): Boolean =
+    EnvEditorService.getInstance(project).canReveal(
+        LinkedProjectsService.getInstance(project).all().map { it.projectId }.distinct(),
+    )
 
 private fun linkedRoots(project: com.intellij.openapi.project.Project): Set<String> =
     LinkedProjectsService.getInstance(project).all().map { it.directoryPath }.toSet()
@@ -231,14 +262,12 @@ private suspend fun refreshRevealAccess(project: com.intellij.openapi.project.Pr
     return editor.canReveal(links.map { it.projectId })
 }
 
-/** Tier gate for the read surfaces: every linked org must have the plugin enabled. */
 private suspend fun hasPluginAccess(project: com.intellij.openapi.project.Project): Boolean =
     LinkedProjectsService.getInstance(project).all()
         .map { it.orgId }
         .distinct()
         .all { SyncScheduler.getInstance().hasAccess(it) }
 
-/** Don't leave a secret sitting on the clipboard; only clear what we put there. */
 private fun clearClipboardIfHolding(value: String) {
     val manager = CopyPasteManager.getInstance()
     val current =

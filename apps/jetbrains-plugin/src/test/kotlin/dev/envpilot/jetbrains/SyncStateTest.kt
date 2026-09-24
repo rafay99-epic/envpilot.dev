@@ -1,8 +1,6 @@
 package dev.envpilot.jetbrains
 
 import dev.envpilot.jetbrains.sync.SyncState
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -10,31 +8,27 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SyncStateTest {
-    @BeforeTest
-    @AfterTest
-    fun reset() = SyncState.reset()
-
     @Test
     fun `one project's success does not clear another's error`() {
-        SyncState.markFailureFor("a", "boom")
-        SyncState.markSuccessFor("b")
-        assertEquals("boom", SyncState.lastError)
+        SyncState.markFailure("isolation-a", "boom")
+        SyncState.markSuccess("isolation-b")
+        assertEquals("boom", SyncState.lastError("isolation-a"))
+        assertNull(SyncState.lastError("isolation-b"))
     }
 
     @Test
-    fun `syncing is true while any project syncs`() {
-        SyncState.markStartFor("a")
-        SyncState.markSuccessFor("b")
-        assertTrue(SyncState.syncing)
-        SyncState.markSuccessFor("a")
-        assertFalse(SyncState.syncing)
+    fun `syncing is tracked per project`() {
+        SyncState.markStart("syncing-a")
+        SyncState.markSuccess("syncing-b")
+        assertTrue(SyncState.syncing("syncing-a"))
+        SyncState.markSuccess("syncing-a")
+        assertFalse(SyncState.syncing("syncing-a"))
     }
 
     @Test
-    fun `success clears that project's error and stamps the sync time`() {
-        SyncState.markFailureFor("a", "boom")
-        SyncState.markSuccessFor("a")
-        assertNull(SyncState.lastError)
-        assertTrue(SyncState.lastSyncAtMs > 0)
+    fun `success clears that project's error`() {
+        SyncState.markFailure("clear-a", "boom")
+        SyncState.markSuccess("clear-a")
+        assertNull(SyncState.lastError("clear-a"))
     }
 }

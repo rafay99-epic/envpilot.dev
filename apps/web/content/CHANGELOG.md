@@ -15,6 +15,44 @@
 
 <!-- entry -->
 ---
+title: VS Code extension 1.17.2
+version: v1.17.2
+date: 2026-09-24
+types: [fix, security]
+---
+
+A pull that hits a decryption failure or a truncated result now stops and writes nothing. Before, the literal text `[DECRYPTION_FAILED]` could end up in your `.env`.
+
+Choosing "Skip" when linking a directory now really skips it: the directory is not stored, so nothing overwrites your existing file later. Removing a directory or losing access deletes only files whose contents still match what Envpilot wrote, and also removes synced secret files. A sync that was already in flight can no longer write secrets back after access was revoked.
+
+Edits to a protected file are reverted immediately instead of waiting for you to dismiss the warning. Synced files are created with owner-only permissions (0600, read-only 0400).
+
+Token refresh reads the stored session first, so two VS Code windows no longer sign each other out. A network blip during refresh is reported as a network error instead of "Session expired". Signing in, switching accounts and signing out all go through one path that clears cached permissions.
+
+The commit guard now works on Windows, no longer blocks `.env.example`, `.env.sample` or `.env.template`, no longer blocks removing an already-committed `.env` from the index, and only installs into `.git/hooks` (repos that manage hooks with husky are left alone). Value cloaking covers `export KEY=` and indented lines.
+
+Removed: the dashboard panel, the `envpilot.syncInterval` setting (it did nothing) and the `Select Environments` command (it was a placeholder).
+
+<!-- entry -->
+---
+title: JetBrains plugin 0.1.9
+version: v0.1.9
+date: 2026-09-24
+types: [fix, security]
+---
+
+File drift detection now runs. It was registered under an extension point the platform does not have, so edits to synced files were never noticed. Value cloaking, the copy guard and hover now work on Windows.
+
+"Delete unchanged pulled files when the IDE closes" is honored. Plugin updates no longer delete synced files from under a running dev server. Link state moved to the workspace file, so it is no longer written into `.idea/` where it could be committed. Existing links migrate automatically.
+
+Requests for a variable no longer fail on submit. Sync no longer runs a full pull on every window focus when auto-sync is off.
+
+The Convex connection sends frames in order, queues calls while offline and sends them on reconnect, re-authenticates before the token expires, and shuts down when the plugin unloads. Sign-in polling can be cancelled, a second click is ignored, and the device code is shown. The plugin update block now applies to syncing, not only to Sign In.
+
+Secret file paths that point at `.git`, `.husky`, `.idea`, `.vscode` or an env file are rejected on both the plugin and the server.
+
+<!-- entry -->
+---
 title: JetBrains plugin 0.1.8
 version: v0.1.8
 date: 2026-09-23

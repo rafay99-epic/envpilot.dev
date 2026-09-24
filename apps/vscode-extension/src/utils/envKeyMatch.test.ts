@@ -30,8 +30,6 @@ describe("findEnvKeyMatches", () => {
       "const a = process.env.API_KEY; const b = process.env.API_KEY;";
     const matches = findEnvKeyMatches("javascript", line);
     expect(matches).toHaveLength(2);
-    // Upstream used line.indexOf(key), which put BOTH ranges on the first
-    // occurrence. Each range must cover its own occurrence.
     expect(matches[0]).toEqual({ key: "API_KEY", start: 22, end: 29 });
     expect(matches[1]).toEqual({ key: "API_KEY", start: 53, end: 60 });
     expect(matches[1].start).toBeGreaterThan(matches[0].end);
