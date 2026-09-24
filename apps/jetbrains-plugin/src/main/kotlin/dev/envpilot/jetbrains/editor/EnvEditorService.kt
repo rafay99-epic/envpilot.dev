@@ -81,6 +81,7 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
     ) = newer.copy(
         secretFilePaths = (older.secretFilePaths + newer.secretFilePaths).distinct(),
         secretHashes = older.secretHashes + newer.secretHashes,
+        autoUnsyncOnClose = older.autoUnsyncOnClose && newer.autoUnsyncOnClose,
     )
 
     @Synchronized

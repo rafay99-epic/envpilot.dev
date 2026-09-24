@@ -73,6 +73,7 @@ class EnvEditorServiceTest {
                                 syncedAtMs = 1,
                                 secretFilePaths = listOf(realOlderSecret),
                                 secretHashes = mapOf(realOlderSecret to "older-hash"),
+                                autoUnsyncOnClose = false,
                             ),
                     )
             },
@@ -83,6 +84,7 @@ class EnvEditorServiceTest {
         assertEquals(setOf(realSecret, realOlderSecret), managed.secretFilePaths.toSet())
         assertEquals("secret-hash", managed.secretHashes[realSecret])
         assertEquals("older-hash", managed.secretHashes[realOlderSecret])
+        assertEquals(false, managed.autoUnsyncOnClose)
         assertEquals(1, service.managedPaths().size)
     }
 }
