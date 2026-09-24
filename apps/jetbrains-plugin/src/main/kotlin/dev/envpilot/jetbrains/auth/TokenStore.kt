@@ -8,24 +8,24 @@ import com.intellij.ide.util.PropertiesComponent
 
 data class AccountSummary(val userId: String, val email: String)
 
-/** Tokens stay in PasswordSafe. Preferences hold account ids and emails only. */
-class TokenStore {
-    fun load(userId: String? = activeUserId()): Session? {
-        val id = userId ?: return migrateLegacy()
+open class TokenStore {
+    open fun load(userId: String? = null): Session? {
+        val id = userId ?: activeUserId() ?: return migrateLegacy()
         val email = props().getValue(emailKey(id)) ?: return null
         val access = PasswordSafe.instance.getPassword(accessAttributes(id))
         val refresh = PasswordSafe.instance.getPassword(refreshAttributes(id))
-        if (access.isNullOrBlank() || refresh.isNullOrBlank()) return null
-        return Session(id, email, access, refresh, Jwt.sessionId(access))
+        if (!access.isNullOrBlank() && !refresh.isNullOrBlank()) return Session(id, email, access, refresh, Jwt.sessionId(access))
+        if (access != null || refresh != null) remove(id, activateNext = false)
+        return null
     }
 
-    fun save(session: Session) {
+    open fun save(session: Session) {
+        PasswordSafe.instance.set(accessAttributes(session.userId), Credentials(session.userId, session.accessToken))
+        PasswordSafe.instance.set(refreshAttributes(session.userId), Credentials(session.userId, session.refreshToken))
         val ids = accountIds() + session.userId
         props().setValue(PROP_ACCOUNT_IDS, ids.joinToString(","))
         props().setValue(PROP_ACTIVE_USER_ID, session.userId)
         props().setValue(emailKey(session.userId), session.email)
-        PasswordSafe.instance.set(accessAttributes(session.userId), Credentials(session.userId, session.accessToken))
-        PasswordSafe.instance.set(refreshAttributes(session.userId), Credentials(session.userId, session.refreshToken))
     }
 
     fun accounts(): List<AccountSummary> =

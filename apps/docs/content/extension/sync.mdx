@@ -29,7 +29,7 @@ Variables are written to your target file (`envpilot.targetFile`, default `.env.
 ## What sync does
 
 - On workspace open (`envpilot.autoSync`), the latest variables are pulled and written.
-- A live connection keeps values current while the window is open; a background check (`envpilot.syncInterval`, default 300 s) catches permission changes.
+- A live connection keeps values and permissions current while the window is open.
 - Real-time subscriptions pause after the window has been unfocused for `envpilot.idlePauseMinutes` (default 10) and resume the moment focus returns. Set it to `0` to never pause.
 - When access is revoked, the extension deletes the synced `.env` files it wrote (`envpilot.preventCopyOnRevoke`).
 
@@ -53,7 +53,7 @@ my-monorepo/
 └── packages/sdk/.env      ← staging
 ```
 
-Manage them with **Envpilot: Add Directory** and **Envpilot: Remove Directory**, and pick environments per link with **Envpilot: Select Environments**.
+Manage them with **Envpilot: Add Directory** and **Envpilot: Remove Directory**. Environments are picked per directory when you link or add it.
 
 ## When a file already exists
 
@@ -75,7 +75,6 @@ Synced files can be removed when the workspace closes, so a laptop left open in 
 
 - Sync writes what your role can read. Nothing indicates that other variables exist.
 - Restricted Mode disables writing entirely — trust the workspace first.
-- `envpilot.syncInterval` is a permission check, not a value poll; values arrive over the live connection.
 - One target file per linked directory.
 
 ## Next

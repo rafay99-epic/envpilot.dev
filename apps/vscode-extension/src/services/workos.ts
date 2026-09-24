@@ -1,16 +1,3 @@
-// WorkOS AuthKit device authorization flow, over raw HTTP (no SDK).
-//
-// This replaces the old browser-OAuth-poll login. The extension now obtains
-// real AuthKit JWTs directly from WorkOS:
-//   1. requestDeviceCode()      → device_code + user_code + verification URL
-//   2. pollForToken(deviceCode) → poll until the user approves in the browser
-//   3. refreshAccessToken(rt)   → mint a new 5-minute access token on demand
-//
-// Endpoints & payloads follow the confirmed Stage-2 contract. The public
-// CLIENT_ID is injected at build time (see utils/config.ts). No `zod` here —
-// the extension bundles no validation library, so responses are validated by
-// hand.
-
 import { getWorkosClientId } from "../utils/config";
 
 const WORKOS_BASE = "https://api.workos.com";
@@ -18,8 +5,6 @@ const DEVICE_AUTHORIZE_URL = `${WORKOS_BASE}/user_management/authorize/device`;
 const AUTHENTICATE_URL = `${WORKOS_BASE}/user_management/authenticate`;
 
 const DEVICE_CODE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
-
-// ── Response shapes ──────────────────────────────────────────────────────────
 
 export interface DeviceCodeResponse {
   device_code: string;
@@ -46,13 +31,9 @@ export interface TokenResponse {
 
 export interface RefreshResponse {
   access_token: string;
-  // WorkOS MAY rotate the refresh token — persist whichever it returns.
   refresh_token: string;
 }
 
-// ── Errors ───────────────────────────────────────────────────────────────────
-
-/** Thrown for unrecoverable device-flow failures (denied/expired/network). */
 export class WorkosAuthError extends Error {
   constructor(
     message: string,
@@ -85,6 +66,7 @@ async function postForm(
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(form).toString(),
+    signal: AbortSignal.timeout(10_000),
   });
   let body: unknown = null;
   try {
@@ -94,8 +76,6 @@ async function postForm(
   }
   return { status: res.status, body };
 }
-
-// ── Validation helpers (hand-rolled — no zod in the extension bundle) ─────────
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -163,9 +143,6 @@ function parseRefresh(body: unknown): RefreshResponse | null {
   return { access_token, refresh_token };
 }
 
-// ── Device flow ────────────────────────────────────────────────────────────
-
-/** Step 1: request a device + user code from WorkOS. */
 export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
   assertConfigured();
   let result: { status: number; body: unknown };
@@ -198,27 +175,15 @@ export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
   return parsed;
 }
 
-/** Discriminated outcome of a SINGLE poll attempt. */
 export type PollResult =
   | { status: "complete"; token: TokenResponse }
   | { status: "pending" }
   | { status: "slow_down" }
   | { status: "denied" }
   | { status: "expired" }
-  | { status: "network" };
+  | { status: "network" }
+  | { status: "error" };
 
-/**
- * Step 2 (single attempt): poll the token endpoint once.
- *
- * Callers own the polling loop and the interval; this maps WorkOS's response
- * into a discriminated result:
- *   - 200                       → complete (tokens issued)
- *   - authorization_pending     → pending (keep polling)
- *   - slow_down                 → slow_down (increase interval, keep polling)
- *   - access_denied             → denied (stop)
- *   - expired_token             → expired (stop)
- *   - network / other           → network (transient; caller may retry)
- */
 export async function pollForToken(deviceCode: string): Promise<PollResult> {
   assertConfigured();
   let result: { status: number; body: unknown };
@@ -234,13 +199,7 @@ export async function pollForToken(deviceCode: string): Promise<PollResult> {
 
   if (result.status === 200) {
     const parsed = parseToken(result.body);
-    if (!parsed) {
-      throw new WorkosAuthError(
-        "WorkOS returned an unexpected token response.",
-        "invalid_response"
-      );
-    }
-    return { status: "complete", token: parsed };
+    return parsed ? { status: "complete", token: parsed } : { status: "error" };
   }
 
   const errorCode = extractOauthError(result.body);
@@ -254,13 +213,10 @@ export async function pollForToken(deviceCode: string): Promise<PollResult> {
     case "expired_token":
       return { status: "expired" };
     default:
-      // An unrecognized 4xx/5xx — treat as transient so a hiccup doesn't abort
-      // an otherwise-live device flow.
       return { status: "network" };
   }
 }
 
-/** Step 3: exchange a refresh token for a fresh access token (may rotate rt). */
 export async function refreshAccessToken(
   refreshToken: string
 ): Promise<RefreshResponse> {
@@ -282,13 +238,6 @@ export async function refreshAccessToken(
   if (result.status >= 400) {
     const message =
       extractOauthError(result.body) ?? extractErrorMessage(result.body);
-    // Distinguish a genuinely dead session from a transient hiccup:
-    //   - 5xx / 429           → server unavailable or rate-limited; the refresh
-    //                           token is probably still valid. Surface as
-    //                           `network` so the caller KEEPS the creds and the
-    //                           user can retry (no wrongful forced re-login).
-    //   - other 4xx (400/401) → the refresh grant was rejected (revoked/expired
-    //                           token) → access_denied so the caller clears creds.
     const transient = result.status >= 500 || result.status === 429;
     throw new WorkosAuthError(
       `Session refresh failed${message ? `: ${message}` : ""}.`,
@@ -305,8 +254,6 @@ export async function refreshAccessToken(
   }
   return parsed;
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 function extractOauthError(body: unknown): string | null {
   if (isRecord(body) && "error" in body) {

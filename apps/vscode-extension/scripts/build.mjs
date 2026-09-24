@@ -4,10 +4,6 @@ const args = process.argv.slice(2);
 const isWatch = args.includes("--watch");
 const isMinify = args.includes("--minify");
 
-// ENVPILOT_SERVER_URL always wins. Otherwise a watch build (dev — `bun run
-// dev`) defaults to the local server, while a one-shot/minified build (prod
-// packaging) defaults to production. This keeps `bun run dev` pointed at
-// localhost without anyone having to remember to set the env var.
 const serverUrl =
   process.env.ENVPILOT_SERVER_URL ||
   (isWatch ? "http://localhost:3000" : "https://www.envpilot.dev");
@@ -16,10 +12,6 @@ const define = {
   ...(serverUrl && {
     __DEFAULT_SERVER_URL__: JSON.stringify(serverUrl),
   }),
-  // WorkOS AuthKit device-flow client id (public) and the Convex deployment
-  // URL, baked in at build time from the same env vars the web app uses so a
-  // single build environment configures every surface. See utils/config.ts for
-  // the runtime consumers (getWorkosClientId / getConvexUrl).
   __WORKOS_CLIENT_ID__: JSON.stringify(process.env.WORKOS_CLIENT_ID || ""),
   __CONVEX_URL__: JSON.stringify(process.env.NEXT_PUBLIC_CONVEX_URL || ""),
   __EXTENSION_SENTRY_DSN__: JSON.stringify(
@@ -30,7 +22,6 @@ const define = {
   ),
 };
 
-/** @type {import('esbuild').BuildOptions} */
 const shared = {
   bundle: true,
   format: "cjs",
@@ -40,12 +31,6 @@ const shared = {
   define,
 };
 
-/**
- * Main extension bundle. "./sentry.js" is kept external so the heavy
- * @sentry/node dependency lives in its own chunk (built below) and is
- * only required lazily at runtime — it must not slow down activation.
- * @type {import('esbuild').BuildOptions}
- */
 const extensionOptions = {
   ...shared,
   entryPoints: ["./src/extension.ts"],
@@ -53,7 +38,6 @@ const extensionOptions = {
   external: ["vscode", "./sentry.js"],
 };
 
-/** @type {import('esbuild').BuildOptions} */
 const sentryOptions = {
   ...shared,
   entryPoints: ["./src/utils/sentryRuntime.ts"],
@@ -61,11 +45,6 @@ const sentryOptions = {
   external: ["vscode"],
 };
 
-/**
- * `vscode:uninstall` hook bundle — plain node script (no vscode API) that
- * purges synced .env files after the extension is removed.
- * @type {import('esbuild').BuildOptions}
- */
 const uninstallOptions = {
   ...shared,
   entryPoints: ["./src/uninstall.ts"],

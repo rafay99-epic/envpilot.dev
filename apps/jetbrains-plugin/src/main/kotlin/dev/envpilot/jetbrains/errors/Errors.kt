@@ -7,19 +7,14 @@ import dev.envpilot.jetbrains.version.VersionCheck
 import io.sentry.Sentry
 import io.sentry.SentryLevel
 import kotlinx.coroutines.TimeoutCancellationException
-import java.net.SocketException
-import java.net.UnknownHostException
-import java.net.http.HttpTimeoutException
+import java.io.IOException
 
-/**
- * The one error-handling entry point. Everything that fails reports through
- * [report] (Sentry + idea.log, no-ops without a DSN) and reaches the UI as a
- * friendly sentence via [friendly].
- */
 object Errors {
     const val PLUGIN_DISABLED =
         "Envpilot for JetBrains isn't enabled on your organization's plan. " +
             "Ask an owner to enable it in the Envpilot dashboard."
+
+    const val UPDATE_REQUIRED = "This Envpilot plugin version is no longer supported. Update it from Settings ▸ Plugins."
 
     private val log = logger<Errors>()
 
@@ -36,25 +31,24 @@ object Errors {
                 options.release = "envpilot-jetbrains@${VersionCheck.currentVersion() ?: "unknown"}"
             }
         } catch (_: Exception) {
-            // Telemetry must never break the plugin; leave init untried.
             initialized.set(false)
         }
     }
 
-    /** Handled by the plugin itself; logged, never sent to Sentry. */
-    private fun isExpected(e: Throwable): Boolean {
-        if (e is AuthKitLogin.LoginCancelled && !e.transient) return true
-        if (e is SocketException || e is UnknownHostException || e is HttpTimeoutException) return true
-        if (e is TimeoutCancellationException) return true
-        val msg = e.message ?: return false
-        return msg.startsWith("auth error:") ||
-            msg.startsWith("Convex socket not connected") ||
-            msg.startsWith("Not connected") ||
-            msg.contains("Unauthenticated") ||
-            msg == "socket disconnected"
-    }
+    private fun isExpected(e: Throwable): Boolean =
+        generateSequence(e) { it.cause }.take(16).any { cause ->
+            val msg = cause.message.orEmpty()
+            (cause is AuthKitLogin.LoginCancelled && !cause.transient) ||
+                cause is IOException ||
+                cause is TimeoutCancellationException ||
+                msg.startsWith("auth error:") ||
+                msg.startsWith("Not signed in") ||
+                msg.startsWith("Convex socket stopped") ||
+                msg.startsWith("Connection lost") ||
+                msg.contains("Unauthenticated") ||
+                msg == UPDATE_REQUIRED
+        }
 
-    /** Report to Sentry + the IDE log. Safe to call from anywhere. */
     fun report(
         e: Throwable,
         context: Map<String, String> = emptyMap(),
@@ -71,24 +65,23 @@ object Errors {
         }
     }
 
-    /** Human sentence for the UI — what happened and what to do next. */
     fun friendly(e: Throwable): String {
         val raw = e.message ?: e::class.simpleName ?: "unknown error"
         return when {
             raw.contains("Not signed in", true) ->
-                "You're signed out — use Tools ▸ Envpilot ▸ Sign In."
-            raw.contains("socket", true) || raw.contains("offline", true) ->
-                "Real-time sync is offline. We'll keep retrying; sync runs on its interval meanwhile."
+                "You're signed out. Use Tools ▸ Envpilot ▸ Sign In."
+            raw.contains("socket", true) || raw.contains("Connection lost", true) ->
+                "Lost the connection to Envpilot. It reconnects on its own; retry in a moment."
             raw.contains("timed out", true) || raw.contains("Timeout", true) ->
                 "The server took too long to respond. Check your connection and retry."
             raw.contains("UnknownHost", true) || raw.contains("nodename nor servname", true) ->
-                "Can't reach the Envpilot server — check your internet connection."
+                "Can't reach the Envpilot server. Check your internet connection."
             Regex("401|auth error|unauthorized|unauthenticated", RegexOption.IGNORE_CASE).containsMatchIn(raw) ->
-                "Your session expired — sign in again from Tools ▸ Envpilot."
+                "Your session expired. Sign in again from Tools ▸ Envpilot."
             Regex("403|permission|forbidden|access", RegexOption.IGNORE_CASE).containsMatchIn(raw) ->
                 "Your account doesn't have access to this resource."
             raw.contains("Decryption failed", true) ->
-                raw // already user-facing from PullService
+                raw
             else -> raw.replaceFirstChar { it.uppercase() }.let { if (it.endsWith(".")) it else "$it." }
         }
     }

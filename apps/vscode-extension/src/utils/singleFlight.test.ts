@@ -17,7 +17,7 @@ describe("SingleFlight", () => {
     const b = sf.run("k", fn);
     const c = sf.run("k", fn);
 
-    expect(calls).toBe(1); // only the first call actually invoked fn
+    expect(calls).toBe(1);
 
     resolve("value");
     await expect(a).resolves.toBe("value");
@@ -51,7 +51,7 @@ describe("SingleFlight", () => {
     const second = await sf.run("k", fn);
 
     expect(first).toBe(1);
-    expect(second).toBe(2); // entry cleared after settle, so it ran again
+    expect(second).toBe(2);
     expect(calls).toBe(2);
   });
 
@@ -64,7 +64,6 @@ describe("SingleFlight", () => {
     };
 
     await expect(sf.run("k", fn)).rejects.toThrow("boom");
-    // A later call must not be stuck joining the failed promise.
     await expect(sf.run("k", fn)).rejects.toThrow("boom");
     expect(calls).toBe(2);
   });
@@ -80,8 +79,8 @@ describe("SingleFlight", () => {
     const a = sf.run("a", fn);
     const b = sf.run("b", fn);
     sf.delete("a");
-    const a2 = sf.run("a", fn); // fresh run, not joined to `a`
-    const b2 = sf.run("b", fn); // still coalesced with `b`
+    const a2 = sf.run("a", fn);
+    const b2 = sf.run("b", fn);
 
     expect(resolvers).toHaveLength(3);
 
@@ -104,12 +103,12 @@ describe("SingleFlight", () => {
 
     const a = sf.run("k", fn);
     sf.delete("k");
-    const b = sf.run("k", fn); // replacement registered under the same key
+    const b = sf.run("k", fn);
 
-    resolvers[0](1); // settle the deleted run — must not remove `b`'s entry
+    resolvers[0](1);
     await expect(a).resolves.toBe(1);
 
-    const c = sf.run("k", fn); // must join `b`, not start fresh work
+    const c = sf.run("k", fn);
     expect(resolvers).toHaveLength(2);
 
     resolvers[1](2);
@@ -127,9 +126,9 @@ describe("SingleFlight", () => {
 
     const a = sf.run("k", fn);
     sf.clear();
-    const b = sf.run("k", fn); // must start a fresh run, not join `a`
+    const b = sf.run("k", fn);
 
-    expect(resolvers).toHaveLength(2); // two independent runs, not coalesced
+    expect(resolvers).toHaveLength(2);
 
     resolvers[0](7);
     resolvers[1](8);

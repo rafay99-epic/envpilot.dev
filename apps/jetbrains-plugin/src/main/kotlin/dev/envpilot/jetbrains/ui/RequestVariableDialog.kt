@@ -4,7 +4,6 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
-import com.intellij.openapi.util.Disposer
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import dev.envpilot.jetbrains.auth.AuthService
@@ -12,11 +11,7 @@ import dev.envpilot.jetbrains.convex.ConvexApi
 import dev.envpilot.jetbrains.errors.Errors
 import dev.envpilot.jetbrains.model.VALID_ENVIRONMENTS
 import dev.envpilot.jetbrains.sync.SyncScheduler
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import javax.swing.JComponent
 
 data class RequestProject(
@@ -26,10 +21,6 @@ data class RequestProject(
     val allowedEnvironments: List<String>,
 )
 
-/**
- * Submit a variable request (same approval flow as the web). The value is
- * encrypted server-side by the createWithValue action.
- */
 class RequestVariableDialog(
     private val project: Project,
     private val projects: List<RequestProject>,
@@ -42,15 +33,12 @@ class RequestVariableDialog(
     private val projectCombo =
         javax.swing.JComboBox(projects.map { it.name }.toTypedArray())
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     init {
         title = "Request Variable"
         setOKButtonText("Submit Request")
         envChecks.first().second.isSelected = true
         projectCombo.addActionListener { updateEnvironmentAccess() }
         updateEnvironmentAccess()
-        Disposer.register(myDisposable) { scope.cancel() }
         init()
     }
 
@@ -62,7 +50,7 @@ class RequestVariableDialog(
                 }
                 row("Key:") {
                     cell(keyField).align(AlignX.FILL)
-                }.comment("UPPER_SNAKE_CASE — letters, digits and underscores, starting with a letter.")
+                }.comment("UPPER_SNAKE_CASE: letters, digits and underscores, starting with a letter.")
                 row("Proposed value:") {
                     cell(valueField).align(AlignX.FILL)
                 }.comment("Sent over TLS and encrypted by the existing Convex action before storage.")
@@ -120,7 +108,8 @@ class RequestVariableDialog(
             )
         if (confirmed != com.intellij.openapi.ui.Messages.YES) return
 
-        scope.launch {
+        super.doOKAction()
+        SyncScheduler.getInstance().launch {
             try {
                 check(AuthService.getInstance().getSession() != null) { "Not signed in" }
                 if (!SyncScheduler.getInstance().hasAccess(selectedProject.orgId)) {
@@ -128,13 +117,14 @@ class RequestVariableDialog(
                     return@launch
                 }
                 ConvexApi.createVariableRequest(projectId, key, value, environments, sensitive, description)
-                notify("Variable request for $key submitted — awaiting approval.", NotificationType.INFORMATION)
+                notify("Variable request for $key submitted, awaiting approval.", NotificationType.INFORMATION)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Errors.report(e, mapOf("surface" to "request-variable"))
                 notify("Request failed: ${Errors.friendly(e)}", NotificationType.ERROR)
             }
         }
-        super.doOKAction()
     }
 
     private fun updateEnvironmentAccess() {

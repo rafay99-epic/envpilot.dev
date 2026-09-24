@@ -26,13 +26,17 @@ data class PullMeta(
     val capabilities: Map<String, Boolean>,
 )
 
+data class AccessMeta(
+    val environmentScope: List<String>?,
+    val capabilities: Map<String, Boolean>,
+)
+
 data class PullResult(val variables: List<PulledVariable>, val meta: PullMeta)
 
 data class SecretFileMeta(
     val id: String,
     val name: String,
     val path: String,
-    /** Octal POSIX mode parsed from the API, e.g. 0o600 → 384. Null when unset. */
     val mode: Int?,
     val size: Long,
 )

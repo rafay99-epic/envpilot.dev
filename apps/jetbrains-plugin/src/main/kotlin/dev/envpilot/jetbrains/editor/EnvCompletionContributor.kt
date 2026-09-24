@@ -18,11 +18,6 @@ import dev.envpilot.jetbrains.sync.LinkedProjectsService
 import dev.envpilot.jetbrains.sync.SyncScheduler
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Env-key autocomplete inside .env* files. Keys come from linked projects'
- * metadata (no decryption), cached 30s. Port of the extension's autocomplete
- * provider, scoped to plain-text env files.
- */
 class EnvCompletionContributor : CompletionContributor() {
     init {
         extend(
@@ -64,12 +59,9 @@ class EnvCompletionContributor : CompletionContributor() {
             val cached = mutableSetOf<String>()
             val missing = mutableListOf<LinkedProject>()
             for (link in links) {
-                // A known-disabled org offers nothing, cached or not.
                 if (SyncScheduler.getInstance().cachedAccess(link.orgId) == false) continue
-                service.cachedKeys(link.projectId)?.let { cached.addAll(it) } ?: missing.add(link)
+                service.cachedKeys(link.projectId, link.environment)?.let { cached.addAll(it) } ?: missing.add(link)
             }
-            // Never block completion on the network — warm the cache off-thread
-            // so the NEXT invocation has the keys. PullService warms it too.
             if (missing.isNotEmpty()) warmCache(project, missing)
             return cached.ifEmpty { null }
         }
@@ -78,8 +70,7 @@ class EnvCompletionContributor : CompletionContributor() {
             project: Project,
             links: List<LinkedProject>,
         ) {
-            // Caches are per IDE project, so the single-flight key must be too.
-            val keyOf = { link: LinkedProject -> "${project.locationHash}:${link.projectId}" }
+            val keyOf = { link: LinkedProject -> "${project.locationHash}:${link.projectId}:${link.environment}" }
             val pending = links.filter { warming.add(keyOf(it)) }
             if (pending.isEmpty()) return
             SyncScheduler.getInstance().launch {
@@ -95,7 +86,9 @@ class EnvCompletionContributor : CompletionContributor() {
                                     link.environment.takeIf { it.isNotBlank() },
                                     metadataOnly = true,
                                 )
-                            service.cacheKeys(link.projectId, meta.variables.map { it.key }.toSet())
+                            service.cacheKeys(link.projectId, link.environment, meta.variables.map { it.key }.toSet())
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) {
                             dev.envpilot.jetbrains.errors.Errors.report(e, mapOf("surface" to "completion"))
                         }

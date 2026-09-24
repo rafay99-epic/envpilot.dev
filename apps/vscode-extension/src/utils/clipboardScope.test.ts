@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { shouldBlock, type ClipboardGuardScope } from "./clipboardScope";
-import type { ProtectionMode } from "../services/fileProtection";
+import type { ProtectionMode } from "../roles";
 
 describe("shouldBlock", () => {
-  // Full matrix: scope × mode (undefined = file not in the managed map).
   const matrix: Array<
     [ClipboardGuardScope, ProtectionMode | undefined, boolean]
   > = [

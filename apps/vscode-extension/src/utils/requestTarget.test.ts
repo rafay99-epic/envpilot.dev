@@ -26,7 +26,6 @@ function org(id: string, name: string): Organization {
 
 const orgs = [org("org1", "Acme"), org("org2", "Globex")];
 
-/** Only the project rows, in order — separators dropped for concise asserts. */
 function projectRows(
   projects: Project[],
   organizations: Organization[] = orgs,
@@ -71,7 +70,6 @@ describe("isRequestEligible", () => {
   });
 
   it("uses capabilities over the role slug when present (custom roles)", () => {
-    // A custom role that may submit requests is eligible…
     expect(
       isRequestEligible(
         project({
@@ -81,7 +79,6 @@ describe("isRequestEligible", () => {
         })
       )
     ).toBe(true);
-    // …and a developer whose registry role lost the capability is not.
     expect(
       isRequestEligible(
         project({
@@ -91,7 +88,6 @@ describe("isRequestEligible", () => {
         })
       )
     ).toBe(false);
-    // Explicit non-assignment still wins over the capability.
     expect(
       isRequestEligible(
         project({

@@ -4,30 +4,33 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
+import com.intellij.openapi.components.StoragePathMacros
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.io.FileUtil
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Project-level state for editor integrations: which files Envpilot manages,
- * the last synced content hashes, cached variable metadata for completion,
- * and cloak/reveal state.
- *
- * Sync state is PERSISTED (hashes and key names only — never decrypted
- * values) so status icons, cloaking and the copy guard survive IDE restarts
- * without re-pulling.
- */
+internal fun pathKey(path: String): String {
+    val normalized = FileUtil.toSystemIndependentName(path)
+    val file = java.io.File(normalized)
+    if (!file.isAbsolute) return normalized
+    return FileUtil.toSystemIndependentName(runCatching { file.canonicalPath }.getOrDefault(normalized))
+}
+
 @Service(Service.Level.PROJECT)
-@State(name = "EnvpilotEditorState", storages = [Storage("EnvpilotPlugin.xml")])
+@State(
+    name = "EnvpilotEditorState",
+    storages = [Storage(StoragePathMacros.WORKSPACE_FILE), Storage(value = "EnvpilotPlugin.xml", deprecated = true)],
+)
 class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
-    class ManagedFileState {
-        var keys: List<String> = emptyList()
-        var syncedHash: String = ""
-        var syncedAtMs: Long = 0
-        var secretFilePaths: List<String> = emptyList()
-        var secretHashes: Map<String, String> = emptyMap()
-        var envCreated: Boolean = false
-        var autoUnsyncOnClose: Boolean = true
-    }
+    data class ManagedFileState(
+        var keys: List<String> = emptyList(),
+        var syncedHash: String = "",
+        var syncedAtMs: Long = 0,
+        var secretFilePaths: List<String> = emptyList(),
+        var secretHashes: Map<String, String> = emptyMap(),
+        var envCreated: Boolean = false,
+        var autoUnsyncOnClose: Boolean = true,
+    )
 
     class State {
         var managed: MutableMap<String, ManagedFileState> = mutableMapOf()
@@ -47,25 +50,41 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
 
     private var state = State()
 
-    // Transient caches — rebuilt from the server, never persisted.
     private val metadataCache = ConcurrentHashMap<String, Pair<Long, Set<String>>>()
     private val filesCache = ConcurrentHashMap<String, Pair<Long, List<dev.envpilot.jetbrains.model.SecretFileMeta>>>()
-    private val capabilityCache = ConcurrentHashMap<String, Map<String, Boolean>>()
-    private val environmentScopeCache = ConcurrentHashMap<String, List<String>>()
-    private val accessMetaProjects = ConcurrentHashMap.newKeySet<String>()
+    private val accessMeta = ConcurrentHashMap<String, dev.envpilot.jetbrains.model.AccessMeta>()
     private val metadataTtlMs = 30_000L
 
     @Volatile var revealUntilMs: Long = 0
 
-    /** Paths a pull is writing right now, so drift detection ignores exactly those writes. */
     @Volatile var writingPaths: Set<String> = emptySet()
 
+    @Synchronized
     override fun getState(): State = state
 
+    @Synchronized
     override fun loadState(s: State) {
-        state = s
+        write(
+            s.managed.entries
+                .groupBy({ pathKey(it.key) }) { entry ->
+                    entry.value.copy(
+                        secretFilePaths = entry.value.secretFilePaths.map(::pathKey),
+                        secretHashes = entry.value.secretHashes.mapKeys { pathKey(it.key) },
+                    )
+                }.mapValues { (_, entries) -> entries.sortedBy { it.syncedAtMs }.reduce(::mergeEntries) },
+        )
     }
 
+    private fun mergeEntries(
+        older: ManagedFileState,
+        newer: ManagedFileState,
+    ) = newer.copy(
+        secretFilePaths = (older.secretFilePaths + newer.secretFilePaths).distinct(),
+        secretHashes = older.secretHashes + newer.secretHashes,
+        autoUnsyncOnClose = older.autoUnsyncOnClose && newer.autoUnsyncOnClose,
+    )
+
+    @Synchronized
     fun recordSync(
         path: String,
         keys: Set<String>,
@@ -76,20 +95,21 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
         autoUnsyncOnClose: Boolean = true,
     ) {
         val entry =
-            ManagedFileState().apply {
-                this.keys = keys.toList()
-                this.syncedHash = hash
-                this.syncedAtMs = System.currentTimeMillis()
-                this.secretFilePaths = secretFilePaths
-                this.secretHashes = secretHashes
-                this.envCreated = envCreated
-                this.autoUnsyncOnClose = autoUnsyncOnClose
-            }
-        state.managed[path] = entry
+            ManagedFileState(
+                keys = keys.toList(),
+                syncedHash = hash,
+                syncedAtMs = System.currentTimeMillis(),
+                secretFilePaths = secretFilePaths.map(::pathKey),
+                secretHashes = secretHashes.mapKeys { pathKey(it.key) },
+                envCreated = envCreated,
+                autoUnsyncOnClose = autoUnsyncOnClose,
+            )
+        write(state.managed + (pathKey(path) to entry))
     }
 
+    @Synchronized
     fun managed(path: String): ManagedFile? {
-        val entry = state.managed[path] ?: return null
+        val entry = state.managed[pathKey(path)] ?: return null
         return ManagedFile(
             keys = entry.keys.toSet(),
             syncedHash = entry.syncedHash,
@@ -101,17 +121,29 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
         )
     }
 
+    @Synchronized
     fun managedPaths(): Set<String> = state.managed.keys.toSet()
 
+    @Synchronized
+    fun expectedHashes(): Map<String, String> =
+        buildMap {
+            state.managed.forEach { (path, entry) ->
+                putAll(entry.secretHashes)
+                put(path, entry.syncedHash)
+            }
+        }
+
+    @Synchronized
     fun markDrifted(path: String): Boolean {
-        val entry = state.managed[path] ?: return false
-        entry.syncedHash = ""
+        val key = pathKey(path)
+        val entry = state.managed[key] ?: return false
+        write(state.managed + (key to entry.copy(syncedHash = "")))
         return true
     }
 
-    /** Status of a linked directory's env file, for tree icons/labels. */
+    @Synchronized
     fun statusFor(targetFile: String): LinkStatus {
-        val entry = state.managed[targetFile] ?: return LinkStatus.NOT_PULLED
+        val entry = state.managed[pathKey(targetFile)] ?: return LinkStatus.NOT_PULLED
         if (entry.syncedHash.isEmpty()) return LinkStatus.DRIFTED
         if (!java.nio.file.Files.exists(java.nio.file.Path.of(targetFile))) return LinkStatus.NOT_PULLED
         return LinkStatus.SYNCED
@@ -129,60 +161,50 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
         filesCache[key] = System.currentTimeMillis() to metas
     }
 
-    fun cachedKeys(projectId: String): Set<String>? {
-        val (at, keys) = metadataCache[projectId] ?: return null
+    fun cachedKeys(
+        projectId: String,
+        environment: String,
+    ): Set<String>? {
+        val (at, keys) = metadataCache["$projectId:$environment"] ?: return null
         return if (System.currentTimeMillis() - at < metadataTtlMs) keys else null
     }
 
     fun cacheKeys(
         projectId: String,
+        environment: String,
         keys: Set<String>,
     ) {
-        metadataCache[projectId] = System.currentTimeMillis() to keys
-    }
-
-    fun cacheCapabilities(
-        projectId: String,
-        capabilities: Map<String, Boolean>,
-    ) {
-        capabilityCache[projectId] = capabilities
+        metadataCache["$projectId:$environment"] = System.currentTimeMillis() to keys
     }
 
     fun cacheAccessMeta(
         projectId: String,
-        meta: dev.envpilot.jetbrains.model.PullMeta,
+        meta: dev.envpilot.jetbrains.model.AccessMeta,
     ) {
-        accessMetaProjects.add(projectId)
-        cacheCapabilities(projectId, meta.capabilities)
-        if (meta.environmentScope == null) {
-            environmentScopeCache.remove(projectId)
-        } else {
-            environmentScopeCache[projectId] = meta.environmentScope
-        }
+        accessMeta[projectId] = meta
     }
 
     fun hasCapability(
         projectId: String,
         capability: String,
-    ): Boolean = capabilityCache[projectId]?.get(capability) == true
+    ): Boolean = accessMeta[projectId]?.capabilities?.get(capability) == true
 
-    fun hasAccessMeta(projectId: String): Boolean = projectId in accessMetaProjects
+    fun hasAccessMeta(projectId: String): Boolean = accessMeta.containsKey(projectId)
 
     fun allowedEnvironments(projectId: String): List<String> =
-        environmentScopeCache[projectId] ?: dev.envpilot.jetbrains.model.VALID_ENVIRONMENTS
+        accessMeta[projectId]?.environmentScope ?: dev.envpilot.jetbrains.model.VALID_ENVIRONMENTS
 
     fun canReveal(projectIds: Collection<String>): Boolean =
-        projectIds.isNotEmpty() &&
-            projectIds.all {
-                capabilityCache[it]?.get("project.secrets.reveal") == true
-            }
+        projectIds.isNotEmpty() && projectIds.all { hasCapability(it, "project.secrets.reveal") }
 
     data class PurgeResult(val removed: Int, val preserved: Int)
 
+    @Synchronized
     fun purgeManagedFiles(respectAutoUnsync: Boolean = false): PurgeResult {
         var removed = 0
         var preserved = 0
-        for ((envPath, entry) in state.managed.toMap()) {
+        val kept = state.managed.toMutableMap()
+        for ((envPath, entry) in state.managed) {
             if (respectAutoUnsync && !entry.autoUnsyncOnClose) continue
             var keepState = false
             val env = java.nio.file.Path.of(envPath)
@@ -210,15 +232,18 @@ class EnvEditorService : PersistentStateComponent<EnvEditorService.State> {
                     keepState = true
                 }
             }
-            if (!keepState) state.managed.remove(envPath)
+            if (!keepState) kept.remove(envPath)
         }
+        write(kept)
         metadataCache.clear()
         filesCache.clear()
-        capabilityCache.clear()
-        environmentScopeCache.clear()
-        accessMetaProjects.clear()
+        accessMeta.clear()
         revealUntilMs = 0
         return PurgeResult(removed, preserved)
+    }
+
+    private fun write(managed: Map<String, ManagedFileState>) {
+        state = State().also { it.managed = managed.toMutableMap() }
     }
 
     private fun makeWritable(path: java.nio.file.Path) {

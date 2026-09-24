@@ -126,6 +126,12 @@ describe("isFileWritable", () => {
     );
   });
 
+  it("normalizes a legacy admin role to owner", () => {
+    expect(isFileWritable(access({ role: "admin", assigned: false }))).toBe(
+      true
+    );
+  });
+
   it("unassigned non-owners always get a read-only file", () => {
     for (const role of [
       "project_manager",

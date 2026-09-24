@@ -2,33 +2,6 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 
-/**
- * Local state for unsync-on-close, stored under ~/.envpilot next to the
- * managed-files manifest (see managedFiles.ts for why it lives outside VS
- * Code's storage). Two concerns, both best-effort — a failure here must never
- * break activation or deactivation:
- *
- * 1. SESSION MARKERS (~/.envpilot/vscode-sessions/<pid>): one JSON file per
- *    live extension host, written on activate and removed on clean
- *    deactivate. The file records the session's workspace folders so that
- *    (a) a crash sweep can target the CRASHED session's folders, whatever
- *    workspace the next activation opens, and (b) a closing window can spare
- *    files that another still-live window is using. A marker whose pid is no
- *    longer running means that session crashed or was force-killed before
- *    deactivate() could purge.
- *
- *    PID liveness is a heuristic: a recycled pid makes a dead session look
- *    alive, so its sweep is skipped until that pid dies too. Rare, and it
- *    fails toward NOT deleting — acceptable.
- *
- * 2. PENDING UNSYNC REPORTS (~/.envpilot/vscode-unsync-reports.json): purge
- *    summaries (counts only — never paths or values) queued at shutdown,
- *    where network calls are unreliable, and drained/sent on the next
- *    activation for the server-side audit trail.
- *
- * This module must stay free of vscode imports so it stays unit-testable.
- */
-
 export interface UnsyncReport {
   projectId: string;
   deletedCount: number;
@@ -45,7 +18,6 @@ export function getReportsPath(homedir: string = os.homedir()): string {
   return path.join(homedir, ".envpilot", "vscode-unsync-reports.json");
 }
 
-/** A pid is alive if signal 0 is deliverable (EPERM = alive, not ours). */
 function defaultIsPidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -66,11 +38,10 @@ async function readMarkerFolders(markerPath: string): Promise<string[]> {
     if (!Array.isArray(folders)) return [];
     return folders.filter((f): f is string => typeof f === "string");
   } catch {
-    return []; // Legacy empty marker or corrupt JSON — no folder info.
+    return [];
   }
 }
 
-/** Record this extension host (and its workspace folders) as live. */
 export async function writeSessionMarker(
   pid: number,
   folders: string[],
@@ -83,30 +54,18 @@ export async function writeSessionMarker(
       JSON.stringify({ folders }),
       { mode: 0o600 }
     );
-  } catch {
-    // Never block activation.
-  }
+  } catch {}
 }
 
-/** Remove this extension host's marker on clean shutdown. Best-effort. */
 export async function clearSessionMarker(
   pid: number,
   sessionsDir: string = getSessionsDir()
 ): Promise<void> {
   try {
     await fs.unlink(path.join(sessionsDir, String(pid)));
-  } catch {
-    // Missing marker is fine.
-  }
+  } catch {}
 }
 
-/**
- * Remove markers of dead extension hosts and return their recorded workspace
- * folders — a non-empty `crashed` means at least one prior session ended
- * without a clean deactivate (crash, force-quit, power loss) and a crash
- * sweep over `deadFolders` is warranted. Non-pid filenames (.DS_Store and
- * friends) are ignored entirely — they are not session markers.
- */
 export async function reapDeadSessionMarkers(
   sessionsDir: string = getSessionsDir(),
   isPidAlive: (pid: number) => boolean = defaultIsPidAlive
@@ -124,21 +83,12 @@ export async function reapDeadSessionMarkers(
       deadFolders.push(...(await readMarkerFolders(markerPath)));
       try {
         await fs.unlink(markerPath);
-      } catch {
-        // Already reaped by a concurrent window.
-      }
+      } catch {}
     }
-  } catch {
-    // Missing dir = no prior sessions.
-  }
+  } catch {}
   return { crashed, deadFolders };
 }
 
-/**
- * Workspace folders of OTHER live extension hosts. A closing window must
- * never purge files that a still-running window is using — its purge
- * excludes anything under these folders.
- */
 export async function getLiveSessionFolders(
   excludePid: number,
   sessionsDir: string = getSessionsDir(),
@@ -153,13 +103,10 @@ export async function getLiveSessionFolders(
       if (pid === excludePid || !isPidAlive(pid)) continue;
       folders.push(...(await readMarkerFolders(path.join(sessionsDir, name))));
     }
-  } catch {
-    // Missing dir = no other sessions.
-  }
+  } catch {}
   return folders;
 }
 
-/** Queue a purge summary for the next-activation audit report. Best-effort. */
 export async function appendUnsyncReport(
   report: UnsyncReport,
   reportsPath: string = getReportsPath()
@@ -172,26 +119,28 @@ export async function appendUnsyncReport(
       encoding: "utf-8",
       mode: 0o600,
     });
-  } catch {
-    // Losing a counts-only report is acceptable; breaking shutdown is not.
-  }
+  } catch {}
 }
 
-/**
- * Take all queued reports, removing the file. Returns [] when there is
- * nothing to send. Callers own delivery; a failed send loses the batch
- * (counts-only telemetry — not worth retry machinery).
- */
 export async function drainUnsyncReports(
+  send: (reports: UnsyncReport[]) => Promise<void>,
   reportsPath: string = getReportsPath()
-): Promise<UnsyncReport[]> {
-  const reports = await readReports(reportsPath);
+): Promise<void> {
+  const claimPath = `${reportsPath}.${process.pid}`;
   try {
-    await fs.unlink(reportsPath);
+    await fs.rename(reportsPath, claimPath);
   } catch {
-    // Missing file is fine.
+    return;
   }
-  return reports;
+  const reports = await readReports(claimPath);
+  try {
+    if (reports.length > 0) await send(reports);
+  } catch (err) {
+    for (const report of reports) await appendUnsyncReport(report, reportsPath);
+    throw err;
+  } finally {
+    await fs.rm(claimPath, { force: true });
+  }
 }
 
 async function readReports(reportsPath: string): Promise<UnsyncReport[]> {

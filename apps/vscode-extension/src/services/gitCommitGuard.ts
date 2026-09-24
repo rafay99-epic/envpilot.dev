@@ -1,21 +1,27 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs/promises";
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import type { GitExtension, API, Repository } from "../types/git";
 import * as output from "../utils/outputChannel";
 import { captureError } from "../utils/sentry";
+import { shouldAutoInstallHook } from "../utils/config";
+import { isPathInside } from "../utils/paths";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
-const ENV_PATTERN = /(^|\/)\.env($|\.)/;
+const ENV_NAME = /^\.env($|\.)/;
+const ENV_TEMPLATE_NAME = /\.env\.(example|sample|template|dist)$/;
+const INDEX_DELETED = 2;
+const SHELL_SHEBANG = /^#!\s*\S*\/(?:env\s+)?(?:ba)?sh(?:\s|$)/;
+const TOP_LEVEL_EXIT = /^exit\b/m;
 
 const HOOK_START_MARKER = "# ENVPILOT_GUARD_START";
 const HOOK_END_MARKER = "# ENVPILOT_GUARD_END";
 
 const HOOK_BLOCK = `${HOOK_START_MARKER} - Do not remove. Installed by Envpilot VS Code extension.
-ENV_FILES=$(git diff --cached --name-only | grep -E '(^|/)\\.env($|\\.)' || true)
+ENV_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '(^|/)\\.env($|\\.)' | grep -vE '\\.env\\.(example|sample|template|dist)$' || true)
 if [ -n "$ENV_FILES" ]; then
   echo ""
   echo "\\033[1;31mERROR:\\033[0m Envpilot commit guard blocked this commit."
@@ -29,23 +35,53 @@ if [ -n "$ENV_FILES" ]; then
 fi
 ${HOOK_END_MARKER}`;
 
-/**
- * GitCommitGuardService provides dual-layer protection against committing .env files:
- * 1. VS Code Git Extension API: auto-unstages .env files in real-time
- * 2. Pre-commit hook: blocks .env commits from any git client
- */
+export function isGuardedEnvFile(fsPath: string): boolean {
+  const name = path.basename(fsPath);
+  return ENV_NAME.test(name) && !ENV_TEMPLATE_NAME.test(name);
+}
+
+function findGuardBlock(
+  content: string
+): { before: string; after: string } | "none" | "unterminated" {
+  const start = content.indexOf(HOOK_START_MARKER);
+  if (start === -1) return "none";
+  const end = content.indexOf(HOOK_END_MARKER, start);
+  if (end === -1) return "unterminated";
+  return {
+    before: content.slice(0, start),
+    after: content.slice(end + HOOK_END_MARKER.length),
+  };
+}
+
 export class GitCommitGuardService {
   private disposables: vscode.Disposable[] = [];
   private gitApi: API | null = null;
-  private installedHookPaths: Set<string> = new Set();
-  /** Per-repo `state.onDidChange` subscriptions, torn down when a repo closes. */
+  private initialized: Promise<void> | null = null;
   private repoWatchers: Map<Repository, vscode.Disposable> = new Map();
   private lastWarningTime = 0;
   private static readonly WARNING_DEBOUNCE_MS = 5000;
 
-  async initialize(): Promise<void> {
-    await this.initializeGitApi();
-    await this.installPreCommitHooks();
+  constructor(private linkedDirectories: () => string[]) {}
+
+  initialize(): Promise<void> {
+    this.initialized ??= this.initializeGitApi();
+    return this.initialized;
+  }
+
+  async installHooks(): Promise<number> {
+    let installed = 0;
+    for (const root of this.repoRoots()) {
+      if (await this.installHookIfLinked(root)) installed++;
+    }
+    return installed;
+  }
+
+  async removeHooks(): Promise<number> {
+    let removed = 0;
+    for (const root of this.repoRoots()) {
+      if (await this.removeHookAtPath(root)) removed++;
+    }
+    return removed;
   }
 
   private async initializeGitApi(): Promise<void> {
@@ -66,22 +102,17 @@ export class GitCommitGuardService {
 
       this.gitApi = gitExtension.exports.getAPI(1);
 
-      // Watch existing repositories
       for (const repo of this.gitApi.repositories) {
         this.watchRepository(repo);
       }
 
-      // Watch for new repositories
       this.disposables.push(
         this.gitApi.onDidOpenRepository((repo) => {
           this.watchRepository(repo);
-          this.installHookForRepo(repo);
-        })
-      );
-
-      // Tear down the per-repo listener when a repo closes (e.g. a folder
-      // is removed from a multi-root workspace) so it doesn't leak forever.
-      this.disposables.push(
+          if (shouldAutoInstallHook()) {
+            void this.installHookIfLinked(repo.rootUri.fsPath);
+          }
+        }),
         this.gitApi.onDidCloseRepository((repo) => {
           this.unwatchRepository(repo);
         })
@@ -91,12 +122,6 @@ export class GitCommitGuardService {
         `Git commit guard active. Watching ${this.gitApi.repositories.length} repository(ies).`
       );
     } catch (err) {
-      // "Git model not found" is thrown by the built-in git extension's
-      // getAPI() when its internal model hasn't finished loading yet (e.g.
-      // the workspace has no repositories, or the git extension is still
-      // activating). It's an expected, transient condition — not an
-      // actionable bug — so we degrade gracefully (gitApi stays null, the
-      // pre-commit hook fallback still runs) without reporting to Sentry.
       const message = err instanceof Error ? err.message : String(err);
       if (!message.includes("Git model not found")) {
         captureError(err, { phase: "commit-guard-init" });
@@ -105,13 +130,21 @@ export class GitCommitGuardService {
     }
   }
 
+  private repoRoots(): string[] {
+    if (this.gitApi) {
+      return this.gitApi.repositories.map((repo) => repo.rootUri.fsPath);
+    }
+    return (vscode.workspace.workspaceFolders ?? []).map(
+      (folder) => folder.uri.fsPath
+    );
+  }
+
   private watchRepository(repo: Repository): void {
-    // Avoid double-subscribing if a repo is reported as opened more than once.
     if (this.repoWatchers.has(repo)) {
       return;
     }
     const disposable = repo.state.onDidChange(() => {
-      this.checkAndUnstageEnvFiles(repo);
+      void this.checkAndUnstageEnvFiles(repo).catch(captureError);
     });
     this.repoWatchers.set(repo, disposable);
   }
@@ -125,15 +158,15 @@ export class GitCommitGuardService {
   }
 
   private async checkAndUnstageEnvFiles(repo: Repository): Promise<void> {
-    const envFiles = repo.state.indexChanges.filter((change) =>
-      ENV_PATTERN.test(change.uri.fsPath)
+    const envFiles = repo.state.indexChanges.filter(
+      (change) =>
+        change.status !== INDEX_DELETED && isGuardedEnvFile(change.uri.fsPath)
     );
 
     if (envFiles.length === 0) {
       return;
     }
 
-    // Unstage each .env file
     for (const change of envFiles) {
       try {
         await vscode.commands.executeCommand("git.unstage", change.uri);
@@ -144,7 +177,6 @@ export class GitCommitGuardService {
       }
     }
 
-    // Debounced warning notification
     const now = Date.now();
     if (
       now - this.lastWarningTime >
@@ -166,121 +198,119 @@ export class GitCommitGuardService {
     }
   }
 
-  private async installPreCommitHooks(): Promise<void> {
-    if (!this.gitApi) {
-      // Try to find git repos from workspace folders
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders) return;
-
-      for (const folder of workspaceFolders) {
-        await this.installHookAtPath(folder.uri.fsPath);
-      }
-      return;
-    }
-
-    for (const repo of this.gitApi.repositories) {
-      await this.installHookForRepo(repo);
-    }
-  }
-
-  private async installHookForRepo(repo: Repository): Promise<void> {
-    await this.installHookAtPath(repo.rootUri.fsPath);
-  }
-
-  private async installHookAtPath(repoRoot: string): Promise<void> {
+  private async hookPath(
+    repoRoot: string
+  ): Promise<{ path: string; insideGit: boolean } | null> {
+    let stdout: string;
     try {
-      // Handles core.hooksPath and worktrees (.git is a file there).
-      let hooksDir: string;
-      try {
-        const { stdout } = await execAsync("git rev-parse --git-path hooks", {
-          cwd: repoRoot,
-        });
-        hooksDir = path.resolve(repoRoot, stdout.trim());
-      } catch {
-        return; // Not a git repo
+      ({ stdout } = await execFileAsync(
+        "git",
+        ["rev-parse", "--git-common-dir", "--git-path", "hooks"],
+        { cwd: repoRoot }
+      ));
+    } catch {
+      return null;
+    }
+    const [gitDir, hooksDir] = stdout
+      .trim()
+      .split("\n")
+      .map((line) => path.resolve(repoRoot, line.trim()));
+    if (!gitDir || !hooksDir) return null;
+    return {
+      path: path.join(hooksDir, "pre-commit"),
+      insideGit: isPathInside(hooksDir, gitDir),
+    };
+  }
+
+  private async installHookIfLinked(repoRoot: string): Promise<boolean> {
+    if (!this.linkedDirectories().some((dir) => isPathInside(dir, repoRoot))) {
+      return false;
+    }
+    try {
+      const hook = await this.hookPath(repoRoot);
+      if (!hook) return false;
+      if (!hook.insideGit) {
+        output.warn(
+          `Commit guard hook skipped for ${repoRoot}: core.hooksPath points outside .git.`
+        );
+        return false;
+      }
+      const hookPath = hook.path;
+
+      const existing = await fs.readFile(hookPath, "utf-8").catch(() => "");
+      const firstLine = existing.split("\n", 1)[0];
+      if (firstLine.startsWith("#!") && !SHELL_SHEBANG.test(firstLine)) {
+        output.warn(
+          `Commit guard hook skipped: ${hookPath} is not a sh/bash script.`
+        );
+        return false;
       }
 
-      const hookPath = path.join(hooksDir, "pre-commit");
-
-      // Ensure hooks directory exists
-      await fs.mkdir(hooksDir, { recursive: true });
-
-      let existingContent = "";
-      try {
-        existingContent = await fs.readFile(hookPath, "utf-8");
-      } catch {
-        // File doesn't exist
+      const block = findGuardBlock(existing);
+      if (block === "unterminated") {
+        output.warn(
+          `Commit guard hook skipped: ${hookPath} has a start marker with no end marker.`
+        );
+        return false;
       }
 
-      // Check if our guard is already installed
-      if (existingContent.includes(HOOK_START_MARKER)) {
-        // Update existing guard block
-        const startIdx = existingContent.indexOf(HOOK_START_MARKER);
-        const endIdx =
-          existingContent.indexOf(HOOK_END_MARKER) + HOOK_END_MARKER.length;
-        const updated =
-          existingContent.substring(0, startIdx) +
-          HOOK_BLOCK +
-          existingContent.substring(endIdx);
-        await fs.writeFile(hookPath, updated, "utf-8");
-        await fs.chmod(hookPath, 0o755);
-        this.installedHookPaths.add(hookPath);
-        output.log(`Updated commit guard hook at ${hookPath}`);
-        return;
-      }
+      const shebang = firstLine.startsWith("#!") ? `${firstLine}\n` : "";
+      const next =
+        block !== "none"
+          ? block.before + HOOK_BLOCK + block.after
+          : !existing.trim()
+            ? `#!/bin/sh\n\n${HOOK_BLOCK}\n`
+            : TOP_LEVEL_EXIT.test(existing)
+              ? `${shebang}${HOOK_BLOCK}\n${existing.slice(shebang.length)}`
+              : `${existing.trimEnd()}\n\n${HOOK_BLOCK}\n`;
 
-      // Install new hook
-      let newContent: string;
-      if (existingContent.trim()) {
-        // Append to existing hook
-        newContent = existingContent.trimEnd() + "\n\n" + HOOK_BLOCK + "\n";
-        output.log(`Appended commit guard to existing hook at ${hookPath}`);
-      } else {
-        // Create new hook
-        newContent = "#!/bin/sh\n\n" + HOOK_BLOCK + "\n";
-        output.log(`Created commit guard hook at ${hookPath}`);
+      if (next !== existing) {
+        await fs.mkdir(path.dirname(hookPath), { recursive: true });
+        await fs.writeFile(hookPath, next, "utf-8");
+        output.log(`Installed commit guard hook at ${hookPath}`);
       }
-
-      await fs.writeFile(hookPath, newContent, "utf-8");
       await fs.chmod(hookPath, 0o755);
-      this.installedHookPaths.add(hookPath);
+      return true;
     } catch (err) {
       captureError(err, { phase: "commit-guard-hook-install" });
       output.error(
         `Failed to install pre-commit hook at ${repoRoot}: ${err instanceof Error ? err.message : String(err)}`
       );
+      return false;
     }
   }
 
-  async removeHooks(): Promise<void> {
-    for (const hookPath of this.installedHookPaths) {
-      try {
-        const content = await fs.readFile(hookPath, "utf-8");
-        if (!content.includes(HOOK_START_MARKER)) continue;
+  private async removeHookAtPath(repoRoot: string): Promise<boolean> {
+    try {
+      const hookPath = (await this.hookPath(repoRoot))?.path;
+      if (!hookPath) return false;
 
-        const startIdx = content.indexOf(HOOK_START_MARKER);
-        const endIdx =
-          content.indexOf(HOOK_END_MARKER) + HOOK_END_MARKER.length;
-
-        let cleaned =
-          content.substring(0, startIdx) + content.substring(endIdx);
-        cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
-
-        // If only shebang remains, delete the file
-        if (cleaned === "#!/bin/sh" || cleaned === "") {
-          await fs.unlink(hookPath);
-          output.log(`Removed commit guard hook at ${hookPath}`);
-        } else {
-          await fs.writeFile(hookPath, cleaned + "\n", "utf-8");
-          output.log(`Removed commit guard block from ${hookPath}`);
-        }
-      } catch (err) {
-        output.error(
-          `Failed to remove hook at ${hookPath}: ${err instanceof Error ? err.message : String(err)}`
+      const content = await fs.readFile(hookPath, "utf-8").catch(() => "");
+      const block = findGuardBlock(content);
+      if (block === "none") return false;
+      if (block === "unterminated") {
+        output.warn(
+          `Commit guard block in ${hookPath} has no end marker; remove it by hand.`
         );
+        return false;
       }
+
+      const cleaned = (block.before + block.after)
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+      if (cleaned === "#!/bin/sh" || cleaned === "") {
+        await fs.unlink(hookPath);
+      } else {
+        await fs.writeFile(hookPath, `${cleaned}\n`, "utf-8");
+      }
+      output.log(`Removed commit guard from ${hookPath}`);
+      return true;
+    } catch (err) {
+      output.error(
+        `Failed to remove hook in ${repoRoot}: ${err instanceof Error ? err.message : String(err)}`
+      );
+      return false;
     }
-    this.installedHookPaths.clear();
   }
 
   dispose(): void {
@@ -292,6 +322,5 @@ export class GitCommitGuardService {
       disposable.dispose();
     }
     this.repoWatchers.clear();
-    // Hooks persist intentionally — they protect even without the extension
   }
 }

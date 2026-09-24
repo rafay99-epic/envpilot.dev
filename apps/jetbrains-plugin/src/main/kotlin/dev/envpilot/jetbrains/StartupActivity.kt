@@ -20,11 +20,6 @@ import dev.envpilot.jetbrains.version.VersionCheck
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-/**
- * Per project open: initialize auth + error reporting, run the version check, start
- * auto-sync, register the copy guard and cloak-on-open listeners. Project work is
- * disposed when the project closes; the app-wide hooks live and die with the plugin.
- */
 class StartupActivity : ProjectActivity {
     companion object {
         private val guardsInstalled = AtomicBoolean(false)
@@ -33,9 +28,6 @@ class StartupActivity : ProjectActivity {
         private val originalCopyHandler = AtomicReference<EditorActionHandler?>(null)
         private val originalCutHandler = AtomicReference<EditorActionHandler?>(null)
         private val LAST_HOVER_AT = Key.create<Long>("envpilot.lastHoverAt")
-
-        // App service: disposed on plugin unload, so it is our plugin-lifetime parent.
-        private fun pluginLifetime(): SyncScheduler = SyncScheduler.getInstance()
     }
 
     override suspend fun execute(project: Project) {
@@ -53,14 +45,13 @@ class StartupActivity : ProjectActivity {
         watchLinkedProjects(project)
         restoreCommitGuard(project)
 
-        // Perceived real-time: pull the moment the user returns to the IDE.
         project.messageBus.connect(project).subscribe(
             com.intellij.openapi.application.ApplicationActivationListener.TOPIC,
             object : com.intellij.openapi.application.ApplicationActivationListener {
                 override fun applicationActivated(ideFrame: com.intellij.openapi.wm.IdeFrame) {
-                    if (project.isDisposed) return
+                    if (project.isDisposed || !dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.autoSync) return
                     SyncScheduler.getInstance().launch {
-                        SyncScheduler.getInstance().runCycle(project)
+                        SyncScheduler.getInstance().runCycle(project, skipIfBusy = true)
                     }
                 }
             },
@@ -70,7 +61,6 @@ class StartupActivity : ProjectActivity {
         installUninstallPurge()
         installKeyHover()
 
-        // Cloak managed values when a file opens or becomes active.
         project.messageBus.connect(project).subscribe(
             FileEditorManagerListener.FILE_EDITOR_MANAGER,
             object : FileEditorManagerListener {
@@ -89,17 +79,13 @@ class StartupActivity : ProjectActivity {
 
         Disposer.register(project) {
             SyncScheduler.getInstance().stopFor(project)
-            dev.envpilot.jetbrains.sync.SyncState.clear(project)
+            dev.envpilot.jetbrains.sync.SyncState.clear(project.locationHash)
             unsyncOnClose(project)
         }
     }
 
-    /**
-     * Decrypted secrets on disk defeat the vault — when the IDE closes,
-     * delete the env files and secret files we materialized. Only files we
-     * wrote (tracked in EnvEditorService) are ever touched.
-     */
     private fun unsyncOnClose(project: Project) {
+        if (!dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.autoUnsyncOnClose) return
         val result = dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project).purgeManagedFiles(respectAutoUnsync = true)
         if (result.removed > 0 || result.preserved > 0) {
             com.intellij.openapi.diagnostic.logger<StartupActivity>()
@@ -118,10 +104,11 @@ class StartupActivity : ProjectActivity {
 
     private fun restoreCommitGuard(project: Project) {
         if (!dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.commitGuardEnabled) return
+        val managed = dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project).expectedHashes().keys
         dev.envpilot.jetbrains.sync.LinkedProjectsService.getInstance(project).all()
             .map { it.directoryPath }
             .distinct()
-            .forEach(dev.envpilot.jetbrains.guards.CommitGuard::install)
+            .forEach { runCatching { dev.envpilot.jetbrains.guards.CommitGuard.install(it, managed) } }
     }
 
     private fun cloakIfManaged(
@@ -136,13 +123,9 @@ class StartupActivity : ProjectActivity {
         }
     }
 
-    /**
-     * App-wide, once: when the plugin is disabled/uninstalled, delete every
-     * pulled env file and secret file — same protection as close-time unsync.
-     */
     private fun installUninstallPurge() {
         if (!purgeInstalled.compareAndSet(false, true)) return
-        ApplicationManager.getApplication().messageBus.connect(pluginLifetime()).subscribe(
+        ApplicationManager.getApplication().messageBus.connect(SyncScheduler.getInstance()).subscribe(
             com.intellij.ide.plugins.DynamicPluginListener.TOPIC,
             object : com.intellij.ide.plugins.DynamicPluginListener {
                 override fun beforePluginUnload(
@@ -150,8 +133,10 @@ class StartupActivity : ProjectActivity {
                     isUpdate: Boolean,
                 ) {
                     if (pluginDescriptor.pluginId.idString != dev.envpilot.jetbrains.version.VersionCheck.PLUGIN_ID) return
-                    for (project in com.intellij.openapi.project.ProjectManager.getInstance().openProjects) {
-                        dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project).purgeManagedFiles()
+                    if (!isUpdate) {
+                        for (project in com.intellij.openapi.project.ProjectManager.getInstance().openProjects) {
+                            dev.envpilot.jetbrains.editor.EnvEditorService.getInstance(project).purgeManagedFiles()
+                        }
                     }
                     restoreGlobalGuards()
                     purgeInstalled.set(false)
@@ -161,7 +146,6 @@ class StartupActivity : ProjectActivity {
         )
     }
 
-    /** App-wide, once: show masked Envpilot metadata when hovering managed env keys or code references. */
     private fun installKeyHover() {
         if (!hoverInstalled.compareAndSet(false, true)) return
         EditorFactory.getInstance().eventMulticaster.addEditorMouseMotionListener(
@@ -188,14 +172,7 @@ class StartupActivity : ProjectActivity {
                             file.name.startsWith(".env"),
                             managed?.keys.orEmpty(),
                         ) ?: return
-                    val link =
-                        dev.envpilot.jetbrains.sync.LinkedProjectsService.getInstance(project).all().firstOrNull {
-                            val targetName =
-                                dev.envpilot.jetbrains.config.EnvpilotSettings.getInstance().state.targetFile.ifBlank { ".env.local" }
-                            val keys = service.managed(java.nio.file.Path.of(it.directoryPath, targetName).toString())?.keys.orEmpty()
-                            runCatching { java.nio.file.Path.of(file.path).startsWith(java.nio.file.Path.of(it.directoryPath)) }
-                                .getOrDefault(false) && key in keys
-                        } ?: return
+                    val link = dev.envpilot.jetbrains.editor.linkForKey(project, file.path, key) ?: return
                     editor.putUserData(LAST_HOVER_AT, System.currentTimeMillis())
                     com.intellij.codeInsight.hint.HintManager.getInstance().showInformationHint(
                         editor,
@@ -203,15 +180,13 @@ class StartupActivity : ProjectActivity {
                     )
                 }
             },
-            pluginLifetime(),
+            SyncScheduler.getInstance(),
         )
     }
 
-    /** App-wide, once: wrap copy/cut with the cloak-aware guard. */
     private fun installGlobalGuards() {
         if (!guardsInstalled.compareAndSet(false, true)) return
         ApplicationManager.getApplication().invokeLater {
-            // Unload can run restoreGlobalGuards before this deferred block; do not re-wrap then.
             if (!guardsInstalled.get()) return@invokeLater
             try {
                 val manager = EditorActionManager.getInstance()
@@ -229,10 +204,8 @@ class StartupActivity : ProjectActivity {
         }
     }
 
-    /** Undo [installGlobalGuards] so a dynamic reload reinstalls onto the real handlers. */
     private fun restoreGlobalGuards() {
         val app = ApplicationManager.getApplication()
-        // Same thread as the deferred install, so the two cannot interleave.
         if (!app.isDispatchThread) {
             app.invokeAndWait { restoreGlobalGuards() }
             return

@@ -5,7 +5,6 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 
-/** The one balloon helper. Always hops to the EDT — callers are usually coroutines. */
 fun notifyBalloon(
     project: Project,
     message: String,

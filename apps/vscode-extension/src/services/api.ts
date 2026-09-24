@@ -1,14 +1,9 @@
 import * as vscode from "vscode";
-import axios, {
-  AxiosInstance,
-  AxiosError,
-  InternalAxiosRequestConfig,
-} from "axios";
 import { ConvexHttpClient } from "convex/browser";
 import { anyApi } from "convex/server";
-import { getServerUrl, getConvexUrl } from "../utils/config";
+import { getConvexUrl } from "../utils/config";
 import { SingleFlight } from "../utils/singleFlight";
-import { TokenManager } from "./tokenManager";
+import { TokenManager, TransientAuthError } from "./tokenManager";
 import { captureError } from "../utils/sentry";
 import { normalizeOrgRole } from "../roles";
 import type {
@@ -20,8 +15,6 @@ import type {
   UsageInfo,
 } from "../types";
 
-// ============================================================================
-/** Metadata row from features/files/queries:list. Never contains content. */
 export type SecretFileRow = {
   _id: string;
   name: string;
@@ -40,7 +33,6 @@ export type SecretFileRow = {
   access: "read" | "write";
 };
 
-/** One decrypted secret file. `content` is base64. */
 export type SecretFileContent = {
   name: string;
   path: string;
@@ -50,10 +42,6 @@ export type SecretFileContent = {
   contentType?: string;
   content: string;
 };
-
-// Convex row shapes (typed against the confirmed Stage-2 contract; anyApi is
-// untyped so results are cast to these).
-// ============================================================================
 
 interface OrgRow {
   _id: string;
@@ -98,8 +86,6 @@ interface CheckFeatureResult {
   reason?: string;
 }
 
-// Shape returned by the variableValues.pullValues Convex action (Stage 3,
-// Phase 2) — the direct replacement for GET /api/extension/variables.
 interface PullValuesResult {
   variables: Array<{
     _id: string;
@@ -121,141 +107,102 @@ interface PullValuesResult {
     hasWriteAccess: boolean;
     scopeRestricted: boolean;
     decryptionFailures?: string[];
-    /** Server-resolved unsync-on-close; absent on older deployments. */
+    truncatedAt?: number;
     autoUnsyncOnClose?: boolean;
-    /** Resolved capability map (additive; absent on older deployments). */
     capabilities?: Record<string, boolean>;
   };
 }
 
-const LINK_EXPIRES_DAYS_DEFAULT = 30;
+type AccessMeta = Partial<
+  Pick<
+    PullValuesResult["meta"],
+    | "unifiedRole"
+    | "assigned"
+    | "environmentScope"
+    | "hasWriteAccess"
+    | "scopeRestricted"
+    | "autoUnsyncOnClose"
+    | "capabilities"
+  >
+>;
 
-/**
- * API service for communicating with the Envpilot backend.
- *
- * Stage-2 cutover: identity is a WorkOS AuthKit JWT. All non-vault data
- * (organizations, projects, variable metadata/requests, tier/usage) is read
- * DIRECTLY from Convex over an authenticated HTTP client. The only calls that
- * still go over HTTP to the Next.js app are the WorkOS-Vault crypto paths —
- * reading decrypted secret VALUES and creating variable requests (encrypted
- * server-side) — carrying an `Authorization: Bearer <fresh JWT>` header.
- */
+const LINK_EXPIRES_DAYS_DEFAULT = 30;
+const ACCESS_REVOKED_MESSAGE =
+  "Your access to this organization has been revoked. Please contact your organization.";
+
+export function assertCompletePull(meta: PullValuesResult["meta"]): void {
+  const failed = meta.decryptionFailures ?? [];
+  if (failed.length > 0) {
+    throw new Error(
+      `Envpilot could not decrypt ${failed.join(", ")}. Nothing was written. Try again, or ask a project owner to re-save these values.`
+    );
+  }
+  if (meta.truncatedAt !== undefined) {
+    throw new Error(
+      `This environment has more than ${meta.truncatedAt} variables, more than one pull can return. Nothing was written.`
+    );
+  }
+}
+
+function isSessionExpired(err: unknown): boolean {
+  if (err instanceof TransientAuthError) return false;
+  if ((err as { status?: number })?.status === 401) return true;
+  const message = err instanceof Error ? err.message : String(err);
+  return /unauthenticated|unauthorized|not signed in|invalid or expired bearer|no auth provider/i.test(
+    message
+  );
+}
+
+function isAccessSuspended(err: unknown): boolean {
+  const data = (err as { data?: unknown })?.data;
+  const message = err instanceof Error ? err.message : String(err);
+  return `${message} ${typeof data === "string" ? data : ""}`.includes(
+    "ACCESS_SUSPENDED"
+  );
+}
+
 export class ApiService {
-  private client: AxiosInstance;
   private tokenManager: TokenManager;
   private roleCache: Map<string, string> = new Map();
   private projectRoleCache: Map<string, string> = new Map();
-  /**
-   * Authoritative unified access facts returned alongside each getVariables
-   * response (additive server fields). Populated on the SAME request that
-   * fetches the variables, so it never goes stale relative to a sync. File
-   * protection reads this first; the role caches are the fallback.
-   */
-  private accessMetaCache: Map<
-    string,
-    {
-      unifiedRole?: string;
-      assigned?: boolean;
-      environmentScope?: string[] | null;
-      hasWriteAccess?: boolean;
-      scopeRestricted?: boolean;
-      autoUnsyncOnClose?: boolean;
-      capabilities?: Record<string, boolean>;
-    }
-  > = new Map();
-  /** Short-TTL response cache (one sync fans out to several refreshes). */
+  private accessMetaCache: Map<string, AccessMeta> = new Map();
   private responseCache: Map<string, { at: number; value: unknown }> =
     new Map();
   private static readonly CACHE_TTL_MS = 30_000;
-  /** In-flight GET coalescing keyed by cache key (single-flight). */
   private inflight = new SingleFlight();
-  /** Bumped by clearCache() so fetches started before the clear (e.g. under
-   * the old account) can never repopulate the caches with stale data. */
   private cacheGeneration = 0;
-  /** Guards against stacking multiple "session expired" prompts at once. */
   private reauthPromptActive = false;
+  private convex: {
+    url: string;
+    token: string;
+    client: ConvexHttpClient;
+  } | null = null;
 
   constructor(tokenManager: TokenManager) {
     this.tokenManager = tokenManager;
-    this.client = axios.create({
-      timeout: 30000,
-    });
-
-    // Attach a fresh WorkOS JWT bearer to every vault HTTP request.
-    this.client.interceptors.request.use(async (config) => {
-      config.baseURL = getServerUrl();
-      const token = await this.tokenManager.getFreshToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    });
-
-    // On a 401, force-refresh the token and retry the request ONCE — the
-    // server may have rejected a token that still looked fresh locally. Only
-    // when the retry also 401s (or the forced refresh fails) is the session
-    // genuinely dead — then surface the single reauth prompt.
-    this.client.interceptors.response.use(
-      (response) => response,
-      async (error: AxiosError<{ error?: string }>) => {
-        const status = error.response?.status;
-        const config = error.config as
-          | (InternalAxiosRequestConfig & { _envpilotRetried?: boolean })
-          | undefined;
-
-        if (status === 401 && config) {
-          if (!config._envpilotRetried) {
-            config._envpilotRetried = true;
-            const token = await this.tokenManager.getFreshToken(true);
-            if (token) {
-              config.headers.Authorization = `Bearer ${token}`;
-              return this.client.request(config);
-            }
-          }
-          void this.promptReauth();
-        }
-
-        const rawMessage = error.response?.data?.error || error.message;
-        // Translate the backend's org-wide revocation marker (security hold /
-        // membership removed) into a plain "contact your organization"
-        // message instead of leaking the raw guard string.
-        const message = rawMessage?.includes("ACCESS_SUSPENDED")
-          ? "Your access to this organization has been revoked. Please contact your organization."
-          : rawMessage;
-        throw Object.assign(new Error(message), { status });
-      }
-    );
   }
 
-  // ============================================
-  // Auth-scoped Convex client
-  // ============================================
-
-  /**
-   * Build a ConvexHttpClient authed with a freshly-minted WorkOS JWT. The HTTP
-   * client's setAuth takes a token STRING, so the token is resolved up front —
-   * every call therefore carries a non-expired JWT.
-   */
-  private async getConvexClient(): Promise<ConvexHttpClient> {
+  private async getConvexClient(
+    forceRefresh: boolean
+  ): Promise<ConvexHttpClient> {
     const url = getConvexUrl();
     if (!url) {
       throw new Error(
         "No Convex URL available. Set envpilot.convexUrl or reinstall the extension."
       );
     }
-    const token = await this.tokenManager.getFreshToken();
+    const token = await this.tokenManager.getFreshToken(forceRefresh);
     if (!token) {
       throw Object.assign(new Error("You are not signed in."), { status: 401 });
     }
-    const client = new ConvexHttpClient(url);
-    client.setAuth(token);
-    return client;
+    if (this.convex?.token !== token || this.convex.url !== url) {
+      const client = new ConvexHttpClient(url);
+      client.setAuth(token);
+      this.convex = { url, token, client };
+    }
+    return this.convex.client;
   }
 
-  /**
-   * List a project's secret files. METADATA ONLY — no decryption, no vault
-   * read, no download audit entry. The drift badge runs entirely on this.
-   */
   async listSecretFiles(
     projectId: string,
     environment?: string
@@ -266,7 +213,6 @@ export class ApiService {
     );
   }
 
-  /** Decrypt ONE secret file. Audited server-side on every call. */
   async getSecretFileContent(fileId: string): Promise<SecretFileContent> {
     return this.convexAction<SecretFileContent>(
       anyApi.features.files.values.getFileContent,
@@ -274,84 +220,53 @@ export class ApiService {
     );
   }
 
-  private async convexQuery<T>(
+  private convexQuery<T>(
     ref: unknown,
     args: Record<string, unknown> = {}
   ): Promise<T> {
-    return this.withReauth(async () => {
-      const client = await this.getConvexClient();
-      // anyApi refs are untyped — the concrete shape is enforced by our casts.
-      return client.query(ref as never, args as never) as Promise<T>;
-    });
+    return this.call(
+      (client) => client.query(ref as never, args as never) as Promise<T>
+    );
   }
 
-  private async convexMutation<T>(
+  private convexMutation<T>(
     ref: unknown,
     args: Record<string, unknown> = {}
   ): Promise<T> {
-    return this.withReauth(async () => {
-      const client = await this.getConvexClient();
-      return client.mutation(ref as never, args as never) as Promise<T>;
-    });
+    return this.call(
+      (client) => client.mutation(ref as never, args as never) as Promise<T>
+    );
   }
 
-  private async convexAction<T>(
+  private convexAction<T>(
     ref: unknown,
     args: Record<string, unknown> = {}
   ): Promise<T> {
-    return this.withReauth(async () => {
-      const client = await this.getConvexClient();
-      return client.action(ref as never, args as never) as Promise<T>;
-    });
+    return this.call(
+      (client) => client.action(ref as never, args as never) as Promise<T>
+    );
   }
 
-  /**
-   * Run a Convex call and, on a dead/expired session, surface the same single
-   * reauth prompt the old HTTP path showed on a 401 — otherwise the direct
-   * Convex path fails with repeated auth errors and no recovery hint. The error
-   * is always rethrown so callers still handle the failure.
-   */
-  private async withReauth<T>(run: () => Promise<T>): Promise<T> {
+  private async call<T>(
+    run: (client: ConvexHttpClient) => Promise<T>
+  ): Promise<T> {
+    const attempt = async (forceRefresh: boolean) =>
+      run(await this.getConvexClient(forceRefresh));
     try {
-      return await run();
+      return await attempt(false).catch((err: unknown) => {
+        if (!isSessionExpired(err)) throw err;
+        return attempt(true);
+      });
     } catch (err) {
-      if (this.isSessionExpired(err)) {
+      if (isSessionExpired(err)) {
         void this.promptReauth();
       }
-      // Org-wide revocation (security hold / membership removed): the
-      // backend throws a ConvexError whose payload rides on `.data` (the
-      // message body is redacted in prod deployments). Translate to the
-      // plain "contact your organization" message here — the single choke
-      // point for every direct Convex call — so sync results and
-      // notifications never show a raw guard string or a generic
-      // "Server Error".
-      const data = (err as { data?: unknown })?.data;
-      const raw = `${err instanceof Error ? err.message : String(err)} ${
-        typeof data === "string" ? data : ""
-      }`;
-      if (raw.includes("ACCESS_SUSPENDED")) {
-        throw Object.assign(
-          new Error(
-            "Your access to this organization has been revoked. Please contact your organization."
-          ),
-          { status: 403 }
-        );
+      if (isAccessSuspended(err)) {
+        throw Object.assign(new Error(ACCESS_REVOKED_MESSAGE), { status: 403 });
       }
       throw err;
     }
   }
-
-  private isSessionExpired(err: unknown): boolean {
-    if ((err as { status?: number })?.status === 401) return true;
-    const message = err instanceof Error ? err.message : String(err);
-    return /unauthenticated|unauthorized|not signed in|invalid or expired bearer|no auth provider/i.test(
-      message
-    );
-  }
-
-  // ============================================
-  // Caching / reauth helpers
-  // ============================================
 
   private async promptReauth(): Promise<void> {
     if (this.reauthPromptActive) {
@@ -360,7 +275,7 @@ export class ApiService {
     this.reauthPromptActive = true;
     try {
       const action = await vscode.window.showWarningMessage(
-        "Envpilot: Session expired — sign in again to continue.",
+        "Envpilot: Session expired. Sign in again to continue.",
         "Sign In"
       );
       if (action === "Sign In") {
@@ -389,7 +304,6 @@ export class ApiService {
     return this.inflight.run(key, fetcher);
   }
 
-  /** Drop all cached responses (manual refresh, sign-out, account switch). */
   clearCache(): void {
     this.cacheGeneration++;
     this.responseCache.clear();
@@ -397,6 +311,7 @@ export class ApiService {
     this.roleCache.clear();
     this.projectRoleCache.clear();
     this.accessMetaCache.clear();
+    this.convex = null;
   }
 
   private static numericFeature(
@@ -416,10 +331,6 @@ export class ApiService {
     const value = resolved?.features?.[key]?.value;
     return typeof value === "boolean" ? value : fallback;
   }
-
-  // ============================================
-  // Organizations — DIRECT Convex
-  // ============================================
 
   async getOrganizations(): Promise<Organization[]> {
     const cached = this.getCached<Organization[]>("orgs");
@@ -449,9 +360,7 @@ export class ApiService {
         _id: org._id,
         name: org.name,
         slug: org.slug,
-        tier: (tiers[index]?.tierName === "pro"
-          ? "pro"
-          : "free") as Organization["tier"],
+        tier: tiers[index]?.tierName === "pro" ? "pro" : "free",
         unifiedRole: normalizeOrgRole(org.role),
       }));
 
@@ -461,10 +370,6 @@ export class ApiService {
       return organizations;
     });
   }
-
-  // ============================================
-  // Projects — DIRECT Convex
-  // ============================================
 
   async getProjects(organizationId?: string): Promise<Project[]> {
     const cacheKey = `projects:${organizationId ?? "all"}`;
@@ -493,14 +398,11 @@ export class ApiService {
     });
   }
 
-  /** Projects within one organization, with unified-role + assignment info. */
   private async listProjectsForOrg(organizationId: string): Promise<Project[]> {
     const [projects, membership] = await Promise.all([
       this.convexQuery<ProjectRow[]>(
         anyApi.features.projects.queries.listWithStats,
-        {
-          organizationId,
-        }
+        { organizationId }
       ),
       this.convexQuery<MembershipRow | null>(
         anyApi.features.organizations.queries.getMembership,
@@ -510,56 +412,33 @@ export class ApiService {
 
     const unifiedRole = normalizeOrgRole(membership?.role);
     return Promise.all(
-      projects.map((project) =>
-        this.mapProject(project, unifiedRole, unifiedRole === "owner")
-      )
+      projects.map((project) => this.mapProject(project, unifiedRole))
     );
   }
 
-  /** Every accessible project across all orgs (per-project role). */
   private async listAllProjects(): Promise<Project[]> {
     const projects = await this.convexQuery<ProjectRow[]>(
       anyApi.features.projects.queries.listForUser,
       {}
     );
     return Promise.all(
-      projects.map((project) => {
-        const unifiedRole = normalizeOrgRole(project.userRole);
-        return this.mapProject(project, unifiedRole, unifiedRole === "owner");
-      })
+      projects.map((project) =>
+        this.mapProject(project, normalizeOrgRole(project.userRole))
+      )
     );
   }
 
-  /**
-   * Resolve per-project assignment + environment scope. Owners are implicitly
-   * assigned to every project; everyone else's assignment/scope comes from the
-   * projectMembers row.
-   */
   private async mapProject(
     project: ProjectRow,
-    unifiedRole: ReturnType<typeof normalizeOrgRole>,
-    isOwner: boolean
+    unifiedRole: ReturnType<typeof normalizeOrgRole>
   ): Promise<Project> {
-    const legacyProjectRole = isOwner
+    const isOwner = unifiedRole === "owner";
+    const projectMembership = isOwner
       ? null
-      : unifiedRole === "developer"
-        ? "developer"
-        : "manager";
-
-    let assigned = isOwner;
-    let environmentScope: string[] | null = null;
-    if (!isOwner) {
-      const projectMembership =
-        await this.convexQuery<ProjectMembershipRow | null>(
+      : await this.convexQuery<ProjectMembershipRow | null>(
           anyApi.features.projects.members.getProjectMembership,
           { projectId: project._id }
         );
-      assigned = projectMembership !== null;
-      environmentScope =
-        unifiedRole === "developer"
-          ? (projectMembership?.environments ?? null)
-          : null;
-    }
 
     return {
       _id: project._id,
@@ -570,141 +449,98 @@ export class ApiService {
       icon: project.icon ?? null,
       color: project.color ?? null,
       userRole: null,
-      projectRole: legacyProjectRole,
+      projectRole: isOwner
+        ? null
+        : unifiedRole === "developer"
+          ? "developer"
+          : "manager",
       unifiedRole,
-      assigned,
-      environmentScope,
+      assigned: isOwner || projectMembership !== null,
+      environmentScope:
+        unifiedRole === "developer"
+          ? (projectMembership?.environments ?? null)
+          : null,
     };
   }
 
-  async getProject(projectId: string): Promise<Project | null> {
-    try {
-      const project = await this.convexQuery<ProjectRow | null>(
-        anyApi.features.projects.queries.getById,
-        { projectId }
-      );
-      if (!project) return null;
-      return {
-        _id: project._id,
-        name: project.name,
-        slug: project.slug,
-        description: project.description ?? null,
-        organizationId: project.organizationId,
-        icon: project.icon ?? null,
-        color: project.color ?? null,
-      };
-    } catch (err) {
-      captureError(err, { phase: "get-project" });
-      return null;
-    }
-  }
-
-  // ============================================
-  // Variables — VAULT over HTTP (JWT bearer)
-  // ============================================
-
-  async getVariables(
+  getVariables(
     projectId: string,
     environment: string,
     organizationId?: string,
     options?: { fresh?: boolean }
   ): Promise<EnvironmentVariable[]> {
-    const cacheKey = `vars:${projectId}:${environment}:${organizationId ?? ""}`;
-    if (!options?.fresh) {
+    return this.pullValues(
+      `vars:${projectId}:${environment}:${organizationId ?? ""}`,
+      { projectId, environment },
+      options?.fresh ?? false
+    );
+  }
+
+  getVariablesMetadata(
+    projectId: string,
+    environment: string,
+    organizationId?: string
+  ): Promise<EnvironmentVariable[]> {
+    return this.pullValues(
+      `varsmeta:${projectId}:${environment}:${organizationId ?? ""}`,
+      { projectId, environment, metadataOnly: true },
+      false
+    );
+  }
+
+  private async pullValues(
+    cacheKey: string,
+    args: { projectId: string; environment: string; metadataOnly?: true },
+    fresh: boolean
+  ): Promise<EnvironmentVariable[]> {
+    if (!fresh) {
       const cached = this.getCached<EnvironmentVariable[]>(cacheKey);
       if (cached) return cached;
     }
 
     return this.coalesce(cacheKey, async () => {
       const gen = this.cacheGeneration;
-      // Direct Convex action (decrypts server-side) — replaces the deleted
-      // GET /api/extension/variables vault route.
       const result = await this.convexAction<PullValuesResult>(
         anyApi.features.variables.values.pullValues,
-        { projectId, environment }
+        args
       );
+      assertCompletePull(result.meta);
 
-      const variables = result.variables.map((row) =>
-        ApiService.toEnvironmentVariable(row)
+      const variables = result.variables.map(
+        (row): EnvironmentVariable => ({
+          _id: row._id,
+          key: row.key,
+          value: row.value,
+          description: row.description ?? null,
+          environments: row.environments,
+          projectId: row.projectId,
+          isSensitive: row.isSensitive,
+          version: row.version,
+          access: row.access,
+        })
       );
       if (gen === this.cacheGeneration) {
-        this.roleCache.set(projectId, result.meta.role);
-        this.cacheAccessMeta(projectId, result.meta);
+        const { meta } = result;
+        this.roleCache.set(args.projectId, meta.role);
+        this.accessMetaCache.set(args.projectId, {
+          unifiedRole: meta.unifiedRole,
+          assigned: meta.assigned,
+          environmentScope: meta.environmentScope,
+          hasWriteAccess: meta.hasWriteAccess,
+          scopeRestricted: meta.scopeRestricted,
+          autoUnsyncOnClose: meta.autoUnsyncOnClose,
+          capabilities: meta.capabilities,
+        });
         this.setCached(cacheKey, variables);
       }
       return variables;
     });
   }
 
-  /** Map a pullValues row into the extension's EnvironmentVariable shape. */
-  private static toEnvironmentVariable(
-    row: PullValuesResult["variables"][number]
-  ): EnvironmentVariable {
-    return {
-      _id: row._id,
-      key: row.key,
-      value: row.value,
-      description: row.description ?? null,
-      environments: row.environments,
-      projectId: row.projectId,
-      isSensitive: row.isSensitive,
-      version: row.version,
-      access: row.access,
-    };
-  }
-
-  private cacheAccessMeta(
-    projectId: string,
-    data:
-      | {
-          unifiedRole?: string;
-          assigned?: boolean;
-          environmentScope?: string[] | null;
-          hasWriteAccess?: boolean;
-          scopeRestricted?: boolean;
-          autoUnsyncOnClose?: boolean;
-          capabilities?: Record<string, boolean>;
-        }
-      | undefined
-  ): void {
-    if (!data) return;
-    if (
-      data.unifiedRole !== undefined ||
-      data.assigned !== undefined ||
-      data.hasWriteAccess !== undefined ||
-      data.environmentScope !== undefined
-    ) {
-      this.accessMetaCache.set(projectId, {
-        unifiedRole: data.unifiedRole,
-        assigned: data.assigned,
-        environmentScope: data.environmentScope,
-        hasWriteAccess: data.hasWriteAccess,
-        scopeRestricted: data.scopeRestricted,
-        autoUnsyncOnClose: data.autoUnsyncOnClose,
-        capabilities: data.capabilities,
-      });
-    }
-  }
-
-  getAccessMeta(projectId: string):
-    | {
-        unifiedRole?: string;
-        assigned?: boolean;
-        environmentScope?: string[] | null;
-        hasWriteAccess?: boolean;
-        scopeRestricted?: boolean;
-        autoUnsyncOnClose?: boolean;
-        capabilities?: Record<string, boolean>;
-      }
-    | undefined {
+  getAccessMeta(projectId: string): AccessMeta | undefined {
     return this.accessMetaCache.get(projectId);
   }
 
-  /**
-   * Send queued unsync purge summaries (counts only) for the server-side
-   * audit trail. Fire-and-forget by contract: failures are captured to
-   * Sentry and swallowed — a report must never block activation or sync.
-   */
   async reportUnsync(
     reports: Array<{
       projectId: string;
@@ -714,72 +550,20 @@ export class ApiService {
       occurredAt: number;
     }>
   ): Promise<void> {
-    if (reports.length === 0) return;
-    try {
-      await this.convexMutation(
-        anyApi.features.users.projectAccess.reportUnsync,
-        { reports }
-      );
-    } catch (err) {
-      captureError(err, { phase: "report-unsync" });
-    }
+    await this.convexMutation(
+      anyApi.features.users.projectAccess.reportUnsync,
+      { reports }
+    );
   }
 
-  /**
-   * Variable metadata only — `value` is always empty. Used by UI surfaces
-   * (tree view, dashboard) that never display values: skips per-variable vault
-   * decryption on the server and avoids logging spurious "export" audit events.
-   */
-  async getVariablesMetadata(
-    projectId: string,
-    environment: string,
-    organizationId?: string
-  ): Promise<EnvironmentVariable[]> {
-    const cacheKey = `varsmeta:${projectId}:${environment}:${organizationId ?? ""}`;
-    const cached = this.getCached<EnvironmentVariable[]>(cacheKey);
-    if (cached) return cached;
-
-    return this.coalesce(cacheKey, async () => {
-      const gen = this.cacheGeneration;
-      // Direct Convex action, metadata-only (no vault decryption, no export
-      // audit) — replaces the deleted GET /api/extension/variables?metadataOnly.
-      const result = await this.convexAction<PullValuesResult>(
-        anyApi.features.variables.values.pullValues,
-        { projectId, environment, metadataOnly: true }
-      );
-
-      const variables = result.variables.map((row) =>
-        ApiService.toEnvironmentVariable(row)
-      );
-      if (gen === this.cacheGeneration) {
-        this.roleCache.set(projectId, result.meta.role);
-        this.cacheAccessMeta(projectId, result.meta);
-        this.setCached(cacheKey, variables);
-      }
-      return variables;
-    });
-  }
-
-  /** Cached org role for a project (raw role string; normalize before use). */
   getUserRole(projectId: string): string | undefined {
     return this.roleCache.get(projectId);
   }
 
-  /** Cached project role (raw role string; compare after normalizing). */
   getProjectRole(projectId: string): string | undefined {
     return this.projectRoleCache.get(projectId);
   }
 
-  // ============================================
-  // Project linking — DIRECT Convex mutations
-  // ============================================
-
-  /**
-   * Record this device's scoping row for a project. Identity is the JWT; the
-   * mutation returns the projectAccess id + token but the extension no longer
-   * stores that token as a credential — it stores the deviceId as a link
-   * marker and computes the local expiry.
-   */
   async linkExtension(
     projectId: string,
     deviceInfo: DeviceInfo,
@@ -795,8 +579,6 @@ export class ApiService {
       }
     );
     return {
-      // Link marker (NOT the projectAccess token) — kept only so storage's
-      // presence filter treats the project as linked.
       accessToken: deviceInfo.deviceId,
       expiresAt: Date.now() + expiresInDays * 24 * 60 * 60 * 1000,
     };
@@ -805,18 +587,10 @@ export class ApiService {
   async unlinkExtension(projectId: string, deviceId: string): Promise<void> {
     await this.convexMutation(
       anyApi.features.users.projectAccess.unlinkExtension,
-      {
-        projectId,
-        deviceId,
-      }
+      { projectId, deviceId }
     );
   }
 
-  // ============================================
-  // Tier / usage — DIRECT Convex
-  // ============================================
-
-  /** Check whether extension access is enabled for the organization's tier. */
   async checkExtensionAccess(
     organizationId: string
   ): Promise<{ enabled: boolean; reason?: string }> {
@@ -833,7 +607,7 @@ export class ApiService {
       };
     } catch (err) {
       captureError(err, { phase: "check-extension-access" });
-      return { enabled: false, reason: "Unable to verify extension access" };
+      return { enabled: true };
     }
   }
 
@@ -872,9 +646,7 @@ export class ApiService {
       }
 
       const usage: UsageInfo = {
-        tier: (resolved?.tierName === "pro"
-          ? "pro"
-          : usageData.tier) as UsageInfo["tier"],
+        tier: resolved?.tierName === "pro" ? "pro" : usageData.tier,
         enforcementEnabled,
         limits: {
           projects: ApiService.numericFeature(resolved, "max_projects"),
@@ -916,11 +688,6 @@ export class ApiService {
     }
   }
 
-  // ============================================
-  // Variable requests
-  // ============================================
-
-  /** Submit a variable request — DIRECT Convex (value encrypted server-side). */
   async submitVariableRequest(request: {
     key: string;
     value: string;
@@ -929,8 +696,6 @@ export class ApiService {
     projectId: string;
     isSensitive: boolean;
   }): Promise<VariableRequest> {
-    // Direct Convex action — replaces the deleted
-    // POST /api/extension/variable-requests vault route.
     const created = await this.convexAction<VariableRequest | null>(
       anyApi.features.variables.requests.actions.createWithValue,
       {
@@ -950,18 +715,13 @@ export class ApiService {
     return created;
   }
 
-  /** List variable requests for a project — DIRECT Convex. */
   async getVariableRequests(
     projectId: string,
-    status?: string
+    status?: VariableRequest["status"]
   ): Promise<VariableRequest[]> {
-    const args: Record<string, unknown> = { projectId };
-    if (status) {
-      args.status = status;
-    }
     return this.convexQuery<VariableRequest[]>(
       anyApi.features.variables.requests.queries.listForProject,
-      args
+      status ? { projectId, status } : { projectId }
     );
   }
 }

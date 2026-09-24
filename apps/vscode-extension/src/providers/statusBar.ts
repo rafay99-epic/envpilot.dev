@@ -13,13 +13,9 @@ export class StatusBarProvider {
   private isSyncing = false;
   private lastSyncResult: SyncResult | null = null;
   private errorClearTimer: ReturnType<typeof setTimeout> | null = null;
-  /**
-   * Cached from the last update() call so tooltip/text building stays sync —
-   * refreshed once per update() (itself only invoked on auth/sync/manual
-   * refresh events, not on a render loop) rather than re-queried per call.
-   */
   private activeAccountEmail: string | undefined;
   private accountCount = 0;
+  private disposables: vscode.Disposable[] = [];
 
   constructor(
     authService: AuthService,
@@ -36,18 +32,18 @@ export class StatusBarProvider {
     );
     this.statusBarItem.command = "envpilot.showStatus";
 
-    this.authService.onAuthStateChanged(() => {
-      this.update();
-    });
-    this.syncService.onSyncComplete((result) =>
-      this.handleSyncComplete(result)
+    this.disposables.push(
+      this.authService.onAuthStateChanged(() => void this.update()),
+      this.syncService.onSyncComplete((result) =>
+        this.handleSyncComplete(result)
+      ),
+      this.syncService.onPermissionRevoked((project) =>
+        this.handlePermissionRevoked(project)
+      ),
+      this.syncService.onConnectionStateChanged(() => void this.update())
     );
-    this.syncService.onPermissionRevoked((project) =>
-      this.handlePermissionRevoked(project)
-    );
-    this.syncService.onConnectionStateChanged(() => this.update());
 
-    this.update();
+    void this.update();
     this.statusBarItem.show();
   }
 
@@ -68,10 +64,7 @@ export class StatusBarProvider {
 
     if (allLinkedProjects.length === 0 && !linkedProject) {
       this.statusBarItem.text = "$(shield) Envpilot";
-      const lines = [
-        "Signed in \u2014 no project linked",
-        "Click to link a project",
-      ];
+      const lines = ["Signed in, no project linked", "Click to link a project"];
       const accountHint = this.buildAccountHintText();
       if (accountHint) lines.push("", accountHint);
       this.statusBarItem.tooltip = lines.join("\n");
@@ -80,7 +73,6 @@ export class StatusBarProvider {
       return;
     }
 
-    // Restore default command for linked state
     this.statusBarItem.command = "envpilot.showStatus";
 
     if (this.isSyncing) {
@@ -97,9 +89,7 @@ export class StatusBarProvider {
       return;
     }
 
-    // Build tooltip for V2 (multi-project / multi-directory) or V1
     if (allLinkedProjects.length > 1) {
-      // Multiple projects linked
       this.statusBarItem.text = `$(shield) Envpilot: ${allLinkedProjects.length} projects`;
       this.statusBarItem.tooltip =
         this.buildMultiProjectTooltip(allLinkedProjects);
@@ -108,27 +98,25 @@ export class StatusBarProvider {
       this.statusBarItem.tooltip = this.buildV2Tooltip(allLinkedProjects[0]);
     } else if (linkedProject) {
       const syncInfo = linkedProject.lastSyncedAt
-        ? `Synced ${this.formatTime(linkedProject.lastSyncedAt)}`
+        ? `Synced ${formatTime(linkedProject.lastSyncedAt)}`
         : "Never synced";
 
       this.statusBarItem.text = `$(shield) ${linkedProject.projectName}`;
-      const md = new vscode.MarkdownString(
-        [
-          `### $(shield) ${linkedProject.projectName}`,
-          "",
-          `$(organization) ${linkedProject.organizationName}`,
-          `$(server-environment) ${linkedProject.environment}`,
-          `$(file) ${linkedProject.targetFile}`,
-          "",
-          `$(sync) ${syncInfo}`,
-          this.lastSyncResult
-            ? `$(symbol-variable) ${this.lastSyncResult.variablesCount} variables`
-            : "",
-        ]
-          .filter(Boolean)
-          .join("\n")
-      );
-      md.supportThemeIcons = true;
+      const md = new vscode.MarkdownString("", true);
+      md.appendMarkdown("### $(shield) ");
+      md.appendText(linkedProject.projectName);
+      md.appendMarkdown("\n\n$(organization) ");
+      md.appendText(linkedProject.organizationName);
+      md.appendMarkdown("\n\n$(server-environment) ");
+      md.appendText(linkedProject.environment);
+      md.appendMarkdown("\n\n$(file) ");
+      md.appendText(linkedProject.targetFile);
+      md.appendMarkdown(`\n\n$(sync) ${syncInfo}`);
+      if (this.lastSyncResult) {
+        md.appendMarkdown(
+          `\n\n$(symbol-variable) ${this.lastSyncResult.variablesCount} variables`
+        );
+      }
       this.statusBarItem.tooltip = md;
     }
 
@@ -147,12 +135,6 @@ export class StatusBarProvider {
     }
   }
 
-  /**
-   * Surface real-time sync connectivity so a silently-dead WebSocket isn't
-   * invisible (see RealTimeSyncService's bounded-backoff reconnect check).
-   * Only applies once a project is linked — this method runs after the
-   * "not authenticated" / "no project linked" early returns.
-   */
   private applyConnectionIndicator(): void {
     const state: SyncConnectionState = this.syncService.getConnectionState();
     if (state === "connected") {
@@ -166,19 +148,13 @@ export class StatusBarProvider {
 
     const note = isReconnecting
       ? "$(sync~spin) Reconnecting to Envpilot… real-time updates are paused."
-      : "$(debug-disconnect) Real-time sync disconnected — retrying periodically in the background.";
+      : "$(debug-disconnect) Real-time sync disconnected, retrying periodically in the background.";
 
     if (this.statusBarItem.tooltip instanceof vscode.MarkdownString) {
       this.statusBarItem.tooltip.appendMarkdown(`\n\n---\n\n${note}`);
     }
   }
 
-  /**
-   * Refresh the cached active-account email and total account count. Called
-   * once per update() (itself only invoked on sign-in/out/switch and other
-   * discrete UI-refresh events, never on a render loop), so this stays a
-   * single pair of lightweight storage reads rather than a per-paint cost.
-   */
   private async refreshAccountInfo(): Promise<void> {
     const [accounts, activeAccountId] = await Promise.all([
       this.storageService.listAccounts(),
@@ -191,17 +167,15 @@ export class StatusBarProvider {
     this.accountCount = accounts.length;
   }
 
-  /** Plain-text account line for tooltips that aren't MarkdownStrings. */
   private buildAccountHintText(): string | undefined {
     if (!this.activeAccountEmail) {
       return undefined;
     }
     return this.accountCount > 1
-      ? `Signed in as ${this.activeAccountEmail} (${this.accountCount} accounts — run "Envpilot: Switch Account" to switch)`
+      ? `Signed in as ${this.activeAccountEmail} (${this.accountCount} accounts, run "Envpilot: Switch Account" to switch)`
       : `Signed in as ${this.activeAccountEmail}`;
   }
 
-  /** Appends the active-account line (and multi-account hint) to a MarkdownString tooltip. */
   private appendAccountInfo(): void {
     if (
       !this.activeAccountEmail ||
@@ -210,90 +184,80 @@ export class StatusBarProvider {
       return;
     }
 
-    const hint =
-      this.accountCount > 1
-        ? `$(account) ${this.activeAccountEmail} · ${this.accountCount} accounts — run "Envpilot: Switch Account" to switch`
-        : `$(account) ${this.activeAccountEmail}`;
-
-    this.statusBarItem.tooltip.appendMarkdown(`\n\n---\n\n${hint}`);
+    const tooltip = this.statusBarItem.tooltip;
+    tooltip.appendMarkdown("\n\n---\n\n$(account) ");
+    tooltip.appendText(this.activeAccountEmail);
+    if (this.accountCount > 1) {
+      tooltip.appendMarkdown(
+        ` · ${this.accountCount} accounts, run "Envpilot: Switch Account" to switch`
+      );
+    }
   }
 
   private buildMultiProjectTooltip(
     projects: LinkedProjectV2[]
   ): vscode.MarkdownString {
-    const lines: string[] = [
-      `### $(shield) Envpilot — ${projects.length} Projects Linked`,
-      "",
-    ];
-
+    const md = new vscode.MarkdownString("", true);
+    md.appendMarkdown(
+      `### $(shield) Envpilot: ${projects.length} Projects Linked\n\n`
+    );
     for (const project of projects) {
-      lines.push(
-        "---",
-        "",
-        `**$(folder-library) ${project.projectName}**`,
-        `$(organization) ${project.organizationName}`,
-        `$(file-directory) ${project.directories.length} director${project.directories.length !== 1 ? "ies" : "y"}`,
-        ""
+      md.appendMarkdown("---\n\n**$(folder-library) ");
+      md.appendText(project.projectName);
+      md.appendMarkdown("**\n\n$(organization) ");
+      md.appendText(project.organizationName);
+      md.appendMarkdown(
+        `\n\n$(file-directory) ${project.directories.length} director${project.directories.length !== 1 ? "ies" : "y"}\n\n`
       );
     }
-
-    const md = new vscode.MarkdownString(lines.join("\n"));
-    md.supportThemeIcons = true;
     return md;
   }
 
   private buildV2Tooltip(project: LinkedProjectV2): vscode.MarkdownString {
-    const lines: string[] = [
-      `### $(shield) ${project.projectName}`,
-      "",
-      `$(organization) ${project.organizationName}`,
-    ];
+    const md = new vscode.MarkdownString("", true);
+    md.appendMarkdown("### $(shield) ");
+    md.appendText(project.projectName);
+    md.appendMarkdown("\n\n$(organization) ");
+    md.appendText(project.organizationName);
 
     if (project.directories.length > 0) {
-      lines.push("", "---", "", "**Directories:**");
+      md.appendMarkdown("\n\n---\n\n**Directories:**\n");
       for (const dir of project.directories) {
         const syncInfo = dir.lastSyncedAt
-          ? this.formatTime(dir.lastSyncedAt)
+          ? formatTime(dir.lastSyncedAt)
           : "never";
-        const envs = dir.environments.join(", ");
-        lines.push(
-          `- $(folder-opened) \`${dir.displayName || dir.directoryPath}\``,
-          `  ${envs} \u2192 ${dir.targetFile} \u00b7 synced ${syncInfo}`
+        md.appendMarkdown("\n- $(folder-opened) ");
+        md.appendText(dir.displayName || dir.directoryPath);
+        md.appendMarkdown(": ");
+        md.appendText(
+          `${dir.environments.join(", ")} \u2192 ${dir.targetFile} \u00b7 synced ${syncInfo}`
         );
       }
     }
 
     if (this.lastSyncResult) {
-      lines.push(
-        "",
-        `$(symbol-variable) ${this.lastSyncResult.variablesCount} variables`
+      md.appendMarkdown(
+        `\n\n$(symbol-variable) ${this.lastSyncResult.variablesCount} variables`
       );
     }
-
-    const md = new vscode.MarkdownString(lines.join("\n"));
-    md.supportThemeIcons = true;
     return md;
   }
 
   setSyncing(syncing: boolean): void {
     this.isSyncing = syncing;
-    this.update();
+    void this.update();
   }
 
   private handleSyncComplete(result: SyncResult): void {
     this.isSyncing = false;
     this.lastSyncResult = result;
-    this.update();
+    void this.update();
 
-    // Successful syncs update the status bar silently — this fires once per
-    // directory on every background sync, so toasts here are pure noise
-    // (manual pulls already show an aggregate notification).
     if (!result.success) {
       this.statusBarItem.backgroundColor = new vscode.ThemeColor(
         "statusBarItem.errorBackground"
       );
 
-      // Auto-clear error background after 10 seconds
       if (this.errorClearTimer) clearTimeout(this.errorClearTimer);
       this.errorClearTimer = setTimeout(() => {
         this.statusBarItem.backgroundColor = undefined;
@@ -321,19 +285,21 @@ export class StatusBarProvider {
     );
   }
 
-  private formatTime(timestamp: number): string {
-    const diff = Date.now() - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-
-    if (minutes < 1) return "just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return new Date(timestamp).toLocaleDateString();
-  }
-
   dispose(): void {
     if (this.errorClearTimer) clearTimeout(this.errorClearTimer);
+    for (const d of this.disposables) d.dispose();
+    this.disposables = [];
     this.statusBarItem.dispose();
   }
+}
+
+export function formatTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return new Date(timestamp).toLocaleDateString();
 }

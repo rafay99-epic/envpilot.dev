@@ -2,14 +2,13 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { ApiService } from "./api";
-import { FileProtectionService, type ProtectionMode } from "./fileProtection";
+import { FileProtectionService } from "./fileProtection";
 import { ClipboardGuardService } from "./clipboardGuard";
 import { ConvexService } from "./convex";
 import { StorageService } from "../utils/storage";
 import {
   getEnvironment,
   getTargetFile,
-  getSyncInterval,
   shouldPreventCopyOnRevoke,
 } from "../utils/config";
 import {
@@ -17,7 +16,6 @@ import {
   pathKey,
   pathsEqual,
   toPlatformPath,
-  getDisplayPath,
   isPathInside,
 } from "../utils/paths";
 import { materialiseSecretFiles } from "./secretFiles";
@@ -29,12 +27,14 @@ import {
   releaseManagedFile,
   readManifest,
   getManifestPath,
+  purgeManagedFilesFiltered,
+  hashContent,
 } from "../utils/managedFiles";
-import { captureError } from "../utils/sentry";
 import {
   normalizeOrgRole,
   fileProtectionMode,
   type ProjectAccess as RoleAccess,
+  type ProtectionMode,
 } from "../roles";
 import type {
   LinkedProject,
@@ -43,11 +43,9 @@ import type {
   SyncResult,
   EnvironmentVariable,
   ConflictCheckResult,
-  ConflictStrategy,
   LinkDirectoryOptions,
 } from "../types";
 
-/** WebSocket connectivity state, surfaced to the status bar. */
 export type SyncConnectionState = "connected" | "reconnecting" | "disconnected";
 
 const ENV_FILE_HEADER = `# Envpilot - Synced Environment Variables
@@ -60,58 +58,78 @@ const ENV_FILE_HEADER = `# Envpilot - Synced Environment Variables
 
 `;
 
-/**
- * First line of ENV_FILE_HEADER — the marker that identifies a file as
- * Envpilot-generated. Used before deleting a legacy/merged file so we never
- * clobber a file the user hand-authored.
- */
 const ENV_FILE_MARKER = "# Envpilot - Synced Environment Variables";
 
-/**
- * Workspace Trust choke point: Envpilot never writes secrets into a
- * Restricted Mode window. Every sync path funnels through the two env-file
- * writers, so this single guard covers them all. Cleanup (unsync purge,
- * revocation deletes) intentionally does NOT check trust — removing secrets
- * from an untrusted workspace is always allowed.
- */
+const ENV_FILE_MODES = { writable: 0o600, readonly: 0o400 };
+
 function assertTrustedWorkspace(): void {
   if (!vscode.workspace.isTrusted) {
     throw new Error(
-      "This workspace is in Restricted Mode — Envpilot will not write secrets here. Trust the workspace to sync."
+      "This workspace is in Restricted Mode. Envpilot will not write secrets here. Trust the workspace to sync."
     );
   }
 }
 
-/**
- * Atomic env-file write: write a temp sibling, then rename over the target so
- * a reader (or a crash mid-write) never observes a half-written secrets file.
- */
+function formatValue(value: string): string {
+  if (!/[\s#"'`$\\]|[\x00-\x1f]/.test(value)) return value;
+  const escaped = value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r");
+  return `"${escaped}"`;
+}
+
+function renderEnvFile({
+  projectName,
+  environment,
+  variables,
+}: {
+  projectName: string;
+  environment: string;
+  variables: ReadonlyArray<
+    Pick<EnvironmentVariable, "key" | "value" | "description" | "isSensitive">
+  >;
+}): string {
+  let content = ENV_FILE_HEADER.replace("{projectName}", projectName)
+    .replace("{environment}", environment)
+    .replace("{syncedAt}", new Date().toISOString());
+  const sections = [
+    { title: "# Application Variables", sensitive: false },
+    { title: "# Sensitive Variables (secrets)", sensitive: true },
+  ];
+  for (const { title, sensitive } of sections) {
+    const section = variables.filter((v) => v.isSensitive === sensitive);
+    if (section.length === 0) continue;
+    content += `${title}\n`;
+    for (const variable of section) {
+      if (variable.description) content += `# ${variable.description}\n`;
+      content += `${variable.key}=${formatValue(variable.value)}\n`;
+    }
+    if (!sensitive) content += "\n";
+  }
+  return content;
+}
+
 let tmpCounter = 0;
 
 async function atomicWriteFile(
   filePath: string,
   content: string
 ): Promise<void> {
-  // UNIQUE per write. A fixed temp name collides whenever two syncs target
-  // the same file — two projects linked to one directory both write
-  // `.env.local`, the first rename succeeds, and the second fails with
-  // ENOENT because its temp was already renamed away. The suffix stays after
-  // `.tmp-envpilot` so the activation sweeper still recognises leftovers.
   const tmpPath = `${filePath}.tmp-envpilot.${process.pid}.${tmpCounter++}`;
   try {
-    await fs.writeFile(tmpPath, content, "utf-8");
+    await fs.writeFile(tmpPath, content, {
+      encoding: "utf-8",
+      mode: ENV_FILE_MODES.writable,
+    });
     await fs.rename(tmpPath, filePath);
   } catch (err) {
-    // Never leave a secrets-bearing temp file behind (a failed write can
-    // still have created a partial temp).
     await fs.unlink(tmpPath).catch(() => {});
     throw err;
   }
 }
 
-/**
- * Sync service for managing environment variable synchronization
- */
 export class SyncService {
   private api: ApiService;
   private storage: StorageService;
@@ -121,10 +139,7 @@ export class SyncService {
   private metadataSubIds: string[] = [];
   private lastMetadataHash = new Map<string, string>();
   private syncDebounceTimers = new Map<string, NodeJS.Timeout>();
-  /** Coalesces concurrent syncDirectory runs for the same directory. */
   private syncFlight = new SingleFlight();
-  /** Serializes refreshSubscriptions() so concurrent callers can't race on
-   * subscription-id teardown/setup (mirrors StorageService.metadataWriteQueue). */
   private refreshSubscriptionsQueue: Promise<void> = Promise.resolve();
   private connectionState: SyncConnectionState = "disconnected";
   private _onSyncComplete = new vscode.EventEmitter<SyncResult>();
@@ -143,49 +158,27 @@ export class SyncService {
     this.storage = storage;
   }
 
-  /**
-   * Set the ConvexService instance for reactive subscriptions.
-   */
   setConvexService(convexService: ConvexService): void {
     this.convexService = convexService;
   }
 
-  /**
-   * Set the file protection service for read-only enforcement
-   */
   setFileProtection(fileProtection: FileProtectionService): void {
     this.fileProtection = fileProtection;
   }
 
-  /**
-   * Set the clipboard guard service for copy/paste protection
-   */
   setClipboardGuard(clipboardGuard: ClipboardGuardService): void {
     this.clipboardGuard = clipboardGuard;
   }
 
-  /**
-   * Start reactive sync via WebSocket subscriptions.
-   * Subscribes to variable metadata changes — when variables are modified,
-   * triggers an HTTP fetch for decrypted values from WorkOS Vault.
-   */
   startPeriodicSync(): void {
-    // Enqueue on the refreshSubscriptions queue so setup can't interleave
-    // with an in-flight doRefreshSubscriptions and double-subscribe — the
-    // metadataSubIds idempotence guard is only race-free on this queue.
     const task = this.refreshSubscriptionsQueue.then(() =>
       this.setupMetadataSubscriptions()
     );
     this.refreshSubscriptionsQueue = task.catch(() => {});
   }
 
-  /**
-   * Set up WebSocket subscriptions for variable metadata changes.
-   */
   private async setupMetadataSubscriptions(): Promise<void> {
     if (!this.convexService) return;
-    // Idempotence: already subscribed — a second startPeriodicSync() call
-    // must not stack duplicate subscriptions.
     if (this.metadataSubIds.length > 0) return;
 
     const linkedProjects = await this.storage.getLinkedProjectsV2();
@@ -201,7 +194,6 @@ export class SyncService {
           project.projectId,
           env,
           (metadata) => {
-            // Compute a hash to detect actual changes
             const hash = JSON.stringify(
               metadata.map((m) => `${m.key}:${m.version}`)
             );
@@ -212,7 +204,6 @@ export class SyncService {
             const prevHash = this.lastMetadataHash.get(key);
 
             if (prevHash !== undefined && prevHash !== hash) {
-              // Variables changed — debounce and trigger HTTP fetch
               this.debouncedSync(project, directory);
             }
             this.lastMetadataHash.set(key, hash);
@@ -224,10 +215,6 @@ export class SyncService {
     }
   }
 
-  /**
-   * Debounced sync to avoid rapid re-fetches when multiple variables change at once.
-   * Uses syncInterval setting as the minimum interval between vault fetch calls.
-   */
   private debouncedSync(
     project: LinkedProjectV2,
     directory: LinkedDirectory
@@ -238,7 +225,6 @@ export class SyncService {
       clearTimeout(existing);
     }
 
-    // Use a short debounce (2s) — much faster than old 300s polling
     const timer = setTimeout(async () => {
       this.syncDebounceTimers.delete(key);
       console.log(
@@ -250,12 +236,6 @@ export class SyncService {
     this.syncDebounceTimers.set(key, timer);
   }
 
-  /**
-   * Refresh metadata subscriptions when projects are linked/unlinked.
-   * Queued (not just awaited) so concurrent callers — e.g. a revocation
-   * cleanup and a brand-new project link happening back to back — can't
-   * interleave teardown/setup and orphan or drop a subscription.
-   */
   async refreshSubscriptions(): Promise<void> {
     const task = this.refreshSubscriptionsQueue.then(() =>
       this.doRefreshSubscriptions()
@@ -269,19 +249,12 @@ export class SyncService {
     await this.setupMetadataSubscriptions();
   }
 
-  /**
-   * Tear down metadata subscriptions.
-   */
   private teardownMetadataSubscriptions(): void {
     if (!this.convexService) return;
     for (const subId of this.metadataSubIds) {
       this.convexService.unsubscribe(subId);
     }
     this.metadataSubIds = [];
-    // lastMetadataHash deliberately survives teardown: the first callback
-    // after a resubscribe must diff against the pre-teardown hash, otherwise
-    // changes made while paused/torn down are silently dropped. Entries are
-    // pruned only when their project/directory is actually unlinked.
 
     for (const timer of this.syncDebounceTimers.values()) {
       clearTimeout(timer);
@@ -289,19 +262,10 @@ export class SyncService {
     this.syncDebounceTimers.clear();
   }
 
-  /**
-   * Key for lastMetadataHash/syncDebounceTimers — pathKey collapses every
-   * spelling of a directory (stored vs freshly picked, any casing) to one
-   * key, so set-time and prune-time keys always match.
-   */
   private hashKey(projectId: string, directoryPath: string): string {
     return `${projectId}:${pathKey(directoryPath)}`;
   }
 
-  /**
-   * Drop cached metadata hashes for an unlinked project (all directories) or
-   * a single removed directory.
-   */
   private pruneMetadataHashes(projectId: string, directoryPath?: string): void {
     const exact =
       directoryPath !== undefined
@@ -315,53 +279,30 @@ export class SyncService {
     }
   }
 
-  /**
-   * Stop reactive sync — tear down subscriptions.
-   */
   stopPeriodicSync(): void {
     this.teardownMetadataSubscriptions();
   }
 
-  /**
-   * Pause reactive sync — tears down the metadata subscriptions (and their
-   * pending debounce timers) the same way `stopPeriodicSync()` does. Meant
-   * for transient pauses (e.g. window idle) where the caller will `resume()`
-   * later. Idempotent — a no-op if already paused (no active subscriptions).
-   */
   pause(): void {
     if (this.metadataSubIds.length === 0) return;
     this.teardownMetadataSubscriptions();
   }
 
-  /**
-   * Resume reactive sync after `pause()` — re-establishes the metadata
-   * subscriptions exactly the way `startPeriodicSync()` does (this simply
-   * delegates to it). Idempotent — a no-op if already running.
-   */
   resume(): void {
     if (this.metadataSubIds.length > 0) return;
     this.startPeriodicSync();
   }
 
-  // ============================================
-  // V1 Legacy Methods (kept for compatibility)
-  // ============================================
-
-  /**
-   * Handle when permissions are revoked
-   */
   private async handlePermissionRevoked(
     project: LinkedProject,
     reason: string
   ): Promise<void> {
     this._onPermissionRevoked.fire(project);
 
-    // Delete the synced .env file if configured
     if (shouldPreventCopyOnRevoke()) {
       await this.deleteEnvFile(project);
     }
 
-    // Remove the linked project
     await this.storage.removeLinkedProject(
       project.projectId,
       project.workspacePath
@@ -373,12 +314,8 @@ export class SyncService {
     );
   }
 
-  /**
-   * Sync variables for a linked project
-   */
   async syncProject(project: LinkedProject): Promise<SyncResult> {
     try {
-      // Check local expiry first
       if (project.expiresAt && Date.now() > project.expiresAt) {
         await this.handlePermissionRevoked(project, "Access token expired");
         return {
@@ -389,27 +326,19 @@ export class SyncService {
         };
       }
 
-      // Fetch variables. The server authenticates via the WorkOS JWT and
-      // rejects the request if the caller no longer has access, so a separate
-      // token-validation round trip is unnecessary.
       const variables = await this.api.getVariables(
         project.projectId,
         project.environment
       );
 
-      // Write to .env file
       await this.writeEnvFile(project, variables);
 
-      // Materialise secret files alongside the .env. Files already in sync
-      // are skipped without a fetch, so a routine sync of an up-to-date
-      // workspace performs zero decrypts and writes zero audit rows.
       await this.syncSecretFiles(
         project.projectId,
         [project.environment],
         project.workspacePath
       );
 
-      // Update last synced timestamp
       await this.storage.updateLinkedProject(
         project.projectId,
         project.workspacePath,
@@ -418,8 +347,6 @@ export class SyncService {
         }
       );
 
-      // Cache the server-resolved unsync-on-close flag so deactivate() can
-      // act on it offline.
       await this.persistUnsyncFlag(project.projectId);
 
       const result: SyncResult = {
@@ -445,9 +372,6 @@ export class SyncService {
     }
   }
 
-  /**
-   * Sync variables for the current workspace
-   */
   async syncCurrentWorkspace(): Promise<SyncResult | null> {
     const workspacePath = this.getCurrentWorkspacePath();
     if (!workspacePath) {
@@ -467,47 +391,16 @@ export class SyncService {
     return this.syncProject(linkedProject);
   }
 
-  /**
-   * Write environment variables to the .env file
-   * Validates that the target path is within the workspace to prevent path traversal
-   */
-  /**
-   * Pull the project's secret files into the workspace.
-   *
-   * Deliberately non-fatal: a keystore that cannot be written must not fail
-   * the variable sync that already succeeded. Conflicts and failures are
-   * surfaced as warnings so they are visible rather than silent.
-   */
   private async syncSecretFiles(
     projectId: string,
     environments: string[],
     root: string | undefined,
-    /**
-     * Overwrite locally-modified files instead of reporting them as
-     * conflicts. Only the edit watcher sets this: a routine sync must never
-     * silently destroy someone's hand-placed keystore, but a revert exists
-     * precisely to undo the edit that triggered it.
-     */
     force = false,
-    /**
-     * Limits `force` to these paths. The edit watcher passes the single file
-     * it fired for: forcing the whole pass would overwrite every other
-     * locally-modified secret file in the environment as collateral.
-     */
     forcePaths?: string[]
   ): Promise<void> {
     if (!root) return;
-    // Trust is re-checked HERE, not only at the env-file writers. Those run
-    // under Promise.allSettled, so a rejected .env write does not stop
-    // execution reaching this call — and trust can also flip mid-sync. A
-    // Restricted Mode window must never end up with a plaintext keystore.
     assertTrustedWorkspace();
 
-    // A secret file has ONE path, but a directory can be linked to several
-    // environments — and the same path may legitimately exist in more than
-    // one (a dev and a prod google-services.json). Writing both into one
-    // directory would race them onto the same file, so materialise exactly
-    // the first environment, the same way the CLI scopes to one.
     const environment = environments[0];
     if (!environment) return;
 
@@ -522,56 +415,29 @@ export class SyncService {
           forcePaths,
           setSyncing: (syncing) => this.fileProtection?.setSyncing(syncing),
           onWritten: async (file, contents) => {
-            // Secret files get the SAME guards a synced .env gets. Mirrors
-            // writeEnvFileToDirectory step for step; only the permission bits
-            // differ, because a keystore is 0600/0400 rather than 0644/0444.
-            //
-            // 1. Manifest — so uninstall/purge and rename tracking see it.
-            // MUST hash the same representation the purge/unsync paths
-            // read back (`fs.readFile(path, "utf-8")`). Recording a base64
-            // hash meant the two never matched, so every secret file was
-            // "hand-edited" to the purge and survived uninstall. Binary
-            // content decodes lossily on both sides — identically — so the
-            // hashes still agree.
             await recordManagedFile(
               file.absolutePath,
-              // Raw bytes. Recording a decoded string aliased every invalid
-              // utf-8 sequence to U+FFFD, so two different binary keystores
-              // hashed the same and a hand-edited one could be purged as
-              // "unchanged".
               contents,
               undefined,
               "strict-readonly",
-              // Ownership: two projects can be linked to the same directory,
-              // and unlinking one must not delete the other's secret files.
               projectId
             );
 
-            // 2. Clipboard guard. Always strict-readonly: a secret file is
-            //    never hand-edited, the dashboard and CLI are the write path.
             this.clipboardGuard?.protectFile(
               file.absolutePath,
               "strict-readonly"
             );
 
-            // 3. Unauthorized-edit protection, restoring the file's OWN mode.
-            //    The .env default would re-chmod to 0444 on revert, which is
-            //    world-readable and looser than what the file was pulled with.
             this.fileProtection?.watchFile(
               file.absolutePath,
-              async () => {
-                // force: the file IS modified — that is why the watcher
-                // fired. Without it materialise classes it a conflict and
-                // leaves the unauthorized edit in place, so the warning
-                // ("you cannot modify it") is the only thing that happens.
-                await this.syncSecretFiles(
-                  projectId,
-                  environments,
-                  root,
-                  true,
-                  [file.path]
-                );
-              },
+              () =>
+                this.syncFlight.run(
+                  `sync:${projectId}:${pathKey(root)}:${file.path}`,
+                  () =>
+                    this.syncSecretFiles(projectId, environments, root, true, [
+                      file.path,
+                    ])
+                ),
               "strict-readonly",
               { writable: 0o600, readonly: file.numericMode }
             );
@@ -590,7 +456,6 @@ export class SyncService {
         );
       }
     } catch (error) {
-      // Secret files are additive: never let them break variable sync.
       console.warn(
         `[envpilot] secret file sync failed: ${
           error instanceof Error ? error.message : "unknown"
@@ -605,109 +470,48 @@ export class SyncService {
   ): Promise<void> {
     assertTrustedWorkspace();
     const envFilePath = path.resolve(project.workspacePath, project.targetFile);
-    const normalizedWorkspace = path.resolve(project.workspacePath);
-
-    // Security: Ensure path doesn't escape workspace (path traversal protection)
-    if (
-      !envFilePath.startsWith(normalizedWorkspace + path.sep) &&
-      envFilePath !== normalizedWorkspace
-    ) {
+    if (!isPathInside(envFilePath, project.workspacePath)) {
       throw new Error("Target file path must be within workspace");
     }
-
-    // Build file content
-    let content = ENV_FILE_HEADER.replace("{projectName}", project.projectName)
-      .replace("{environment}", project.environment)
-      .replace("{syncedAt}", new Date().toISOString());
-
-    // Group variables by sensitivity
-    const regularVars = variables.filter((v) => !v.isSensitive);
-    const sensitiveVars = variables.filter((v) => v.isSensitive);
-
-    // Add regular variables
-    if (regularVars.length > 0) {
-      content += "# Application Variables\n";
-      for (const variable of regularVars) {
-        if (variable.description) {
-          content += `# ${variable.description}\n`;
-        }
-        content += `${variable.key}=${this.formatValue(variable.value)}\n`;
+    await this.writeManagedEnvFile(
+      envFilePath,
+      renderEnvFile({
+        projectName: project.projectName,
+        environment: project.environment,
+        variables,
+      }),
+      this.resolveProtectionMode(project.projectId, variables),
+      async () => {
+        await this.syncProject(project);
       }
-      content += "\n";
-    }
+    );
+  }
 
-    // Add sensitive variables
-    if (sensitiveVars.length > 0) {
-      content += "# Sensitive Variables (secrets)\n";
-      for (const variable of sensitiveVars) {
-        if (variable.description) {
-          content += `# ${variable.description}\n`;
-        }
-        content += `${variable.key}=${this.formatValue(variable.value)}\n`;
-      }
-    }
-
-    // Suppress the unauthorized-edit watcher for our own write.
+  private async writeManagedEnvFile(
+    filePath: string,
+    content: string,
+    mode: ProtectionMode,
+    onDrift: () => Promise<void>
+  ): Promise<void> {
     this.fileProtection?.setSyncing(true);
     try {
-      // Make writable before writing (in case it was previously set read-only)
-      try {
-        await fs.chmod(envFilePath, 0o644);
-      } catch {
-        // File may not exist yet
+      await fs.chmod(filePath, ENV_FILE_MODES.writable).catch(() => {});
+      await atomicWriteFile(filePath, content);
+      await recordManagedFile(filePath, content, undefined, mode);
+      this.clipboardGuard?.protectFile(filePath, mode);
+      if (mode !== "writable") {
+        await fs.chmod(filePath, ENV_FILE_MODES.readonly);
       }
-
-      // Write file
-      const protectionMode = this.resolveProtectionMode(
-        project.projectId,
-        variables
-      );
-      await atomicWriteFile(envFilePath, content);
-      await recordManagedFile(envFilePath, content, undefined, protectionMode);
-
-      // Register EVERY managed file (including writable) with the clipboard
-      // guard — the clipboardGuard.scope setting decides which modes block.
-      if (this.clipboardGuard) {
-        this.clipboardGuard.protectFile(envFilePath, protectionMode);
-      }
-
-      // Apply role-based file protection
-      if (protectionMode !== "writable") {
-        await fs.chmod(envFilePath, 0o444);
-        if (this.fileProtection) {
-          this.fileProtection.watchFile(
-            envFilePath,
-            async () => {
-              await this.syncProject(project);
-            },
-            protectionMode
-          );
-        }
-      }
+      this.fileProtection?.watchFile(filePath, onDrift, mode, ENV_FILE_MODES);
     } finally {
       this.fileProtection?.setSyncing(false);
     }
   }
 
-  /**
-   * Build a unified ProjectAccess for THIS sync request, mirroring the CLI's
-   * accessFromMeta (apps/cli/src/commands/pull.ts). Built fresh from the
-   * role/projectRole that were just populated by the getVariables() call
-   * this sync made (api.ts caches them as a side effect of that response),
-   * not from a cache that could hold a value left over from an unrelated
-   * project/org. `/api/extension/variables` doesn't send the additive
-   * `unifiedRole`/`assigned`/`environmentScope`/`hasWriteAccess`/per-variable
-   * `access` fields yet (unlike `/api/cli/variables`) — this reads them
-   * defensively so the extension picks them up automatically, additively,
-   * the moment the server route adds them, without another client change.
-   */
   private buildProjectAccess(
     projectId: string,
     variables: EnvironmentVariable[]
   ): RoleAccess {
-    // Prefer the authoritative unified fields the server returns alongside the
-    // variables (populated on the same request — never stale). Fall back to the
-    // legacy role/projectRole caches + per-variable access for older servers.
     const meta = this.api.getAccessMeta(projectId);
     const projectRole = this.api.getProjectRole(projectId);
     const role = normalizeOrgRole(
@@ -715,9 +519,6 @@ export class SyncService {
     );
     return {
       role,
-      // Owners are implicitly assigned to every project — the legacy server
-      // sends no assignment info for them, so gating on projectRole here would
-      // wrongly lock an owner's file read-only.
       assigned:
         role === "owner" || (meta?.assigned ?? projectRole !== undefined),
       environmentScope: meta?.environmentScope ?? null,
@@ -726,41 +527,17 @@ export class SyncService {
     };
   }
 
-  /**
-   * Determine the file protection mode for THIS sync's fetched variables —
-   * never from a stale projectId-keyed cache read at an unrelated point in
-   * time (see buildProjectAccess).
-   */
   private resolveProtectionMode(
     projectId: string,
     variables: EnvironmentVariable[]
   ): ProtectionMode {
-    // Capability map from the same response that delivered the variables —
-    // when present it is the authority (registry roles, incl. custom ones).
     return fileProtectionMode(
       this.buildProjectAccess(projectId, variables),
       this.api.getAccessMeta(projectId)?.capabilities
     );
   }
 
-  /**
-   * Whether the signed-in user may unmask secret values on screen.
-   *
-   * Driven by the `project.secrets.reveal` capability, which admins toggle
-   * per role in the registry — so a viewer or a locked-down developer never
-   * gets the 30-second reveal, while an owner or team lead does.
-   *
-   * FAIL CLOSED, twice over: a project whose capability map has not arrived
-   * yet denies, and a single denying project denies overall. The reveal
-   * command is global (it unmasks every managed file at once), so the most
-   * restrictive linked project has to win — otherwise access to one
-   * permissive project would unmask another project's secrets.
-   */
   canRevealSecrets(projectIds: string[]): boolean {
-    // Capability maps are cached per project from the last pull, and
-    // apiService.clearCache() drops them on sign-out and account switch —
-    // so after a transition this reads an empty cache and fails closed
-    // until the new session's first sync repopulates it.
     if (projectIds.length === 0) return false;
     return projectIds.every(
       (id) =>
@@ -769,10 +546,6 @@ export class SyncService {
     );
   }
 
-  /**
-   * Track WebSocket connectivity (set by RealTimeSyncService) so the status
-   * bar can surface a silent sync failure instead of going quiet forever.
-   */
   setConnectionState(state: SyncConnectionState): void {
     if (this.connectionState === state) return;
     this.connectionState = state;
@@ -783,41 +556,17 @@ export class SyncService {
     return this.connectionState;
   }
 
-  /**
-   * Format a value for .env file (handle quotes and special characters)
-   */
-  private formatValue(value: string): string {
-    // Characters that require quoting in .env files
-    const needsQuoting = /[\s#"'`$\\]|[\x00-\x1f]/;
-
-    if (needsQuoting.test(value)) {
-      // Escape backslashes first, then quotes, then newlines
-      const escaped = value
-        .replace(/\\/g, "\\\\")
-        .replace(/"/g, '\\"')
-        .replace(/\n/g, "\\n")
-        .replace(/\r/g, "\\r");
-      return `"${escaped}"`;
-    }
-    return value;
-  }
-
-  /**
-   * Delete the synced .env file
-   */
   private async deleteEnvFile(project: LinkedProject): Promise<void> {
     const envFilePath = path.resolve(project.workspacePath, project.targetFile);
     const normalizedWorkspace = path.resolve(project.workspacePath);
 
-    // Security check before deletion
     if (
       !envFilePath.startsWith(normalizedWorkspace + path.sep) &&
       envFilePath !== normalizedWorkspace
     ) {
-      return; // Don't delete files outside workspace
+      return;
     }
 
-    // Stop watching and clipboard protection before deletion
     if (this.fileProtection) {
       this.fileProtection.unwatchFile(envFilePath);
     }
@@ -827,18 +576,12 @@ export class SyncService {
 
     try {
       await fs.access(envFilePath);
-      // Make writable before deleting (read-only files can't be unlinked on some systems)
-      await fs.chmod(envFilePath, 0o644);
+      await fs.chmod(envFilePath, ENV_FILE_MODES.writable);
       await fs.unlink(envFilePath);
-    } catch {
-      // File doesn't exist, nothing to delete
-    }
+    } catch {}
     await forgetManagedFile(envFilePath);
   }
 
-  /**
-   * Link a project to the current workspace
-   */
   async linkProject(
     projectId: string,
     projectName: string,
@@ -868,15 +611,11 @@ export class SyncService {
 
     await this.storage.addLinkedProject(linkedProject);
 
-    // Sync immediately after linking
     await this.syncProject(linkedProject);
 
     return linkedProject;
   }
 
-  /**
-   * Unlink a project from the current workspace
-   */
   async unlinkProject(projectId: string): Promise<void> {
     const workspacePath = this.getCurrentWorkspacePath();
     if (!workspacePath) {
@@ -886,7 +625,6 @@ export class SyncService {
     const linkedProject =
       await this.storage.getLinkedProjectForWorkspace(workspacePath);
     if (linkedProject && linkedProject.projectId === projectId) {
-      // Delete the .env file
       if (shouldPreventCopyOnRevoke()) {
         await this.deleteEnvFile(linkedProject);
       }
@@ -895,9 +633,6 @@ export class SyncService {
     }
   }
 
-  /**
-   * Get the current workspace folder path
-   */
   private getCurrentWorkspacePath(): string | null {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
@@ -906,9 +641,6 @@ export class SyncService {
     return folders[0].uri.fsPath;
   }
 
-  /**
-   * Get the linked project for the current workspace
-   */
   async getLinkedProject(): Promise<LinkedProject | null> {
     const workspacePath = this.getCurrentWorkspacePath();
     if (!workspacePath) {
@@ -917,16 +649,6 @@ export class SyncService {
     return this.storage.getLinkedProjectForWorkspace(workspacePath);
   }
 
-  // ============================================
-  // V2 Methods (multi-directory support)
-  // ============================================
-
-  /**
-   * Check for existing .env file conflicts across every file this directory
-   * will write. Multi-env directories fan out to one file per environment, so
-   * a conflict on ANY derived file counts. The result aggregates existing keys
-   * across all conflicting files and reports the first existing file's path.
-   */
   async checkForConflicts(
     directoryPath: string,
     targetFile: string,
@@ -937,65 +659,29 @@ export class SyncService {
       envFileNamesFor({ environments, targetFile }).values()
     );
 
-    let firstExistingFile: string | undefined;
-    const allKeys: string[] = [];
-    let totalCount = 0;
+    let existingFile: string | undefined;
+    const keys = new Set<string>();
 
     for (const filename of filenames) {
       const envFilePath = path.resolve(platformPath, filename);
-      try {
-        const content = await fs.readFile(envFilePath, "utf-8");
-        const keys = this.parseEnvKeys(content);
-        if (firstExistingFile === undefined) {
-          firstExistingFile = envFilePath;
-        }
-        totalCount += keys.length;
-        for (const key of keys) {
-          if (!allKeys.includes(key)) {
-            allKeys.push(key);
-          }
-        }
-      } catch {
-        // File doesn't exist — no conflict for this one.
-      }
+      const content = await fs.readFile(envFilePath, "utf-8").catch(() => "");
+      if (!content.trim()) continue;
+      existingFile ??= envFilePath;
+      for (const key of this.parseEnvFile(content).keys()) keys.add(key);
     }
 
-    if (firstExistingFile === undefined) {
+    if (existingFile === undefined) {
       return { hasConflict: false };
     }
 
     return {
       hasConflict: true,
-      existingFile: firstExistingFile,
-      existingVariableCount: totalCount,
-      existingKeys: allKeys,
+      existingFile,
+      existingVariableCount: keys.size,
+      existingKeys: [...keys],
     };
   }
 
-  /**
-   * Parse variable keys from .env file content
-   */
-  private parseEnvKeys(content: string): string[] {
-    const keys: string[] = [];
-    const lines = content.split("\n");
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith("#")) {
-        const match = trimmed.match(/^([A-Z_][A-Z0-9_]*)=/);
-        if (match) {
-          keys.push(match[1]);
-        }
-      }
-    }
-
-    return keys;
-  }
-
-  /**
-   * Create a backup of every existing .env file this directory writes.
-   * Returns the list of backup paths created (one per file that existed).
-   */
   async backupEnvFile(
     directoryPath: string,
     targetFile: string,
@@ -1014,13 +700,10 @@ export class SyncService {
       try {
         existingContent = await fs.readFile(envFilePath, "utf-8");
       } catch {
-        continue; // Nothing to back up.
+        continue;
       }
       const backupPath = `${envFilePath}.backup-${timestamp}`;
       await fs.copyFile(envFilePath, backupPath);
-      // A backup of an Envpilot-synced file carries live secrets, so track it
-      // for the uninstall purge. A user-authored file (no header) is their
-      // data — never track, never delete.
       if (existingContent.startsWith(ENV_FILE_MARKER)) {
         await recordManagedFile(backupPath, existingContent);
       }
@@ -1029,9 +712,6 @@ export class SyncService {
     return backups;
   }
 
-  /**
-   * Parse .env file content into a Map
-   */
   private parseEnvFile(content: string): Map<string, string> {
     const vars = new Map<string, string>();
     const lines = content.split("\n");
@@ -1044,7 +724,6 @@ export class SyncService {
           const key = trimmed.substring(0, eqIndex);
           let value = trimmed.substring(eqIndex + 1);
 
-          // Handle quoted values
           if (
             (value.startsWith('"') && value.endsWith('"')) ||
             (value.startsWith("'") && value.endsWith("'"))
@@ -1060,11 +739,6 @@ export class SyncService {
     return vars;
   }
 
-  /**
-   * Merge a single env's pulled variables into one on-disk file (new keys
-   * override, existing keys preserved). `environment` is the single env name
-   * used for the file header. See {@link mergeDirectory} for the fan-out.
-   */
   async mergeEnvFiles(
     projectId: string,
     directoryPath: string,
@@ -1081,82 +755,35 @@ export class SyncService {
     try {
       const content = await fs.readFile(envFilePath, "utf-8");
       existingVars = this.parseEnvFile(content);
-    } catch {
-      // File doesn't exist, that's fine
-    }
+    } catch {}
 
-    // Override with new variables
     for (const variable of newVariables) {
       existingVars.set(variable.key, variable.value);
     }
 
-    // Build merged content
-    let mergedContent = ENV_FILE_HEADER.replace("{projectName}", projectName)
-      .replace("{environment}", environment)
-      .replace("{syncedAt}", new Date().toISOString());
-
-    for (const [key, value] of existingVars) {
-      mergedContent += `${key}=${this.formatValue(value)}\n`;
-    }
-
-    // Suppress the unauthorized-edit watcher for our own write.
-    this.fileProtection?.setSyncing(true);
-    try {
-      // Make writable before writing (in case it was previously set read-only)
-      try {
-        await fs.chmod(envFilePath, 0o644);
-      } catch {
-        // File may not exist yet
+    await this.writeManagedEnvFile(
+      envFilePath,
+      renderEnvFile({
+        projectName,
+        environment,
+        variables: [...existingVars].map(([key, value]) => ({
+          key,
+          value,
+          description: null,
+          isSensitive: false,
+        })),
+      }),
+      this.resolveProtectionMode(projectId, newVariables),
+      async () => {
+        const project = await this.storage.getLinkedProjectV2(projectId);
+        const dir = project?.directories.find((d) =>
+          pathsEqual(d.directoryPath, directoryPath)
+        );
+        if (project && dir) await this.syncDirectory(project, dir);
       }
-      // A merged file carries pulled secret values, so it gets the exact same
-      // protection as the overwrite path (writeEnvFileToDirectory): mode in
-      // the manifest (for the activation re-arm), clipboard guard, read-only
-      // chmod + revert watcher for non-writable roles.
-      const protectionMode = this.resolveProtectionMode(
-        projectId,
-        newVariables
-      );
-      await atomicWriteFile(envFilePath, mergedContent);
-      await recordManagedFile(
-        envFilePath,
-        mergedContent,
-        undefined,
-        protectionMode
-      );
-
-      if (this.clipboardGuard) {
-        this.clipboardGuard.protectFile(envFilePath, protectionMode);
-      }
-
-      if (protectionMode !== "writable") {
-        await fs.chmod(envFilePath, 0o444);
-        if (this.fileProtection) {
-          this.fileProtection.watchFile(
-            envFilePath,
-            async () => {
-              const project = await this.storage.getLinkedProjectV2(projectId);
-              const dir = project?.directories.find((d) =>
-                pathsEqual(d.directoryPath, directoryPath)
-              );
-              if (project && dir) {
-                await this.syncDirectory(project, dir);
-              }
-            },
-            protectionMode
-          );
-        }
-      }
-    } finally {
-      this.fileProtection?.setSyncing(false);
-    }
+    );
   }
 
-  /**
-   * Conflict-path "merge" for a whole directory: fetch every environment and
-   * merge each into its corresponding derived file (no key prefixing, no
-   * cross-env dedup). Mirrors the fan-out in syncDirectory but preserves
-   * existing on-disk keys instead of overwriting the file.
-   */
   private async mergeDirectory(
     projectId: string,
     projectName: string,
@@ -1183,38 +810,37 @@ export class SyncService {
     );
   }
 
-  /**
-   * Sync a single directory within a project. Concurrent callers for the same
-   * directory (debounced subscription fire, manual pull, activation sync)
-   * coalesce into one run via single-flight.
-   */
   async syncDirectory(
     project: LinkedProjectV2,
     directory: LinkedDirectory
   ): Promise<SyncResult> {
-    // Key includes the project: the same directory can be linked to two
-    // projects, and one project's sync must not serve the other's result.
     return this.syncFlight.run(
       `sync:${project.projectId}:${pathKey(directory.directoryPath)}`,
-      () => this.doSyncDirectory(project, directory)
+      async () => {
+        const result = await this.doSyncDirectory(project, directory);
+        if (!result) {
+          return {
+            success: false,
+            variablesCount: 0,
+            targetFile: directory.targetFile,
+            error: "Directory is no longer linked",
+          };
+        }
+        this._onSyncComplete.fire(result);
+        return result;
+      }
     );
   }
 
   private async doSyncDirectory(
     project: LinkedProjectV2,
     directory: LinkedDirectory
-  ): Promise<SyncResult> {
-    // Derive one file per environment (single-env keeps the stored targetFile
-    // for back-compat; multi-env fans out to .env.local/.env.<env>). NO key
-    // prefixing, NO dedup across environments — each file is its own env.
+  ): Promise<SyncResult | undefined> {
     const envToFile = envFileNamesFor(directory);
     const envs = Array.from(envToFile.keys());
     const derivedFiles = Array.from(envToFile.values());
 
     try {
-      // Fetch all environments in parallel. The server validates the access
-      // token on every variables request, so a separate upfront validation
-      // round trip is redundant — a revoked token surfaces as an error here.
       const varsByEnv = await Promise.all(
         envs.map((env) =>
           this.api.getVariables(project.projectId, env, undefined, {
@@ -1223,10 +849,15 @@ export class SyncService {
         )
       );
 
-      // Write ONE FILE PER ENVIRONMENT. Per-file protection/clipboard guards
-      // are registered inside writeEnvFileToDirectory (they're path-keyed, so
-      // one call per file is correct). Collect per-file outcomes so a single
-      // file failure is reported rather than swallowed.
+      const linked = await this.storage.getLinkedProjectV2(project.projectId);
+      if (
+        !linked?.directories.some((d) =>
+          pathsEqual(d.directoryPath, directory.directoryPath)
+        )
+      ) {
+        return undefined;
+      }
+
       const writeResults = await Promise.allSettled(
         envs.map((env, i) =>
           this.writeEnvFileToDirectory(
@@ -1240,17 +871,12 @@ export class SyncService {
         )
       );
 
-      // Secret files land in the SAME directory as the .env files. This path
-      // (not syncProject) is what modern multi-directory links run through,
-      // so the files step has to live here too.
       await this.syncSecretFiles(
         project.projectId,
         directory.environments,
         directory.directoryPath
       );
 
-      // Remove a stale merged file left over from the old single-file scheme
-      // (only for multi-env dirs, and only if it carries our header).
       await this.cleanupStaleMergedFile(directory, envToFile);
 
       const totalVars = varsByEnv.reduce((n, vars) => n + vars.length, 0);
@@ -1271,14 +897,11 @@ export class SyncService {
         };
       }
 
-      // Update last synced ONCE after all files written successfully.
       await this.storage.updateDirectorySyncTime(
         project.projectId,
         directory.directoryPath
       );
 
-      // Cache the server-resolved unsync-on-close flag so deactivate() can
-      // act on it offline.
       await this.persistUnsyncFlag(project.projectId);
 
       return {
@@ -1296,16 +919,6 @@ export class SyncService {
     }
   }
 
-  /**
-   * Delete a stale merged file from the pre-fan-out single-file scheme.
-   *
-   * Only relevant for multi-env directories whose stored `targetFile` is NOT
-   * one of the newly derived per-env filenames (e.g. an old `.env.local`
-   * holding DEVELOPMENT_/STAGING_-prefixed junk when the derived set is
-   * `.env.local`/`.env.staging`/`.env.production`, or a custom merged file).
-   * Deletes only if the file carries the Envpilot header — a hand-authored
-   * file with the same name is left untouched and logged.
-   */
   private async cleanupStaleMergedFile(
     directory: LinkedDirectory,
     envToFile: Map<string, string>
@@ -1315,151 +928,59 @@ export class SyncService {
     const derived = new Set(envToFile.values());
     if (derived.has(directory.targetFile)) return;
 
-    await this.unlinkDirFile(
-      directory.directoryPath,
-      directory.targetFile,
-      true
-    );
+    await this.unlinkDirFile(directory.directoryPath, directory.targetFile);
   }
 
-  /**
-   * Sync all directories for a project (in parallel — each directory
-   * writes to its own file; metadata writes are serialized in storage)
-   */
   async syncAllDirectories(project: LinkedProjectV2): Promise<SyncResult[]> {
-    const results = await Promise.all(
+    return Promise.all(
       project.directories.map((directory) =>
         this.syncDirectory(project, directory)
       )
     );
-
-    for (const result of results) {
-      this._onSyncComplete.fire(result);
-    }
-
-    return results;
   }
 
-  /**
-   * Write env file to a specific directory
-   */
   private async writeEnvFileToDirectory(
     directoryPath: string,
     targetFile: string,
     projectName: string,
-    environments: string,
+    environment: string,
     variables: EnvironmentVariable[],
-    projectId?: string
+    projectId: string
   ): Promise<void> {
     assertTrustedWorkspace();
     const platformPath = toPlatformPath(directoryPath);
     const envFilePath = path.resolve(platformPath, targetFile);
-    const normalizedDir = path.resolve(platformPath);
-
-    // Security: Ensure path doesn't escape directory
-    if (
-      !envFilePath.startsWith(normalizedDir + path.sep) &&
-      envFilePath !== normalizedDir
-    ) {
+    if (!isPathInside(envFilePath, platformPath)) {
       throw new Error("Target file path must be within directory");
     }
-
-    // Build file content
-    let content = ENV_FILE_HEADER.replace("{projectName}", projectName)
-      .replace("{environment}", environments)
-      .replace("{syncedAt}", new Date().toISOString());
-
-    const regularVars = variables.filter((v) => !v.isSensitive);
-    const sensitiveVars = variables.filter((v) => v.isSensitive);
-
-    if (regularVars.length > 0) {
-      content += "# Application Variables\n";
-      for (const variable of regularVars) {
-        if (variable.description) {
-          content += `# ${variable.description}\n`;
-        }
-        content += `${variable.key}=${this.formatValue(variable.value)}\n`;
+    await this.writeManagedEnvFile(
+      envFilePath,
+      renderEnvFile({ projectName, environment, variables }),
+      this.resolveProtectionMode(projectId, variables),
+      async () => {
+        const project = await this.storage.getLinkedProjectV2(projectId);
+        const dir = project?.directories.find((d) =>
+          pathsEqual(d.directoryPath, directoryPath)
+        );
+        if (project && dir) await this.syncDirectory(project, dir);
       }
-      content += "\n";
-    }
-
-    if (sensitiveVars.length > 0) {
-      content += "# Sensitive Variables (secrets)\n";
-      for (const variable of sensitiveVars) {
-        if (variable.description) {
-          content += `# ${variable.description}\n`;
-        }
-        content += `${variable.key}=${this.formatValue(variable.value)}\n`;
-      }
-    }
-
-    // Suppress the unauthorized-edit watcher for our own write.
-    this.fileProtection?.setSyncing(true);
-    try {
-      // Make writable before writing (in case it was previously set read-only)
-      try {
-        await fs.chmod(envFilePath, 0o644);
-      } catch {
-        // File may not exist yet
-      }
-
-      const protectionMode = projectId
-        ? this.resolveProtectionMode(projectId, variables)
-        : "readonly-with-request";
-      await atomicWriteFile(envFilePath, content);
-      await recordManagedFile(envFilePath, content, undefined, protectionMode);
-
-      // Register EVERY managed file (including writable) with the clipboard
-      // guard — the clipboardGuard.scope setting decides which modes block.
-      if (this.clipboardGuard) {
-        this.clipboardGuard.protectFile(envFilePath, protectionMode);
-      }
-
-      // Apply role-based file protection
-      if (protectionMode !== "writable") {
-        await fs.chmod(envFilePath, 0o444);
-        if (this.fileProtection) {
-          const syncCallback = async () => {
-            // Re-sync this specific directory
-            if (projectId) {
-              const project = await this.storage.getLinkedProjectV2(projectId);
-              if (project) {
-                const dir = project.directories.find(
-                  (d) =>
-                    normalizePath(d.directoryPath) ===
-                    normalizePath(directoryPath)
-                );
-                if (dir) {
-                  await this.syncDirectory(project, dir);
-                }
-              }
-            }
-          };
-          this.fileProtection.watchFile(
-            envFilePath,
-            syncCallback,
-            protectionMode
-          );
-        }
-      }
-    } finally {
-      this.fileProtection?.setSyncing(false);
-    }
+    );
   }
 
-  /**
-   * Delete env files from all directories when access is revoked.
-   * Continues cleanup even if individual directories fail.
-   */
-  async cleanupAllDirectories(project: LinkedProjectV2): Promise<void> {
-    // The project is being unlinked/revoked — its metadata hashes are dead.
+  async cleanupAllDirectories(project: LinkedProjectV2): Promise<number> {
+    await this.storage.removeLinkedProjectV2(project.projectId);
     this.pruneMetadataHashes(project.projectId);
+    await this.syncFlight.wait(`sync:${project.projectId}:`);
     const errors: Error[] = [];
+    let spared = 0;
 
     for (const directory of project.directories) {
       try {
-        await this.deleteSecretFilesFromDirectory(project.projectId, directory);
-        await this.deleteEnvFileFromDirectory(directory);
+        spared += await this.deleteSecretFilesFromDirectory(
+          project.projectId,
+          directory
+        );
+        spared += await this.deleteEnvFileFromDirectory(directory);
       } catch (err) {
         errors.push(err instanceof Error ? err : new Error(String(err)));
       }
@@ -1470,34 +991,17 @@ export class SyncService {
         `Failed to cleanup ${errors.length}/${project.directories.length} directories`
       );
     }
+    return spared;
   }
 
-  /**
-   * Delete every env file a directory maps to.
-   *
-   * Removes each derived per-env file unconditionally (they're ours), plus the
-   * legacy `targetFile` when it isn't already one of the derived names AND it
-   * carries the Envpilot header (guards against nuking a user's file).
-   */
-  /**
-   * Release every secret file this directory materialised: stop the edit
-   * watcher, drop the clipboard guard, forget the manifest entry, and remove
-   * the file. Mirrors deleteEnvFileFromDirectory — an unlinked project must
-   * not leave a decrypted keystore behind, and a released path must not stay
-   * registered with guards that now point at nothing.
-   */
   private async deleteSecretFilesFromDirectory(
     projectId: string,
     directory: LinkedDirectory
-  ): Promise<void> {
-    // Enumerate from the LOCAL manifest, never the API. Cleanup runs when
-    // access is revoked or a project is unlinked — exactly when the listing
-    // endpoint rejects the caller — and the previous version swallowed that
-    // failure and reported success, leaving decrypted keystores on disk.
-    const platformPath = toPlatformPath(directory.directoryPath);
-    const normalizedDir = path.resolve(platformPath);
-    // The .env files this directory owns are handled by
-    // deleteEnvFileFromDirectory; everything else it manages is a secret file.
+  ): Promise<number> {
+    const resolvedDir = path.resolve(toPlatformPath(directory.directoryPath));
+    const normalizedDir = await fs
+      .realpath(resolvedDir)
+      .catch(() => resolvedDir);
     const envFiles = new Set(envFileNamesFor(directory).values());
     envFiles.add(directory.targetFile);
 
@@ -1505,72 +1009,69 @@ export class SyncService {
     try {
       entries = await readManifest(getManifestPath());
     } catch {
-      return;
+      return 0;
     }
 
+    let spared = 0;
     for (const entry of entries) {
       const filePath = path.resolve(entry.path);
       const rel = path.relative(normalizedDir, filePath);
       if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) continue;
       if (envFiles.has(rel)) continue;
-      // A directory can host secret files from more than one linked project,
-      // and both may publish the SAME relative path. Drop this project's
-      // claim and delete only when it was the last one — otherwise the file
-      // still belongs to a project that is very much still linked.
+      const read = await fs
+        .readFile(filePath)
+        .then((content) => ({ content }))
+        .catch((error: NodeJS.ErrnoException) => ({ error }));
+      if ("error" in read && read.error.code !== "ENOENT") {
+        spared++;
+        continue;
+      }
       const lastOwner = await releaseManagedFile(filePath, projectId);
       if (!lastOwner) continue;
-
+      if ("error" in read) continue;
+      if (hashContent(read.content) !== entry.sha256) {
+        spared++;
+        continue;
+      }
       this.fileProtection?.unwatchFile(filePath);
       this.clipboardGuard?.unprotectFile(filePath);
-
       try {
-        await fs.access(filePath);
-        // Pulled at 0400, so make it writable before unlinking.
-        await fs.chmod(filePath, 0o600);
+        await fs.chmod(filePath, ENV_FILE_MODES.writable);
         await fs.unlink(filePath);
-      } catch {
-        // Already gone — that is the goal.
-      }
+      } catch {}
     }
+    return spared;
   }
 
   private async deleteEnvFileFromDirectory(
     directory: LinkedDirectory
-  ): Promise<void> {
-    const envToFile = envFileNamesFor(directory);
-    const derived = new Set(envToFile.values());
+  ): Promise<number> {
+    const dir = path.resolve(toPlatformPath(directory.directoryPath));
+    const derived = new Set(envFileNamesFor(directory).values());
+    const derivedPaths = [...derived].map((file) => path.resolve(dir, file));
 
-    for (const filename of derived) {
-      await this.unlinkDirFile(directory.directoryPath, filename, false);
+    for (const filePath of derivedPaths) {
+      this.fileProtection?.unwatchFile(filePath);
+      this.clipboardGuard?.unprotectFile(filePath);
     }
+    const { spared } = await purgeManagedFilesFiltered((filePath) =>
+      derivedPaths.some((derivedPath) => pathsEqual(derivedPath, filePath))
+    );
 
-    // Legacy merged targetFile (multi-env with a custom name) — only if it's
-    // Envpilot-generated.
     if (!derived.has(directory.targetFile)) {
-      await this.unlinkDirFile(
-        directory.directoryPath,
-        directory.targetFile,
-        true
-      );
+      await this.unlinkDirFile(directory.directoryPath, directory.targetFile);
     }
+    return spared;
   }
 
-  /**
-   * Delete a single file inside a linked directory, unwatching protection and
-   * clipboard guards first. When `requireHeader` is set, the file is only
-   * removed if it starts with the Envpilot header marker — otherwise it's left
-   * in place and logged (never clobber a hand-authored file).
-   */
   private async unlinkDirFile(
     directoryPath: string,
-    filename: string,
-    requireHeader: boolean
+    filename: string
   ): Promise<void> {
     const platformPath = toPlatformPath(directoryPath);
     const filePath = path.resolve(platformPath, filename);
     const normalizedDir = path.resolve(platformPath);
 
-    // Security check — never touch anything outside the directory.
     if (
       !filePath.startsWith(normalizedDir + path.sep) &&
       filePath !== normalizedDir
@@ -1578,43 +1079,30 @@ export class SyncService {
       return;
     }
 
-    if (requireHeader) {
-      let content: string;
-      try {
-        content = await fs.readFile(filePath, "utf-8");
-      } catch {
-        return; // Doesn't exist — nothing to clean up.
-      }
-      if (!content.startsWith(ENV_FILE_MARKER)) {
-        console.warn(
-          `[Sync] Leaving ${filePath} untouched — no Envpilot header, looks user-authored`
-        );
-        return;
-      }
+    let content: string;
+    try {
+      content = await fs.readFile(filePath, "utf-8");
+    } catch {
+      return;
+    }
+    if (!content.startsWith(ENV_FILE_MARKER)) {
+      console.warn(
+        `[Sync] Leaving ${filePath} untouched, no Envpilot header, looks user-authored`
+      );
+      return;
     }
 
-    // Stop watching and clipboard protection before deletion.
-    if (this.fileProtection) {
-      this.fileProtection.unwatchFile(filePath);
-    }
-    if (this.clipboardGuard) {
-      this.clipboardGuard.unprotectFile(filePath);
-    }
+    this.fileProtection?.unwatchFile(filePath);
+    this.clipboardGuard?.unprotectFile(filePath);
 
     try {
       await fs.access(filePath);
-      // Make writable before deleting (read-only files can't be unlinked on some systems).
-      await fs.chmod(filePath, 0o644);
+      await fs.chmod(filePath, ENV_FILE_MODES.writable);
       await fs.unlink(filePath);
-    } catch {
-      // File doesn't exist.
-    }
+    } catch {}
     await forgetManagedFile(filePath);
   }
 
-  /**
-   * Link a project with directory options (V2)
-   */
   async linkProjectWithDirectory(
     projectId: string,
     projectName: string,
@@ -1624,9 +1112,8 @@ export class SyncService {
     expiresAt: number,
     options: LinkDirectoryOptions
   ): Promise<LinkedProjectV2 | null> {
-    // Fail BEFORE any backup or storage mutation — a link persisted in
-    // Restricted Mode would overwrite the user's .env once trust is granted.
     assertTrustedWorkspace();
+    if (options.conflictStrategy === "skip") return null;
     const directory: LinkedDirectory = {
       directoryPath: normalizePath(options.directoryPath),
       targetFile: options.targetFile || getTargetFile(),
@@ -1636,7 +1123,6 @@ export class SyncService {
       createdAt: Date.now(),
     };
 
-    // Handle conflict strategy
     if (options.conflictStrategy === "backup") {
       const conflict = await this.checkForConflicts(
         options.directoryPath,
@@ -1652,7 +1138,6 @@ export class SyncService {
       }
     }
 
-    // Add to storage
     await this.storage.addLinkedProjectV2(
       projectId,
       projectName,
@@ -1664,35 +1149,30 @@ export class SyncService {
       getEnvironment()
     );
 
-    // Get the project to sync
     const project = await this.storage.getLinkedProjectV2(projectId);
     if (!project) {
       return null;
     }
 
-    // Sync the directory
     if (options.conflictStrategy === "merge") {
       await this.mergeDirectory(projectId, projectName, directory);
       await this.storage.updateDirectorySyncTime(
         projectId,
         directory.directoryPath
       );
-    } else if (options.conflictStrategy !== "skip") {
+    } else {
       await this.syncDirectory(project, directory);
     }
 
     return project;
   }
 
-  /**
-   * Add a directory to an existing project (V2)
-   */
   async addDirectoryToProject(
     project: LinkedProjectV2,
     options: LinkDirectoryOptions
   ): Promise<void> {
-    // Same upfront trust gate as linkProjectWithDirectory.
     assertTrustedWorkspace();
+    if (options.conflictStrategy === "skip") return;
     const directory: LinkedDirectory = {
       directoryPath: normalizePath(options.directoryPath),
       targetFile: options.targetFile || getTargetFile(),
@@ -1702,7 +1182,6 @@ export class SyncService {
       createdAt: Date.now(),
     };
 
-    // Handle conflict strategy
     if (options.conflictStrategy === "backup") {
       const conflict = await this.checkForConflicts(
         options.directoryPath,
@@ -1718,10 +1197,8 @@ export class SyncService {
       }
     }
 
-    // Add to storage
     await this.storage.addDirectoryToProject(project.projectId, directory);
 
-    // Get updated project
     const updatedProject = await this.storage.getLinkedProjectV2(
       project.projectId
     );
@@ -1729,7 +1206,6 @@ export class SyncService {
       return;
     }
 
-    // Sync the new directory
     if (options.conflictStrategy === "merge") {
       await this.mergeDirectory(
         project.projectId,
@@ -1740,48 +1216,30 @@ export class SyncService {
         project.projectId,
         directory.directoryPath
       );
-    } else if (options.conflictStrategy !== "skip") {
+    } else {
       await this.syncDirectory(updatedProject, directory);
     }
   }
 
-  /**
-   * Remove a directory from a project (V2)
-   */
   async removeDirectoryFromProject(
     projectId: string,
-    directoryPath: string,
-    deleteEnvFile = true
+    directoryPath: string
   ): Promise<void> {
-    if (deleteEnvFile && shouldPreventCopyOnRevoke()) {
-      const project = await this.storage.getLinkedProjectV2(projectId);
-      if (project) {
-        const directory = project.directories.find(
-          (d) => normalizePath(d.directoryPath) === normalizePath(directoryPath)
-        );
-        if (directory) {
-          await this.deleteEnvFileFromDirectory(directory);
-        }
-      }
-    }
+    const project = await this.storage.getLinkedProjectV2(projectId);
+    const directory = project?.directories.find((d) =>
+      pathsEqual(d.directoryPath, directoryPath)
+    );
 
     await this.storage.removeDirectoryFromProject(projectId, directoryPath);
     this.pruneMetadataHashes(projectId, directoryPath);
+    await this.syncFlight.wait(`sync:${projectId}:${pathKey(directoryPath)}`);
+
+    if (directory && shouldPreventCopyOnRevoke()) {
+      await this.deleteSecretFilesFromDirectory(projectId, directory);
+      await this.deleteEnvFileFromDirectory(directory);
+    }
   }
 
-  /**
-   * Get the linked project for a directory (V2)
-   */
-  async getLinkedProjectForDirectory(
-    directoryPath: string
-  ): Promise<LinkedProjectV2 | null> {
-    return this.storage.getProjectForDirectory(directoryPath);
-  }
-
-  /**
-   * Get linked project V2 for current workspace: the first project with a
-   * linked directory inside ANY workspace folder (multi-root aware).
-   */
   async getLinkedProjectV2ForWorkspace(): Promise<LinkedProjectV2 | null> {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
@@ -1797,48 +1255,17 @@ export class SyncService {
     );
   }
 
-  /**
-   * Get all linked projects V2
-   */
   async getAllLinkedProjectsV2(): Promise<LinkedProjectV2[]> {
     return this.storage.getLinkedProjectsV2();
   }
 
-  /**
-   * Sync current workspace using V2 format
-   */
-  async syncCurrentWorkspaceV2(): Promise<SyncResult[] | null> {
-    if (!vscode.workspace.workspaceFolders?.length) {
-      vscode.window.showWarningMessage("No workspace folder open");
-      return null;
-    }
-
-    const linkedProject = await this.getLinkedProjectV2ForWorkspace();
-    if (!linkedProject) {
-      vscode.window.showWarningMessage(
-        'No project linked to this workspace. Use "Envpilot: Link Project" to link a project.'
-      );
-      return null;
-    }
-
-    return this.syncAllDirectories(linkedProject);
-  }
-
-  /**
-   * Persist the unsync-on-close flag the last getVariables() call resolved
-   * for this project (cacheAccessMeta populates it on the same request).
-   * Best-effort — never fails a sync.
-   */
   private async persistUnsyncFlag(projectId: string): Promise<void> {
     try {
       const flag = this.api.getAccessMeta(projectId)?.autoUnsyncOnClose;
       if (flag !== undefined) {
         await this.storage.setProjectUnsyncFlag(projectId, flag);
       }
-    } catch {
-      // Flag caching must never break a sync; deactivate() falls back to
-      // the secure default (true) when no cached value exists.
-    }
+    } catch {}
   }
 
   dispose(): void {

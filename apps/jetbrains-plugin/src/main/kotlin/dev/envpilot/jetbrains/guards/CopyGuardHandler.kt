@@ -9,10 +9,6 @@ import com.intellij.openapi.editor.actionSystem.EditorActionHandler
 import com.intellij.openapi.project.Project
 import dev.envpilot.jetbrains.editor.EnvCloak
 
-/**
- * Blocks clipboard copies/cuts from any Envpilot-managed file while it is
- * hidden. Reveal Values (time-boxed) lifts the block.
- */
 class CopyGuardHandler(
     private val delegate: EditorActionHandler,
     private val isCut: Boolean = false,

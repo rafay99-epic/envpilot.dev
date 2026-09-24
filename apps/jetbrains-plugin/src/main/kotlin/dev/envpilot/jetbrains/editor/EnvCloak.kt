@@ -13,35 +13,22 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 
-/**
- * Hides managed secret content at the RENDER level (fold regions), the way
- * the VS Code extension cloaks values — the text is not drawn at all, not
- * merely recolored.
- *
- * - .env files: each managed value folds to "••••••••"
- * - other managed files (uploaded secrets): the whole document folds to a
- *   single "hidden" placeholder
- *
- * Reveal (time-boxed, from the tool window) temporarily removes folds. The
- * copy guard blocks clipboard access to managed files while hidden.
- */
 object EnvCloak {
     private val FOLDS = Key.create<Array<FoldRegion>>("envpilot.cloakFolds")
     private val FOLD_LISTENER = Key.create<DocumentListener>("envpilot.cloakListener")
 
     private const val ENV_PLACEHOLDER = "••••••••"
-    private const val FILE_PLACEHOLDER = "🔒 Envpilot secret file — hidden (Reveal Values to show)"
+    private const val FILE_PLACEHOLDER = "Envpilot secret file hidden (Reveal Values to show)"
 
-    private val KEY_REGEX = Regex("(?m)^([A-Za-z_][A-Za-z0-9_.]*)(\\s*=)(.*)$")
+    private val KEY_REGEX = Regex("(?m)^[ \\t]*(?:export[ \\t]+)?([A-Za-z_][A-Za-z0-9_.]*)([ \\t]*=)(.*)$")
 
-    /** Inclusive value ranges to fold, one per managed `KEY=value` line. Pure, so it is testable. */
     internal fun foldRanges(
         text: CharSequence,
         managedKeys: Set<String>,
     ): List<IntRange> =
         KEY_REGEX.findAll(text)
             .filter { it.groupValues[1] in managedKeys }
-            .map { it.groups[3]!!.range }
+            .mapNotNull { it.groups[3]?.range }
             .filterNot { it.isEmpty() }
             .toList()
 
@@ -68,9 +55,8 @@ object EnvCloak {
                     region?.let { folds.add(it) }
                 }
                 editor.putUserData(FOLDS, folds.toTypedArray())
-            } else if (text.textLength > 2) {
-                // Whole-document fold for uploaded secret files (json, pem, keystore…).
-                val region = editor.foldingModel.addFoldRegion(1, text.textLength, FILE_PLACEHOLDER)
+            } else if (text.textLength > 0) {
+                val region = editor.foldingModel.addFoldRegion(0, text.textLength, FILE_PLACEHOLDER)
                 region?.isExpanded = false
                 editor.putUserData(FOLDS, if (region != null) arrayOf(region) else emptyArray())
             } else {
@@ -81,7 +67,6 @@ object EnvCloak {
         attachListener(editor, project)
     }
 
-    /** Managed and currently hidden? The copy guard blocks clipboard access then. */
     fun isProtected(
         editor: Editor,
         project: Project,
@@ -126,8 +111,6 @@ object EnvCloak {
                     }
                 }
             }
-        // Documents outlive editors: tie the listener to THIS editor, or reopening
-        // the same file stacks a listener per open until the project closes.
         val disposable = Disposer.newDisposable()
         editor.document.addDocumentListener(listener, disposable)
         editor.putUserData(FOLD_LISTENER, listener)

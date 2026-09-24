@@ -13,7 +13,6 @@ class EnvCloakTest {
 
     @Test
     fun `folds the whole quoted value`() {
-        // EnvFiles.quote escapes newlines, so a multi-line secret is one physical line.
         val text = "API_KEY=\"line1\\nline2\"\nPORT=3000\n"
         assertEquals(listOf("\"line1\\nline2\""), folded(text, "API_KEY"))
     }
@@ -27,5 +26,10 @@ class EnvCloakTest {
     fun `leaves comments and empty values alone`() {
         assertTrue(folded("# API_KEY=secret\n", "API_KEY").isEmpty())
         assertTrue(folded("API_KEY=\n", "API_KEY").isEmpty())
+    }
+
+    @Test
+    fun `folds exported and indented keys`() {
+        assertEquals(listOf("one", "two"), folded("export API_KEY=one\n  TOKEN=two\n", "API_KEY", "TOKEN"))
     }
 }
