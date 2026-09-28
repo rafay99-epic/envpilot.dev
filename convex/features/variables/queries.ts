@@ -448,10 +448,7 @@ export async function listWithAccessCore(
   const limit = args.limit ?? LIST_READ_CAP;
 
   const resolvedRows = (
-    await resolveEffectiveVariables(ctx, {
-      projectId: args.projectId,
-      limit: limit + 1,
-    })
+    await resolveEffectiveVariables(ctx, { projectId: args.projectId })
   ).map((row) =>
     row.source.kind === "own" ? row : { ...row, projectId: args.projectId }
   );

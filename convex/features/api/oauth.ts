@@ -387,13 +387,12 @@ export const _search = internalQuery({
         skippedProjects += 1;
         continue;
       }
-      const limit = SEARCH_ROW_BUDGET - rowsRead;
       let listed: Awaited<ReturnType<typeof listWithAccessCore>>;
       try {
         listed = await listWithAccessCore(ctx, {
           projectId: project._id,
           userId: user._id,
-          limit,
+          limit: SEARCH_ROW_BUDGET - rowsRead,
         });
       } catch {
         skippedProjects += 1;

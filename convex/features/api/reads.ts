@@ -1,13 +1,16 @@
 import { v, ConvexError } from "convex/values";
 import { MAX_PROJECT_FILES } from "../../lib/fileLimits";
-import { resolveEffectiveVariables } from "../variables/resolve";
+import {
+  resolveEffectiveVariables,
+  resolveEffectiveVariablesWithin,
+} from "../variables/resolve";
 import { activeProjectsQuery, isWorkspace } from "../../lib/projectKind";
 import {
   action,
   internalQuery,
   internalMutation,
 } from "../../_generated/server";
-import type { ActionCtx } from "../../_generated/server";
+import type { ActionCtx, QueryCtx } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { countActiveProjects } from "../featureRegistry/gates";
@@ -988,6 +991,28 @@ type SearchResult = {
   skippedProjects: number;
 };
 
+async function scopedProjects(
+  ctx: QueryCtx,
+  organizationId: Id<"organizations">,
+  ids: Id<"projects">[],
+  max: number
+): Promise<Doc<"projects">[]> {
+  const found: Doc<"projects">[] = [];
+  for (const id of ids) {
+    if (found.length >= max) break;
+    const project = await ctx.db.get(id);
+    if (
+      project &&
+      project.deletedAt === undefined &&
+      project.organizationId === organizationId &&
+      !isWorkspace(project)
+    ) {
+      found.push(project);
+    }
+  }
+  return found;
+}
+
 export const _searchScoped = internalQuery({
   args: {
     organizationId: v.id("organizations"),
@@ -1003,22 +1028,12 @@ export const _searchScoped = internalQuery({
         ? await activeProjectsQuery(ctx.db, args.organizationId).take(
             SEARCH_MAX_PROJECTS + 1
           )
-        : (
-            await Promise.all(
-              args.scopeProjects
-                .slice(0, SEARCH_MAX_PROJECTS + 1)
-                .map((id) => ctx.db.get(id))
-            )
-          ).filter(
-            (project): project is Doc<"projects"> =>
-              project !== null &&
-              project.deletedAt === undefined &&
-              project.organizationId === args.organizationId &&
-              !isWorkspace(project)
+        : await scopedProjects(
+            ctx,
+            args.organizationId,
+            args.scopeProjects,
+            SEARCH_MAX_PROJECTS + 1
           );
-    const scopeTruncated =
-      args.scopeProjects !== "all" &&
-      args.scopeProjects.length > SEARCH_MAX_PROJECTS;
 
     const needle = args.query.toLowerCase();
     const scanned = projects.slice(0, SEARCH_MAX_PROJECTS);
@@ -1044,20 +1059,23 @@ export const _searchScoped = internalQuery({
         continue;
       }
 
-      const limit = SEARCH_ROW_BUDGET - rowsRead;
-      let variables: Awaited<ReturnType<typeof resolveEffectiveVariables>>;
+      let resolved: Awaited<ReturnType<typeof resolveEffectiveVariablesWithin>>;
       try {
-        variables = await resolveEffectiveVariables(ctx, {
-          projectId: project._id,
-          limit,
-        });
+        resolved = await resolveEffectiveVariablesWithin(
+          ctx,
+          { projectId: project._id },
+          SEARCH_ROW_BUDGET - rowsRead
+        );
       } catch {
         skippedProjects += 1;
         continue;
       }
-      rowsRead += variables.length;
-      if (variables.length >= limit) skippedProjects += 1;
-      for (const variable of variables) {
+      rowsRead += resolved.rows.length;
+      if (!resolved.complete) {
+        skippedProjects += 1;
+        rowsRead = SEARCH_ROW_BUDGET;
+      }
+      for (const variable of resolved.rows) {
         if (results.length >= SEARCH_MAX_RESULTS) break;
         if (
           !environmentAllowedByScope(
@@ -1080,7 +1098,6 @@ export const _searchScoped = internalQuery({
     return {
       results,
       truncated:
-        scopeTruncated ||
         projects.length > SEARCH_MAX_PROJECTS ||
         results.length >= SEARCH_MAX_RESULTS ||
         skippedProjects > 0,
