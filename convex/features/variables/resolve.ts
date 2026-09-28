@@ -37,11 +37,46 @@ export type ResolvedVariable = Doc<"environmentVariables"> & {
 
 export async function resolveEffectiveVariables(
   ctx: QueryCtx,
-  args: { projectId: Id<"projects">; environment?: string; limit?: number }
+  args: { projectId: Id<"projects">; environment?: string }
 ): Promise<ResolvedVariable[]> {
-  const own: ResolvedVariable[] = (
-    await activeRows(ctx, args.projectId, args.environment, args.limit)
-  ).map((row) => ({ ...row, source: { kind: "own" } }));
+  return (await resolveWithin(ctx, args, undefined)).rows;
+}
+
+export async function resolveEffectiveVariablesWithin(
+  ctx: QueryCtx,
+  args: { projectId: Id<"projects"> },
+  readLimit: number
+): Promise<{ rows: ResolvedVariable[]; complete: boolean }> {
+  return await resolveWithin(ctx, args, readLimit);
+}
+
+async function resolveWithin(
+  ctx: QueryCtx,
+  args: { projectId: Id<"projects">; environment?: string },
+  readLimit: number | undefined
+): Promise<{ rows: ResolvedVariable[]; complete: boolean }> {
+  let read = 0;
+  let complete = true;
+  const readRows = async (
+    projectId: Id<"projects">
+  ): Promise<Doc<"environmentVariables">[]> => {
+    const remaining = readLimit === undefined ? undefined : readLimit - read;
+    if (remaining !== undefined && remaining <= 0) {
+      complete = false;
+      return [];
+    }
+    const rows = await activeRows(ctx, projectId, remaining);
+    read += rows.length;
+    if (remaining !== undefined && rows.length >= remaining) complete = false;
+    return rows;
+  };
+  const inEnvironment = (row: Doc<"environmentVariables">) =>
+    args.environment === undefined ||
+    row.environments.includes(args.environment);
+
+  const own: ResolvedVariable[] = (await readRows(args.projectId))
+    .filter(inEnvironment)
+    .map((row) => ({ ...row, source: { kind: "own" } }));
 
   const memberships = await ctx.db
     .query("workspaceProjects")
@@ -57,31 +92,16 @@ export async function resolveEffectiveVariables(
   const inherited: ResolvedVariable[] = [];
 
   for (const membership of memberships) {
-    const remaining =
-      args.limit === undefined
-        ? undefined
-        : args.limit - own.length - inherited.length;
-    if (remaining !== undefined && remaining <= 0) break;
     const workspace = await ctx.db.get(membership.workspaceId);
     // A soft-deleted workspace stops sharing immediately. Members lose the
     // keys on their next pull rather than reading rows queued for purge.
     if (!workspace || workspace.deletedAt !== undefined) continue;
 
-    for (const row of await activeRows(
-      ctx,
-      membership.workspaceId,
-      undefined,
-      remaining
-    )) {
+    for (const row of await readRows(membership.workspaceId)) {
       // Absent appliesTo = every member project, and it keeps following
       // membership as projects join. Present = exactly that list.
       if (row.appliesTo && !row.appliesTo.includes(args.projectId)) continue;
-      if (
-        args.environment !== undefined &&
-        !row.environments.includes(args.environment)
-      ) {
-        continue;
-      }
+      if (!inEnvironment(row)) continue;
 
       inherited.push({
         ...row,
@@ -96,14 +116,13 @@ export async function resolveEffectiveVariables(
 
   const resolved = [...own, ...inherited];
   assertNoDuplicatePairs(resolved);
-  return resolved;
+  return { rows: resolved, complete };
 }
 
-/** Active rows of one project, optionally narrowed to one environment. */
+/** Active rows of one project, at most `limit` when given. */
 async function activeRows(
   ctx: QueryCtx,
   projectId: Id<"projects">,
-  environment?: string,
   limit?: number
 ): Promise<Doc<"environmentVariables">[]> {
   const query = ctx.db
@@ -111,13 +130,7 @@ async function activeRows(
     .withIndex("by_project_deleted", (q) =>
       q.eq("projectId", projectId).eq("deletedAt", undefined)
     );
-  const rows = await (limit === undefined
-    ? query.collect()
-    : query.take(limit));
-
-  return environment === undefined
-    ? rows
-    : rows.filter((row) => row.environments.includes(environment));
+  return await (limit === undefined ? query.collect() : query.take(limit));
 }
 
 /**
