@@ -1,8 +1,10 @@
 import { v } from "convex/values";
+import type { Id } from "../../_generated/dataModel";
 import { internalMutation } from "../../_generated/server";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { SURFACE_GATE, surfaceValidator } from "../../lib/surfaces";
 import { createAuditLog, resolveAuditProjectId } from "../../lib/audit";
+import { isWorkspace } from "../../lib/projectKind";
 
 /**
  * THE single enforcement core for the public API key platform.
@@ -29,6 +31,7 @@ export const _authorizeRequest = internalMutation({
       environment: v.optional(v.string()),
       projectId: v.optional(v.id("projects")),
     }),
+    projectSlug: v.optional(v.string()),
     // Present only for calls that should record usage (value pulls); absent
     // for metadata reads, which skip both the lastUsedAt patch and the audit
     // insert entirely (PLAN §2: "metadata reads NOT audited — volume noise").
@@ -61,6 +64,13 @@ export const _authorizeRequest = internalMutation({
       scopeEnvironments: v.union(v.literal("all"), v.array(v.string())),
       scopeResources: v.array(v.string()),
       keyId: v.id("apiKeys"),
+      project: v.optional(
+        v.object({
+          _id: v.id("projects"),
+          name: v.string(),
+          slug: v.string(),
+        })
+      ),
     }),
     v.object({
       ok: v.literal(false),
@@ -75,6 +85,7 @@ export const _authorizeRequest = internalMutation({
     })
   ),
   handler: async (ctx, args) => {
+    const requirement = { ...args.requirement };
     const key = await ctx.db
       .query("apiKeys")
       .withIndex("by_token_hash", (q) => q.eq("tokenHash", args.tokenHash))
@@ -88,7 +99,7 @@ export const _authorizeRequest = internalMutation({
       const projectId = await resolveAuditProjectId(
         ctx.db,
         k.organizationId,
-        args.requirement.projectId
+        requirement.projectId
       );
       await createAuditLog(ctx, {
         organizationId: k.organizationId,
@@ -98,7 +109,7 @@ export const _authorizeRequest = internalMutation({
         details: {
           keyId: k._id,
           keyName: k.name,
-          requirement: args.requirement,
+          requirement: requirement,
           reason,
         },
       });
@@ -149,26 +160,47 @@ export const _authorizeRequest = internalMutation({
     // key holder inherently knows which org their key belongs to, and the
     // discovery endpoint must work for narrowly-scoped keys.
     if (
-      args.requirement.resource !== "organization" &&
-      !key.scopeResources.includes(args.requirement.resource)
+      requirement.resource !== "organization" &&
+      !key.scopeResources.includes(requirement.resource)
     ) {
       await logDenied(key, "resource_out_of_scope");
       return { ok: false as const, denied: "resource_scope" as const };
     }
 
     if (
-      args.requirement.environment !== undefined &&
+      requirement.environment !== undefined &&
       key.scopeEnvironments !== "all" &&
-      !key.scopeEnvironments.includes(args.requirement.environment)
+      !key.scopeEnvironments.includes(requirement.environment)
     ) {
       await logDenied(key, "environment_out_of_scope");
       return { ok: false as const, denied: "environment_scope" as const };
     }
 
+    let project:
+      | { _id: Id<"projects">; name: string; slug: string }
+      | undefined;
+    if (args.projectSlug !== undefined) {
+      const slug = args.projectSlug;
+      const found = await ctx.db
+        .query("projects")
+        .withIndex("by_org_slug_deleted", (q) =>
+          q
+            .eq("organizationId", key.organizationId)
+            .eq("slug", slug)
+            .eq("deletedAt", undefined)
+        )
+        .first();
+      if (!found || isWorkspace(found)) {
+        return { ok: false as const, denied: "project_scope" as const };
+      }
+      project = { _id: found._id, name: found.name, slug: found.slug };
+      requirement.projectId = found._id;
+    }
+
     if (
-      args.requirement.projectId !== undefined &&
+      requirement.projectId !== undefined &&
       key.scopeProjects !== "all" &&
-      !key.scopeProjects.includes(args.requirement.projectId)
+      !key.scopeProjects.includes(requirement.projectId)
     ) {
       await logDenied(key, "project_out_of_scope");
       return { ok: false as const, denied: "project_scope" as const };
@@ -206,7 +238,11 @@ export const _authorizeRequest = internalMutation({
         organizationId: key.organizationId,
         userId: key.createdBy,
         action: args.recordUse.auditAction,
-        details: args.recordUse.details,
+        details: JSON.stringify({
+          keyId: key._id,
+          projectId: requirement.projectId,
+          ...(JSON.parse(args.recordUse.details) as Record<string, unknown>),
+        }),
         createdAt: now,
       });
     }
@@ -218,6 +254,7 @@ export const _authorizeRequest = internalMutation({
       scopeEnvironments: key.scopeEnvironments,
       scopeResources: key.scopeResources,
       keyId: key._id,
+      project,
     };
   },
 });

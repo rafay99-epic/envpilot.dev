@@ -1,12 +1,14 @@
 ---
 title: Tools
-description: All nine MCP tools, their parameters, and the API-key resource each one demands.
+description: All thirteen MCP tools, their parameters, the API-key resource each one demands, and which ones an OAuth sign-in can use.
 icon: zap
 ---
 
 # Tools
 
 Every tool runs against the same scope, rate limits and plan gate as the REST API, and every value-returning call is audited.
+
+With an API key, the key's resources decide which tools work. With an [OAuth sign-in](/mcp/clients#sign-in-with-oauth), the signed-in person's role decides, and eight tools are offered: everything except shared accounts, secret files and variable requests, which stay on API keys.
 
 ## Read tools
 
@@ -20,21 +22,24 @@ Every tool runs against the same scope, rate limits and plan gate as the REST AP
 | `envpilot_get_file`      | The decrypted contents of **one** secret file, base64-encoded                                         | `files`                                       |
 | `envpilot_search`        | Search project names/slugs and variable **keys** — never values. Bounded to 20 projects / 100 matches | `projects` (plus `variables` for key matches) |
 | `envpilot_search_docs`   | Full-text search over **published** documentation — titles and page bodies. Never returns drafts      | `docs`                                        |
-| `envpilot_get_doc`       | One **published** documentation page with its markdown body                                           | `docs`                                        |
+| `envpilot_get_doc`       | One **published** page: its outline, one section, or up to 60,000 characters at a time with a cursor  | `docs`                                        |
 
 ## Write-adjacent tools
 
-A machine credential can perform exactly two mutations, and both end at a human:
+A machine credential can file requests and write documentation drafts. Every one of those ends at a human:
 
 | Tool                          | What it does                                                                                         | Resource   |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------- | ---------- |
 | `envpilot_request_variable`   | File a request with a **required justification**. A human approves it and supplies the value         | `requests` |
 | `envpilot_get_request_status` | Poll a filed request — `pending`, `approved`, `rejected` (with the reviewer's reason), or `canceled` | `requests` |
 | `envpilot_create_doc`         | Propose a documentation page. Always creates a **draft**; a human publishes it                       | `docs`     |
+| `envpilot_update_doc_draft`   | Replace, append to, or replace one section of a draft: one this key created, or one you wrote        | `docs`     |
 
-Neither writes anything a reader sees on its own. A requested variable has no
-value until a person supplies one, and a proposed page is invisible to your
-team — and to every other agent — until a person publishes it.
+None of them writes anything a reader sees on its own. A requested variable has
+no value until a person supplies one, and a draft page is invisible to your
+team, and to every other agent, until a person publishes it.
+
+In Claude these tools carry `destructiveHint`, so Claude asks before each call.
 
 ## Secret file tools in detail
 
@@ -76,6 +81,31 @@ page limit — 10 per project and 25 per organization on Free, unlimited on Pro.
 The caps are the same numbers the dashboard enforces, so an agent cannot use
 the MCP surface to walk around them. See [Plans & Limits](/limits/plans).
 
+### Long pages: write in parts, read in pages
+
+A single tool call carries its whole payload, so a very long page is slow for
+the agent to produce in one go. Create the page with its first part, then add
+the rest with `envpilot_update_doc_draft` (`mode: "append"`), or rewrite one
+part with `mode: "replace_section"` and a section id. Every edit re-checks the
+**whole** resulting body, so splitting text across calls cannot slip a secret
+or an injected instruction past the scanner. Published pages cannot be edited
+over MCP.
+
+`envpilot_get_doc` returns at most 60,000 characters per call. Pass
+`view: "outline"` for the section list, `section` for one section, and the
+`nextCursor` from a response as `cursor` to keep reading. Breaks fall on
+paragraph boundaries and never inside a code block, unless a single line or
+code block is itself longer than 60,000 characters; that one is split at the
+limit.
+
+### Retrying safely
+
+`envpilot_create_doc` and `envpilot_request_variable` accept `client_ref`, a
+string the caller picks. A second call with the same `client_ref` returns the
+first result instead of filing a duplicate, as long as the credential can
+still reach that project. Use it when a call timed out and you cannot tell
+whether it landed.
+
 ### Pages name variables, never values
 
 A page may reference `API_BASE_URL`; it never contains the value. Resolving it
@@ -107,6 +137,7 @@ payloads, commit SHAs — pass through untouched.
 | `request_variable`                                      | 5/hour per key, burst 2               | Yes     |
 | `search_docs`, `get_doc`                                | 120/min metadata                      | No      |
 | `create_doc`                                            | 30/hour per key, burst 10             | Yes     |
+| `update_doc_draft`                                      | 120/hour per key, burst 40            | Yes     |
 
 ## Limits
 

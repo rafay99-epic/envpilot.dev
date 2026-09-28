@@ -78,11 +78,32 @@ Authorization: Bearer <the ENVPILOT_API_KEY value>
 
 Prefer a client-native secret store or environment-variable reference. Placeholder syntax is client-specific: do not assume a generic client expands `${ENVPILOT_API_KEY}` or `${env:ENVPILOT_API_KEY}`.
 
-### Hosted Claude connectors are not compatible
+## Sign in with OAuth
 
-Claude's hosted custom connectors—used by Claude web and synced to hosted Claude Desktop and mobile—are different from Claude Code's local MCP configuration. Their standard setup accepts a remote URL and an OAuth connection flow, not a per-user arbitrary `Authorization` header. Envpilot currently uses a fixed `envpk_...` bearer API key and does not expose the OAuth flow those hosted connectors expect, so use **Claude Code** instead.
+Clients that speak MCP OAuth can connect with your Envpilot login instead of an API key. There is no key to create, store, or rotate, and nothing to put in an environment variable. The connection acts as you: it sees the projects, variables and documentation your role can see, and nothing more.
 
-Do not paste an Envpilot API key into an **OAuth Client Secret** field. That field authenticates an OAuth client during a token exchange; it does not become `Authorization: Bearer envpk_...` on MCP requests and cannot adapt Envpilot's API-key auth into OAuth.
+An OAuth sign-in gets eight tools. Shared accounts, secret files and variable requests stay on API keys.
+
+### Claude (web, Desktop, mobile, Cowork)
+
+1. Open **Customize → Connectors** and choose **Add custom connector**. On Team and Enterprise plans an Owner adds it under **Organization settings → Connectors**.
+2. Enter `https://www.envpilot.dev/api/mcp` as the server URL. Leave the OAuth client fields empty.
+3. Select **Connect** and sign in to Envpilot in the window that opens.
+
+Do not paste an Envpilot API key into an **OAuth Client Secret** field. That field authenticates an OAuth client during a token exchange; it never becomes the `Authorization` header on MCP requests.
+
+### Claude Code without a key
+
+```bash
+claude mcp add --transport http --scope user \
+  envpilot https://www.envpilot.dev/api/mcp
+```
+
+Run `/mcp` in a session and choose **Authenticate** for `envpilot`. A browser window opens for the Envpilot sign-in.
+
+### More than one organization
+
+If your account belongs to several organizations, pass `organization` (the organization's slug) to the project tools. The error message lists the slugs you can use.
 
 ## Troubleshooting
 
@@ -97,7 +118,7 @@ First separate client setup failures from Envpilot tool errors:
 | Works on Windows but not in WSL       | Windows and WSL environments are separate. Set the key inside the WSL distribution and restart the WSL-hosted client.                                                                                                                                                  |
 | Header contains `${...}` literally    | The client did not expand the placeholder. Claude Code uses `${ENVPILOT_API_KEY}`; Cursor uses `${env:ENVPILOT_API_KEY}`; Codex uses `bearer_token_env_var = "ENVPILOT_API_KEY"`. Confirm the client supports that syntax and inherited the variable, then restart it. |
 | HTTP 401 before tools load            | Ensure the header is exactly `Authorization: Bearer envpk_...`: one `Bearer` prefix, one space, no surrounding quotes in the value, no duplicated prefix, and no literal placeholder. Use a safe presence check instead of printing the key.                           |
-| Hosted Claude cannot authenticate     | Hosted Claude web/Desktop/mobile custom connectors use their URL/OAuth flow and cannot supply Envpilot's fixed bearer key through the standard setup. Use Claude Code; do not put the API key in an OAuth client-secret field.                                         |
+| Hosted Claude cannot authenticate     | Leave the OAuth client fields empty and use Connect to sign in. Do not put an API key in an OAuth client-secret field. An organization plan without the MCP server also stops the sign-in from being usable.                                                           |
 
 Once tools load, these are the server's error semantics:
 
@@ -119,4 +140,4 @@ Older server builds returned an opaque `[Request ID] Server Error` for all of th
 - Streamable HTTP only. There is no stdio transport and no local proxy.
 - Placeholder syntax is client-specific — `${VAR}`, `${env:VAR}` and `bearer_token_env_var` are not interchangeable.
 - A client only inherits the environment it was launched with; changing the key means fully restarting it.
-- Hosted Claude web, Desktop and mobile connectors expect OAuth and cannot authenticate here. Use Claude Code.
+- Hosted Claude web, Desktop and mobile connect with [OAuth](#sign-in-with-oauth). Shared accounts, secret files and variable requests need an API key.

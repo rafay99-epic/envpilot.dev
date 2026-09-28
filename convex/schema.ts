@@ -475,6 +475,7 @@ export default defineSchema({
     reviewedAt: v.optional(v.number()),
     // If approved, the created variable
     createdVariableId: v.optional(v.id("environmentVariables")),
+    clientRef: v.optional(v.string()),
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -488,7 +489,8 @@ export default defineSchema({
     .index("by_project_and_requester", ["projectId", "requestedBy"])
     .index("by_project_and_key", ["projectId", "key"])
     // Per-key open-pendings cap + revoke-time visibility for machine requests
-    .index("by_requested_key_and_status", ["requestedByKeyId", "status"]),
+    .index("by_requested_key_and_status", ["requestedByKeyId", "status"])
+    .index("by_requester_and_client_ref", ["requestedBy", "clientRef"]),
 
   // ==========================================
   // CHANGE REQUESTS (protected environments)
@@ -842,8 +844,11 @@ export default defineSchema({
     publishedAt: v.optional(v.number()),
     // Soft delete; daily GC purges past the retention window.
     deletedAt: v.optional(v.number()),
+    createdByKeyId: v.optional(v.id("apiKeys")),
+    clientRef: v.optional(v.string()),
   })
     .index("by_project", ["projectId"])
+    .index("by_author_and_client_ref", ["authorId", "clientRef"])
     .index("by_project_and_status", ["projectId", "status"])
     .index("by_project_and_module", ["projectId", "module"])
     // A module share reads exactly the pages it serves. Without deletedAt and

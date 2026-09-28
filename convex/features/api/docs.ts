@@ -16,6 +16,8 @@ import {
   action,
   internalQuery,
   internalMutation,
+  type MutationCtx,
+  type QueryCtx,
 } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
@@ -25,14 +27,25 @@ import { createBody } from "../docs/content";
 import { readBody } from "../docs/content";
 import { normalizePrUrl, scanDocBody, slugifyTitle } from "../docs/guards";
 import { templateFor } from "../docs/templates";
-import { requireDocCapacity, uniqueSlug } from "../docs/helpers";
+import {
+  applyDraftEdit,
+  requireDocCapacity,
+  uniqueSlug,
+} from "../docs/helpers";
 import {
   hashToken,
   assertKeyFormat,
   consumeRateLimit,
+  normalizeClientRef,
   throwForDenial,
   type Authorization,
 } from "./helpers";
+import {
+  findSection,
+  pageOf,
+  parseCursor,
+  parseSections,
+} from "../docs/sections";
 
 /** Hard ceiling on one search response — bounded scan, never a full table. */
 const MAX_SEARCH_ROWS = 25;
@@ -74,7 +87,7 @@ const surfaceArg = v.optional(
   )
 );
 
-const docSummaryValidator = v.object({
+export const docSummaryValidator = v.object({
   docId: v.id("docs"),
   title: v.string(),
   slug: v.string(),
@@ -86,7 +99,7 @@ const docSummaryValidator = v.object({
 
 /** Return types are explicit: inferring them is circular via `internal` and
  *  collapses to `any` (TS7022/7023). Same as reads.ts. */
-type DocSummary = {
+export type DocSummary = {
   docId: Id<"docs">;
   title: string;
   slug: string;
@@ -96,7 +109,7 @@ type DocSummary = {
   updatedAt: number;
 };
 
-type DocDetail = {
+export type DocDetail = {
   docId: Id<"docs">;
   title: string;
   slug: string;
@@ -108,10 +121,35 @@ type DocDetail = {
   publishedAt?: number;
 };
 
-type CreatedDraft = {
+export type CreatedDraft = {
   docId: Id<"docs">;
   slug: string;
+  projectSlug: string;
+  status: "draft" | "published";
+  warnings: string[];
+};
+
+export const createdDraftValidator = v.object({
+  docId: v.id("docs"),
+  slug: v.string(),
+  projectSlug: v.string(),
+  status: v.union(v.literal("draft"), v.literal("published")),
+  warnings: v.array(v.string()),
+});
+
+export type DocPage = Omit<DocDetail, "body"> & {
+  body: string;
+  totalChars: number;
+  nextCursor?: string;
+  sections?: Array<{ id: string; title: string; level: number; chars: number }>;
+};
+
+export type UpdatedDraft = {
+  docId: Id<"docs">;
+  slug: string;
+  projectSlug: string;
   status: "draft";
+  bytes: number;
   warnings: string[];
 };
 
@@ -132,45 +170,22 @@ export const searchDocs = action({
     const tokenHash = await hashToken(args.token);
     await consumeRateLimit(ctx, "apiMetadata", tokenHash);
 
-    // Two-step (as in reads.ts): the slug needs an organizationId, which only
-    // a successful authorize returns. The second call enforces project scope.
-    const bootstrap: Authorization = await ctx.runMutation(
-      internal.features.api.authorize._authorizeRequest,
-      {
-        tokenHash,
-        requirement: { resource: "docs" },
-        gateFeature: args.gateFeature,
-        surface: args.surface,
-      }
-    );
-    if (!bootstrap.ok) throwForDenial(bootstrap.denied);
-
-    const projectDoc = await ctx.runQuery(
-      internal.features.projects.queries._getBySlug,
-      { organizationId: bootstrap.organizationId, slug: args.projectSlug }
-    );
-    if (!projectDoc) throw new ConvexError("Project not found");
-
     const scoped: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
       {
         tokenHash,
-        requirement: { resource: "docs", projectId: projectDoc._id },
+        requirement: { resource: "docs" },
+        projectSlug: args.projectSlug,
         gateFeature: args.gateFeature,
         surface: args.surface,
       }
     );
-    // Out-of-scope must be indistinguishable from unknown.
-    if (!scoped.ok) {
-      if (scoped.denied === "project_scope") {
-        throw new ConvexError("Project not found");
-      }
-      throwForDenial(scoped.denied);
-    }
+    if (!scoped.ok) throwForDenial(scoped.denied);
+    if (!scoped.project) throw new ConvexError("Project not found");
 
     return await ctx.runQuery(internal.features.api.docs._searchScopedDocs, {
-      organizationId: bootstrap.organizationId,
-      projectId: projectDoc._id,
+      organizationId: scoped.organizationId,
+      projectId: scoped.project._id,
       query: args.query,
       module: args.module,
       limit: args.limit,
@@ -187,88 +202,89 @@ export const _searchScopedDocs = internalQuery({
     limit: v.optional(v.number()),
   },
   returns: v.array(docSummaryValidator),
-  handler: async (ctx, args) => {
-    const gate = await checkBooleanFeature(
-      ctx.db,
-      args.organizationId,
-      "project_docs"
+  handler: async (ctx, args) => searchPublishedDocs(ctx, args),
+});
+
+export async function searchPublishedDocs(
+  ctx: QueryCtx,
+  args: {
+    organizationId: Id<"organizations">;
+    projectId: Id<"projects">;
+    query?: string;
+    module?: string;
+    limit?: number;
+  }
+): Promise<DocSummary[]> {
+  const gate = await checkBooleanFeature(
+    ctx.db,
+    args.organizationId,
+    "project_docs"
+  );
+  if (!gate.allowed) {
+    throw new ConvexError(
+      gate.reason ?? "Project documentation requires a higher tier."
     );
-    if (!gate.allowed) {
-      throw new ConvexError(
-        gate.reason ?? "Project documentation requires a higher tier."
-      );
+  }
+
+  // Closes the gap where another tenant's projectId is passed with a valid key.
+  const project = await ctx.db.get(args.projectId);
+  if (
+    !project ||
+    project.deletedAt !== undefined ||
+    project.organizationId !== args.organizationId
+  ) {
+    throw new ConvexError("Project not found");
+  }
+
+  const limit = Math.min(
+    Math.max(args.limit ?? MAX_SEARCH_ROWS, 1),
+    MAX_SEARCH_ROWS
+  );
+  const term = args.query?.trim();
+  const moduleFilter = args.module?.trim().toLowerCase();
+
+  // Index-backed: agents loop, and a full scan here is the shape that bills.
+  // `status` is a filterField on both indexes, so drafts are never read.
+  const matched: Doc<"docs">[] = [];
+  const seen = new Set<string>();
+  const push = (doc: Doc<"docs"> | null) => {
+    if (!doc || doc.deletedAt !== undefined) return;
+    if (doc.status !== "published") return;
+    if (moduleFilter && doc.module.toLowerCase() !== moduleFilter) return;
+    if (seen.has(doc._id)) return;
+    seen.add(doc._id);
+    matched.push(doc);
+  };
+
+  if (term) {
+    for (const doc of await ctx.db
+      .query("docs")
+      .withSearchIndex("search_title", (q) =>
+        q
+          .search("title", term)
+          .eq("projectId", args.projectId)
+          .eq("status", "published")
+      )
+      .take(limit)) {
+      push(doc);
     }
-
-    // Closes the gap where another tenant's projectId is passed with a valid key.
-    const project = await ctx.db.get(args.projectId);
-    if (
-      !project ||
-      project.deletedAt !== undefined ||
-      project.organizationId !== args.organizationId
-    ) {
-      throw new ConvexError("Project not found");
-    }
-
-    const limit = Math.min(
-      Math.max(args.limit ?? MAX_SEARCH_ROWS, 1),
-      MAX_SEARCH_ROWS
-    );
-    const term = args.query?.trim();
-    const moduleFilter = args.module?.trim().toLowerCase();
-
-    // Index-backed: agents loop, and a full scan here is the shape that bills.
-    // `status` is a filterField on both indexes, so drafts are never read.
-    const matched: Doc<"docs">[] = [];
-    const seen = new Set<string>();
-    const push = (doc: Doc<"docs"> | null) => {
-      if (!doc || doc.deletedAt !== undefined) return;
-      if (doc.status !== "published") return;
-      if (moduleFilter && doc.module.toLowerCase() !== moduleFilter) return;
-      if (seen.has(doc._id)) return;
-      seen.add(doc._id);
-      matched.push(doc);
-    };
-
-    if (term) {
-      for (const doc of await ctx.db
-        .query("docs")
-        .withSearchIndex("search_title", (q) =>
+    if (matched.length < limit) {
+      for (const row of await ctx.db
+        .query("docContent")
+        .withSearchIndex("search_body", (q) =>
           q
-            .search("title", term)
+            .search("body", term)
             .eq("projectId", args.projectId)
             .eq("status", "published")
         )
         .take(limit)) {
-        push(doc);
+        push(await ctx.db.get(row.docId));
       }
-      if (matched.length < limit) {
-        for (const row of await ctx.db
-          .query("docContent")
-          .withSearchIndex("search_body", (q) =>
-            q
-              .search("body", term)
-              .eq("projectId", args.projectId)
-              .eq("status", "published")
-          )
-          .take(limit)) {
-          push(await ctx.db.get(row.docId));
-        }
-      }
-      // Neither index covers `module`, which the tool contract says `query`
-      // matches — bounded metadata scan, only when the indexes underfill.
-      if (matched.length < limit) {
-        const needle = term.toLowerCase();
-        for (const doc of await ctx.db
-          .query("docs")
-          .withIndex("by_project_and_status", (q) =>
-            q.eq("projectId", args.projectId).eq("status", "published")
-          )
-          .filter((q) => q.eq(q.field("deletedAt"), undefined))
-          .take(SEARCH_SCAN_LIMIT)) {
-          if (moduleMatchesTerm(doc.module, needle)) push(doc);
-        }
-      }
-    } else {
+    }
+    // Neither index covers `module`, which the tool contract says `query`
+    // matches — bounded metadata scan, only when the indexes underfill.
+    if (matched.length < limit) {
+      const needle = term.toLowerCase();
       for (const doc of await ctx.db
         .query("docs")
         .withIndex("by_project_and_status", (q) =>
@@ -276,52 +292,79 @@ export const _searchScopedDocs = internalQuery({
         )
         .filter((q) => q.eq(q.field("deletedAt"), undefined))
         .take(SEARCH_SCAN_LIMIT)) {
-        push(doc);
+        if (moduleMatchesTerm(doc.module, needle)) push(doc);
       }
-      matched.sort((a, b) => b.updatedAt - a.updatedAt);
     }
+  } else {
+    for (const doc of await ctx.db
+      .query("docs")
+      .withIndex("by_project_and_status", (q) =>
+        q.eq("projectId", args.projectId).eq("status", "published")
+      )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .take(SEARCH_SCAN_LIMIT)) {
+      push(doc);
+    }
+    matched.sort((a, b) => b.updatedAt - a.updatedAt);
+  }
 
-    return matched.slice(0, limit).map((doc) => ({
-      docId: doc._id,
-      title: doc.title,
-      slug: doc.slug,
-      module: doc.module,
-      type: doc.type,
-      excerpt: doc.excerpt,
-      updatedAt: doc.updatedAt,
-    }));
-  },
+  return matched.slice(0, limit).map((doc) => ({
+    docId: doc._id,
+    title: doc.title,
+    slug: doc.slug,
+    module: doc.module,
+    type: doc.type,
+    excerpt: doc.excerpt,
+    updatedAt: doc.updatedAt,
+  }));
+}
+
+export const docPageValidator = v.object({
+  docId: v.id("docs"),
+  title: v.string(),
+  slug: v.string(),
+  module: v.string(),
+  type: v.union(v.literal("api"), v.literal("guide")),
+  body: v.string(),
+  totalChars: v.number(),
+  nextCursor: v.optional(v.string()),
+  sections: v.optional(
+    v.array(
+      v.object({
+        id: v.string(),
+        title: v.string(),
+        level: v.number(),
+        chars: v.number(),
+      })
+    )
+  ),
+  prUrl: v.optional(v.string()),
+  updatedAt: v.number(),
+  publishedAt: v.optional(v.number()),
 });
 
-/** Fetch ONE published page with its body. */
+export const docViewArg = v.optional(
+  v.union(v.literal("outline"), v.literal("content"))
+);
+
+/** Fetch ONE published page, its outline, or one page of its body. */
 export const getDoc = action({
   args: {
     token: v.string(),
     docId: v.id("docs"),
+    view: docViewArg,
+    section: v.optional(v.string()),
+    cursor: v.optional(v.string()),
     gateFeature: gateFeatureArg,
     surface: surfaceArg,
   },
-  returns: v.object({
-    docId: v.id("docs"),
-    title: v.string(),
-    slug: v.string(),
-    module: v.string(),
-    type: v.union(v.literal("api"), v.literal("guide")),
-    body: v.string(),
-    prUrl: v.optional(v.string()),
-    updatedAt: v.number(),
-    publishedAt: v.optional(v.number()),
-  }),
-  handler: async (ctx, args): Promise<DocDetail> => {
+  returns: docPageValidator,
+  handler: async (ctx, args): Promise<DocPage> => {
     assertKeyFormat(args.token);
     const tokenHash = await hashToken(args.token);
     await consumeRateLimit(ctx, "apiMetadata", tokenHash);
 
-    // The doc's project is not known until the row is read, so authorize in
-    // two steps exactly like the slug-addressed reads in reads.ts: establish
-    // the key first, resolve the row, then re-authorize with its projectId —
-    // which is what actually enforces project scope.
-    const first: Authorization = await ctx.runMutation(
+    const authorization: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
       {
         tokenHash,
@@ -330,42 +373,85 @@ export const getDoc = action({
         surface: args.surface,
       }
     );
-    if (!first.ok) throwForDenial(first.denied);
+    if (!authorization.ok) throwForDenial(authorization.denied);
 
-    const located: { projectId: Id<"projects">; doc: DocDetail } =
-      await ctx.runQuery(internal.features.api.docs._locatePublishedDoc, {
-        organizationId: first.organizationId,
-        docId: args.docId,
-      });
-
-    const second: Authorization = await ctx.runMutation(
-      internal.features.api.authorize._authorizeRequest,
+    const located: LocatedDoc = await ctx.runQuery(
+      internal.features.api.docs._locatePublishedDoc,
       {
+        organizationId: authorization.organizationId,
+        scopeProjects: authorization.scopeProjects,
+        docId: args.docId,
+      }
+    );
+
+    // A project the key cannot see must be indistinguishable from a missing
+    // one — never confirm a document's existence to a key out of scope.
+    if (!located.inScope) {
+      await ctx.runMutation(internal.features.api.authorize._authorizeRequest, {
         tokenHash,
         requirement: { resource: "docs", projectId: located.projectId },
         gateFeature: args.gateFeature,
         surface: args.surface,
-      }
-    );
-    // A project the key cannot see must be indistinguishable from a missing
-    // one — never confirm a document's existence to a key out of scope.
-    if (!second.ok) {
-      if (second.denied === "project_scope") {
-        throw new ConvexError("Document not found");
-      }
-      throwForDenial(second.denied);
+      });
+      throw new ConvexError("Document not found");
     }
 
-    return located.doc;
+    return pageDoc(located.doc, args);
   },
 });
+
+type LocatedDoc =
+  | { inScope: false; projectId: Id<"projects"> }
+  | { inScope: true; projectId: Id<"projects">; doc: DocDetail };
+
+export function pageDoc(
+  doc: DocDetail,
+  args: { view?: "outline" | "content"; section?: string; cursor?: string }
+): DocPage {
+  const { body, ...meta } = doc;
+  const sections = parseSections(body);
+  const outline = sections.map((s) => ({
+    id: s.id,
+    title: s.title,
+    level: s.level,
+    chars: s.end - s.start,
+  }));
+
+  if (args.view === "outline") {
+    return { ...meta, body: "", totalChars: body.length, sections: outline };
+  }
+
+  const text =
+    args.section === undefined
+      ? body
+      : (() => {
+          const section = findSection(body, args.section);
+          return body.slice(section.start, section.end);
+        })();
+  const { chunk, nextOffset } = pageOf(
+    text,
+    parseCursor(args.cursor, text.length)
+  );
+  const firstPageOfLongDoc =
+    args.cursor === undefined &&
+    args.section === undefined &&
+    nextOffset !== undefined;
+  return {
+    ...meta,
+    body: chunk,
+    totalChars: text.length,
+    nextCursor: nextOffset === undefined ? undefined : String(nextOffset),
+    sections: firstPageOfLongDoc ? outline : undefined,
+  };
+}
 
 export const _locatePublishedDoc = internalQuery({
   args: {
     organizationId: v.id("organizations"),
+    scopeProjects: v.union(v.literal("all"), v.array(v.id("projects"))),
     docId: v.id("docs"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<LocatedDoc> => {
     const gate = await checkBooleanFeature(
       ctx.db,
       args.organizationId,
@@ -392,8 +478,15 @@ export const _locatePublishedDoc = internalQuery({
     ) {
       throw new ConvexError("Document not found");
     }
+    if (
+      args.scopeProjects !== "all" &&
+      !args.scopeProjects.includes(doc.projectId)
+    ) {
+      return { inScope: false, projectId: doc.projectId };
+    }
 
     return {
+      inScope: true,
       projectId: doc.projectId,
       doc: {
         docId: doc._id,
@@ -409,6 +502,29 @@ export const _locatePublishedDoc = internalQuery({
     };
   },
 });
+
+async function findDocByClientRef(
+  ctx: QueryCtx,
+  projectId: Id<"projects">,
+  authorId: Id<"users">,
+  keyId: Id<"apiKeys"> | undefined,
+  clientRef: string
+): Promise<Doc<"docs"> | null> {
+  const rows = await ctx.db
+    .query("docs")
+    .withIndex("by_author_and_client_ref", (q) =>
+      q.eq("authorId", authorId).eq("clientRef", clientRef)
+    )
+    .take(20);
+  return (
+    rows.find(
+      (row) =>
+        row.projectId === projectId &&
+        row.createdByKeyId === keyId &&
+        row.deletedAt === undefined
+    ) ?? null
+  );
+}
 
 /**
  * Propose a documentation page. Creates a DRAFT — always.
@@ -429,62 +545,40 @@ export const createDoc = action({
     title: v.string(),
     body: v.optional(v.string()),
     prUrl: v.optional(v.string()),
+    clientRef: v.optional(v.string()),
     gateFeature: gateFeatureArg,
     surface: surfaceArg,
   },
-  returns: v.object({
-    docId: v.id("docs"),
-    slug: v.string(),
-    status: v.literal("draft"),
-    warnings: v.array(v.string()),
-  }),
+  returns: createdDraftValidator,
   handler: async (ctx, args): Promise<CreatedDraft> => {
     assertKeyFormat(args.token);
+    const clientRef = normalizeClientRef(args.clientRef);
     const tokenHash = await hashToken(args.token);
     await consumeRateLimit(ctx, "docCreate", tokenHash);
-
-    const bootstrap: Authorization = await ctx.runMutation(
-      internal.features.api.authorize._authorizeRequest,
-      {
-        tokenHash,
-        requirement: { resource: "docs" },
-        gateFeature: args.gateFeature,
-        surface: args.surface,
-      }
-    );
-    if (!bootstrap.ok) throwForDenial(bootstrap.denied);
-
-    const projectDoc = await ctx.runQuery(
-      internal.features.projects.queries._getBySlug,
-      { organizationId: bootstrap.organizationId, slug: args.projectSlug }
-    );
-    if (!projectDoc) throw new ConvexError("Project not found");
 
     const scoped: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
       {
         tokenHash,
-        requirement: { resource: "docs", projectId: projectDoc._id },
+        requirement: { resource: "docs" },
+        projectSlug: args.projectSlug,
         gateFeature: args.gateFeature,
         surface: args.surface,
       }
     );
-    if (!scoped.ok) {
-      if (scoped.denied === "project_scope") {
-        throw new ConvexError("Project not found");
-      }
-      throwForDenial(scoped.denied);
-    }
+    if (!scoped.ok) throwForDenial(scoped.denied);
+    if (!scoped.project) throw new ConvexError("Project not found");
 
     return await ctx.runMutation(internal.features.api.docs._createDocDraft, {
-      organizationId: bootstrap.organizationId,
-      keyId: bootstrap.keyId,
-      projectId: projectDoc._id,
+      organizationId: scoped.organizationId,
+      keyId: scoped.keyId,
+      projectId: scoped.project._id,
       module: args.module,
       type: args.type,
       title: args.title,
       body: args.body,
       prUrl: args.prUrl,
+      clientRef,
     });
   },
 });
@@ -499,14 +593,10 @@ export const _createDocDraft = internalMutation({
     title: v.string(),
     body: v.optional(v.string()),
     prUrl: v.optional(v.string()),
+    clientRef: v.optional(v.string()),
   },
-  returns: v.object({
-    docId: v.id("docs"),
-    slug: v.string(),
-    status: v.literal("draft"),
-    warnings: v.array(v.string()),
-  }),
-  handler: async (ctx, args) => {
+  returns: createdDraftValidator,
+  handler: async (ctx, args): Promise<CreatedDraft> => {
     const gate = await checkBooleanFeature(
       ctx.db,
       args.organizationId,
@@ -527,73 +617,245 @@ export const _createDocDraft = internalMutation({
       throw new ConvexError("Project not found");
     }
 
-    // Same ceilings as the dashboard. An agent must not be able to walk
-    // around a tier limit just because it came in through the MCP surface.
-    await requireDocCapacity(ctx, project, args.projectId);
-
-    const title = args.title.trim();
-    if (title.length === 0 || title.length > 200) {
-      throw new ConvexError("Title must be 1-200 characters");
-    }
-    const moduleName = args.module.trim();
-    if (moduleName.length === 0 || moduleName.length > 100) {
-      throw new ConvexError("Module must be 1-100 characters");
-    }
-
-    const body = args.body ?? templateFor(args.type);
-    // Blocks credential material and instructions aimed at the reader's tool
-    // belt BEFORE anything is stored. Title and module are scanned too: both
-    // are returned by search, so they reach an agent exactly like the body.
-    const meta = scanDocBody(`${title}\n${moduleName}`);
-    const bodyScan = scanDocBody(body);
-    // Both sets reach the reviewer — a warning about the title is exactly as
-    // worth seeing as one about the body, and discarding it hid half of them.
-    const warnings = [...meta.warnings, ...bodyScan.warnings];
-
-    const slug = await uniqueSlug(ctx, args.projectId, slugifyTitle(title));
-    const now = Date.now();
-
     // An API key has no user identity, so the key's creator owns the draft —
     // a real users row, which every downstream permission check needs.
     const key = await ctx.db.get(args.keyId);
     if (!key) throw new ConvexError("Invalid key");
 
-    const docId = await ctx.db.insert("docs", {
-      projectId: args.projectId,
-      module: moduleName,
-      type: args.type,
-      title,
-      slug,
-      // Always. Nothing on this surface can publish.
-      status: "draft",
+    return await insertAgentDraft(ctx, {
+      project,
       authorId: key.createdBy,
-      // Scheme-checked: this value is agent-supplied and is rendered as an
-      // href in the reviewer's dashboard, so `javascript:` must never reach
-      // the database.
-      prUrl: normalizePrUrl(args.prUrl),
-      createdAt: now,
-      updatedAt: now,
+      keyId: key._id,
+      module: args.module,
+      type: args.type,
+      title: args.title,
+      body: args.body,
+      prUrl: args.prUrl,
+      clientRef: args.clientRef,
+      auditDetails: { via: "api_key", keyId: args.keyId },
     });
+  },
+});
 
-    const excerpt = await createBody(ctx, docId, args.projectId, body);
-    await ctx.db.patch(docId, { excerpt });
+export async function insertAgentDraft(
+  ctx: MutationCtx,
+  args: {
+    project: Doc<"projects">;
+    authorId: Id<"users">;
+    keyId?: Id<"apiKeys">;
+    module: string;
+    type: "api" | "guide";
+    title: string;
+    body?: string;
+    prUrl?: string;
+    clientRef?: string;
+    auditDetails: Record<string, unknown>;
+  }
+): Promise<CreatedDraft> {
+  const { project } = args;
 
-    await createAuditLog(ctx, {
-      organizationId: args.organizationId,
-      projectId: args.projectId,
-      userId: key.createdBy,
-      action: "doc.created",
-      // Metadata only — the body is already stored once in docContent, and
-      // an audit row must not keep a second copy of it.
-      details: {
-        title,
-        module: moduleName,
-        slug,
-        via: "api_key",
-        keyId: args.keyId,
-      },
+  if (args.clientRef !== undefined) {
+    const existing = await findDocByClientRef(
+      ctx,
+      project._id,
+      args.authorId,
+      args.keyId,
+      args.clientRef
+    );
+    if (existing) {
+      return {
+        docId: existing._id,
+        slug: existing.slug,
+        projectSlug: project.slug,
+        status: existing.status,
+        warnings: [],
+      };
+    }
+  }
+
+  // Same ceilings as the dashboard. An agent must not be able to walk
+  // around a tier limit just because it came in through the MCP surface.
+  await requireDocCapacity(ctx, project, project._id);
+
+  const title = args.title.trim();
+  if (title.length === 0 || title.length > 200) {
+    throw new ConvexError("Title must be 1-200 characters");
+  }
+  const moduleName = args.module.trim();
+  if (moduleName.length === 0 || moduleName.length > 100) {
+    throw new ConvexError("Module must be 1-100 characters");
+  }
+
+  const body = args.body ?? templateFor(args.type);
+  // Blocks credential material and instructions aimed at the reader's tool
+  // belt BEFORE anything is stored. Title and module are scanned too: both
+  // are returned by search, so they reach an agent exactly like the body.
+  const meta = scanDocBody(`${title}\n${moduleName}`);
+  const bodyScan = scanDocBody(body);
+  // Both sets reach the reviewer — a warning about the title is exactly as
+  // worth seeing as one about the body, and discarding it hid half of them.
+  const warnings = [...meta.warnings, ...bodyScan.warnings];
+
+  const slug = await uniqueSlug(ctx, project._id, slugifyTitle(title));
+  const now = Date.now();
+
+  const docId = await ctx.db.insert("docs", {
+    projectId: project._id,
+    module: moduleName,
+    type: args.type,
+    title,
+    slug,
+    // Always. Nothing on this surface can publish.
+    status: "draft",
+    authorId: args.authorId,
+    // Scheme-checked: this value is agent-supplied and is rendered as an
+    // href in the reviewer's dashboard, so `javascript:` must never reach
+    // the database.
+    prUrl: normalizePrUrl(args.prUrl),
+    createdByKeyId: args.keyId,
+    clientRef: args.clientRef,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const excerpt = await createBody(ctx, docId, project._id, body);
+  await ctx.db.patch(docId, { excerpt });
+
+  await createAuditLog(ctx, {
+    organizationId: project.organizationId,
+    projectId: project._id,
+    userId: args.authorId,
+    action: "doc.created",
+    // Metadata only — the body is already stored once in docContent, and
+    // an audit row must not keep a second copy of it.
+    details: { title, module: moduleName, slug, ...args.auditDetails },
+  });
+
+  return {
+    docId,
+    slug,
+    projectSlug: project.slug,
+    status: "draft",
+    warnings,
+  };
+}
+
+export const updatedDraftValidator = v.object({
+  docId: v.id("docs"),
+  slug: v.string(),
+  projectSlug: v.string(),
+  status: v.literal("draft"),
+  bytes: v.number(),
+  warnings: v.array(v.string()),
+});
+
+export const draftEditModeArg = v.union(
+  v.literal("replace"),
+  v.literal("append"),
+  v.literal("replace_section")
+);
+
+export const updateDocDraft = action({
+  args: {
+    token: v.string(),
+    docId: v.id("docs"),
+    mode: draftEditModeArg,
+    body: v.string(),
+    section: v.optional(v.string()),
+    gateFeature: gateFeatureArg,
+    surface: surfaceArg,
+  },
+  returns: updatedDraftValidator,
+  handler: async (ctx, args): Promise<UpdatedDraft> => {
+    assertKeyFormat(args.token);
+    const tokenHash = await hashToken(args.token);
+    await consumeRateLimit(ctx, "docUpdate", tokenHash);
+
+    const authorization: Authorization = await ctx.runMutation(
+      internal.features.api.authorize._authorizeRequest,
+      {
+        tokenHash,
+        requirement: { resource: "docs" },
+        gateFeature: args.gateFeature,
+        surface: args.surface,
+      }
+    );
+    if (!authorization.ok) throwForDenial(authorization.denied);
+
+    return await ctx.runMutation(internal.features.api.docs._updateDocDraft, {
+      organizationId: authorization.organizationId,
+      scopeProjects: authorization.scopeProjects,
+      keyId: authorization.keyId,
+      docId: args.docId,
+      mode: args.mode,
+      body: args.body,
+      section: args.section,
     });
+  },
+});
 
-    return { docId, slug, status: "draft" as const, warnings };
+export const _updateDocDraft = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    scopeProjects: v.union(v.literal("all"), v.array(v.id("projects"))),
+    keyId: v.id("apiKeys"),
+    docId: v.id("docs"),
+    mode: draftEditModeArg,
+    body: v.string(),
+    section: v.optional(v.string()),
+  },
+  returns: updatedDraftValidator,
+  handler: async (ctx, args): Promise<UpdatedDraft> => {
+    const gate = await checkBooleanFeature(
+      ctx.db,
+      args.organizationId,
+      "project_docs"
+    );
+    if (!gate.allowed) {
+      throw new ConvexError(
+        gate.reason ?? "Project documentation requires a higher tier."
+      );
+    }
+
+    const doc = await ctx.db.get(args.docId);
+    if (
+      !doc ||
+      doc.deletedAt !== undefined ||
+      doc.createdByKeyId !== args.keyId
+    ) {
+      throw new ConvexError("Document not found");
+    }
+    const project = await ctx.db.get(doc.projectId);
+    if (
+      !project ||
+      project.deletedAt !== undefined ||
+      project.organizationId !== args.organizationId ||
+      (args.scopeProjects !== "all" &&
+        !args.scopeProjects.includes(doc.projectId))
+    ) {
+      throw new ConvexError("Document not found");
+    }
+    const key = await ctx.db.get(args.keyId);
+    if (!key) throw new ConvexError("Invalid key");
+
+    const { bytes, warnings } = await applyDraftEdit(
+      ctx,
+      doc,
+      { mode: args.mode, body: args.body, section: args.section },
+      {
+        organizationId: args.organizationId,
+        userId: key.createdBy,
+        details: { via: "api_key", keyId: args.keyId },
+      }
+    );
+
+    return {
+      docId: doc._id,
+      slug: doc.slug,
+      projectSlug: project.slug,
+      status: "draft",
+      bytes,
+      warnings,
+    };
   },
 });
