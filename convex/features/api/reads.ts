@@ -966,6 +966,7 @@ export const getProjectFiles = action({
 const SEARCH_MAX_PROJECTS = 20;
 const SEARCH_MAX_RESULTS = 100;
 const SEARCH_ROW_BUDGET = 8000;
+const SEARCH_SCOPE_READS = 100;
 
 const searchResultValidator = v.object({
   results: v.array(
@@ -998,7 +999,7 @@ async function scopedProjects(
   max: number
 ): Promise<Doc<"projects">[]> {
   const found: Doc<"projects">[] = [];
-  for (const id of ids) {
+  for (const id of ids.slice(0, SEARCH_SCOPE_READS)) {
     if (found.length >= max) break;
     const project = await ctx.db.get(id);
     if (
@@ -1099,6 +1100,8 @@ export const _searchScoped = internalQuery({
       results,
       truncated:
         projects.length > SEARCH_MAX_PROJECTS ||
+        (args.scopeProjects !== "all" &&
+          args.scopeProjects.length > SEARCH_SCOPE_READS) ||
         results.length >= SEARCH_MAX_RESULTS ||
         skippedProjects > 0,
       skippedProjects,
