@@ -3,6 +3,7 @@ import {
   mutation,
   internalMutation,
   MutationCtx,
+  QueryCtx,
 } from "../../../_generated/server";
 import { internal } from "../../../_generated/api";
 import {
@@ -273,6 +274,13 @@ export const create = mutation({
   },
 });
 
+const requestStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("approved"),
+  v.literal("rejected"),
+  v.literal("canceled")
+);
+
 // Anti-spam bounds for machine-originated requests. The per-key rate
 // limiter (machineRequestCreate) throttles bursts; these bound STANDING
 // state. ponytail: fixed constants, config knobs when a real org needs them.
@@ -298,8 +306,12 @@ export const _createFromKey = internalMutation({
     // The agent's justification — the approver's only context. Required.
     justification: v.string(),
     isSensitive: v.optional(v.boolean()),
+    clientRef: v.optional(v.string()),
   },
-  returns: v.id("environmentVariableRequests"),
+  returns: v.object({
+    requestId: v.id("environmentVariableRequests"),
+    status: requestStatusValidator,
+  }),
   handler: async (ctx, args) => {
     const apiKey = await ctx.db.get(args.keyId);
     if (
@@ -317,6 +329,18 @@ export const _createFromKey = internalMutation({
     }
     if (args.justification.length > 500) {
       throw new ConvexError("Justification must be at most 500 characters");
+    }
+
+    if (args.clientRef !== undefined) {
+      const existing = await findKeyRequestByClientRef(
+        ctx,
+        apiKey.createdBy,
+        args.keyId,
+        args.clientRef
+      );
+      if (existing) {
+        return { requestId: existing._id, status: existing.status };
+      }
     }
 
     // Standing-state cap: an agent loop must not pile up pendings.
@@ -374,7 +398,7 @@ export const _createFromKey = internalMutation({
     // requestedBy = the key's creator: the field is load-bearing (dedupe,
     // visibility, verdict email) and a machine has no user id of its own.
     // requestedByKeyId marks the real principal; UI/emails render the key.
-    return insertRequest(ctx, {
+    const requestId = await insertRequest(ctx, {
       key: args.key,
       // Valueless by design: agents never propose secret values — the
       // reviewer supplies one at approval (approveWithValue).
@@ -387,8 +411,29 @@ export const _createFromKey = internalMutation({
       requestedByKeyId: args.keyId,
       requesterLabel: `API key "${apiKey.name}"`,
     });
+    const row = await ctx.db.get(requestId);
+    if (!row) throw new ConvexError("Request not found");
+    if (args.clientRef !== undefined && row.requestedByKeyId === args.keyId) {
+      await ctx.db.patch(requestId, { clientRef: args.clientRef });
+    }
+    return { requestId, status: row.status };
   },
 });
+
+export async function findKeyRequestByClientRef(
+  ctx: QueryCtx,
+  requestedBy: Id<"users">,
+  keyId: Id<"apiKeys">,
+  clientRef: string
+): Promise<Doc<"environmentVariableRequests"> | null> {
+  const rows = await ctx.db
+    .query("environmentVariableRequests")
+    .withIndex("by_requester_and_client_ref", (q) =>
+      q.eq("requestedBy", requestedBy).eq("clientRef", clientRef)
+    )
+    .take(20);
+  return rows.find((row) => row.requestedByKeyId === keyId) ?? null;
+}
 
 /**
  * TTL sweep (cron): auto-cancel machine-originated requests that sat

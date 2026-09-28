@@ -44,6 +44,7 @@ export type Authorization =
       scopeEnvironments: "all" | string[];
       scopeResources: string[];
       keyId: Id<"apiKeys">;
+      project?: { _id: Id<"projects">; name: string; slug: string };
     }
   | { ok: false; denied: Denied };
 
@@ -95,7 +96,8 @@ export async function consumeRateLimit(
     | "cicdPull"
     | "dockerPull"
     | "machineRequestCreate"
-    | "docCreate",
+    | "docCreate"
+    | "docUpdate",
   tokenHash: string
 ): Promise<void> {
   try {
@@ -108,4 +110,15 @@ export async function consumeRateLimit(
     }
     throw error;
   }
+}
+
+export function normalizeClientRef(
+  raw: string | undefined
+): string | undefined {
+  const trimmed = raw?.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.length > 200) {
+    throw new ConvexError("client_ref must be at most 200 characters");
+  }
+  return trimmed;
 }

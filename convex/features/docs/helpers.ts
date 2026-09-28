@@ -20,6 +20,10 @@ import {
   countOrgDocs,
   countProjectDocs,
 } from "../featureRegistry/gates";
+import { createAuditLog } from "../../lib/audit";
+import { readBody, writeBody } from "./content";
+import { scanDocBody } from "./guards";
+import { appendToBody, replaceSection } from "./sections";
 
 /** Ceiling on a single project's doc listing — structural, not a tier limit. */
 export const MAX_DOC_ROWS = 500;
@@ -216,4 +220,55 @@ export async function requireDocCapacity(
       `Your organization has reached its documentation limit (${perOrg.current}/${perOrg.limit}). Delete a page or upgrade for unlimited pages.`
     );
   }
+}
+
+export type DraftEdit = {
+  mode: "replace" | "append" | "replace_section";
+  body: string;
+  section?: string;
+};
+
+export async function applyDraftEdit(
+  ctx: MutationCtx,
+  doc: Doc<"docs">,
+  edit: DraftEdit,
+  audit: {
+    organizationId: Id<"organizations">;
+    userId: Id<"users">;
+    details: Record<string, unknown>;
+  }
+): Promise<{ bytes: number; warnings: string[] }> {
+  if (doc.status !== "draft") {
+    throw new ConvexError(
+      "This page is published. Published pages change only through the dashboard."
+    );
+  }
+  const current = await readBody(ctx, doc._id);
+  let next: string;
+  if (edit.mode === "replace") {
+    next = edit.body;
+  } else if (edit.mode === "append") {
+    next = appendToBody(current, edit.body);
+  } else {
+    if (!edit.section) {
+      throw new ConvexError("section is required when mode is replace_section");
+    }
+    next = replaceSection(current, edit.section, edit.body);
+  }
+
+  const { warnings } = scanDocBody(next);
+  const excerpt = await writeBody(ctx, doc._id, doc.projectId, next);
+  await ctx.db.patch(doc._id, {
+    updatedAt: Date.now(),
+    ...(excerpt === null ? {} : { excerpt }),
+  });
+  await createAuditLog(ctx, {
+    organizationId: audit.organizationId,
+    projectId: doc.projectId,
+    userId: audit.userId,
+    action: "doc.updated",
+    details: { ...audit.details, slug: doc.slug, mode: edit.mode },
+  });
+
+  return { bytes: new TextEncoder().encode(next).length, warnings };
 }

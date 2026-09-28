@@ -15,6 +15,22 @@
 
 <!-- entry -->
 ---
+title: Faster MCP server, long documentation pages, and sign-in with Claude
+version: v1.71.0
+date: 2026-09-28
+types: [feature, improvement, fix]
+---
+
+The MCP server answers faster. Each call now authorizes the key and resolves the project in one step instead of three, variable and account values decrypt eight at a time instead of one by one, and one flaky vault read is retried instead of failing the whole pull. `envpilot_search` runs as a single query and no longer writes an audit entry for every project a key cannot read.
+
+Long documentation pages work over MCP. `envpilot_get_doc` returns an outline, a single section, or up to 60,000 characters at a time with a cursor, so a large page never overflows an agent's tool output limit. The new `envpilot_update_doc_draft` tool appends to a draft, replaces it, or replaces one section, so an agent can write a long page in parts. Every edit re-checks the whole page for credentials and injected instructions.
+
+`envpilot_create_doc` and `envpilot_request_variable` accept `client_ref`. Retrying a call that timed out returns the first result instead of creating a duplicate.
+
+Claude on the web, Desktop, mobile and Cowork can now connect with your Envpilot login. Add `https://www.envpilot.dev/api/mcp` as a custom connector and sign in; Claude Code works the same way without an API key. The connection acts as you and sees what your role sees. Shared accounts, secret files and variable requests still need an API key.
+
+<!-- entry -->
+---
 title: VS Code extension 1.17.2
 version: v1.17.2
 date: 2026-09-24

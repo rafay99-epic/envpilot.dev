@@ -38,7 +38,7 @@ const REJECT_PATTERNS: SecretPattern[] = [
   {
     label: "a connection string with an inline password",
     // Any length: a five-character password is still a password.
-    re: /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:(?!(?:password|pass|secret|token|xxx+|\.{3}|<|\$|%|\*+|your[-_]?)\b)[^\s:/@]+@/i,
+    re: /\b[a-z][a-z0-9+.-]{0,31}:\/\/[^\s:/@]+:(?!(?:password|pass|secret|token|xxx+|\.{3}|<|\$|%|\*+|your[-_]?)\b)[^\s:/@]+@/i,
   },
 ];
 

@@ -155,6 +155,13 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 10,
   },
 
+  docUpdate: {
+    kind: "token bucket",
+    rate: 120,
+    period: 3_600_000,
+    capacity: 40,
+  },
+
   // Documentation shares: 60 emails per hour per org. Charged per RECIPIENT,
   // because the cost being bounded is outbound mail rather than rows.
   //
