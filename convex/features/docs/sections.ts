@@ -35,6 +35,7 @@ function lines(body: string): Line[] {
 
 export function parseSections(body: string): DocSection[] {
   const sections: DocSection[] = [];
+  const open: DocSection[] = [];
   const seen = new Map<string, number>();
   for (const line of lines(body)) {
     if (line.inFence) continue;
@@ -44,20 +45,24 @@ export function parseSections(body: string): DocSection[] {
     const base = slugifyTitle(title);
     const count = (seen.get(base) ?? 0) + 1;
     seen.set(base, count);
-    sections.push({
+    const section: DocSection = {
       id: count === 1 ? base : `${base}-${count}`,
       title,
       level: hashes.length,
       start: line.start,
       end: body.length,
-    });
+    };
+    for (
+      let top = open[open.length - 1];
+      top && top.level >= section.level;
+      top = open[open.length - 1]
+    ) {
+      top.end = section.start;
+      open.pop();
+    }
+    open.push(section);
+    sections.push(section);
   }
-  sections.forEach((section, i) => {
-    const next = sections
-      .slice(i + 1)
-      .find((later) => later.level <= section.level);
-    section.end = next ? next.start : body.length;
-  });
   return sections;
 }
 

@@ -37,10 +37,10 @@ export type ResolvedVariable = Doc<"environmentVariables"> & {
 
 export async function resolveEffectiveVariables(
   ctx: QueryCtx,
-  args: { projectId: Id<"projects">; environment?: string }
+  args: { projectId: Id<"projects">; environment?: string; limit?: number }
 ): Promise<ResolvedVariable[]> {
   const own: ResolvedVariable[] = (
-    await activeRows(ctx, args.projectId, args.environment)
+    await activeRows(ctx, args.projectId, args.environment, args.limit)
   ).map((row) => ({ ...row, source: { kind: "own" } }));
 
   const memberships = await ctx.db
@@ -57,12 +57,22 @@ export async function resolveEffectiveVariables(
   const inherited: ResolvedVariable[] = [];
 
   for (const membership of memberships) {
+    const remaining =
+      args.limit === undefined
+        ? undefined
+        : args.limit - own.length - inherited.length;
+    if (remaining !== undefined && remaining <= 0) break;
     const workspace = await ctx.db.get(membership.workspaceId);
     // A soft-deleted workspace stops sharing immediately. Members lose the
     // keys on their next pull rather than reading rows queued for purge.
     if (!workspace || workspace.deletedAt !== undefined) continue;
 
-    for (const row of await activeRows(ctx, membership.workspaceId)) {
+    for (const row of await activeRows(
+      ctx,
+      membership.workspaceId,
+      undefined,
+      remaining
+    )) {
       // Absent appliesTo = every member project, and it keeps following
       // membership as projects join. Present = exactly that list.
       if (row.appliesTo && !row.appliesTo.includes(args.projectId)) continue;
@@ -93,14 +103,17 @@ export async function resolveEffectiveVariables(
 async function activeRows(
   ctx: QueryCtx,
   projectId: Id<"projects">,
-  environment?: string
+  environment?: string,
+  limit?: number
 ): Promise<Doc<"environmentVariables">[]> {
-  const rows = await ctx.db
+  const query = ctx.db
     .query("environmentVariables")
     .withIndex("by_project_deleted", (q) =>
       q.eq("projectId", projectId).eq("deletedAt", undefined)
-    )
-    .collect();
+    );
+  const rows = await (limit === undefined
+    ? query.collect()
+    : query.take(limit));
 
   return environment === undefined
     ? rows

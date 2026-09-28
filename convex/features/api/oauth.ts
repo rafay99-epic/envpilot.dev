@@ -19,8 +19,10 @@ import { pool, VAULT_POOL_WIDTH } from "../../lib/pool";
 import { isWorkspace } from "../../lib/projectKind";
 import {
   applyDraftEdit,
+  canEditDoc,
   requireDocAccess,
   requireDocsFeature,
+  type DocAccess,
 } from "../docs/helpers";
 import { readBody } from "../docs/content";
 import { listForUserCore } from "../projects/helpers";
@@ -32,7 +34,6 @@ import {
   docSummaryValidator,
   docViewArg,
   draftEditModeArg,
-  findDocByClientRef,
   insertAgentDraft,
   pageDoc,
   searchPublishedDocs,
@@ -386,14 +387,21 @@ export const _search = internalQuery({
         skippedProjects += 1;
         continue;
       }
-      let rows: ReadableVariables["rows"];
+      const limit = SEARCH_ROW_BUDGET - rowsRead;
+      let listed: Awaited<ReturnType<typeof listWithAccessCore>>;
       try {
-        rows = await readableVariables(ctx, project._id, user._id);
+        listed = await listWithAccessCore(ctx, {
+          projectId: project._id,
+          userId: user._id,
+          limit,
+        });
       } catch {
         skippedProjects += 1;
         continue;
       }
-      rowsRead += rows.length;
+      rowsRead += listed.variables.length;
+      if (listed.truncatedAt !== undefined) skippedProjects += 1;
+      const rows = listed.variables.filter((row) => row.hasAccess);
       for (const row of rows) {
         if (results.length >= SEARCH_MAX_RESULTS) break;
         if (row.key.toLowerCase().includes(needle)) {
@@ -499,19 +507,20 @@ async function requireAgentVisibleProject(
   ctx: QueryCtx,
   userId: Id<"users">,
   doc: Doc<"docs"> | null
-): Promise<{ doc: Doc<"docs">; project: Doc<"projects"> }> {
+): Promise<{ doc: Doc<"docs">; project: Doc<"projects">; access: DocAccess }> {
   const project = doc ? await ctx.db.get(doc.projectId) : null;
   if (!doc || doc.deletedAt !== undefined || !project) {
     throw new ConvexError("Document not found");
   }
   await requireMcpGate(ctx, project.organizationId);
+  let access: DocAccess;
   try {
-    await requireDocAccess(ctx, userId, project._id);
+    access = await requireDocAccess(ctx, userId, project._id);
   } catch {
     throw new ConvexError("Document not found");
   }
   await requireDocsFeature(ctx, project.organizationId);
-  return { doc, project };
+  return { doc, project, access };
 }
 
 export const _getDoc = internalQuery({
@@ -556,15 +565,6 @@ export const createDoc = action({
   handler: async (ctx, args): Promise<CreatedDraft> => {
     const principal = await verifyOAuthToken(args.token);
     const clientRef = normalizeClientRef(args.clientRef);
-
-    if (clientRef !== undefined) {
-      const existing: CreatedDraft | null = await ctx.runQuery(
-        internal.features.api.oauth._findDocByClientRef,
-        { workosId: principal.workosId, clientRef }
-      );
-      if (existing) return existing;
-    }
-
     await consumeRateLimit(ctx, "docCreate", oauthRateKey(principal));
     return await ctx.runMutation(internal.features.api.oauth._createDoc, {
       workosId: principal.workosId,
@@ -578,28 +578,6 @@ export const createDoc = action({
       prUrl: args.prUrl,
       clientRef,
     });
-  },
-});
-
-export const _findDocByClientRef = internalQuery({
-  args: { workosId: v.string(), clientRef: v.string() },
-  handler: async (ctx, args): Promise<CreatedDraft | null> => {
-    const user = await requireOAuthUser(ctx, args.workosId);
-    const doc = await findDocByClientRef(
-      ctx,
-      user._id,
-      undefined,
-      args.clientRef
-    );
-    const project = doc ? await ctx.db.get(doc.projectId) : null;
-    if (!doc || !project) return null;
-    return {
-      docId: doc._id,
-      slug: doc.slug,
-      projectSlug: project.slug,
-      status: doc.status,
-      warnings: [],
-    };
   },
 });
 
@@ -685,13 +663,16 @@ export const _updateDocDraft = internalMutation({
   returns: updatedDraftValidator,
   handler: async (ctx, args): Promise<UpdatedDraft> => {
     const user = await requireOAuthUser(ctx, args.workosId);
-    const { doc, project } = await requireAgentVisibleProject(
+    const { doc, project, access } = await requireAgentVisibleProject(
       ctx,
       user._id,
       await ctx.db.get(args.docId)
     );
     if (doc.authorId !== user._id) {
       throw new ConvexError("Document not found");
+    }
+    if (!canEditDoc(doc, user._id, access)) {
+      throw new ConvexError("Your role cannot edit this documentation page");
     }
     const { bytes, warnings } = await applyDraftEdit(
       ctx,
