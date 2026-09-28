@@ -428,7 +428,7 @@ export const getVersionHistory = query({
   },
 });
 
-async function listWithAccessCore(
+export async function listWithAccessCore(
   ctx: QueryCtx,
   args: { projectId: Id<"projects">; userId: Id<"users">; limit?: number }
 ): Promise<{

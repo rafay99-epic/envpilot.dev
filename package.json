@@ -55,6 +55,7 @@
     "@convex-dev/rate-limiter": "^0.3.2",
     "@convex-dev/workflow": "^0.3.5",
     "@convex-dev/workpool": "^0.4.1",
+    "jose": "^6.2.12",
     "resend": "^6.9.3"
   }
 }

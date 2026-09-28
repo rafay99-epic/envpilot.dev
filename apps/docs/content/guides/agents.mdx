@@ -99,7 +99,7 @@ Step 2 is the habit worth encouraging in your prompt: **look at key names first,
 
 - Pro plan (`mcp_server`), re-checked on every call.
 - Scope is immutable — widening access means a new key and a client restart.
-- Hosted Claude connectors expect OAuth and cannot carry a fixed bearer key; use Claude Code.
+- Hosted Claude connectors sign in with OAuth; see [Sign in with OAuth](/mcp/clients#sign-in-with-oauth). Shared accounts, secret files and variable requests still need an API key.
 - Tool calls draw on the same rate buckets as REST for that key.
 
 ## See also

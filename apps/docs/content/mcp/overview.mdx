@@ -8,25 +8,26 @@ icon: zap
 
 MCP (Model Context Protocol) lets an assistant call tools against your real data instead of guessing at it. Envpilot runs a remote MCP server, so Claude Code, Codex, or Cursor can look up your projects, read the variables you allow, and fetch a secret file a build needs — through the **same** auth, scope, rate limits and audit trail as the REST API. Nothing is re-implemented for agents.
 
-Requires the **Pro** plan (`mcp_server`) and an [API key](/mcp/setup).
+Requires the **Pro** plan (`mcp_server`). Connect with an [API key](/mcp/setup) or [sign in with OAuth](/mcp/clients#sign-in-with-oauth).
 
 ```
 https://www.envpilot.dev/api/mcp
 ```
 
-Transport is Streamable HTTP; auth is `Authorization: Bearer envpk_…`.
+Transport is Streamable HTTP. Auth is `Authorization: Bearer envpk_…` or an OAuth access token from the Envpilot sign-in.
 
 ## What an agent can do
 
 | Can                                                   | Cannot                                          |
 | ----------------------------------------------------- | ----------------------------------------------- |
-| List projects in the key's scope                      | Create, edit, or delete anything                |
+| List projects in the key's scope                      | Create, edit, or delete variables or files      |
 | Read variables and shared accounts                    | Read outside the key's projects or environments |
 | Read secret files, with the `files` resource          | Approve its own request                         |
 | Search project names and variable **keys**            | See variable **values** through search          |
 | File a variable request, with the `requests` resource | Propose a value for that request                |
+| Write documentation **drafts**                        | Publish a page                                  |
 
-That last row is the whole trust model: **read-only keys, human-approved escalation.** An agent states what it needs and why; a human decides and supplies the value. See [Agent requests](/mcp/agent-requests).
+The request row is the whole trust model: **read-only keys, human-approved escalation.** An agent states what it needs and why; a human decides and supplies the value. See [Agent requests](/mcp/agent-requests).
 
 ## Getting connected
 
@@ -40,7 +41,7 @@ That last row is the whole trust model: **read-only keys, human-approved escalat
 - **Scope is immutable.** Projects, environments, resources and surfaces are fixed at creation; widening means a new key.
 - **Rate limits are shared with REST** for that key: 120/min metadata, 30/min value pulls, plus the file buckets. Request filing is 5/hour, burst 2.
 - **Every value-returning call is audited** against the key, including every secret-file fetch.
-- **Hosted Claude connectors are not supported** — they expect OAuth, and Envpilot uses a fixed bearer key. Use Claude Code.
+- **OAuth sign-ins act as the person.** Their role decides what the connection sees. Shared accounts, secret files and variable requests need an API key.
 
 ## Next
 

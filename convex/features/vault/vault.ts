@@ -293,6 +293,14 @@ export async function vaultRead(vaultRef: string): Promise<string> {
   return data.value;
 }
 
+export async function vaultReadWithRetry(vaultRef: string): Promise<string> {
+  try {
+    return await vaultRead(vaultRef);
+  } catch {
+    return await vaultRead(vaultRef);
+  }
+}
+
 /** Update the value; same id, new version. */
 export async function vaultUpdate(args: {
   vaultRef: string;

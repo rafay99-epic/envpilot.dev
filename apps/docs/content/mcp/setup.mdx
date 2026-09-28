@@ -190,4 +190,4 @@ Revocation is instant—anything still using the old key stops on its next call.
 - **Scope cannot be widened.** Adding a project, environment or resource means a new key and a client restart.
 - **The key is shown once.** Store it in an environment variable, never in a config file you commit.
 - **Pro plan** (`mcp_server`), re-checked on every tool call.
-- Hosted Claude connectors cannot carry a fixed bearer key — see [Connecting a client](/mcp/clients).
+- Hosted Claude connectors sign in with OAuth instead of a key; see [Connecting a client](/mcp/clients#sign-in-with-oauth).

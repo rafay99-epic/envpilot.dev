@@ -1,11 +1,13 @@
 import { v, ConvexError, type Infer } from "convex/values";
 import { action, internalQuery } from "../../_generated/server";
+import { findKeyRequestByClientRef } from "../variables/requests/mutations";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import {
   hashToken,
   assertKeyFormat,
   consumeRateLimit,
+  normalizeClientRef,
   throwForDenial,
   type Authorization,
 } from "./helpers";
@@ -49,6 +51,23 @@ const machineRequestShape = v.object({
   createdAt: v.number(),
 });
 type MachineRequest = Infer<typeof machineRequestShape>;
+type RequestStatus = MachineRequest["status"];
+
+const filedRequestValidator = v.object({
+  requestId: v.id("environmentVariableRequests"),
+  status: v.union(
+    v.literal("pending"),
+    v.literal("approved"),
+    v.literal("rejected"),
+    v.literal("canceled")
+  ),
+  projectSlug: v.string(),
+  message: v.string(),
+});
+type FiledRequest = Infer<typeof filedRequestValidator>;
+
+const FILED_MESSAGE =
+  "Request filed. A human reviewer approves it in the Envpilot dashboard and supplies the value; poll get_request_status or retry the read after approval.";
 
 export const createVariableRequest = action({
   args: {
@@ -58,23 +77,22 @@ export const createVariableRequest = action({
     environments: v.array(v.string()),
     justification: v.string(),
     isSensitive: v.optional(v.boolean()),
+    clientRef: v.optional(v.string()),
     surface: surfaceArg,
   },
-  returns: v.object({
-    requestId: v.id("environmentVariableRequests"),
-    status: v.literal("pending"),
-    message: v.string(),
-  }),
-  handler: async (
-    ctx,
-    args
-  ): Promise<{
-    requestId: Id<"environmentVariableRequests">;
-    status: "pending";
-    message: string;
-  }> => {
+  returns: filedRequestValidator,
+  handler: async (ctx, args): Promise<FiledRequest> => {
     assertKeyFormat(args.token);
+    const clientRef = normalizeClientRef(args.clientRef);
     const tokenHash = await hashToken(args.token);
+
+    if (clientRef !== undefined) {
+      const existing: FiledRequest | null = await ctx.runQuery(
+        internal.features.api.requests._findKeyRequestByClientRef,
+        { tokenHash, clientRef }
+      );
+      if (existing) return existing;
+    }
 
     // Strict per-key bucket BEFORE any authorize/DB work — a retry-looping
     // agent is blocked at the door, not after fanning out reviewer email.
@@ -83,33 +101,14 @@ export const createVariableRequest = action({
     // bounds it — one cheap indexed miss per attempt.)
     await consumeRateLimit(ctx, "machineRequestCreate", tokenHash);
 
-    // Bootstrap authorize (no project yet), then resolve slug → projectId
-    // and authorize AGAIN with it — identical two-step to reads.ts, so an
-    // out-of-scope project is indistinguishable from a nonexistent one.
-    const bootstrap: Authorization = await ctx.runMutation(
-      internal.features.api.authorize._authorizeRequest,
-      {
-        tokenHash,
-        requirement: { resource: "requests" },
-        surface: args.surface,
-      }
-    );
-    if (!bootstrap.ok)
-      throwForDenial(bootstrap.denied, {
-        resourceScope: REQUESTS_RESOURCE_DENIAL,
-      });
-
-    const projectDoc = await ctx.runQuery(
-      internal.features.projects.queries._getBySlug,
-      { organizationId: bootstrap.organizationId, slug: args.projectSlug }
-    );
-    if (!projectDoc) throw new ConvexError("Project not found");
-
+    // The slug resolves inside the core, so an out-of-scope project is
+    // indistinguishable from a nonexistent one.
     const scoped: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
       {
         tokenHash,
-        requirement: { resource: "requests", projectId: projectDoc._id },
+        requirement: { resource: "requests" },
+        projectSlug: args.projectSlug,
         surface: args.surface,
       }
     );
@@ -117,6 +116,8 @@ export const createVariableRequest = action({
       throwForDenial(scoped.denied, {
         resourceScope: REQUESTS_RESOURCE_DENIAL,
       });
+    const projectDoc = scoped.project;
+    if (!projectDoc) throw new ConvexError("Project not found");
 
     // Requested environments must all fall inside the key's scope — the
     // scope data comes from _authorizeRequest, which only checks a single
@@ -137,7 +138,10 @@ export const createVariableRequest = action({
       }
     }
 
-    const requestId: Id<"environmentVariableRequests"> = await ctx.runMutation(
+    const filed: {
+      requestId: Id<"environmentVariableRequests">;
+      status: RequestStatus;
+    } = await ctx.runMutation(
       internal.features.variables.requests.mutations._createFromKey,
       {
         keyId: scoped.keyId,
@@ -146,14 +150,42 @@ export const createVariableRequest = action({
         environments: args.environments,
         justification: args.justification,
         isSensitive: args.isSensitive,
+        clientRef,
       }
     );
 
+    return { ...filed, projectSlug: projectDoc.slug, message: FILED_MESSAGE };
+  },
+});
+
+export const _findKeyRequestByClientRef = internalQuery({
+  args: { tokenHash: v.string(), clientRef: v.string() },
+  handler: async (ctx, args): Promise<FiledRequest | null> => {
+    const key = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_token_hash", (q) => q.eq("tokenHash", args.tokenHash))
+      .first();
+    if (
+      !key ||
+      key.revokedAt !== undefined ||
+      (key.expiresAt !== undefined && key.expiresAt <= Date.now())
+    ) {
+      return null;
+    }
+    const request = await findKeyRequestByClientRef(
+      ctx,
+      key.createdBy,
+      key._id,
+      args.clientRef
+    );
+    if (!request) return null;
+    const project = await ctx.db.get(request.projectId);
+    if (!project) return null;
     return {
-      requestId,
-      status: "pending" as const,
-      message:
-        "Request filed — a human reviewer must approve it in the Envpilot dashboard and supply the value. Tell the user to review it, then poll get_request_status or simply retry the read after approval.",
+      requestId: request._id,
+      status: request.status,
+      projectSlug: project.slug,
+      message: FILED_MESSAGE,
     };
   },
 });
