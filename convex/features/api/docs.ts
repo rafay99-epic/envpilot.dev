@@ -503,8 +503,9 @@ export const _locatePublishedDoc = internalQuery({
   },
 });
 
-export async function findDocByClientRef(
+async function findDocByClientRef(
   ctx: QueryCtx,
+  projectId: Id<"projects">,
   authorId: Id<"users">,
   keyId: Id<"apiKeys"> | undefined,
   clientRef: string
@@ -517,43 +518,13 @@ export async function findDocByClientRef(
     .take(20);
   return (
     rows.find(
-      (row) => row.createdByKeyId === keyId && row.deletedAt === undefined
+      (row) =>
+        row.projectId === projectId &&
+        row.createdByKeyId === keyId &&
+        row.deletedAt === undefined
     ) ?? null
   );
 }
-
-export const _findKeyDocByClientRef = internalQuery({
-  args: { tokenHash: v.string(), clientRef: v.string() },
-  handler: async (ctx, args): Promise<CreatedDraft | null> => {
-    const key = await ctx.db
-      .query("apiKeys")
-      .withIndex("by_token_hash", (q) => q.eq("tokenHash", args.tokenHash))
-      .first();
-    if (
-      !key ||
-      key.revokedAt !== undefined ||
-      (key.expiresAt !== undefined && key.expiresAt <= Date.now())
-    ) {
-      return null;
-    }
-    const doc = await findDocByClientRef(
-      ctx,
-      key.createdBy,
-      key._id,
-      args.clientRef
-    );
-    if (!doc) return null;
-    const project = await ctx.db.get(doc.projectId);
-    if (!project) return null;
-    return {
-      docId: doc._id,
-      slug: doc.slug,
-      projectSlug: project.slug,
-      status: doc.status,
-      warnings: [],
-    };
-  },
-});
 
 /**
  * Propose a documentation page. Creates a DRAFT — always.
@@ -583,15 +554,6 @@ export const createDoc = action({
     assertKeyFormat(args.token);
     const clientRef = normalizeClientRef(args.clientRef);
     const tokenHash = await hashToken(args.token);
-
-    if (clientRef !== undefined) {
-      const existing: CreatedDraft | null = await ctx.runQuery(
-        internal.features.api.docs._findKeyDocByClientRef,
-        { tokenHash, clientRef }
-      );
-      if (existing) return existing;
-    }
-
     await consumeRateLimit(ctx, "docCreate", tokenHash);
 
     const scoped: Authorization = await ctx.runMutation(
@@ -695,6 +657,7 @@ export async function insertAgentDraft(
   if (args.clientRef !== undefined) {
     const existing = await findDocByClientRef(
       ctx,
+      project._id,
       args.authorId,
       args.keyId,
       args.clientRef

@@ -1,6 +1,5 @@
 import { v, ConvexError, type Infer } from "convex/values";
 import { action, internalQuery } from "../../_generated/server";
-import { findKeyRequestByClientRef } from "../variables/requests/mutations";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import {
@@ -86,14 +85,6 @@ export const createVariableRequest = action({
     const clientRef = normalizeClientRef(args.clientRef);
     const tokenHash = await hashToken(args.token);
 
-    if (clientRef !== undefined) {
-      const existing: FiledRequest | null = await ctx.runQuery(
-        internal.features.api.requests._findKeyRequestByClientRef,
-        { tokenHash, clientRef }
-      );
-      if (existing) return existing;
-    }
-
     // Strict per-key bucket BEFORE any authorize/DB work — a retry-looping
     // agent is blocked at the door, not after fanning out reviewer email.
     // (Keyed by the presented hash: this throttles a misbehaving CLIENT;
@@ -155,38 +146,6 @@ export const createVariableRequest = action({
     );
 
     return { ...filed, projectSlug: projectDoc.slug, message: FILED_MESSAGE };
-  },
-});
-
-export const _findKeyRequestByClientRef = internalQuery({
-  args: { tokenHash: v.string(), clientRef: v.string() },
-  handler: async (ctx, args): Promise<FiledRequest | null> => {
-    const key = await ctx.db
-      .query("apiKeys")
-      .withIndex("by_token_hash", (q) => q.eq("tokenHash", args.tokenHash))
-      .first();
-    if (
-      !key ||
-      key.revokedAt !== undefined ||
-      (key.expiresAt !== undefined && key.expiresAt <= Date.now())
-    ) {
-      return null;
-    }
-    const request = await findKeyRequestByClientRef(
-      ctx,
-      key.createdBy,
-      key._id,
-      args.clientRef
-    );
-    if (!request) return null;
-    const project = await ctx.db.get(request.projectId);
-    if (!project) return null;
-    return {
-      requestId: request._id,
-      status: request.status,
-      projectSlug: project.slug,
-      message: FILED_MESSAGE,
-    };
   },
 });
 

@@ -104,3 +104,24 @@ describe("draft edits", () => {
     expect(appendToBody("", "b")).toBe("b");
   });
 });
+
+describe("parseSections — scale", () => {
+  it("parses a page of many short headings in linear time", () => {
+    const body = Array.from({ length: 60_000 }, (_, i) => `# h${i}`).join("\n");
+    const started = performance.now();
+    const sections = parseSections(body);
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(sections).toHaveLength(60_000);
+    expect(sections[0]?.end).toBe(sections[1]?.start);
+    expect(sections.at(-1)?.end).toBe(body.length);
+  });
+});
+
+describe("pageOf — oversized structures", () => {
+  it("splits a single line longer than the page at the limit", () => {
+    const line = "x".repeat(250);
+    const first = pageOf(line, 0, 100);
+    expect(first.chunk).toHaveLength(100);
+    expect(first.nextOffset).toBe(100);
+  });
+});

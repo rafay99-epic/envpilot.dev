@@ -334,6 +334,7 @@ export const _createFromKey = internalMutation({
     if (args.clientRef !== undefined) {
       const existing = await findKeyRequestByClientRef(
         ctx,
+        args.projectId,
         apiKey.createdBy,
         args.keyId,
         args.clientRef
@@ -420,8 +421,9 @@ export const _createFromKey = internalMutation({
   },
 });
 
-export async function findKeyRequestByClientRef(
+async function findKeyRequestByClientRef(
   ctx: QueryCtx,
+  projectId: Id<"projects">,
   requestedBy: Id<"users">,
   keyId: Id<"apiKeys">,
   clientRef: string
@@ -432,7 +434,11 @@ export async function findKeyRequestByClientRef(
       q.eq("requestedBy", requestedBy).eq("clientRef", clientRef)
     )
     .take(20);
-  return rows.find((row) => row.requestedByKeyId === keyId) ?? null;
+  return (
+    rows.find(
+      (row) => row.projectId === projectId && row.requestedByKeyId === keyId
+    ) ?? null
+  );
 }
 
 /**

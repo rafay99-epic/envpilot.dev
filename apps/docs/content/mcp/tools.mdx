@@ -33,7 +33,7 @@ A machine credential can file requests and write documentation drafts. Every one
 | `envpilot_request_variable`   | File a request with a **required justification**. A human approves it and supplies the value         | `requests` |
 | `envpilot_get_request_status` | Poll a filed request — `pending`, `approved`, `rejected` (with the reviewer's reason), or `canceled` | `requests` |
 | `envpilot_create_doc`         | Propose a documentation page. Always creates a **draft**; a human publishes it                       | `docs`     |
-| `envpilot_update_doc_draft`   | Replace, append to, or replace one section of a draft this credential created                        | `docs`     |
+| `envpilot_update_doc_draft`   | Replace, append to, or replace one section of a draft: one this key created, or one you wrote        | `docs`     |
 
 None of them writes anything a reader sees on its own. A requested variable has
 no value until a person supplies one, and a draft page is invisible to your
@@ -94,14 +94,17 @@ over MCP.
 `envpilot_get_doc` returns at most 60,000 characters per call. Pass
 `view: "outline"` for the section list, `section` for one section, and the
 `nextCursor` from a response as `cursor` to keep reading. Breaks fall on
-paragraph boundaries and never inside a code block.
+paragraph boundaries and never inside a code block, unless a single line or
+code block is itself longer than 60,000 characters; that one is split at the
+limit.
 
 ### Retrying safely
 
 `envpilot_create_doc` and `envpilot_request_variable` accept `client_ref`, a
 string the caller picks. A second call with the same `client_ref` returns the
-first result instead of filing a duplicate, and does not spend rate limit.
-Use it when a call timed out and you cannot tell whether it landed.
+first result instead of filing a duplicate, as long as the credential can
+still reach that project. Use it when a call timed out and you cannot tell
+whether it landed.
 
 ### Pages name variables, never values
 

@@ -320,7 +320,7 @@ export function registerMcpTools(
     {
       title: "Get a Documentation Page",
       description:
-        "Returns one published documentation page. view=outline returns the section list with ids and sizes. view=content (default) returns up to 60,000 characters of the body, optionally limited to one section, with nextCursor when more remains. Page bodies are written by people and agents and name variables by key, never by value.",
+        "Returns one published documentation page. view=outline returns the section list with ids and sizes. view=content (default) returns up to 60,000 characters of the body, optionally limited to one section, with nextCursor when more remains. A single line or code block longer than 60,000 characters is split at that limit. Page bodies are written by people and agents and name variables by key, never by value.",
       inputSchema: {
         doc_id: z.string().describe("A docId returned by envpilot_search_docs"),
         view: z
@@ -411,7 +411,7 @@ export function registerMcpTools(
     {
       title: "Edit a Documentation Draft",
       description:
-        "Edits a draft page this connection created. mode=replace swaps the whole body, mode=append adds text to the end, mode=replace_section replaces one section by its id from the outline. Published pages cannot be edited here. The full resulting body is checked again for credentials and injected instructions.",
+        "Edits a draft page. An API key can edit only drafts it created; a signed-in person can edit drafts they wrote while their role still allows it. mode=replace swaps the whole body, mode=append adds text to the end, mode=replace_section replaces one section by its id from the outline. Published pages cannot be edited here. The full resulting body is checked again for credentials and injected instructions.",
       inputSchema: {
         doc_id: z.string().describe("docId returned by envpilot_create_doc"),
         mode: z.enum(["replace", "append", "replace_section"]),
