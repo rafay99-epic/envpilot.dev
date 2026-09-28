@@ -1,0 +1,19 @@
+convex/features/api/reads.ts
+  s_ed0ae489aa2c51::t_88ca76a16f0436 969,1002,1103-1104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1212a2fb8229d47c13b28659afe4fdeb892bba3b",
+  "prompts": {},
+  "sessions": {
+    "s_ed0ae489aa2c51": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a36fefa9-6ce7-4da8-b0eb-2e703e94251a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
