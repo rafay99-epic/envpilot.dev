@@ -196,9 +196,10 @@ Settings → API Keys (org-wide creation is owner-only).
 **MCP OAuth migration**: the admin Dashboard's "MCP OAuth only" switch
 (`adminSettings.mcpApiKeysRetired`, `convex/lib/mcpRetirement.ts`) makes
 `_authorizeRequest` deny every `mcp_server` key call with
-`mcp_keys_retired`; turning it off restores keys. The FIRST switch-on emails
-each manager of an MCP-capable key once and shows them a dashboard card until
-they press OK (`features/api/mcpRetirement.ts`). REST, the Action and Docker
+`mcp_keys_retired`; turning it off restores keys. The FIRST switch-on emails,
+once, the creator of each MCP-capable key (or the org's `org.api_keys` holders
+when the creator has left) and shows them a dashboard card until they press OK
+(`features/api/mcpRetirement.ts`). REST, the Action and Docker
 never read the setting. Legacy
 `serviceTokens` (CI/CD tab) still work via a compat fallback in
 `cicd/pull.ts`; `migrate-service-tokens` copies them into `apiKeys`.

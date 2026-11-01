@@ -11,22 +11,36 @@ export type DocSection = {
   end: number;
 };
 
-const HEADING = /^(#{1,6})[ \t]+(.+?)[ \t#]*$/;
-const FENCE = /^[ \t]*(?:```|~~~)/;
+// CommonMark: up to three leading spaces, optional CR from CRLF bodies.
+const HEADING = /^ {0,3}(#{1,6})[ \t]+(.+?)[ \t#]*\r?$/;
+// A fence closes only on the same marker, at least as long as the opener.
+const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 
 type Line = { start: number; next: number; text: string; inFence: boolean };
 
 function lines(body: string): Line[] {
   const out: Line[] = [];
-  let inFence = false;
+  let openFence: string | null = null;
   let start = 0;
   while (start <= body.length) {
     const newline = body.indexOf("\n", start);
     const end = newline === -1 ? body.length : newline;
     const text = body.slice(start, end);
-    const isFence = FENCE.test(text);
-    out.push({ start, next: end + 1, text, inFence: inFence || isFence });
-    if (isFence) inFence = !inFence;
+    const marker = FENCE.exec(text)?.[1];
+    const closes =
+      openFence !== null &&
+      marker !== undefined &&
+      marker[0] === openFence[0] &&
+      marker.length >= openFence.length &&
+      text.trim() === marker;
+    out.push({
+      start,
+      next: end + 1,
+      text,
+      inFence: openFence !== null || marker !== undefined,
+    });
+    if (closes) openFence = null;
+    else if (openFence === null && marker !== undefined) openFence = marker;
     if (newline === -1) break;
     start = end + 1;
   }
@@ -36,17 +50,19 @@ function lines(body: string): Line[] {
 export function parseSections(body: string): DocSection[] {
   const sections: DocSection[] = [];
   const open: DocSection[] = [];
-  const seen = new Map<string, number>();
+  const used = new Set<string>();
   for (const line of lines(body)) {
     if (line.inFence) continue;
     const [, hashes = "", raw = ""] = HEADING.exec(line.text) ?? [];
     if (!hashes) continue;
     const title = raw.trim();
     const base = slugifyTitle(title);
-    const count = (seen.get(base) ?? 0) + 1;
-    seen.set(base, count);
+    // "Setup", "Setup" and "Setup 2" must not share an id.
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+    used.add(id);
     const section: DocSection = {
-      id: count === 1 ? base : `${base}-${count}`,
+      id,
       title,
       level: hashes.length,
       start: line.start,

@@ -45,7 +45,7 @@ export async function resolveEffectiveVariables(
 export async function resolveEffectiveVariablesWithin(
   ctx: QueryCtx,
   args: { projectId: Id<"projects"> },
-  readLimit: number
+  readLimit: number | undefined
 ): Promise<{ rows: ResolvedVariable[]; complete: boolean; read: number }> {
   return await resolveWithin(ctx, args, readLimit);
 }

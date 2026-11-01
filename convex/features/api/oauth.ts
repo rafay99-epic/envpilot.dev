@@ -27,6 +27,7 @@ import {
 import { readBody } from "../docs/content";
 import { listForUserCore } from "../projects/helpers";
 import { listWithAccessCore } from "../variables/queries";
+import { resolveProjectAccessContext } from "../variables/helpers";
 import { vaultReadWithRetry } from "../vault/vault";
 import {
   createdDraftValidator,
@@ -303,11 +304,25 @@ export const _readVariables = internalQuery({
       organization._id,
       args.projectSlug
     );
+    // A project the user is not assigned to and holds no variable grants in
+    // reads as missing, before any pull is recorded against it.
+    const resolved = await resolveProjectAccessContext(
+      ctx,
+      project._id,
+      user._id
+    );
+    const rows = await readableVariables(ctx, project._id, user._id);
+    if (
+      !resolved ||
+      (!resolved.access.isOwner && !resolved.access.assigned && !rows.length)
+    ) {
+      throw new ConvexError("Project not found");
+    }
     return {
       organizationId: organization._id,
       projectId: project._id,
       userId: user._id,
-      rows: await readableVariables(ctx, project._id, user._id),
+      rows,
     };
   },
 });
@@ -393,6 +408,7 @@ export const _search = internalQuery({
           projectId: project._id,
           userId: user._id,
           limit: SEARCH_ROW_BUDGET - rowsRead,
+          readBudget: SEARCH_ROW_BUDGET - rowsRead,
         });
       } catch {
         skippedProjects += 1;

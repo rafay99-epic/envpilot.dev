@@ -145,7 +145,16 @@ export const createVariableRequest = action({
       }
     );
 
-    return { ...filed, projectSlug: projectDoc.slug, message: FILED_MESSAGE };
+    // A client_ref retry can return a request that was already reviewed.
+    const message =
+      filed.status === "pending"
+        ? FILED_MESSAGE
+        : filed.status === "approved"
+          ? "Request already approved. Read the variable to get the value."
+          : filed.status === "rejected"
+            ? "Request was rejected. get_request_status has the reviewer's reason."
+            : "Request was canceled. File a new request if you still need it.";
+    return { ...filed, projectSlug: projectDoc.slug, message };
   },
 });
 

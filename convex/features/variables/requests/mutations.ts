@@ -431,14 +431,13 @@ async function findKeyRequestByClientRef(
   const rows = await ctx.db
     .query("environmentVariableRequests")
     .withIndex("by_requester_and_client_ref", (q) =>
-      q.eq("requestedBy", requestedBy).eq("clientRef", clientRef)
+      q
+        .eq("requestedBy", requestedBy)
+        .eq("clientRef", clientRef)
+        .eq("projectId", projectId)
     )
     .take(20);
-  return (
-    rows.find(
-      (row) => row.projectId === projectId && row.requestedByKeyId === keyId
-    ) ?? null
-  );
+  return rows.find((row) => row.requestedByKeyId === keyId) ?? null;
 }
 
 /**

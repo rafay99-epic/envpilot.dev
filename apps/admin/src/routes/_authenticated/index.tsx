@@ -164,7 +164,12 @@ function DashboardPage() {
           {/* MCP OAuth migration toggle */}
           <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5">
             <KeyRound className="h-4 w-4 text-ink-muted" />
-            <span className="text-sm text-ink-muted">MCP OAuth only</span>
+            <label
+              htmlFor="mcp-oauth-only-toggle"
+              className="text-sm text-ink-muted"
+            >
+              MCP OAuth only
+            </label>
             <Switch
               checked={mcpOAuthOnly}
               onChange={handleToggleMcpOAuthOnly}

@@ -1071,7 +1071,7 @@ export const _searchScoped = internalQuery({
         skippedProjects += 1;
         continue;
       }
-      rowsRead += resolved.rows.length;
+      rowsRead += resolved.read;
       if (!resolved.complete) {
         skippedProjects += 1;
         rowsRead = SEARCH_ROW_BUDGET;
@@ -1103,7 +1103,7 @@ export const _searchScoped = internalQuery({
         (args.scopeProjects !== "all" &&
           args.scopeProjects.length > SEARCH_SCOPE_READS) ||
         results.length >= SEARCH_MAX_RESULTS ||
-        skippedProjects > 0,
+        (args.includeKeys && skippedProjects > 0),
       skippedProjects,
     };
   },

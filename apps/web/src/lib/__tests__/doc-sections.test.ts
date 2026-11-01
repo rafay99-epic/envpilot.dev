@@ -125,3 +125,31 @@ describe("pageOf — oversized structures", () => {
     expect(first.nextOffset).toBe(100);
   });
 });
+
+describe("parseSections: Markdown edge cases", () => {
+  it("keeps a fence open until the same marker at least as long", () => {
+    const body = [
+      "````md",
+      "```",
+      "## inside",
+      "~~~",
+      "````",
+      "## Outside",
+    ].join("\n");
+    expect(parseSections(body).map((s) => s.title)).toEqual(["Outside"]);
+  });
+
+  it("reads indented and CRLF headings", () => {
+    const body = "   ## Indented\r\ntext\r\n## Windows\r\n";
+    expect(parseSections(body).map((s) => s.title)).toEqual([
+      "Indented",
+      "Windows",
+    ]);
+  });
+
+  it("never gives two sections the same id", () => {
+    const body = ["## Setup", "## Setup", "## Setup 2"].join("\n");
+    const ids = parseSections(body).map((s) => s.id);
+    expect(new Set(ids).size).toBe(3);
+  });
+});

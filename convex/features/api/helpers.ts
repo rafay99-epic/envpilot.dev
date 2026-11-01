@@ -120,8 +120,10 @@ export async function consumeRateLimit(
 export function normalizeClientRef(
   raw: string | undefined
 ): string | undefined {
-  const trimmed = raw?.trim();
-  if (!trimmed) return undefined;
+  if (raw === undefined) return undefined;
+  const trimmed = raw.trim();
+  // A blank ref would silently turn off retry protection the caller asked for.
+  if (!trimmed) throw new ConvexError("client_ref must not be empty");
   if (trimmed.length > 200) {
     throw new ConvexError("client_ref must be at most 200 characters");
   }

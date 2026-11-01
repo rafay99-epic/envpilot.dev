@@ -17,7 +17,7 @@
 ---
 title: Faster MCP server, long documentation pages, and sign-in with Claude
 version: v1.71.0
-date: 2026-09-28
+date: 2026-11-01
 types: [feature, improvement, fix]
 ---
 

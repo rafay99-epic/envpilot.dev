@@ -433,7 +433,15 @@ export const getVersionHistory = query({
 
 export async function listWithAccessCore(
   ctx: QueryCtx,
-  args: { projectId: Id<"projects">; userId: Id<"users">; limit?: number }
+  args: {
+    projectId: Id<"projects">;
+    userId: Id<"users">;
+    limit?: number;
+    // Caps raw rows read across the project and its workspaces. Only search
+    // passes it; everyone else reads the full list so truncation reflects
+    // the project's own effective rows.
+    readBudget?: number;
+  }
 ): Promise<{
   variables: ReturnType<typeof mapVariableRow>[];
   truncatedAt: number | undefined;
@@ -451,12 +459,10 @@ export async function listWithAccessCore(
 
   const limit = args.limit ?? LIST_READ_CAP;
 
-  // Read at most limit + 1 rows across the project and its workspaces, so a
-  // caller's limit bounds the scan itself, not just the returned slice.
   const effective = await resolveEffectiveVariablesWithin(
     ctx,
     { projectId: args.projectId },
-    limit + 1
+    args.readBudget
   );
   const resolvedRows = effective.rows.map((row) =>
     row.source.kind === "own" ? row : { ...row, projectId: args.projectId }

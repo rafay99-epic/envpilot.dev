@@ -30,6 +30,8 @@ export async function requireOAuthUser(
     .withIndex("by_workos_id", (q) => q.eq("workosId", workosId))
     .first();
   if (!user) throw new ConvexError("No Envpilot account matches this sign-in");
+  // Same rule as the dashboard sign-in (users.ts): a banned account gets nothing.
+  if (user.isBanned) throw new ConvexError("Your account has been suspended");
   return user;
 }
 

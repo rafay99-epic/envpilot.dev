@@ -87,6 +87,6 @@ export default authkitMiddleware({
 // in the dashboard layout (ConvexAuthProvider), not the root layout.
 export const config = {
   matcher: [
-    "/((?!_next|changelog|faq|vs/|wishlist|privacy|terms|logo|support|contact|pricing|sitemap\\.xml|robots\\.txt|api/(?:mcp|v1/|version|config|telemetry-envelope|extension/|webhooks/)|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).+)",
+    "/((?!_next|changelog|faq|vs/|wishlist|privacy|terms|logo|support|contact|pricing|sitemap\\.xml|robots\\.txt|\\.well-known/oauth-protected-resource|api/(?:mcp|v1/|version|config|telemetry-envelope|extension/|webhooks/)|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).+)",
   ],
 };

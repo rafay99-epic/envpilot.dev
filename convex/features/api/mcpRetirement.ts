@@ -31,7 +31,8 @@ const MAX_KEYS_PER_NOTICE = 20;
  */
 async function recipientsFor(
   ctx: MutationCtx,
-  key: Doc<"apiKeys">
+  key: Doc<"apiKeys">,
+  managersByOrg: Map<Id<"organizations">, Id<"users">[]>
 ): Promise<Id<"users">[]> {
   const creator = await ctx.db
     .query("organizationMembers")
@@ -41,6 +42,8 @@ async function recipientsFor(
     .first();
   if (creator && creator.status !== "suspended") return [key.createdBy];
 
+  const cached = managersByOrg.get(key.organizationId);
+  if (cached) return cached;
   const members = await ctx.db
     .query("organizationMembers")
     .withIndex("by_organization", (q) =>
@@ -53,6 +56,7 @@ async function recipientsFor(
     const profile = await getRoleProfile(ctx, member.role);
     if (hasCapability(profile, "org.api_keys")) managers.push(member.userId);
   }
+  managersByOrg.set(key.organizationId, managers);
   return managers;
 }
 
@@ -65,6 +69,7 @@ export const buildNotices = internalMutation({
       .query("apiKeys")
       .paginate({ cursor: args.cursor, numItems: KEYS_PER_PAGE });
     const orgNames = new Map<Id<"organizations">, string | null>();
+    const managersByOrg = new Map<Id<"organizations">, Id<"users">[]>();
 
     for (const key of page.page) {
       const live =
@@ -83,7 +88,7 @@ export const buildNotices = internalMutation({
       if (!orgName) continue;
       const label = `${key.name} · ${orgName}`;
 
-      for (const userId of await recipientsFor(ctx, key)) {
+      for (const userId of await recipientsFor(ctx, key, managersByOrg)) {
         const notice = await ctx.db
           .query("mcpRetirementNotices")
           .withIndex("by_user", (q) => q.eq("userId", userId))

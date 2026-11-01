@@ -199,6 +199,7 @@ export const _authorizeRequest = internalMutation({
         )
         .first();
       if (!found || isWorkspace(found)) {
+        await logDenied(key, "project_not_found");
         return { ok: false as const, denied: "project_scope" as const };
       }
       project = { _id: found._id, name: found.name, slug: found.slug };

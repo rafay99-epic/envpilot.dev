@@ -257,18 +257,18 @@ export async function applyDraftEdit(
   }
 
   const { warnings } = scanDocBody(next);
+  // null = byte-identical, e.g. a retried call: nothing to stamp or audit.
   const excerpt = await writeBody(ctx, doc._id, doc.projectId, next);
-  await ctx.db.patch(doc._id, {
-    updatedAt: Date.now(),
-    ...(excerpt === null ? {} : { excerpt }),
-  });
-  await createAuditLog(ctx, {
-    organizationId: audit.organizationId,
-    projectId: doc.projectId,
-    userId: audit.userId,
-    action: "doc.updated",
-    details: { ...audit.details, slug: doc.slug, mode: edit.mode },
-  });
+  if (excerpt !== null) {
+    await ctx.db.patch(doc._id, { updatedAt: Date.now(), excerpt });
+    await createAuditLog(ctx, {
+      organizationId: audit.organizationId,
+      projectId: doc.projectId,
+      userId: audit.userId,
+      action: "doc.updated",
+      details: { ...audit.details, slug: doc.slug, mode: edit.mode },
+    });
+  }
 
   return { bytes: new TextEncoder().encode(next).length, warnings };
 }

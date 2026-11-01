@@ -495,15 +495,15 @@ async function findDocByClientRef(
   const rows = await ctx.db
     .query("docs")
     .withIndex("by_author_and_client_ref", (q) =>
-      q.eq("authorId", authorId).eq("clientRef", clientRef)
+      q
+        .eq("authorId", authorId)
+        .eq("clientRef", clientRef)
+        .eq("projectId", projectId)
     )
     .take(20);
   return (
     rows.find(
-      (row) =>
-        row.projectId === projectId &&
-        row.createdByKeyId === keyId &&
-        row.deletedAt === undefined
+      (row) => row.createdByKeyId === keyId && row.deletedAt === undefined
     ) ?? null
   );
 }

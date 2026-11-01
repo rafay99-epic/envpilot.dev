@@ -490,7 +490,11 @@ export default defineSchema({
     .index("by_project_and_key", ["projectId", "key"])
     // Per-key open-pendings cap + revoke-time visibility for machine requests
     .index("by_requested_key_and_status", ["requestedByKeyId", "status"])
-    .index("by_requester_and_client_ref", ["requestedBy", "clientRef"]),
+    .index("by_requester_and_client_ref", [
+      "requestedBy",
+      "clientRef",
+      "projectId",
+    ]),
 
   // ==========================================
   // CHANGE REQUESTS (protected environments)
@@ -848,7 +852,7 @@ export default defineSchema({
     clientRef: v.optional(v.string()),
   })
     .index("by_project", ["projectId"])
-    .index("by_author_and_client_ref", ["authorId", "clientRef"])
+    .index("by_author_and_client_ref", ["authorId", "clientRef", "projectId"])
     .index("by_project_and_status", ["projectId", "status"])
     .index("by_project_and_module", ["projectId", "module"])
     // A module share reads exactly the pages it serves. Without deletedAt and
