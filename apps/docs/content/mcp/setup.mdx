@@ -36,9 +36,9 @@ In Claude Code run `/mcp`; other clients show the server's tools in their MCP pa
 
 - **Your role decides.** The connection reads exactly what you can read in the dashboard: the same projects, environments, variable permissions and documentation. A suspended membership sees nothing.
 - **Eight tools:** `envpilot_list_projects`, `envpilot_get_variables`, `envpilot_get_variable`, `envpilot_search`, `envpilot_search_docs`, `envpilot_get_doc`, `envpilot_create_doc` and `envpilot_update_doc_draft`. See [Tools](/mcp/tools).
-- **Not available with sign-in:** shared accounts, secret files and variable requests.
-- **Writes are drafts.** An agent can draft documentation; a person publishes it in the dashboard. Clients ask you before each write.
-- **More than one organization:** pass `organization` (the organization's slug) to the tools. The error message lists the slugs you can use.
+- **Not available over MCP:** shared accounts, secret files and variable requests. Use the dashboard or the CLI.
+- **Writes are drafts.** An agent can draft documentation; a person publishes it in the dashboard. Clients that honour `destructiveHint`, such as Claude, ask you before each write.
+- **More than one organization:** pass `organization` (the organization's slug) to the project tools. `envpilot_get_doc` and `envpilot_update_doc_draft` take a doc id, which already names the project. The error message lists the slugs you can use.
 - **Audited and rate limited per person.** Every value read is logged against your user.
 
 ## How sign-in works
@@ -61,10 +61,8 @@ The old key-based setup is documented on [API keys (legacy)](/mcp/api-keys).
 
 | Symptom                                                                  | Meaning / fix                                                                                              |
 | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| The client never opens a sign-in page and keeps failing with 401         | An `Authorization` header is still configured. Remove it and restart the client.                           |
-| `API keys no longer work on the Envpilot MCP server`                     | The server only accepts sign-in now. Remove the header and reconnect.                                      |
+| The client never opens a sign-in page and keeps failing with 401         | An `Authorization` header is still configured, often an old API key. Remove it and restart the client.     |
 | `This account belongs to several organizations`                          | Pass `organization` with one of the slugs the message lists.                                               |
-| Eight tools instead of thirteen                                          | Expected. Shared accounts, secret files and variable requests are not available with sign-in.              |
 | `Incompatible auth server: does not support dynamic client registration` | The sign-in service is not accepting new clients. Contact support.                                         |
 | Signed in, but every call fails with a plan error                        | The organization's plan does not include the MCP server.                                                   |
 | Hosted Claude asks for an OAuth client ID or secret                      | Leave those fields empty and choose **Connect**. Never paste an API key into an OAuth client-secret field. |

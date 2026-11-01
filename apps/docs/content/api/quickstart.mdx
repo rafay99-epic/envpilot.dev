@@ -13,7 +13,7 @@ Envpilot's public REST API lets you read projects, variables, and shared account
 Go to **Organization Settings → API Keys** — there's a single creation screen; project scope is a choice you make inside it, not a separate settings page.
 
 1. Click **New API Key**
-2. Select the surfaces where the key may authenticate: REST API, MCP server, and/or GitHub Action
+2. Select the surfaces where the key may authenticate: REST API, GitHub Action and/or Docker
 3. Choose project, environment, and resource scopes (see below) — pick specific projects, or "all projects, including future ones" (owner-only)
 4. Copy the key — it's shown **once**, as `envpk_...`. Envpilot only stores a hash of it; if you lose it, revoke it and create a new one — there's no rotate-in-place.
 
@@ -29,7 +29,7 @@ Every key has three independent scope dimensions:
 - **Environments** — `all` (development, staging, production) or a specific list
 - **Resources** — which resource types the key can read: `variables`, `accounts`, `projects`, and optionally `requests` (the one write path — filing a variable request for a human to approve)
 
-A key also carries immutable **surfaces** — which faces it may use: the REST API (`rest_api`), the MCP server (`mcp_server`), and the GitHub Action (`github_action`). All three route through the same enforcement core; see [Architecture](/start/architecture).
+A key also carries immutable **surfaces** — which faces it may use: the REST API (`rest_api`), the GitHub Action (`github_action`) and the Docker image (`docker`). All of them route through the same enforcement core; see [Architecture](/start/architecture). The MCP server does not take keys.
 
 A key requesting a **project** outside its scope gets a `404` — identical to a project that genuinely doesn't exist, so a leaked key can't be used to probe which project slugs are real. A key requesting a **resource type, environment, or surface** outside its scope gets a `403` instead, since the project's existence is already implied by a URL the key can otherwise reach. This is deliberate: see [API Security](/api/authentication) for why.
 
@@ -107,7 +107,7 @@ Every error response — across all v1 endpoints — has the same shape: `{ "err
 | 401    | `MISSING_TOKEN`     | No `Authorization: Bearer` header                                                                       |
 | 401    | `INVALID_KEY`       | Key is unknown, revoked, or expired — all three look identical to the caller                            |
 | 403    | `FORBIDDEN_SCOPE`   | Key doesn't include this resource type or environment                                                   |
-| 403    | `FORBIDDEN_SURFACE` | Key isn't enabled for this surface (REST vs. MCP vs. GitHub Action)                                     |
+| 403    | `FORBIDDEN_SURFACE` | Key isn't enabled for this surface (REST vs. GitHub Action vs. Docker)                                  |
 | 403    | `TIER_GATE`         | Organization's plan no longer includes the public API                                                   |
 | 404    | `NOT_FOUND`         | Project outside the key's scope, or genuinely doesn't exist — see [Understand scope](#understand-scope) |
 | 422    | `OVERFLOW`          | Project exceeds the 1000-row bounded-read cap — see [Bounded reads](#bounded-reads-no-pagination)       |
@@ -142,7 +142,7 @@ Envpilot's public API fails **closed**: every denial and every partial-data risk
 
 - [API Reference](/api/overview) — every endpoint, filter, and error code
 - [Architecture](/start/architecture) — the five client surfaces and the one auth core
-- [MCP Server](/mcp/overview) — create the right MCP key, configure `ENVPILOT_API_KEY`, and connect an AI agent directly to your variables
+- [MCP Server](/mcp/setup) — connect an AI agent with your Envpilot sign-in, no key needed
 - [Rate limits](/limits/rate-limits) — every per-key bucket and what happens when you exceed it
 - [API Security](/api/authentication) — key model, scoping, revocation, and audit
 

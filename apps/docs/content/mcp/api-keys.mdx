@@ -6,14 +6,14 @@ icon: zap
 
 # API keys (legacy)
 
-<Callout type="warning" title="Use sign-in instead">
-The MCP server now connects with your Envpilot login: see [MCP setup](/mcp/setup). This page keeps the old API-key setup for clients that still use it.
+<Callout type="warning" title="No longer supported">
+The MCP server only accepts sign-in now: see [MCP setup](/mcp/setup). API keys get a `401` from the MCP server. They keep working for the REST API, the GitHub Action and the Docker image. To move a client over, follow [Moving from an API key](/mcp/setup#moving-from-an-api-key).
 
-When MCP moves to sign-in only, API keys stop working with the MCP server and every call returns `API keys no longer work on the Envpilot MCP server`. Keys keep working for the REST API, the GitHub Action and the Docker image. To move a client over, follow [Moving from an API key](/mcp/setup#moving-from-an-api-key).
+This page is kept for reference.
 
 </Callout>
 
-Shared accounts, secret files and variable requests are only available to a key, not to a sign-in.
+The tools that needed a key (shared accounts, secret files and variable requests) were removed with key support.
 
 ## Creating an MCP key
 
@@ -25,14 +25,14 @@ The dashboard no longer offers the **MCP server** surface, so new MCP keys canno
 4. Select only the environments the client needs. A development-only agent should not receive production access.
 5. Select the resources required by its tools:
 
-| Resource    | MCP tools enabled                                                                                                                         |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `projects`  | `envpilot_list_projects`; project-name and project-slug matches from `envpilot_search`                                                    |
-| `variables` | `envpilot_get_variables`, `envpilot_get_variable`; variable-key matches from `envpilot_search` (which also needs `projects` to enumerate) |
-| `accounts`  | `envpilot_list_accounts`                                                                                                                  |
-| `files`     | `envpilot_list_files`, `envpilot_get_file`                                                                                                |
-| `requests`  | `envpilot_request_variable`, `envpilot_get_request_status`                                                                                |
-| `docs`      | `envpilot_search_docs`, `envpilot_get_doc`, `envpilot_create_doc`. **Cannot be combined with `files`** — see below                        |
+| Resource    | MCP tools enabled                                                                                                                               |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projects`  | `envpilot_list_projects`; project-name and project-slug matches from `envpilot_search`                                                          |
+| `variables` | `envpilot_get_variables`, `envpilot_get_variable`; variable-key matches from `envpilot_search` (which also needs `projects` to enumerate)       |
+| `accounts`  | `envpilot_list_accounts`                                                                                                                        |
+| `files`     | `envpilot_list_files`, `envpilot_get_file`                                                                                                      |
+| `requests`  | `envpilot_request_variable`, `envpilot_get_request_status`                                                                                      |
+| `docs`      | `envpilot_search_docs`, `envpilot_get_doc`, `envpilot_create_doc`, `envpilot_update_doc_draft`. **Cannot be combined with `files`** — see below |
 
 For the common project-discovery and variable-read workflow, select `projects` and `variables`. Most assistants begin with `envpilot_list_projects`; without `projects`, that opening call is denied. An accounts-only or requests-only key is still valid, but only for the corresponding tools.
 

@@ -1,6 +1,6 @@
 ---
 title: Giving an agent secrets safely
-description: An end-to-end setup where a coding agent reads what it needs, signed in as you, and changes nothing.
+description: An end-to-end setup where a coding agent reads what it needs, signed in as you, changes no secrets and writes only documentation drafts.
 icon: book
 ---
 
@@ -31,7 +31,7 @@ claude mcp add --transport http --scope user \
   envpilot https://www.envpilot.dev/api/mcp
 ```
 
-No header and no key. Other clients: [Connecting a client](/mcp/clients).
+No header and no key. Set it up with a key before? Run `claude mcp remove envpilot` first: Claude Code keeps an existing entry, header included, and never offers sign-in. Other clients: [Connecting a client](/mcp/clients).
 
 ### Sign in
 
@@ -64,9 +64,9 @@ Step 2 is the habit worth encouraging in your prompt: **look at key names first,
 
 ## Guardrails you must add yourself
 
-- **Sign in with the right account.** The agent sees everything that account can see, production included.
+- **Sign in with the right account.** The agent sees the projects, environments, variables and documentation that account can see, production included.
 - **Ask for development.** Tell the agent which environment to read; it can read any your role allows.
-- **Disconnect when you are done.** Remove the server from the client so it stops renewing its token.
+- **Disconnect when you are done.** Remove the server from the client so it stops renewing its token. A token already issued keeps working until it expires.
 - **Watch the context window.** Once a value is in a transcript, it lives wherever that transcript lives.
 
 <Callout type="warning" title="The agent's context is not a vault">
@@ -80,7 +80,7 @@ Step 2 is the habit worth encouraging in your prompt: **look at key names first,
 
 - Pro plan (`mcp_server`), re-checked on every call.
 - A connection has your access; there is no way yet to give the agent less.
-- Shared accounts, secret files and variable requests need a [legacy API key](/mcp/api-keys).
+- Shared accounts, secret files and variable requests are not available over MCP.
 - Rate limits apply per person.
 
 ## See also
