@@ -22,11 +22,9 @@ The REST API, MCP server, and GitHub Action all authenticate with the **same key
 
 ## Machine credentials never write secrets
 
-Every machine credential — REST API, MCP server, or GitHub Action key — is fundamentally **read-only**. No API key can create, edit, or delete a variable's value. The blast radius of a leaked key is bounded to reads within its scope, never a silent change to what a deploy pulls.
+Every API key — REST API, GitHub Action or Docker image — is fundamentally **read-only**. No API key can create, edit, or delete a variable's value. The blast radius of a leaked key is bounded to reads within its scope, never a silent change to what a deploy pulls. The [MCP server](/mcp/overview) does not accept keys: it acts as the signed-in person, under their role.
 
-There is exactly one escalation path, and it's **opt-in per key**: a key whose scope includes the `requests` resource can **file a variable request** — an ask, with a required justification, that lands in a human reviewer's dashboard queue. This is not a write. The agent never proposes a value; if the reviewer approves, **the reviewer supplies the value**. Keys without the `requests` resource (including every GitHub Action key) can't file requests at all.
-
-This is the trust model in one line: **read-only keys, human-approved escalation.** Request creation is additionally throttled per key — 5 per hour (burst 2), a standing cap of 5 open pending requests, and a 24-hour cooldown after a rejection — so a retry-looping agent can't flood reviewers. See [Rate limits](/limits/rate-limits) and [Architecture](/start/architecture).
+This is the trust model in one line: **keys read, people write.** Keys can no longer file variable requests; that path was removed with API-key access to the MCP server.
 
 ## Revocation is immediate
 

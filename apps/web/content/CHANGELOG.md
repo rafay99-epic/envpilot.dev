@@ -15,6 +15,25 @@
 
 <!-- entry -->
 ---
+title: Agents can manage variables, secret files and shared accounts over MCP
+version: v1.72.0
+date: 2026-11-01
+types: [feature]
+---
+
+The MCP server now covers variables, secret files and shared accounts, not just reads and documentation drafts. Eleven new tools:
+
+- `envpilot_create_variable` and `envpilot_update_variable` add a variable or change its value.
+- `envpilot_list_files`, `envpilot_get_file` and `envpilot_upload_file` list, read and store secret files such as certificates and service-account JSON.
+- `envpilot_list_accounts`, `envpilot_get_account` and `envpilot_create_account` list, read and store shared logins.
+- `envpilot_list_requests` shows whether a change you proposed was applied or rejected.
+- `envpilot_list_doc_drafts` lists the drafts you wrote, and `envpilot_get_doc` now reads them back, so `replace_section` edits work.
+- `envpilot_list_organizations` lists your organizations and their slugs.
+
+Every tool acts as you, under your role and environment scope, with the same plan limits as the dashboard. Values, files and credentials are encrypted before they are stored, and every read and write is in the audit log. A write into a protected environment is never applied directly: it becomes a change request a second person approves. Nothing over MCP deletes. See [MCP tools](https://docs.envpilot.dev/mcp/tools).
+
+<!-- entry -->
+---
 title: The MCP server signs you in with your Envpilot login
 version: v1.71.0
 date: 2026-11-01
