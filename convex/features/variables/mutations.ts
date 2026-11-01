@@ -320,6 +320,17 @@ export const create = mutation({
 });
 
 /**
+ * `create` and `update` for an action that already verified the user (the
+ * MCP server's OAuth path). The core authorizes that user exactly as it
+ * authorizes a dashboard session.
+ */
+export const _createFor = internalMutation({
+  args: { ...createArgs, createdBy: v.id("users") },
+  returns: v.id("environmentVariables"),
+  handler: async (ctx, args) => createCore(ctx, args),
+});
+
+/**
  * Charge the batch-create budget once for a bulk write, and hand back the
  * actor so the caller can pass it to `createMany`.
  *
@@ -781,6 +792,13 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
     return updateCore(ctx, { ...args, updatedBy: actor._id });
+  },
+});
+
+export const _updateFor = internalMutation({
+  args: { ...updateArgs, updatedBy: v.id("users") },
+  handler: async (ctx, args) => {
+    await updateCore(ctx, args);
   },
 });
 

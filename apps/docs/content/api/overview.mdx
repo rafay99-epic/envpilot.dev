@@ -60,7 +60,7 @@ The API sends no CORS headers and is not meant to be called from a browser. An A
 
 ## Limits
 
-- Read-only. There is no write endpoint on any surface; the only machine-initiated action is filing a [request](/platform/requests) over MCP.
+- Read-only. No API key can write. Writes over [MCP](/mcp/overview) use your own sign-in and role, not a key.
 - Pro plan required. The gate is re-checked on **every** request, so a downgrade stops access immediately.
 - Rate limits are per key: 120/min metadata, 30/min values, plus separate buckets for [files](/api/files). See [Rate limits](/limits/rate-limits).
 - Every value-returning call is audited against the key.

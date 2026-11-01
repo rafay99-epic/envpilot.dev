@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, type ObjectType } from "convex/values";
 import { action } from "../../_generated/server";
 import type { ActionCtx } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
@@ -14,7 +14,7 @@ const sourceValidator = v.union(
 );
 
 /** Either the account was written, or a proposal was filed for it. */
-type AccountWriteResult =
+export type AccountWriteResult =
   | { accountId: Id<"projectAccounts"> }
   | { requested: true; requestId: Id<"changeRequests"> };
 
@@ -58,9 +58,24 @@ async function requireCurrentUserId(ctx: ActionCtx): Promise<Id<"users">> {
 }
 
 /** Vault payload for an account — byte-identical to lib/account-payload's serializeAccountVault. */
-function serializeAccountVault(username: string, password: string): string {
+export function serializeAccountVault(
+  username: string,
+  password: string
+): string {
   return JSON.stringify({ username, password });
 }
+
+const createWithCredentialsArgs = {
+  projectId: v.id("projects"),
+  name: v.string(),
+  websiteUrl: v.optional(v.string()),
+  username: v.string(),
+  password: v.string(),
+  description: v.optional(v.string()),
+  environments: v.array(v.string()),
+  override: v.optional(v.boolean()),
+  source: v.optional(sourceValidator),
+};
 
 /**
  * Replaces the WorkOS Vault write path of POST /api/accounts. Encrypts the
@@ -69,117 +84,118 @@ function serializeAccountVault(username: string, password: string): string {
  * route's create-rollback).
  */
 export const createWithCredentials = action({
-  args: {
-    projectId: v.id("projects"),
-    name: v.string(),
-    websiteUrl: v.optional(v.string()),
-    username: v.string(),
-    password: v.string(),
-    description: v.optional(v.string()),
-    environments: v.array(v.string()),
-    override: v.optional(v.boolean()),
-    source: v.optional(sourceValidator),
-  },
+  args: createWithCredentialsArgs,
   returns: accountWriteResultValidator,
-  handler: async (ctx, args): Promise<AccountWriteResult> => {
-    const userId = await requireCurrentUserId(ctx);
+  handler: async (ctx, args): Promise<AccountWriteResult> =>
+    createAccountAs(ctx, await requireCurrentUserId(ctx), args),
+});
 
-    const project = await ctx.runQuery(
-      internal.features.projects.queries._getById,
-      {
-        projectId: args.projectId,
-      }
-    );
-    if (!project) {
-      throw new Error("Project not found");
+/**
+ * The create pipeline for an already-verified user. `createWithCredentials`
+ * resolves the user from the dashboard session; the MCP server resolves it
+ * from an OAuth token. `createCore` authorizes that user.
+ */
+export async function createAccountAs(
+  ctx: ActionCtx,
+  userId: Id<"users">,
+  args: ObjectType<typeof createWithCredentialsArgs>
+): Promise<AccountWriteResult> {
+  const project = await ctx.runQuery(
+    internal.features.projects.queries._getById,
+    {
+      projectId: args.projectId,
     }
+  );
+  if (!project) {
+    throw new Error("Project not found");
+  }
 
-    // Protection is resolved before the vault write so a proposal and a
-    // direct create mint exactly one object either way.
-    const protectedEnvs: string[] = await ctx.runQuery(
-      internal.features.changeRequests.queries.protectedEnvironmentsForWrite,
-      { projectId: args.projectId, environments: args.environments }
-    );
-    const needsRequest = protectedEnvs.length > 0 && args.override !== true;
-    // Break-glass is authorized BEFORE the vault write; the mutation checks
-    // it again, but only once the credential object already exists.
-    if (protectedEnvs.length > 0 && !needsRequest) {
-      await assertCanOverrideProtection(ctx, userId, args.projectId);
+  // Protection is resolved before the vault write so a proposal and a
+  // direct create mint exactly one object either way.
+  const protectedEnvs: string[] = await ctx.runQuery(
+    internal.features.changeRequests.queries.protectedEnvironmentsForWrite,
+    { projectId: args.projectId, environments: args.environments }
+  );
+  const needsRequest = protectedEnvs.length > 0 && args.override !== true;
+  // Break-glass is authorized BEFORE the vault write; the mutation checks
+  // it again, but only once the credential object already exists.
+  if (protectedEnvs.length > 0 && !needsRequest) {
+    await assertCanOverrideProtection(ctx, userId, args.projectId);
+  }
+
+  // The project's own organizationId is authoritative for the vault key
+  // context and the mutation — never a client-supplied value.
+  const vault = await ctx.runAction(
+    internal.features.vault.vault.createSecret,
+    {
+      name: `account:${args.name}:${Date.now()}`,
+      value: serializeAccountVault(args.username, args.password),
+      organizationId: project.organizationId,
+      projectId: args.projectId,
+      environment: "account",
     }
+  );
 
-    // The project's own organizationId is authoritative for the vault key
-    // context and the mutation — never a client-supplied value.
-    const vault = await ctx.runAction(
-      internal.features.vault.vault.createSecret,
-      {
-        name: `account:${args.name}:${Date.now()}`,
-        value: serializeAccountVault(args.username, args.password),
-        organizationId: project.organizationId,
-        projectId: args.projectId,
-        environment: "account",
-      }
-    );
-
-    if (needsRequest) {
-      try {
-        const requestId: Id<"changeRequests"> = await ctx.runMutation(
-          internal.features.changeRequests.mutations.createStaged,
-          {
-            projectId: args.projectId,
-            resourceType: "account",
-            kind: "create",
-            environments: args.environments,
-            payload: JSON.stringify({
-              name: args.name,
-              websiteUrl: args.websiteUrl,
-              description: args.description,
-              environments: args.environments,
-            }),
-            vaultRef: vault.id,
-            label: args.name,
-            source: args.source ?? "web",
-          }
-        );
-        return { requested: true as const, requestId };
-      } catch (error) {
-        await ctx
-          .runAction(internal.features.vault.vault.deleteSecret, {
-            vaultRef: vault.id,
-          })
-          .catch(() => {});
-        throw error;
-      }
-    }
-
-    let accountId: Id<"projectAccounts">;
+  if (needsRequest) {
     try {
-      accountId = await ctx.runMutation(
-        api.features.accounts.mutations.create,
+      const requestId: Id<"changeRequests"> = await ctx.runMutation(
+        internal.features.changeRequests.mutations.createStaged,
         {
           projectId: args.projectId,
-          createdBy: userId,
-          name: args.name,
-          websiteUrl: args.websiteUrl,
-          description: args.description,
+          resourceType: "account",
+          kind: "create",
           environments: args.environments,
+          payload: JSON.stringify({
+            name: args.name,
+            websiteUrl: args.websiteUrl,
+            description: args.description,
+            environments: args.environments,
+          }),
           vaultRef: vault.id,
-          override: args.override,
+          label: args.name,
+          source: args.source ?? "web",
+          requestedBy: userId,
         }
       );
-    } catch (mutationError) {
-      try {
-        await ctx.runAction(internal.features.vault.vault.deleteSecret, {
+      return { requested: true as const, requestId };
+    } catch (error) {
+      await ctx
+        .runAction(internal.features.vault.vault.deleteSecret, {
           vaultRef: vault.id,
-        });
-      } catch {
-        // Best-effort — vaultGc reconciles any straggler.
-      }
-      throw mutationError;
+        })
+        .catch(() => {});
+      throw error;
     }
+  }
 
-    return { accountId };
-  },
-});
+  let accountId: Id<"projectAccounts">;
+  try {
+    accountId = await ctx.runMutation(
+      internal.features.accounts.mutations._createFor,
+      {
+        projectId: args.projectId,
+        createdBy: userId,
+        name: args.name,
+        websiteUrl: args.websiteUrl,
+        description: args.description,
+        environments: args.environments,
+        vaultRef: vault.id,
+        override: args.override,
+      }
+    );
+  } catch (mutationError) {
+    try {
+      await ctx.runAction(internal.features.vault.vault.deleteSecret, {
+        vaultRef: vault.id,
+      });
+    } catch {
+      // Best-effort — vaultGc reconciles any straggler.
+    }
+    throw mutationError;
+  }
+
+  return { accountId };
+}
 
 /**
  * Replaces the WorkOS Vault read/update path of PATCH /api/accounts/[id]. When

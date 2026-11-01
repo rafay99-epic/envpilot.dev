@@ -91,7 +91,13 @@ export function throwForDenial(
  */
 export async function consumeRateLimit(
   ctx: ActionCtx,
-  bucket: "apiMetadata" | "cicdPull" | "dockerPull" | "docCreate" | "docUpdate",
+  bucket:
+    | "apiMetadata"
+    | "cicdPull"
+    | "dockerPull"
+    | "docCreate"
+    | "docUpdate"
+    | "mcpWrite",
   tokenHash: string
 ): Promise<void> {
   try {

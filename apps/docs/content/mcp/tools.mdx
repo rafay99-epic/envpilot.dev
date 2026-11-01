@@ -1,23 +1,54 @@
 ---
 title: Tools
-description: The eight MCP tools, what each one does, and what it costs.
+description: The nineteen MCP tools, what each one does, and what it costs.
 icon: zap
 ---
 
 # Tools
 
-A [signed-in](/mcp/setup) connection gets eight tools. Your role decides what each one can see: the same projects, environments, variables and documentation you can read in the dashboard. Every value-returning call is audited against you.
+A [signed-in](/mcp/setup) connection gets nineteen tools. Your role decides what each one can see and change: the same projects, environments, variables, secret files, shared accounts and documentation you can use in the dashboard. Every value-returning call and every write is audited against you.
 
 ## Read tools
 
-| Tool                     | What it does                                                                                         |
-| ------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `envpilot_list_projects` | List the projects you can see                                                                        |
-| `envpilot_get_variables` | Variables for a project + environment, with optional `keys` / `prefix` / `metadata_only`             |
-| `envpilot_get_variable`  | One variable by exact key                                                                            |
-| `envpilot_search`        | Search project names/slugs and variable **keys**, never values. Bounded to 20 projects / 100 matches |
-| `envpilot_search_docs`   | Full-text search over **published** documentation: titles and page bodies. Never returns drafts      |
-| `envpilot_get_doc`       | One **published** page: its outline, one section, or up to 60,000 characters at a time with a cursor |
+| Tool                          | What it does                                                                                                |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `envpilot_list_organizations` | The organizations you belong to, your role, and whether MCP is on their plan                                |
+| `envpilot_list_projects`      | List the projects you can see                                                                               |
+| `envpilot_get_variables`      | Variables for a project + environment, with optional `keys` / `prefix` / `metadata_only`                    |
+| `envpilot_get_variable`       | One variable by exact key                                                                                   |
+| `envpilot_search`             | Search project names/slugs and variable **keys**, never values. Bounded to 20 projects / 100 matches        |
+| `envpilot_search_docs`        | Full-text search over **published** documentation: titles and page bodies. Never returns drafts             |
+| `envpilot_get_doc`            | One published page, or a draft you wrote: its outline, one section, or up to 60,000 characters at a time    |
+| `envpilot_list_files`         | Secret files in a project: path, size, sha256, environments. Never contents                                 |
+| `envpilot_get_file`           | One secret file's contents by path. Text as `utf8`, binary as `base64`                                      |
+| `envpilot_list_accounts`      | Shared accounts in a project: name, website, environments. Never credentials                                |
+| `envpilot_get_account`        | One shared account's username and password by exact name                                                    |
+| `envpilot_list_requests`      | Change requests you filed and their status: pending, applied, rejected (with the reason), canceled, expired |
+
+## Write tools
+
+An agent can add and change the same things you can in the dashboard, under your role:
+
+| Tool                       | What it does                                                                        |
+| -------------------------- | ----------------------------------------------------------------------------------- |
+| `envpilot_create_variable` | Create a variable with a value in one or more environments                          |
+| `envpilot_update_variable` | Change the value or description of the variable that holds a key in one environment |
+| `envpilot_upload_file`     | Store a secret file at a path, or replace its contents with `replace: true`         |
+| `envpilot_create_account`  | Store a shared account's login                                                      |
+
+Values, file contents and credentials are encrypted before they are stored, exactly as in the dashboard. In Claude every write tool carries `destructiveHint`, so Claude asks before each one.
+
+### Protected environments become requests
+
+A write into a [protected environment](/platform/protected-environments) is never applied over MCP. The tool files a change request instead and answers `status: "proposed"` with a `requestId` and a `reviewUrl`. A second person approves it in the dashboard; until then nothing changes. `envpilot_list_requests` shows whether it was applied or rejected. There is no break-glass override over MCP.
+
+### Updating a variable changes every environment it covers
+
+A variable can cover several environments with one value. `envpilot_update_variable` finds the variable that holds the key in the environment you name, and the response lists every environment it covers, because they all change together.
+
+### Files
+
+`envpilot_upload_file` refuses `.env` and `.env.*` paths: store those values as variables. A path can exist once per environment; when the same path is stored for several environments, pass `environment` to `envpilot_get_file`. File size and count limits are your plan's, the same as the dashboard's.
 
 ## Draft tools
 
@@ -26,21 +57,22 @@ An agent can write documentation drafts. Every draft ends at a person:
 | Tool                        | What it does                                                                    |
 | --------------------------- | ------------------------------------------------------------------------------- |
 | `envpilot_create_doc`       | Propose a documentation page. Always creates a **draft**; a person publishes it |
+| `envpilot_list_doc_drafts`  | The drafts you wrote in a project, newest first                                 |
 | `envpilot_update_doc_draft` | Replace, append to, or replace one section of a draft you wrote                 |
 
-A draft page is invisible to your team, and to every other agent, until a person publishes it. In Claude both tools carry `destructiveHint`, so Claude asks before each one.
+A draft page is invisible to your team, and to every other agent, until a person publishes it. You can read your own drafts back with `envpilot_get_doc`, including the outline whose section ids `replace_section` needs. In Claude the two write tools carry `destructiveHint`, so Claude asks before each one.
 
-Shared accounts, secret files and variable requests were only ever available to API keys and were removed with them. Use the dashboard or the CLI for those.
+Variable requests were only ever available to API keys and were removed with them.
 
 ## Documentation tools in detail
 
 ### Drafts are invisible
 
 `envpilot_create_doc` always writes a draft. Nothing over MCP can
-publish, and `envpilot_search_docs` / `envpilot_get_doc` return **published
-pages only** — a draft is not merely hidden from search, it cannot be fetched
-by id either. That gate is what stops a page one agent wrote from reaching
-another agent's context before a person has read it.
+publish. `envpilot_search_docs` never returns drafts, and `envpilot_get_doc`
+returns a draft only to the person who wrote it — anyone else gets "not
+found", even with the id. That gate is what stops a page one agent wrote from
+reaching another agent's context before a person has read it.
 
 ### Page count is capped by plan
 
@@ -89,18 +121,21 @@ payloads, commit SHAs — pass through untouched.
 
 ## Cost of each call
 
-| Tool                                                | Bucket                        | Audited |
-| --------------------------------------------------- | ----------------------------- | ------- |
-| `list_projects`, `search`, `search_docs`, `get_doc` | 120/min metadata              | No      |
-| `get_variables`, `get_variable`                     | 30/min value pulls            | Yes     |
-| `create_doc`                                        | 30/hour per person, burst 10  | Yes     |
-| `update_doc_draft`                                  | 120/hour per person, burst 40 | Yes     |
+| Tool                                                                                                                                         | Bucket                        | Audited |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ------- |
+| `list_projects`, `search`, `search_docs`, `get_doc`, `list_doc_drafts`, `list_files`, `list_accounts`, `list_requests`, `list_organizations` | 120/min metadata              | No      |
+| `get_variables`, `get_variable`, `get_account`                                                                                               | 30/min value pulls            | Yes     |
+| `get_file`                                                                                                                                   | File downloads, per person    | Yes     |
+| `create_variable`, `update_variable`, `create_account`                                                                                       | 30/min writes, per person     | Yes     |
+| `upload_file`                                                                                                                                | 20/min file uploads           | Yes     |
+| `create_doc`                                                                                                                                 | 30/hour per person, burst 10  | Yes     |
+| `update_doc_draft`                                                                                                                           | 120/hour per person, burst 40 | Yes     |
 
 ## Limits
 
 - A project you cannot see behaves exactly as if it does not exist.
 - `envpilot_search` never returns values, only names and keys.
-- There is no tool that writes a variable, uploads a file, publishes a documentation page, or approves a request. There is no plan on which one appears.
+- There is no tool that deletes anything, publishes a documentation page, approves a request, or overrides a protected environment.
 - Documentation search is full-text: whole words, with only the last term prefix-matched. It is not a substring match and does not correct typos.
 
 ## Next

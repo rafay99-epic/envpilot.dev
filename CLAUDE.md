@@ -204,6 +204,15 @@ in `convex/features/api/oauth.ts` verifies it again before reading anything
 The MCP issuer is deliberately NOT in `convex/auth.config.ts`, so an MCP
 token cannot call dashboard functions. Needs `MCP_OAUTH_ISSUER` +
 `MCP_OAUTH_RESOURCE` in BOTH the web env and the Convex env.
+Variable, secret-file and shared-account tools live in
+`convex/features/api/oauthResources.ts`. They never re-implement a write:
+they verify the token, then call the same core the dashboard uses
+(`uploadFileAs`, `readFileAs`, `createAccountAs`, `listFilesFor`,
+`listAccountsFor`, the variables `_createFor` / `_updateFor`) with the
+verified person as the actor. A protected environment always becomes a
+change request over MCP (`createStaged` with `requestedBy`), never an
+override, and there is no delete tool. `envpilot_get_doc` returns a draft only to its
+author; every other reader gets published pages only.
 **MCP sign-in announcement**: the admin Dashboard's "MCP sign-in notice"
 switch (`adminSettings.mcpApiKeysRetired`, `convex/lib/mcpRetirement.ts`).
 The FIRST switch-on emails, once, the creator of each key MCP used to accept

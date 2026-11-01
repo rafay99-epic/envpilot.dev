@@ -106,7 +106,7 @@ type SearchResult = {
   skippedProjects: number;
 };
 
-async function requireOrgProject(
+export async function requireOrgProject(
   ctx: QueryCtx,
   organizationId: Id<"organizations">,
   slug: string
@@ -501,6 +501,73 @@ export const _searchDocs = internalQuery({
   },
 });
 
+const DRAFT_SCAN_LIMIT = 1000;
+const DRAFT_LIST_LIMIT = 100;
+
+export const listDocDrafts = action({
+  args: {
+    token: v.string(),
+    organization: organizationArg,
+    projectSlug: v.string(),
+  },
+  returns: v.array(docSummaryValidator),
+  handler: async (ctx, args): Promise<DocSummary[]> => {
+    const principal = await verifyOAuthToken(args.token);
+    await consumeRateLimit(ctx, "apiMetadata", oauthRateKey(principal));
+    return await ctx.runQuery(internal.features.api.oauth._listDocDrafts, {
+      workosId: principal.workosId,
+      organization: args.organization,
+      projectSlug: args.projectSlug,
+    });
+  },
+});
+
+/** The caller's own unpublished drafts in a project, newest first. */
+export const _listDocDrafts = internalQuery({
+  args: {
+    workosId: v.string(),
+    organization: organizationArg,
+    projectSlug: v.string(),
+  },
+  returns: v.array(docSummaryValidator),
+  handler: async (ctx, args): Promise<DocSummary[]> => {
+    const user = await requireOAuthUser(ctx, args.workosId);
+    const organization = await resolveOAuthOrganization(
+      ctx,
+      user._id,
+      args.organization
+    );
+    const project = await requireOrgProject(
+      ctx,
+      organization._id,
+      args.projectSlug
+    );
+    await requireDocAccess(ctx, user._id, project._id);
+    await requireDocsFeature(ctx, organization._id);
+    const drafts = await ctx.db
+      .query("docs")
+      .withIndex("by_project_author_status", (q) =>
+        q
+          .eq("projectId", project._id)
+          .eq("authorId", user._id)
+          .eq("status", "draft")
+      )
+      .take(DRAFT_SCAN_LIMIT);
+    return drafts
+      .filter((doc) => doc.deletedAt === undefined)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, DRAFT_LIST_LIMIT)
+      .map((doc) => ({
+        docId: doc._id,
+        title: doc.title,
+        slug: doc.slug,
+        module: doc.module,
+        type: doc.type,
+        updatedAt: doc.updatedAt,
+      }));
+  },
+});
+
 export const getDoc = action({
   args: {
     token: v.string(),
@@ -550,7 +617,10 @@ export const _getDoc = internalQuery({
       user._id,
       await ctx.db.get(args.docId)
     );
-    if (doc.status !== "published") {
+    // A draft reaches only the person who wrote it (through any client they
+    // signed in), so an agent can read back what it wrote. Everyone else sees
+    // published pages only.
+    if (doc.status !== "published" && doc.authorId !== user._id) {
       throw new ConvexError("Document not found");
     }
     return {
@@ -559,6 +629,7 @@ export const _getDoc = internalQuery({
       slug: doc.slug,
       module: doc.module,
       type: doc.type,
+      status: doc.status,
       body: await readBody(ctx, doc._id),
       prUrl: doc.prUrl,
       updatedAt: doc.updatedAt,

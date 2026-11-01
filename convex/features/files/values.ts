@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, type ObjectType } from "convex/values";
 import { ConvexError } from "convex/values";
 import { action } from "../../_generated/server";
 import type { ActionCtx } from "../../_generated/server";
@@ -81,7 +81,7 @@ interface UploadResult {
 }
 
 /** Either the file was written, or a proposal was filed for it. */
-type UploadOutcome =
+export type UploadOutcome =
   | UploadResult
   | { requested: true; requestId: Id<"changeRequests"> };
 
@@ -96,7 +96,7 @@ interface FileContentRefs {
   contentType?: string;
 }
 
-interface FileContentResult {
+export interface FileContentResult {
   name: string;
   path: string;
   mode: string;
@@ -142,6 +142,23 @@ async function discardPair(
   }
 }
 
+const uploadFileArgs = {
+  projectId: v.id("projects"),
+  name: v.string(),
+  path: v.string(),
+  content: v.string(),
+  mode: v.optional(v.string()),
+  contentType: v.optional(v.string()),
+  description: v.optional(v.string()),
+  environments: v.array(v.string()),
+  // Present to replace an existing file's contents in place.
+  replaceFileId: v.optional(v.id("projectFiles")),
+  // File a change request instead of failing when the write is protected.
+  request: v.optional(v.boolean()),
+  override: v.optional(v.boolean()),
+  source: v.optional(sourceValidator),
+};
+
 /**
  * Upload a new secret file, or replace an existing file's contents.
  *
@@ -150,22 +167,7 @@ async function discardPair(
  * `secret_files_max_bytes` is enforced well below that in preflight.
  */
 export const uploadFile = action({
-  args: {
-    projectId: v.id("projects"),
-    name: v.string(),
-    path: v.string(),
-    content: v.string(),
-    mode: v.optional(v.string()),
-    contentType: v.optional(v.string()),
-    description: v.optional(v.string()),
-    environments: v.array(v.string()),
-    // Present to replace an existing file's contents in place.
-    replaceFileId: v.optional(v.id("projectFiles")),
-    // File a change request instead of failing when the write is protected.
-    request: v.optional(v.boolean()),
-    override: v.optional(v.boolean()),
-    source: v.optional(sourceValidator),
-  },
+  args: uploadFileArgs,
   returns: v.union(
     v.object({
       fileId: v.id("projectFiles"),
@@ -176,169 +178,183 @@ export const uploadFile = action({
   ),
   // Explicit return type: the handler calls api.features.files.* — which
   // includes this action — so inference would be circular (TS7022).
-  handler: async (ctx, args): Promise<UploadOutcome> => {
-    const userId = await requireCurrentUserId(ctx);
-    // Throttle BEFORE the encrypt/blob/vault work, not after — the point is
-    // to stop a loop consuming storage and WorkOS calls at all.
-    await rateLimiter.limit(ctx, "fileUpload", {
-      key: userId,
-      throws: true,
-    });
+  handler: async (ctx, args): Promise<UploadOutcome> =>
+    uploadFileAs(ctx, await requireCurrentUserId(ctx), args),
+});
 
-    let plaintext: Uint8Array;
-    try {
-      plaintext = fromBase64(args.content);
-    } catch {
-      throw new ConvexError("File content is not valid base64");
+export type UploadFileArgs = ObjectType<typeof uploadFileArgs>;
+
+/**
+ * The upload pipeline for an already-verified user. `uploadFile` resolves the
+ * user from the dashboard session; the MCP server resolves it from an OAuth
+ * token. Authorization happens inside, against that user.
+ */
+export async function uploadFileAs(
+  ctx: ActionCtx,
+  userId: Id<"users">,
+  args: UploadFileArgs
+): Promise<UploadOutcome> {
+  // Throttle BEFORE the encrypt/blob/vault work, not after — the point is
+  // to stop a loop consuming storage and WorkOS calls at all.
+  await rateLimiter.limit(ctx, "fileUpload", {
+    key: userId,
+    throws: true,
+  });
+
+  let plaintext: Uint8Array;
+  try {
+    plaintext = fromBase64(args.content);
+  } catch {
+    throw new ConvexError("File content is not valid base64");
+  }
+
+  // STEP 1 — everything that can say no, before anything that costs money
+  // or leaves a trace. Returns the normalized values so the check and the
+  // insert cannot disagree about what the path is, and the protected
+  // environments, reported only AFTER access is verified, so an
+  // unauthorized caller gets the ordinary access error instead of the
+  // project's protection configuration.
+  const preflight: PreflightResult = await ctx.runMutation(
+    internal.features.files.mutations.preflightUpload,
+    {
+      projectId: args.projectId,
+      userId,
+      name: args.name,
+      path: args.path,
+      mode: args.mode,
+      environments: args.environments,
+      size: plaintext.length,
+      replaceFileId: args.replaceFileId,
     }
+  );
 
-    // STEP 1 — everything that can say no, before anything that costs money
-    // or leaves a trace. Returns the normalized values so the check and the
-    // insert cannot disagree about what the path is, and the protected
-    // environments, reported only AFTER access is verified, so an
-    // unauthorized caller gets the ordinary access error instead of the
-    // project's protection configuration.
-    const preflight: PreflightResult = await ctx.runMutation(
-      internal.features.files.mutations.preflightUpload,
+  const protectedEnvs = preflight.protectedEnvironments;
+  const needsRequest = protectedEnvs.length > 0 && args.override !== true;
+  if (needsRequest && args.request !== true) {
+    throw new ConvexError(protectedEnvironmentError(protectedEnvs));
+  }
+  if (protectedEnvs.length > 0 && !needsRequest) {
+    // Break-glass, authorized before the encrypt and the vault write.
+    await assertCanOverrideProtection(ctx, userId, args.projectId);
+  }
+
+  // STEP 2 — fresh key, fresh nonce, every time. Never an in-place
+  // re-encrypt, so (key, iv) reuse is unreachable rather than guarded.
+  const digestSalt = newDigestSalt();
+  const sha256 = await digest(plaintext, digestSalt);
+  const sealed = await seal(plaintext);
+
+  // STEP 3 — ciphertext to the blob store.
+  const storageId = await blobStore.put(ctx, sealed.ciphertext);
+
+  // STEP 4 — key material to WorkOS Vault. Convex never holds both.
+  let vaultRef: string;
+  try {
+    const vault = await ctx.runAction(
+      internal.features.vault.vault.createSecret,
       {
+        name: `file:${preflight.path}`,
+        value: sealed.keyMaterial,
+        organizationId: preflight.organizationId,
         projectId: args.projectId,
-        userId,
-        name: args.name,
-        path: args.path,
-        mode: args.mode,
-        environments: args.environments,
-        size: plaintext.length,
-        replaceFileId: args.replaceFileId,
+        environment: "file",
       }
     );
+    vaultRef = vault.id;
+  } catch (vaultError) {
+    await discardPair(ctx, { storageId });
+    throw vaultError;
+  }
 
-    const protectedEnvs = preflight.protectedEnvironments;
-    const needsRequest = protectedEnvs.length > 0 && args.override !== true;
-    if (needsRequest && args.request !== true) {
-      throw new ConvexError(protectedEnvironmentError(protectedEnvs));
-    }
-    if (protectedEnvs.length > 0 && !needsRequest) {
-      // Break-glass, authorized before the encrypt and the vault write.
-      await assertCanOverrideProtection(ctx, userId, args.projectId);
-    }
-
-    // STEP 2 — fresh key, fresh nonce, every time. Never an in-place
-    // re-encrypt, so (key, iv) reuse is unreachable rather than guarded.
-    const digestSalt = newDigestSalt();
-    const sha256 = await digest(plaintext, digestSalt);
-    const sealed = await seal(plaintext);
-
-    // STEP 3 — ciphertext to the blob store.
-    const storageId = await blobStore.put(ctx, sealed.ciphertext);
-
-    // STEP 4 — key material to WorkOS Vault. Convex never holds both.
-    let vaultRef: string;
-    try {
-      const vault = await ctx.runAction(
-        internal.features.vault.vault.createSecret,
+  // STEP 5 — pointers into Convex, or a proposal that stages both refs
+  // until a second person approves it.
+  try {
+    if (needsRequest) {
+      const requestId: Id<"changeRequests"> = await ctx.runMutation(
+        internal.features.changeRequests.mutations.createStaged,
         {
-          name: `file:${preflight.path}`,
-          value: sealed.keyMaterial,
-          organizationId: preflight.organizationId,
           projectId: args.projectId,
-          environment: "file",
-        }
-      );
-      vaultRef = vault.id;
-    } catch (vaultError) {
-      await discardPair(ctx, { storageId });
-      throw vaultError;
-    }
-
-    // STEP 5 — pointers into Convex, or a proposal that stages both refs
-    // until a second person approves it.
-    try {
-      if (needsRequest) {
-        const requestId: Id<"changeRequests"> = await ctx.runMutation(
-          internal.features.changeRequests.mutations.createStaged,
-          {
-            projectId: args.projectId,
-            resourceType: "file",
-            kind: args.replaceFileId ? "update" : "create",
-            targetId: args.replaceFileId,
-            environments: touchedEnvironments(
-              preflight.existingEnvironments,
-              args.environments
-            ),
-            payload: JSON.stringify({
-              name: preflight.name,
-              path: preflight.path,
-              mode: preflight.mode,
-              contentType: args.contentType,
-              size: plaintext.length,
-              sha256,
-              digestSalt,
-              description: args.description,
-              environments: args.environments,
-            }),
-            vaultRef,
-            storageId,
-            label: preflight.path,
-            source: args.source ?? "web",
-          }
-        );
-        return { requested: true as const, requestId };
-      }
-
-      if (args.replaceFileId) {
-        const previous: {
-          previousVaultRef: string;
-          previousStorageId: Id<"_storage">;
-        } = await ctx.runMutation(
-          internal.features.files.mutations.replaceContent,
-          {
-            fileId: args.replaceFileId,
-            userId,
+          resourceType: "file",
+          kind: args.replaceFileId ? "update" : "create",
+          targetId: args.replaceFileId,
+          environments: touchedEnvironments(
+            preflight.existingEnvironments,
+            args.environments
+          ),
+          payload: JSON.stringify({
+            name: preflight.name,
+            path: preflight.path,
+            mode: preflight.mode,
+            contentType: args.contentType,
             size: plaintext.length,
             sha256,
             digestSalt,
-            vaultRef,
-            storageId,
-            contentType: args.contentType,
-            override: args.override,
-          }
-        );
-        // The row now points at the new pair, so the old one is unreachable
-        // and safe to destroy. Order is blob then key: a crash in between
-        // leaves a key to nothing, never bytes with a live key.
-        await discardPair(ctx, {
-          storageId: previous.previousStorageId,
-          vaultRef: previous.previousVaultRef,
-        });
-        return { fileId: args.replaceFileId, size: plaintext.length, sha256 };
-      }
+            description: args.description,
+            environments: args.environments,
+          }),
+          vaultRef,
+          storageId,
+          label: preflight.path,
+          source: args.source ?? "web",
+          requestedBy: userId,
+        }
+      );
+      return { requested: true as const, requestId };
+    }
 
-      const fileId: Id<"projectFiles"> = await ctx.runMutation(
-        internal.features.files.mutations.create,
+    if (args.replaceFileId) {
+      const previous: {
+        previousVaultRef: string;
+        previousStorageId: Id<"_storage">;
+      } = await ctx.runMutation(
+        internal.features.files.mutations.replaceContent,
         {
-          projectId: args.projectId,
-          createdBy: userId,
-          name: preflight.name,
-          path: preflight.path,
-          mode: preflight.mode,
-          contentType: args.contentType,
-          description: args.description,
-          environments: args.environments,
+          fileId: args.replaceFileId,
+          userId,
           size: plaintext.length,
           sha256,
           digestSalt,
           vaultRef,
           storageId,
+          contentType: args.contentType,
           override: args.override,
         }
       );
-      return { fileId, size: plaintext.length, sha256 };
-    } catch (mutationError) {
-      await discardPair(ctx, { storageId, vaultRef });
-      throw mutationError;
+      // The row now points at the new pair, so the old one is unreachable
+      // and safe to destroy. Order is blob then key: a crash in between
+      // leaves a key to nothing, never bytes with a live key.
+      await discardPair(ctx, {
+        storageId: previous.previousStorageId,
+        vaultRef: previous.previousVaultRef,
+      });
+      return { fileId: args.replaceFileId, size: plaintext.length, sha256 };
     }
-  },
-});
+
+    const fileId: Id<"projectFiles"> = await ctx.runMutation(
+      internal.features.files.mutations.create,
+      {
+        projectId: args.projectId,
+        createdBy: userId,
+        name: preflight.name,
+        path: preflight.path,
+        mode: preflight.mode,
+        contentType: args.contentType,
+        description: args.description,
+        environments: args.environments,
+        size: plaintext.length,
+        sha256,
+        digestSalt,
+        vaultRef,
+        storageId,
+        override: args.override,
+      }
+    );
+    return { fileId, size: plaintext.length, sha256 };
+  } catch (mutationError) {
+    await discardPair(ctx, { storageId, vaultRef });
+    throw mutationError;
+  }
+}
 
 /**
  * Decrypt and return ONE file. Audited on every call.
@@ -365,44 +381,51 @@ export const getFileContent = action({
     content: v.string(),
   }),
   // Explicit return type — see uploadFile.
-  handler: async (ctx, args): Promise<FileContentResult> => {
-    const userId = await requireCurrentUserId(ctx);
-    await rateLimiter.limit(ctx, "fileDownload", {
-      key: userId,
-      throws: true,
-    });
-
-    // Authorization happens inside the internal query, which also hands back
-    // the refs that the metadata queries deliberately never expose.
-    const file: FileContentRefs = await ctx.runQuery(
-      internal.features.files.queries._getForContent,
-      { fileId: args.fileId, userId }
-    );
-
-    const ciphertext = await blobStore.get(ctx, file.storageId);
-    const keyMaterial = await ctx.runAction(
-      internal.features.vault.vault.readSecret,
-      { vaultRef: file.vaultRef }
-    );
-
-    // A tampered or truncated blob throws here — the GCM tag is a free
-    // integrity check and the throw is the whole point. Never caught.
-    const plaintext = await open(ciphertext, keyMaterial);
-
-    await ctx.runMutation(internal.features.files.mutations.logDownload, {
-      fileId: args.fileId,
-      userId,
-      clientHint: args.source ?? "unknown",
-    });
-
-    return {
-      name: file.name,
-      path: file.path,
-      mode: file.mode,
-      size: file.size,
-      sha256: file.sha256,
-      contentType: file.contentType,
-      content: toBase64(plaintext),
-    };
-  },
+  handler: async (ctx, args): Promise<FileContentResult> =>
+    readFileAs(ctx, await requireCurrentUserId(ctx), args),
 });
+
+/** Decrypt one file for an already-verified user. See `uploadFileAs`. */
+export async function readFileAs(
+  ctx: ActionCtx,
+  userId: Id<"users">,
+  args: { fileId: Id<"projectFiles">; source?: string }
+): Promise<FileContentResult> {
+  await rateLimiter.limit(ctx, "fileDownload", {
+    key: userId,
+    throws: true,
+  });
+
+  // Authorization happens inside the internal query, which also hands back
+  // the refs that the metadata queries deliberately never expose.
+  const file: FileContentRefs = await ctx.runQuery(
+    internal.features.files.queries._getForContent,
+    { fileId: args.fileId, userId }
+  );
+
+  const ciphertext = await blobStore.get(ctx, file.storageId);
+  const keyMaterial = await ctx.runAction(
+    internal.features.vault.vault.readSecret,
+    { vaultRef: file.vaultRef }
+  );
+
+  // A tampered or truncated blob throws here — the GCM tag is a free
+  // integrity check and the throw is the whole point. Never caught.
+  const plaintext = await open(ciphertext, keyMaterial);
+
+  await ctx.runMutation(internal.features.files.mutations.logDownload, {
+    fileId: args.fileId,
+    userId,
+    clientHint: args.source ?? "unknown",
+  });
+
+  return {
+    name: file.name,
+    path: file.path,
+    mode: file.mode,
+    size: file.size,
+    sha256: file.sha256,
+    contentType: file.contentType,
+    content: toBase64(plaintext),
+  };
+}

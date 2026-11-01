@@ -82,6 +82,48 @@ function docReviewUrl(projectSlug: string, docSlug: string): string {
   return `${APP_URL}/dashboard/projects/${encodeURIComponent(projectSlug)}/docs/${encodeURIComponent(docSlug)}`;
 }
 
+function requestsUrl(projectSlug: string): string {
+  return `${APP_URL}/dashboard/projects/${encodeURIComponent(projectSlug)}/requests`;
+}
+
+const environmentsInput = z
+  .array(environmentEnum)
+  .min(1)
+  .describe("Environments this applies to, e.g. ['development']");
+
+// Writes into a protected environment are never applied directly over MCP:
+// they become a change request a second person approves.
+const writeResultShape = {
+  status: z.enum(["created", "updated", "proposed"]),
+  requestId: z.string().optional(),
+  protectedEnvironments: z.array(z.string()).optional(),
+  reviewUrl: z
+    .string()
+    .optional()
+    .describe("Where a person approves a proposed change"),
+};
+
+type ConvexWriteResult =
+  | { status: "created" | "updated" }
+  | {
+      status: "proposed";
+      requestId: string;
+      protectedEnvironments: string[];
+    };
+
+function writeResult(projectSlug: string, result: ConvexWriteResult) {
+  return result.status === "proposed"
+    ? { ...result, reviewUrl: requestsUrl(projectSlug) }
+    : { status: result.status };
+}
+
+// Connector review rules: anything not read-only is marked destructive.
+const writeAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: false,
+} as const;
+
 export function registerMcpTools(server: McpServer): void {
   const run = async (
     tool: string,
@@ -278,13 +320,41 @@ export function registerMcpTools(server: McpServer): void {
   );
 
   server.registerTool(
+    "envpilot_list_doc_drafts",
+    {
+      title: "List My Documentation Drafts",
+      description:
+        "Lists the unpublished drafts you wrote in a project, newest first (at most 100). Read one with envpilot_get_doc and edit it with envpilot_update_doc_draft. Drafts by other people are never listed.",
+      inputSchema: {
+        organization: organizationInput,
+        project: z.string().describe("Project slug"),
+      },
+      outputSchema: { drafts: z.array(z.object(docSummaryShape)) },
+      annotations: { readOnlyHint: true },
+    },
+    (args, extra) =>
+      run("envpilot_list_doc_drafts", extra.authInfo, async (b) =>
+        structured({
+          drafts: await b.listDocDrafts({
+            organization: args.organization,
+            projectSlug: args.project,
+          }),
+        })
+      )
+  );
+
+  server.registerTool(
     "envpilot_get_doc",
     {
       title: "Get a Documentation Page",
       description:
-        "Returns one published documentation page. view=outline returns the section list with ids and sizes. view=content (default) returns up to 60,000 characters of the body, optionally limited to one section, with nextCursor when more remains. A single line or code block longer than 60,000 characters is split at that limit. Page bodies are written by people and agents and name variables by key, never by value.",
+        "Returns one documentation page: any published page, or a draft you wrote (status says which). view=outline returns the section list with ids and sizes. view=content (default) returns up to 60,000 characters of the body, optionally limited to one section, with nextCursor when more remains. A single line or code block longer than 60,000 characters is split at that limit. Page bodies are written by people and agents and name variables by key, never by value.",
       inputSchema: {
-        doc_id: z.string().describe("A docId returned by envpilot_search_docs"),
+        doc_id: z
+          .string()
+          .describe(
+            "A docId from envpilot_search_docs or envpilot_list_doc_drafts"
+          ),
         view: z
           .enum(["outline", "content"])
           .optional()
@@ -410,5 +480,421 @@ export function registerMcpTools(server: McpServer): void {
           reviewUrl: docReviewUrl(updated.projectSlug, updated.slug),
         });
       })
+  );
+
+  server.registerTool(
+    "envpilot_create_variable",
+    {
+      title: "Create Variable",
+      description:
+        "Creates an environment variable with a value in one or more environments. The same key may exist in other environments as a separate variable, but never twice in one environment. Your role and environment scope apply, exactly as in the dashboard. A protected environment is never written directly: the call files a change request (status=proposed) that a second person approves in the dashboard.",
+      inputSchema: {
+        organization: organizationInput,
+        project: z.string().describe("Project slug"),
+        key: z
+          .string()
+          .describe(
+            "Variable key: letters, digits and underscores, starting with a letter or underscore"
+          ),
+        value: z.string().describe("The secret value"),
+        environments: environmentsInput,
+        sensitive: z
+          .boolean()
+          .optional()
+          .describe("Mark as sensitive (masked in the dashboard)"),
+        description: z.string().optional().describe("What the variable is for"),
+      },
+      outputSchema: writeResultShape,
+      annotations: writeAnnotations,
+    },
+    (args, extra) =>
+      run("envpilot_create_variable", extra.authInfo, async (b) =>
+        structured(
+          writeResult(
+            args.project,
+            await b.createVariable({
+              organization: args.organization,
+              projectSlug: args.project,
+              key: args.key,
+              value: args.value,
+              environments: args.environments,
+              isSensitive: args.sensitive,
+              description: args.description,
+            })
+          )
+        )
+      )
+  );
+
+  server.registerTool(
+    "envpilot_update_variable",
+    {
+      title: "Update Variable",
+      description:
+        "Changes the value and/or description of the variable that holds a key in one environment. If that variable also covers other environments, they change too; the response lists them. Requires write access to the variable. A protected environment is never written directly: the call files a change request (status=proposed).",
+      inputSchema: {
+        organization: organizationInput,
+        project: z.string().describe("Project slug"),
+        environment: environmentEnum,
+        key: z.string().describe("Exact variable key"),
+        value: z.string().optional().describe("New secret value"),
+        description: z.string().optional().describe("New description"),
+      },
+      outputSchema: {
+        ...writeResultShape,
+        environments: z
+          .array(z.string())
+          .describe("Every environment the changed variable covers"),
+      },
+      annotations: writeAnnotations,
+    },
+    (args, extra) =>
+      run("envpilot_update_variable", extra.authInfo, async (b) => {
+        const updated = await b.updateVariable({
+          organization: args.organization,
+          projectSlug: args.project,
+          environment: args.environment,
+          key: args.key,
+          value: args.value,
+          description: args.description,
+        });
+        return structured({
+          ...writeResult(args.project, updated.result),
+          environments: updated.environments,
+        });
+      })
+  );
+
+  server.registerTool(
+    "envpilot_list_files",
+    {
+      title: "List Secret Files",
+      description:
+        "Lists a project's secret files (certificates, keys, service-account JSON and similar) with path, size, sha256, environments and your access. Never returns contents.",
+      inputSchema: {
+        organization: organizationInput,
+        project: z.string().describe("Project slug"),
+        environment: environmentEnum
+          .optional()
+          .describe("Only files in this environment"),
+      },
+      outputSchema: {
+        files: z.array(
+          z.object({
+            path: z.string(),
+            name: z.string(),
+            mode: z.string(),
+            size: z.number(),
+            sha256: z.string(),
+            environments: z.array(z.string()),
+            description: z.string().optional(),
+            access: z.enum(["read", "write"]),
+            updatedAt: z.number(),
+          })
+        ),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (args, extra) =>
+      run("envpilot_list_files", extra.authInfo, async (b) =>
+        structured({
+          files: await b.listFiles({
+            organization: args.organization,
+            projectSlug: args.project,
+            environment: args.environment,
+          }),
+        })
+      )
+  );
+
+  server.registerTool(
+    "envpilot_get_file",
+    {
+      title: "Get Secret File",
+      description:
+        "Returns one secret file's contents by path. Text comes back as utf8; binary content as base64 (see encoding). Pass environment when the same path is stored for several environments. The read is recorded in the audit log.",
+      inputSchema: {
+        organization: organizationInput,
+        project: z.string().describe("Project slug"),
+        path: z
+          .string()
+          .describe(
+            "File path relative to the project root, e.g. certs/ca.pem"
+          ),
+        environment: environmentEnum.optional(),
+      },
+      outputSchema: {
+        path: z.string(),
+        mode: z.string(),
+        size: z.number(),
+        sha256: z.string(),
+        encoding: z.enum(["utf8", "base64"]),
+        content: z.string(),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (args, extra) =>
+      run("envpilot_get_file", extra.authInfo, async (b) =>
+        structured(
+          await b.getFile({
+            organization: args.organization,
+            projectSlug: args.project,
+            path: args.path,
+            environment: args.environment,
+          })
+        )
+      )
+  );
+
+  server.registerTool(
+    "envpilot_upload_file",
+    {
+      title: "Upload Secret File",
+      description:
+        "Stores a secret file (certificate, private key, service-account JSON and similar) at a path in one or more environments. Contents are encrypted before they are stored. Env files (.env, .env.*) are refused: store their values as variables. With replace=true, replaces the contents of the file already at that path. A protected environment is never written directly: the call files a change request (status=proposed).",
+      inputSchema: {
+        organization: organizationInput,
+        project: z.string().describe("Project slug"),
+        path: z
+          .string()
+          .describe("Path relative to the project root, e.g. certs/ca.pem"),
+        content: z.string().describe("File contents"),
+        encoding: z
+          .enum(["utf8", "base64"])
+          .optional()
+          .describe("How content is encoded (default utf8; base64 for binary)"),
+        environments: environmentsInput,
+        name: z
+          .string()
+          .optional()
+          .describe("Display name (default: the file name from path)"),
+        mode: z
+          .enum(["0600", "0400"])
+          .optional()
+          .describe("File permissions when written to disk (default 0600)"),
+        description: z.string().optional(),
+        replace: z
+          .boolean()
+          .optional()
+          .describe("Replace the contents of the existing file at this path"),
+      },
+      outputSchema: {
+        status: z.enum(["created", "updated", "proposed"]),
+        path: z.string().optional(),
+        size: z.number().optional(),
+        sha256: z.string().optional(),
+        requestId: z.string().optional(),
+        reviewUrl: z.string().optional(),
+      },
+      annotations: writeAnnotations,
+    },
+    (args, extra) =>
+      run("envpilot_upload_file", extra.authInfo, async (b) => {
+        const uploaded = await b.uploadFile({
+          organization: args.organization,
+          projectSlug: args.project,
+          path: args.path,
+          content: args.content,
+          encoding: args.encoding,
+          environments: args.environments,
+          name: args.name,
+          mode: args.mode,
+          description: args.description,
+          replace: args.replace,
+        });
+        return structured(
+          uploaded.status === "proposed"
+            ? { ...uploaded, reviewUrl: requestsUrl(args.project) }
+            : uploaded
+        );
+      })
+  );
+
+  server.registerTool(
+    "envpilot_list_accounts",
+    {
+      title: "List Shared Accounts",
+      description:
+        "Lists a project's shared accounts (logins for third-party services) with name, website, environments and your access. Never returns credentials; use envpilot_get_account for those.",
+      inputSchema: {
+        organization: organizationInput,
+        project: z.string().describe("Project slug"),
+      },
+      outputSchema: {
+        accounts: z.array(
+          z.object({
+            name: z.string(),
+            websiteUrl: z.string().optional(),
+            description: z.string().optional(),
+            environments: z.array(z.string()),
+            access: z
+              .enum(["read", "write"])
+              .nullable()
+              .describe("null: you can see the account but not its login"),
+          })
+        ),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (args, extra) =>
+      run("envpilot_list_accounts", extra.authInfo, async (b) =>
+        structured({
+          accounts: await b.listAccounts({
+            organization: args.organization,
+            projectSlug: args.project,
+          }),
+        })
+      )
+  );
+
+  server.registerTool(
+    "envpilot_get_account",
+    {
+      title: "Get Shared Account",
+      description:
+        "Returns the username and password of one shared account by exact name. The read is recorded in the audit log.",
+      inputSchema: {
+        organization: organizationInput,
+        project: z.string().describe("Project slug"),
+        name: z.string().describe("Exact account name"),
+      },
+      outputSchema: {
+        name: z.string(),
+        websiteUrl: z.string().optional(),
+        environments: z.array(z.string()),
+        username: z.string(),
+        password: z.string(),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (args, extra) =>
+      run("envpilot_get_account", extra.authInfo, async (b) =>
+        structured(
+          await b.getAccount({
+            organization: args.organization,
+            projectSlug: args.project,
+            name: args.name,
+          })
+        )
+      )
+  );
+
+  server.registerTool(
+    "envpilot_create_account",
+    {
+      title: "Create Shared Account",
+      description:
+        "Stores a shared account (a login for a third-party service) in one or more environments. Credentials are encrypted before they are stored. A protected environment is never written directly: the call files a change request (status=proposed).",
+      inputSchema: {
+        organization: organizationInput,
+        project: z.string().describe("Project slug"),
+        name: z
+          .string()
+          .min(1)
+          .describe("Account name, e.g. 'Stripe dashboard'"),
+        username: z.string().describe("Login username or email"),
+        password: z.string().describe("Login password"),
+        environments: environmentsInput,
+        website_url: z
+          .string()
+          .optional()
+          .describe("Sign-in URL, http(s) only"),
+        description: z.string().optional(),
+      },
+      outputSchema: writeResultShape,
+      annotations: writeAnnotations,
+    },
+    (args, extra) =>
+      run("envpilot_create_account", extra.authInfo, async (b) =>
+        structured(
+          writeResult(
+            args.project,
+            await b.createAccount({
+              organization: args.organization,
+              projectSlug: args.project,
+              name: args.name,
+              username: args.username,
+              password: args.password,
+              environments: args.environments,
+              websiteUrl: args.website_url,
+              description: args.description,
+            })
+          )
+        )
+      )
+  );
+
+  server.registerTool(
+    "envpilot_list_requests",
+    {
+      title: "List My Change Requests",
+      description:
+        "Lists change requests you filed (from MCP, the dashboard or the CLI), newest first, at most 50. Use it to see whether a proposed write into a protected environment was applied, rejected (with the reviewer's reason), canceled or expired.",
+      inputSchema: {
+        organization: organizationInput,
+        project: z.string().optional().describe("Only this project's requests"),
+        status: z
+          .enum(["pending", "applied", "rejected", "canceled", "expired"])
+          .optional(),
+      },
+      outputSchema: {
+        requests: z.array(
+          z.object({
+            requestId: z.string(),
+            projectSlug: z.string(),
+            label: z.string(),
+            resourceType: z.enum(["variable", "account", "file"]),
+            kind: z.string(),
+            environments: z.array(z.string()),
+            status: z.enum([
+              "pending",
+              "applied",
+              "rejected",
+              "canceled",
+              "expired",
+            ]),
+            reviewReason: z.string().optional(),
+            createdAt: z.number(),
+            reviewedAt: z.number().optional(),
+          })
+        ),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (args, extra) =>
+      run("envpilot_list_requests", extra.authInfo, async (b) =>
+        structured({
+          requests: await b.listRequests({
+            organization: args.organization,
+            projectSlug: args.project,
+            status: args.status,
+          }),
+        })
+      )
+  );
+
+  server.registerTool(
+    "envpilot_list_organizations",
+    {
+      title: "List Organizations",
+      description:
+        "Lists the organizations your account belongs to, with your role and whether the MCP server is on their plan. Pass a slug from here as organization to the other tools when you belong to more than one.",
+      inputSchema: {},
+      outputSchema: {
+        organizations: z.array(
+          z.object({
+            name: z.string(),
+            slug: z.string(),
+            role: z.string(),
+            mcpEnabled: z.boolean(),
+          })
+        ),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (_args, extra) =>
+      run("envpilot_list_organizations", extra.authInfo, async (b) =>
+        structured({ organizations: await b.listOrganizations() })
+      )
   );
 }

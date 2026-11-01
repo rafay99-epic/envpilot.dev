@@ -72,7 +72,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // one legitimate cold start of any fleet this key can serve, while the slow
   // refill means a caller cannot SUSTAIN that rate. This endpoint returns
   // plaintext, so the profile being bounded is exfiltration, not CPU.
-  // Documented publicly in docs/limits/rate-limits — keep the page in sync.
+  // Documented in apps/docs/content/limits/rate-limits.mdx — keep it in sync.
   dockerPull: {
     kind: "token bucket",
     rate:
@@ -134,7 +134,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // in a single burst, and a draft costs no email and no vault call. The cap
   // still exists because every draft is a human review item, and review
   // capacity — not storage — is the scarce resource here.
-  // Documented publicly in docs/rate-limits — keep the page in sync.
+  // Documented in apps/docs/content/limits/rate-limits.mdx — keep it in sync.
   docCreate: {
     kind: "token bucket",
     rate: 30,
@@ -147,6 +147,17 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     rate: 120,
     period: 3_600_000,
     capacity: 40,
+  },
+
+  // Variable and account writes over MCP: 30 per minute per signed-in user.
+  // Charged before the vault write, so a looping agent stops before it mints
+  // vault objects. File uploads keep their own fileUpload bucket.
+  // Documented in apps/docs/content/limits/rate-limits.mdx — keep it in sync.
+  mcpWrite: {
+    kind: "token bucket",
+    rate: 30,
+    period: 60_000,
+    capacity: 30,
   },
 
   // Documentation shares: 60 emails per hour per org. Charged per RECIPIENT,

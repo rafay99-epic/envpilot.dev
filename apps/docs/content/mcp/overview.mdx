@@ -1,12 +1,12 @@
 ---
 title: MCP overview
-description: Give a coding agent scoped, audited access to real secrets — and no way to change them.
+description: Give a coding agent scoped, audited access to real secrets, under your role.
 icon: zap
 ---
 
 # MCP overview
 
-MCP (Model Context Protocol) lets an assistant call tools against your real data instead of guessing at it. Envpilot runs a remote MCP server, so Claude, Claude Code, Codex or Cursor can look up your projects and read the variables your role allows, with the same permissions, rate limits and audit trail as the dashboard.
+MCP (Model Context Protocol) lets an assistant call tools against your real data instead of guessing at it. Envpilot runs a remote MCP server, so Claude, Claude Code, Codex or Cursor can work with your projects' variables, secret files and shared accounts, with the same permissions, rate limits and audit trail as the dashboard.
 
 Requires the **Pro** plan (`mcp_server`). Connect by [signing in](/mcp/setup) with your Envpilot login. The old key-based setup lives on [API keys (legacy)](/mcp/api-keys).
 
@@ -18,14 +18,15 @@ Transport is Streamable HTTP. Auth is an OAuth access token from the Envpilot si
 
 ## What an agent can do
 
-| Can                                        | Cannot                                            |
-| ------------------------------------------ | ------------------------------------------------- |
-| List the projects you can see              | Create, edit, or delete variables or files        |
-| Read the variables your role can read      | Read outside your role's projects or environments |
-| Search project names and variable **keys** | See variable **values** through search            |
-| Read and write documentation **drafts**    | Publish a page                                    |
+| Can                                                                   | Cannot                                            |
+| --------------------------------------------------------------------- | ------------------------------------------------- |
+| List the projects you can see                                         | Delete anything                                   |
+| Read variables, secret files and shared accounts you can read         | Read outside your role's projects or environments |
+| Create variables, files and accounts; update variables; replace files | Write a protected environment without approval    |
+| Search project names and variable **keys**                            | See variable **values** through search            |
+| Read and write documentation **drafts**                               | Publish a page                                    |
 
-The agent reads and drafts; people change secrets and publish. Shared accounts, secret files and variable requests are not available over MCP.
+The agent does what your role allows, nothing more. A write into a [protected environment](/platform/protected-environments) becomes a change request that a second person approves, and documentation stays a draft until a person publishes it.
 
 ## Getting connected
 
@@ -37,8 +38,8 @@ The agent reads and drafts; people change secrets and publish. Shared accounts, 
 
 - **Pro plan only**, re-checked on every call — a downgrade stops the agent immediately.
 - **A connection acts as you.** Your role decides what it sees; there is no way yet to give it less.
-- **Rate limits apply per person**: 120/min metadata and 30/min value pulls.
-- **Every value-returning call is audited** against your user.
+- **Rate limits apply per person**: 120/min metadata, 30/min value pulls, 30/min variable and account writes, 20/min file uploads. See [Tools](/mcp/tools#cost-of-each-call).
+- **Every value-returning call and every write is audited** against your user.
 
 ## Next
 

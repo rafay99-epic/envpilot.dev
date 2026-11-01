@@ -1,6 +1,6 @@
 ---
 title: Requests & approvals
-description: The one write path that isn't a write — how developers and agents ask for a secret, and how reviewers approve it.
+description: How a developer asks for a secret, and how a reviewer approves it and supplies the value.
 icon: users
 ---
 
@@ -8,16 +8,13 @@ icon: users
 
 A request is an ask, not a change: _"I need `STRIPE_SECRET_KEY` in production, here is why."_ It lands in a reviewer's queue, and if the reviewer approves, **the reviewer supplies the value**. The requester never proposes secret material.
 
-That single rule is what lets Envpilot hand a coding agent real access without handing it write access.
-
 ## Who can file, who can review
 
-| Actor                                           | Files requests       | Reviews requests |
-| ----------------------------------------------- | -------------------- | ---------------- |
-| Owner, Project Manager, Team Lead               | — (creates directly) | ✓                |
-| Developer                                       | ✓                    | —                |
-| Editor, Viewer                                  | —                    | —                |
-| API key with the `requests` resource (MCP only) | ✓                    | —                |
+| Actor                             | Files requests       | Reviews requests |
+| --------------------------------- | -------------------- | ---------------- |
+| Owner, Project Manager, Team Lead | — (creates directly) | ✓                |
+| Developer                         | ✓                    | —                |
+| Editor, Viewer                    | —                    | —                |
 
 Reviewing needs the `project.requests.review` capability. Developers see only their own requests; reviewers see every request in their projects.
 
@@ -45,47 +42,20 @@ Once approved, the variable exists and appears in the requester's next pull.
 
 Rejection carries the reviewer's reason back to the requester, so nobody has to guess whether they were denied or ignored. Cancelling is available to the requester while a request is still pending.
 
-## The agent loop
+## Agents
 
-An API key with the `requests` resource — used over the [MCP server](/mcp/overview) — can file exactly the same kind of request. It cannot approve one, and it cannot supply a value.
-
-```mermaid
-sequenceDiagram
-    participant Agent
-    participant MCP as MCP server
-    participant Reviewer as Human reviewer
-    Agent->>MCP: envpilot_request_variable(key, justification)
-    MCP-->>Agent: filed (status: pending)
-    Reviewer->>Reviewer: Approve and supply the value
-    loop Poll
-      Agent->>MCP: envpilot_get_request_status
-      MCP-->>Agent: pending / approved / rejected
-    end
-    Agent->>MCP: envpilot_get_variable(key)
-    MCP-->>Agent: value
-```
-
-A justification is **required** on machine-filed requests. A reviewer approving a request should be able to tell what the agent was doing when it asked.
+Agents no longer file variable requests; that path needed an API key and was removed with API-key access to the MCP server. An agent signed in to the [MCP server](/mcp/overview) works under your role instead: it can create variables you could create, and a write into a [protected environment](/platform/protected-environments) becomes a change request that a second person approves.
 
 ## Limits
-
-Every approval fans out an email, so an agent stuck in a retry loop is a reviewer-spam engine unless it is capped twice:
-
-| Cap                            | Value                           |
-| ------------------------------ | ------------------------------- |
-| Machine request rate           | 5 per hour per API key, burst 2 |
-| Machine requests standing open | 5 pending per API key           |
-
-Hitting the standing cap returns a plain refusal: wait for a human to review what you already filed. Both caps are per **key**, so revoking a runaway agent's key stops it instantly. See [Rate limits](/limits/rate-limits).
 
 Other boundaries worth knowing:
 
 - Requests create variables. They are not a channel for editing an existing value — that is a direct write by someone who holds the capability.
 - The GitHub Action can never file a request. CI reads; it does not negotiate.
-- Approval is the only path where a machine-originated request produces a value, and a human always types it.
+- On approval, a human always types the value.
 
 ## See also
 
 - [CLI: requests](/cli/requests) — `request`, `requests list/approve/reject/cancel`
-- [MCP: agent requests](/mcp/agent-requests)
+- [MCP: agent requests (legacy)](/mcp/agent-requests)
 - [Roles & permissions](/platform/rbac)
