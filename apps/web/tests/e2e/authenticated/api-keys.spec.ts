@@ -52,6 +52,10 @@ test.describe.serial("API keys", () => {
     );
     await apiKeysTab.click();
 
+    // MCP signs in with OAuth; the section says so and links the steps.
+    await expect(page.getByTestId("mcp-oauth-note")).toContainText(
+      "The MCP server uses sign-in."
+    );
     await page.getByRole("button", { name: /^New Key$/i }).click();
     // The drawer mounts with the keys query, so wait for the form itself
     // before reaching into it — clicking mid-mount silently no-ops.
@@ -90,9 +94,7 @@ test.describe.serial("API keys", () => {
     });
     await expect(productionChip).toBeVisible();
 
-    // Resources: variables + projects are the pre-selected defaults —
-    // projects because the default surfaces include the MCP server, whose
-    // clients start by listing projects.
+    // Resources: variables is the pre-selected default.
     const variablesChip = page.getByRole("button", {
       name: /^variables$/i,
       pressed: true,
@@ -100,19 +102,16 @@ test.describe.serial("API keys", () => {
     await expect(variablesChip).toBeVisible();
     await expect(page.getByTestId("api-key-resource-projects")).toHaveAttribute(
       "aria-pressed",
-      "true"
-    );
-
-    // Surfaces come from the purpose preset the drawer opens on ("Agent /
-    // MCP"), so the MCP server is on and the other two are opt-in. Presets
-    // exist precisely so a key is never minted for a mix nobody asked for.
-    await expect(
-      page.getByTestId("api-key-surface-mcp_server")
-    ).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByTestId("api-key-surface-rest_api")).toHaveAttribute(
-      "aria-pressed",
       "false"
     );
+
+    // Surfaces come from the purpose preset the drawer opens on ("REST
+    // read-only"). MCP is not offered: it signs in with OAuth.
+    await expect(page.getByTestId("api-key-surface-rest_api")).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    await expect(page.getByTestId("api-key-surface-mcp_server")).toHaveCount(0);
     await expect(
       page.getByTestId("api-key-surface-github_action")
     ).toHaveAttribute("aria-pressed", "false");
@@ -135,12 +134,6 @@ test.describe.serial("API keys", () => {
     const plaintextKey = (await keyCode.textContent())?.trim() ?? "";
     expect(plaintextKey).toMatch(/^envpk_[0-9a-f]{40}$/);
 
-    // MCP surface keys get rotation guidance on the one-time reveal —
-    // how to swap the key into an already-configured MCP client.
-    await expect(page.getByTestId("api-key-mcp-rotation-hint")).toContainText(
-      /claude mcp remove/i
-    );
-
     await page.getByRole("button", { name: /^Done$/i }).click();
 
     // The list shows the key with its scope badges; the hash never appears.
@@ -151,7 +144,7 @@ test.describe.serial("API keys", () => {
     await expect(row).toBeVisible({ timeout: 10_000 });
     // Scope renders as one quiet line, not a badge per datum.
     await expect(
-      row.getByText(/1 project · production · variables, projects · MCP server/)
+      row.getByText(/1 project · production · variables · REST API/)
     ).toBeVisible();
 
     expect(
