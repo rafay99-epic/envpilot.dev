@@ -15,6 +15,18 @@
 
 <!-- entry -->
 ---
+title: Lighter public pages
+version: v1.70.1
+date: 2026-11-01
+types: [improvement]
+---
+
+The home page, pricing, FAQ, changelog and the other public pages no longer check your session. Each visit used to make several server calls just to find out whether you were signed in. Now it makes none.
+
+The site header always shows sign-in and get-started. If you are already signed in, sign-in takes you straight to your dashboard.
+
+<!-- entry -->
+---
 title: VS Code extension 1.17.2
 version: v1.17.2
 date: 2026-09-24
