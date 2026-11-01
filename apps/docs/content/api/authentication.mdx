@@ -46,7 +46,7 @@ If any part of a variable pull can't be completed safely, the whole request fail
 
 ## Audit trail
 
-Every value pull is logged — which key, which project/environment, which filters were used, and the source (`public-api`, `mcp`, or `cicd` for the GitHub Action). Metadata-only reads (key names without values) are **not** audited individually to avoid log noise, since they carry no secret exposure.
+Every value pull with a key is logged — which key, which project/environment, which filters were used, and the source (`public-api`, or `cicd` for the GitHub Action). MCP has no key: its reads and writes are logged against the signed-in person, and value reads are marked `via: oauth` with the client that made them. Metadata-only reads (key names without values) are **not** audited individually to avoid log noise, since they carry no secret exposure.
 
 Every **denied** request is also logged, including:
 

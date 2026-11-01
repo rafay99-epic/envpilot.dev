@@ -9,7 +9,11 @@ import {
 import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { createAuditLog } from "../../lib/audit";
-import { getRoleProfile, isSuspendedMembership } from "../../lib/authz";
+import {
+  getRoleProfile,
+  isEnvironmentScopeAllowed,
+  isSuspendedMembership,
+} from "../../lib/authz";
 import {
   authorizeAccountAccess,
   authorizeVariableAccess,
@@ -1026,7 +1030,15 @@ export const _preflightAccountCreate = internalQuery({
         q.eq("projectId", project._id).eq("name", args.name)
       )
       .take(20);
-    if (sameName.some((account) => account.deletedAt === undefined)) {
+    // Only accounts this person can already see count, so the refusal never
+    // confirms an account outside their environment scope.
+    if (
+      sameName.some(
+        (account) =>
+          account.deletedAt === undefined &&
+          isEnvironmentScopeAllowed(environmentScope, account.environments)
+      )
+    ) {
       throw new ConvexError(
         `An account named "${args.name}" already exists in this project`
       );
