@@ -146,7 +146,14 @@ export const SECTIONS: DocSection[] = [
     label: "MCP Server",
     blurb: "Give a coding agent scoped, auditable access to secrets.",
     icon: "zap",
-    pages: ["overview", "setup", "clients", "tools", "agent-requests"],
+    pages: [
+      "overview",
+      "setup",
+      "clients",
+      "tools",
+      "agent-requests",
+      "api-keys",
+    ],
   },
   {
     slug: "dashboard",

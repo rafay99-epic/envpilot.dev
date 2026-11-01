@@ -8,7 +8,7 @@ icon: zap
 
 Every tool runs against the same scope, rate limits and plan gate as the REST API, and every value-returning call is audited.
 
-With an API key, the key's resources decide which tools work. With an [OAuth sign-in](/mcp/clients#sign-in-with-oauth), the signed-in person's role decides, and eight tools are offered: everything except shared accounts, secret files and variable requests, which stay on API keys.
+With a [sign-in](/mcp/setup), your role decides which tools work, and eight tools are offered: everything except shared accounts, secret files and variable requests. Those three need a [legacy API key](/mcp/api-keys), where the key's resources (the **Resource** column) decide.
 
 ## Read tools
 
@@ -39,7 +39,7 @@ None of them writes anything a reader sees on its own. A requested variable has
 no value until a person supplies one, and a draft page is invisible to your
 team, and to every other agent, until a person publishes it.
 
-In Claude these tools carry `destructiveHint`, so Claude asks before each call.
+In Claude, `envpilot_request_variable`, `envpilot_create_doc` and `envpilot_update_doc_draft` carry `destructiveHint`, so Claude asks before each one. `envpilot_get_request_status` only reads.
 
 ## Secret file tools in detail
 
@@ -149,4 +149,4 @@ payloads, commit SHAs — pass through untouched.
 
 ## Next
 
-- [Agent requests](/mcp/agent-requests) · [Setup](/mcp/setup)
+- [Agent requests](/mcp/agent-requests) · [Setup](/mcp/setup) · [API keys (legacy)](/mcp/api-keys)
