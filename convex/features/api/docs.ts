@@ -86,6 +86,7 @@ export type DocDetail = {
   slug: string;
   module: string;
   type: "api" | "guide";
+  status: "draft" | "published";
   body: string;
   prUrl?: string;
   updatedAt: number;
@@ -235,6 +236,7 @@ export const docPageValidator = v.object({
   slug: v.string(),
   module: v.string(),
   type: v.union(v.literal("api"), v.literal("guide")),
+  status: v.union(v.literal("draft"), v.literal("published")),
   body: v.string(),
   totalChars: v.number(),
   nextCursor: v.optional(v.string()),

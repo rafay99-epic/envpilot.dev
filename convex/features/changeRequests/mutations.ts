@@ -289,10 +289,9 @@ type FileChangeRequestArgs = {
 
 async function fileChangeRequest(
   ctx: MutationCtx,
-  args: FileChangeRequestArgs
+  args: FileChangeRequestArgs,
+  actor: Doc<"users">
 ): Promise<Id<"changeRequests">> {
-  const actor = await requireAuthedUser(ctx);
-
   const project = await ctx.db.get(args.projectId);
   if (!project || project.deletedAt) {
     throw new ConvexError("Project not found");
@@ -497,22 +496,32 @@ async function fileChangeRequest(
 export const create = mutation({
   args: changeRequestArgs,
   returns: v.id("changeRequests"),
-  handler: async (ctx, args) => fileChangeRequest(ctx, args),
+  handler: async (ctx, args) =>
+    fileChangeRequest(ctx, args, await requireAuthedUser(ctx)),
 });
 
 /**
  * The same filing, plus the vault object / blob an action minted for it.
  * Internal because a client-supplied ref would let a caller attach secret
  * material it never owned — apply makes that ref the resource's.
+ * `requestedBy` is for callers with no dashboard session (MCP OAuth), which
+ * verify the person themselves; everyone else is read from the session.
  */
 export const createStaged = internalMutation({
   args: {
     ...changeRequestArgs,
     vaultRef: v.optional(v.string()),
     storageId: v.optional(v.id("_storage")),
+    requestedBy: v.optional(v.id("users")),
   },
   returns: v.id("changeRequests"),
-  handler: async (ctx, args) => fileChangeRequest(ctx, args),
+  handler: async (ctx, { requestedBy, ...args }) => {
+    const actor = requestedBy
+      ? await ctx.db.get(requestedBy)
+      : await requireAuthedUser(ctx);
+    if (!actor) throw new ConvexError("User not found");
+    return fileChangeRequest(ctx, args, actor);
+  },
 });
 
 export const review = mutation({

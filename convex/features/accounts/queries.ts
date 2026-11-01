@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { query } from "../../_generated/server";
-import type { Doc } from "../../_generated/dataModel";
+import { query, type QueryCtx } from "../../_generated/server";
+import type { Doc, Id } from "../../_generated/dataModel";
 import {
   requireAccountAccess,
   authorizeAccountAccess,
@@ -71,132 +71,138 @@ export const listWithAccess = query({
     projectId: v.id("projects"),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
-    // Identity comes from the verified JWT — never a client-supplied userId
-    // (that let any caller compute another member's access, vaultRefs
-    // included, and would have made the suspension guard here spoofable).
-    const actor = await requireAuthedUser(ctx);
-    const project = await ctx.db.get(args.projectId);
-    if (!project || project.deletedAt) {
-      return [];
-    }
-
-    // Get user's org membership to determine their unified role. A suspended
-    // member is treated as a non-member here (no vaultRefs surface).
-    const membership = await getActiveMembership(
-      ctx,
-      project.organizationId,
-      actor._id
-    );
-
-    if (!membership) {
-      return [];
-    }
-
-    const orgRole = normalizeOrgRole(membership.role);
-    const profile = await getRoleProfile(ctx, orgRole);
-    const isOwner = bypassesAssignment(profile);
-
-    // Assignment is a pure scope check — projectMembers.role is legacy
-    // and never consulted for authorization.
-    let assigned = false;
-    let environmentScope: string[] | undefined;
-    if (!isOwner) {
-      const projectMembership = await ctx.db
-        .query("projectMembers")
-        .withIndex("by_project_and_user", (q) =>
-          q.eq("projectId", args.projectId).eq("userId", actor._id)
-        )
-        .first();
-      assigned = !!projectMembership;
-      // Role default narrowed by the assignment; undefined for non-scoped roles.
-      environmentScope = effectiveEnvironments(
-        profile,
-        projectMembership?.environments
-      );
-    }
-
-    // The owner class and assigned blanket-write roles have write access
-    const roleAccess =
-      isOwner ||
-      (assigned && hasCapability(profile, "project.accounts.update"));
-    const roleRead = assigned && hasCapability(profile, "access.blanket_read");
-    const canManagePermissions =
-      isOwner ||
-      (assigned && hasCapability(profile, "project.permissions.manage"));
-    const projectRole = profileToLegacyProjectRole(profile, assigned);
-
-    const allAccounts = await ctx.db
-      .query("projectAccounts")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .take(args.limit ?? 500);
-    // Scoped developers never receive out-of-scope accounts at all —
-    // not even their metadata
-    const accounts = allAccounts.filter(
-      (account) =>
-        account.deletedAt === undefined &&
-        isEnvironmentScopeAllowed(environmentScope, account.environments)
-    );
-
-    // Prefetch the caller's active grants ONCE instead of one indexed query
-    // per account (getActiveAccountGrant N+1).
-    const grantByAccount = buildActiveAccountGrantMap(
-      await ctx.db
-        .query("accountPermissions")
-        .withIndex("by_user_active", (q) =>
-          q.eq("userId", actor._id).eq("isActive", true)
-        )
-        .collect()
-    );
-
-    const accountsWithAccess = accounts.map((account) => {
-      const grant = grantByAccount.get(account._id as string) ?? null;
-
-      // Mirrors getAccountAccess: owner class → write; assigned blanket-write
-      // roles → write; auditor class → read; grant fallback per grant;
-      // unassigned grant holders capped at read.
-      let access: "write" | "read" | null = null;
-      if (roleAccess) {
-        access = "write";
-      } else if (roleRead) {
-        access = "read";
-      } else if (grant) {
-        access =
-          !assigned || grant.permission === "read"
-            ? "read"
-            : hasCapability(profile, "access.grant_fallback")
-              ? "write"
-              : "read";
-      }
-
-      const hasAccess = access !== null;
-      const effectivePermission = canManagePermissions ? "admin" : access;
-
-      // Vault refs are only returned for accounts the user can access;
-      // assigned members still see metadata for the rest.
-      const { vaultRef, ...metadata } = account;
-
-      return {
-        ...metadata,
-        ...(hasAccess ? { vaultRef } : {}),
-        hasAccess,
-        permission: effectivePermission,
-        roleAccess,
-        userRole: orgRole,
-        projectRole,
-        canManagePermissions,
-      };
-    });
-
-    // Assigned members (and owners) may list metadata for every account;
-    // grant-only viewers see just the accounts shared with them.
-    if (!isOwner && !assigned) {
-      return accountsWithAccess.filter((a) => a.hasAccess);
-    }
-
-    return accountsWithAccess;
-  },
+  // Identity comes from the verified JWT — never a client-supplied userId
+  // (that let any caller compute another member's access, vaultRefs
+  // included, and would have made the suspension guard here spoofable).
+  handler: async (ctx, args) =>
+    listAccountsFor(ctx, (await requireAuthedUser(ctx))._id, args),
 });
+
+/** `listWithAccess` for an already-verified user; the MCP server's entry point. */
+export async function listAccountsFor(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  args: { projectId: Id<"projects">; limit?: number }
+) {
+  const project = await ctx.db.get(args.projectId);
+  if (!project || project.deletedAt) {
+    return [];
+  }
+
+  // Get user's org membership to determine their unified role. A suspended
+  // member is treated as a non-member here (no vaultRefs surface).
+  const membership = await getActiveMembership(
+    ctx,
+    project.organizationId,
+    userId
+  );
+
+  if (!membership) {
+    return [];
+  }
+
+  const orgRole = normalizeOrgRole(membership.role);
+  const profile = await getRoleProfile(ctx, orgRole);
+  const isOwner = bypassesAssignment(profile);
+
+  // Assignment is a pure scope check — projectMembers.role is legacy
+  // and never consulted for authorization.
+  let assigned = false;
+  let environmentScope: string[] | undefined;
+  if (!isOwner) {
+    const projectMembership = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_project_and_user", (q) =>
+        q.eq("projectId", args.projectId).eq("userId", userId)
+      )
+      .first();
+    assigned = !!projectMembership;
+    // Role default narrowed by the assignment; undefined for non-scoped roles.
+    environmentScope = effectiveEnvironments(
+      profile,
+      projectMembership?.environments
+    );
+  }
+
+  // The owner class and assigned blanket-write roles have write access
+  const roleAccess =
+    isOwner || (assigned && hasCapability(profile, "project.accounts.update"));
+  const roleRead = assigned && hasCapability(profile, "access.blanket_read");
+  const canManagePermissions =
+    isOwner ||
+    (assigned && hasCapability(profile, "project.permissions.manage"));
+  const projectRole = profileToLegacyProjectRole(profile, assigned);
+
+  const allAccounts = await ctx.db
+    .query("projectAccounts")
+    .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+    .take(args.limit ?? 500);
+  // Scoped developers never receive out-of-scope accounts at all —
+  // not even their metadata
+  const accounts = allAccounts.filter(
+    (account) =>
+      account.deletedAt === undefined &&
+      isEnvironmentScopeAllowed(environmentScope, account.environments)
+  );
+
+  // Prefetch the caller's active grants ONCE instead of one indexed query
+  // per account (getActiveAccountGrant N+1).
+  const grantByAccount = buildActiveAccountGrantMap(
+    await ctx.db
+      .query("accountPermissions")
+      .withIndex("by_user_active", (q) =>
+        q.eq("userId", userId).eq("isActive", true)
+      )
+      .collect()
+  );
+
+  const accountsWithAccess = accounts.map((account) => {
+    const grant = grantByAccount.get(account._id as string) ?? null;
+
+    // Mirrors getAccountAccess: owner class → write; assigned blanket-write
+    // roles → write; auditor class → read; grant fallback per grant;
+    // unassigned grant holders capped at read.
+    let access: "write" | "read" | null = null;
+    if (roleAccess) {
+      access = "write";
+    } else if (roleRead) {
+      access = "read";
+    } else if (grant) {
+      access =
+        !assigned || grant.permission === "read"
+          ? "read"
+          : hasCapability(profile, "access.grant_fallback")
+            ? "write"
+            : "read";
+    }
+
+    const hasAccess = access !== null;
+    const effectivePermission = canManagePermissions ? "admin" : access;
+
+    // Vault refs are only returned for accounts the user can access;
+    // assigned members still see metadata for the rest.
+    const { vaultRef, ...metadata } = account;
+
+    return {
+      ...metadata,
+      ...(hasAccess ? { vaultRef } : {}),
+      hasAccess,
+      permission: effectivePermission,
+      roleAccess,
+      userRole: orgRole,
+      projectRole,
+      canManagePermissions,
+    };
+  });
+
+  // Assigned members (and owners) may list metadata for every account;
+  // grant-only viewers see just the accounts shared with them.
+  if (!isOwner && !assigned) {
+    return accountsWithAccess.filter((a) => a.hasAccess);
+  }
+
+  return accountsWithAccess;
+}
 
 /**
  * Fetch a single account for a caller with at least read access.

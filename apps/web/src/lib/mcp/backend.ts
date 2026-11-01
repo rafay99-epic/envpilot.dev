@@ -25,6 +25,45 @@ type NewDoc = Org & {
   clientRef?: string;
 };
 
+type OrgProject = Org & { projectSlug: string };
+type RequestStatus =
+  | "pending"
+  | "applied"
+  | "rejected"
+  | "canceled"
+  | "expired";
+type NewVariable = {
+  key: string;
+  value: string;
+  environments: string[];
+  isSensitive?: boolean;
+  description?: string;
+};
+type VariableEdit = {
+  environment: string;
+  key: string;
+  value?: string;
+  description?: string;
+};
+type NewFile = {
+  path: string;
+  content: string;
+  encoding?: "utf8" | "base64";
+  environments: string[];
+  name?: string;
+  mode?: string;
+  description?: string;
+  replace?: boolean;
+};
+type NewAccount = {
+  name: string;
+  username: string;
+  password: string;
+  environments: string[];
+  websiteUrl?: string;
+  description?: string;
+};
+
 function convexClient(): ConvexHttpClient {
   const url = getConvexUrl();
   if (!url) throw new Error("Service is not configured (missing Convex URL).");
@@ -68,6 +107,9 @@ export function mcpBackend(token: string) {
       }
     ) => convex.action(api.features.api.oauth.searchDocs, { token, ...args }),
 
+    listDocDrafts: (args: OrgProject) =>
+      convex.action(api.features.api.oauth.listDocDrafts, { token, ...args }),
+
     getDoc: (args: DocView & { docId: Id<"docs"> }) =>
       convex.action(api.features.api.oauth.getDoc, { token, ...args }),
 
@@ -76,6 +118,67 @@ export function mcpBackend(token: string) {
 
     updateDocDraft: (args: DraftEdit) =>
       convex.action(api.features.api.oauth.updateDocDraft, { token, ...args }),
+
+    createVariable: (args: OrgProject & NewVariable) =>
+      convex.action(api.features.api.oauthResources.createVariable, {
+        token,
+        ...args,
+      }),
+
+    updateVariable: (args: OrgProject & VariableEdit) =>
+      convex.action(api.features.api.oauthResources.updateVariable, {
+        token,
+        ...args,
+      }),
+
+    listFiles: (args: OrgProject & { environment?: string }) =>
+      convex.action(api.features.api.oauthResources.listFiles, {
+        token,
+        ...args,
+      }),
+
+    getFile: (args: OrgProject & { path: string; environment?: string }) =>
+      convex.action(api.features.api.oauthResources.getFile, {
+        token,
+        ...args,
+      }),
+
+    uploadFile: (args: OrgProject & NewFile) =>
+      convex.action(api.features.api.oauthResources.uploadFile, {
+        token,
+        ...args,
+      }),
+
+    listAccounts: (args: OrgProject) =>
+      convex.action(api.features.api.oauthResources.listAccounts, {
+        token,
+        ...args,
+      }),
+
+    getAccount: (args: OrgProject & { name: string }) =>
+      convex.action(api.features.api.oauthResources.getAccount, {
+        token,
+        ...args,
+      }),
+
+    createAccount: (args: OrgProject & NewAccount) =>
+      convex.action(api.features.api.oauthResources.createAccount, {
+        token,
+        ...args,
+      }),
+
+    listRequests: (
+      args: Org & { projectSlug?: string; status?: RequestStatus }
+    ) =>
+      convex.action(api.features.api.oauthResources.listRequests, {
+        token,
+        ...args,
+      }),
+
+    listOrganizations: () =>
+      convex.action(api.features.api.oauthResources.listOrganizations, {
+        token,
+      }),
   };
 }
 

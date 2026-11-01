@@ -1,6 +1,10 @@
 import { v, ConvexError } from "convex/values";
 import { validateHttpUrl, urlValidationMessage } from "../../lib/urlValidation";
-import { mutation, type MutationCtx } from "../../_generated/server";
+import {
+  internalMutation,
+  mutation,
+  type MutationCtx,
+} from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import {
@@ -236,6 +240,22 @@ export const create = mutation({
     const createdBy = (await requireAuthedUser(ctx))._id;
     return createCore(ctx, { ...args, createdBy });
   },
+});
+
+/** `create` for an action that already verified the user (see values.ts). */
+export const _createFor = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    createdBy: v.id("users"),
+    name: v.string(),
+    websiteUrl: v.optional(v.string()),
+    description: v.optional(v.string()),
+    environments: v.array(v.string()),
+    vaultRef: v.string(),
+    override: v.optional(v.boolean()),
+  },
+  returns: v.id("projectAccounts"),
+  handler: async (ctx, args) => createCore(ctx, args),
 });
 
 export async function updateCore(

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { query, internalQuery } from "../../_generated/server";
-import type { Doc } from "../../_generated/dataModel";
+import { query, internalQuery, type QueryCtx } from "../../_generated/server";
+import type { Doc, Id } from "../../_generated/dataModel";
 import { requireFileAccess, authorizeFileAccess } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import { requireAuthedUser } from "../../lib/identity";
@@ -86,126 +86,131 @@ export const list = query({
     environment: v.optional(v.string()),
   },
   returns: v.array(fileMetadataValidator),
-  handler: async (ctx, args) => {
-    const user = await requireAuthedUser(ctx);
-
-    const project = await ctx.db.get(args.projectId);
-    if (!project || project.deletedAt) {
-      throw new ConvexError("Project not found");
-    }
-
-    const membership = await getActiveMembership(
-      ctx,
-      project.organizationId,
-      user._id
-    );
-    if (!membership) {
-      throw new ConvexError("Not authorized");
-    }
-    const profile = await getRoleProfile(ctx, membership.role);
-
-    const assignment = await ctx.db
-      .query("projectMembers")
-      .withIndex("by_project_and_user", (q) =>
-        q.eq("projectId", args.projectId).eq("userId", user._id)
-      )
-      .first();
-
-    // Unassigned members without assignment bypass can still hold per-file
-    // grants (the "viewer sharing" path), so we do not bail out here.
-    const assignmentBypassed = bypassesAssignment(profile);
-    const envScope = assignment
-      ? effectiveEnvironments(profile, assignment.environments)
-      : undefined;
-
-    const rows = await ctx.db
-      .query("projectFiles")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .take(MAX_FILE_ROWS + 1);
-
-    if (rows.length > MAX_FILE_ROWS) {
-      throw new ConvexError(
-        `Project has more than ${MAX_FILE_ROWS} secret files — refusing a partial listing. Contact support to raise the limit.`
-      );
-    }
-
-    const grantRows = await ctx.db
-      .query("filePermissions")
-      .withIndex("by_user_active", (q) =>
-        q.eq("userId", user._id).eq("isActive", true)
-      )
-      .collect();
-    const grantsByFile = buildActiveFileGrantMap(grantRows);
-
-    const blanketWrite =
-      (assignmentBypassed || assignment !== null) &&
-      hasCapability(profile, "project.files.update");
-    const blanketRead =
-      (assignmentBypassed || assignment !== null) &&
-      hasCapability(profile, "access.blanket_read");
-
-    const results: Array<Doc<"projectFiles"> & { access: "read" | "write" }> =
-      [];
-    for (const file of rows) {
-      if (file.deletedAt !== undefined) continue;
-      if (
-        args.environment !== undefined &&
-        !file.environments.includes(args.environment)
-      ) {
-        continue;
-      }
-      // Environment scope wins over any grant — an out-of-scope file is
-      // invisible to a scoped developer even when explicitly shared.
-      if (!isEnvironmentScopeAllowed(envScope, file.environments)) continue;
-
-      // SAME precedence as resolveResourceAccess: blanket write, then
-      // blanket read, then the grant. Consulting the grant before blanket
-      // read gave a role holding BOTH access.blanket_read and
-      // access.grant_fallback a "write" here that the server resolves back
-      // down to read — replace/edit controls the mutation then refuses.
-      let access: "read" | "write" | null = null;
-      if (blanketWrite) {
-        access = "write";
-      } else if (blanketRead) {
-        access = "read";
-      } else {
-        const grant = grantsByFile.get(file._id as string);
-        if (grant) {
-          // An unassigned member (the viewer-sharing path), or one whose
-          // role lacks grant fallback, resolves to read even holding a write
-          // grant.
-          const grantFallback =
-            assignmentBypassed ||
-            (assignment !== null &&
-              hasCapability(profile, "access.grant_fallback"));
-          access =
-            grantFallback && grant.permission === "write" ? "write" : "read";
-        }
-      }
-      if (!access) continue;
-
-      results.push({ ...file, access });
-    }
-
-    return results.map((file) => ({
-      _id: file._id,
-      name: file.name,
-      path: file.path,
-      mode: file.mode ?? "0600",
-      contentType: file.contentType,
-      size: file.size,
-      sha256: file.sha256,
-      digestSalt: file.digestSalt,
-      description: file.description,
-      environments: file.environments,
-      projectId: file.projectId,
-      version: file.version,
-      createdAt: file.createdAt,
-      updatedAt: file.updatedAt,
-      access: file.access,
-    }));
-  },
+  handler: async (ctx, args) =>
+    listFilesFor(ctx, (await requireAuthedUser(ctx))._id, args),
 });
+
+/** `list` for an already-verified user; the MCP server's entry point. */
+export async function listFilesFor(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  args: { projectId: Id<"projects">; environment?: string }
+) {
+  const project = await ctx.db.get(args.projectId);
+  if (!project || project.deletedAt) {
+    throw new ConvexError("Project not found");
+  }
+
+  const membership = await getActiveMembership(
+    ctx,
+    project.organizationId,
+    userId
+  );
+  if (!membership) {
+    throw new ConvexError("Not authorized");
+  }
+  const profile = await getRoleProfile(ctx, membership.role);
+
+  const assignment = await ctx.db
+    .query("projectMembers")
+    .withIndex("by_project_and_user", (q) =>
+      q.eq("projectId", args.projectId).eq("userId", userId)
+    )
+    .first();
+
+  // Unassigned members without assignment bypass can still hold per-file
+  // grants (the "viewer sharing" path), so we do not bail out here.
+  const assignmentBypassed = bypassesAssignment(profile);
+  const envScope = assignment
+    ? effectiveEnvironments(profile, assignment.environments)
+    : undefined;
+
+  const rows = await ctx.db
+    .query("projectFiles")
+    .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+    .take(MAX_FILE_ROWS + 1);
+
+  if (rows.length > MAX_FILE_ROWS) {
+    throw new ConvexError(
+      `Project has more than ${MAX_FILE_ROWS} secret files — refusing a partial listing. Contact support to raise the limit.`
+    );
+  }
+
+  const grantRows = await ctx.db
+    .query("filePermissions")
+    .withIndex("by_user_active", (q) =>
+      q.eq("userId", userId).eq("isActive", true)
+    )
+    .collect();
+  const grantsByFile = buildActiveFileGrantMap(grantRows);
+
+  const blanketWrite =
+    (assignmentBypassed || assignment !== null) &&
+    hasCapability(profile, "project.files.update");
+  const blanketRead =
+    (assignmentBypassed || assignment !== null) &&
+    hasCapability(profile, "access.blanket_read");
+
+  const results: Array<Doc<"projectFiles"> & { access: "read" | "write" }> = [];
+  for (const file of rows) {
+    if (file.deletedAt !== undefined) continue;
+    if (
+      args.environment !== undefined &&
+      !file.environments.includes(args.environment)
+    ) {
+      continue;
+    }
+    // Environment scope wins over any grant — an out-of-scope file is
+    // invisible to a scoped developer even when explicitly shared.
+    if (!isEnvironmentScopeAllowed(envScope, file.environments)) continue;
+
+    // SAME precedence as resolveResourceAccess: blanket write, then
+    // blanket read, then the grant. Consulting the grant before blanket
+    // read gave a role holding BOTH access.blanket_read and
+    // access.grant_fallback a "write" here that the server resolves back
+    // down to read — replace/edit controls the mutation then refuses.
+    let access: "read" | "write" | null = null;
+    if (blanketWrite) {
+      access = "write";
+    } else if (blanketRead) {
+      access = "read";
+    } else {
+      const grant = grantsByFile.get(file._id as string);
+      if (grant) {
+        // An unassigned member (the viewer-sharing path), or one whose
+        // role lacks grant fallback, resolves to read even holding a write
+        // grant.
+        const grantFallback =
+          assignmentBypassed ||
+          (assignment !== null &&
+            hasCapability(profile, "access.grant_fallback"));
+        access =
+          grantFallback && grant.permission === "write" ? "write" : "read";
+      }
+    }
+    if (!access) continue;
+
+    results.push({ ...file, access });
+  }
+
+  return results.map((file) => ({
+    _id: file._id,
+    name: file.name,
+    path: file.path,
+    mode: file.mode ?? "0600",
+    contentType: file.contentType,
+    size: file.size,
+    sha256: file.sha256,
+    digestSalt: file.digestSalt,
+    description: file.description,
+    environments: file.environments,
+    projectId: file.projectId,
+    version: file.version,
+    createdAt: file.createdAt,
+    updatedAt: file.updatedAt,
+    access: file.access,
+  }));
+}
 
 /** Single-file metadata with an authorization check at a minimum level. */
 export const get = query({

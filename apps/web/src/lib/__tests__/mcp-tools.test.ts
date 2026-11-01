@@ -34,16 +34,27 @@ describe("MCP tool definitions", () => {
     }
   });
 
-  it("offers the eight sign-in tools and nothing that needed an API key", () => {
+  it("offers the sign-in tools and nothing that needed an API key", () => {
     expect([...registeredTools().keys()].sort()).toEqual([
+      "envpilot_create_account",
       "envpilot_create_doc",
+      "envpilot_create_variable",
+      "envpilot_get_account",
       "envpilot_get_doc",
+      "envpilot_get_file",
       "envpilot_get_variable",
       "envpilot_get_variables",
+      "envpilot_list_accounts",
+      "envpilot_list_doc_drafts",
+      "envpilot_list_files",
+      "envpilot_list_organizations",
       "envpilot_list_projects",
+      "envpilot_list_requests",
       "envpilot_search",
       "envpilot_search_docs",
       "envpilot_update_doc_draft",
+      "envpilot_update_variable",
+      "envpilot_upload_file",
     ]);
   });
 });
