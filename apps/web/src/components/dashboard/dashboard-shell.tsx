@@ -9,12 +9,11 @@ import { KeyboardShortcutsProvider } from "@/components/keyboard/keyboard-shortc
 import React from "react";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
-  // NOTE: no ConvexBoundaryProvider here — the root layout's
-  // ConvexClientProvider already mounts AuthKitProvider +
-  // ConvexProviderWithAuth around every page. Mounting a second
-  // ConvexProviderWithAuth on the same shared ConvexReactClient makes both
-  // providers call client.setAuth() and fight over the auth state machine
-  // (the loser's useConvexAuth() never resolves).
+  // NOTE: no ConvexAuthProvider here — the dashboard layout already mounts
+  // AuthKitProvider + ConvexProviderWithAuth above this shell. Mounting a
+  // second ConvexProviderWithAuth on the same shared ConvexReactClient makes
+  // both providers call client.setAuth() and fight over the auth state
+  // machine (the loser's useConvexAuth() never resolves).
   //
   // Deliberately NOT gated behind <Authenticated>: the shell renders
   // immediately on load while the WorkOS JWT attaches to the Convex socket.

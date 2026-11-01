@@ -1,6 +1,10 @@
 "use client";
 
-import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
+import {
+  ConvexProvider,
+  ConvexProviderWithAuth,
+  ConvexReactClient,
+} from "convex/react";
 import { AuthKitProvider } from "@workos-inc/authkit-nextjs/components";
 import { useConvexAuthFromWorkOS } from "@/hooks/use-convex-workos-auth";
 import {
@@ -212,10 +216,15 @@ const queryClient = new QueryClient({
   }),
 });
 
+/**
+ * Root provider for every page. The Convex client here is anonymous, which is
+ * all the public pages need (pricing data, contact and support forms).
+ * Signed-in routes add identity with ConvexAuthProvider.
+ */
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <ConvexBoundaryProvider>{children}</ConvexBoundaryProvider>
+      <ConvexProvider client={convex}>{children}</ConvexProvider>
       <Toaster theme="dark" position="bottom-right" richColors closeButton />
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
@@ -227,8 +236,14 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
  * ConvexProviderWithAuth attaches the AuthKit JWT to the Convex WebSocket so
  * every query/mutation runs with a server-verified identity
  * (convex/auth.config.ts + ctx.auth.getUserIdentity()).
+ *
+ * Mount it only on signed-in routes (the dashboard layout). AuthKitProvider
+ * calls server actions on mount, on tab focus and on token refresh, so in the
+ * root layout every anonymous marketing view paid for several Vercel function
+ * calls. Mount it once per tree: two ConvexProviderWithAuth on the shared
+ * client both call setAuth() and the loser's useConvexAuth() never resolves.
  */
-function ConvexBoundaryProvider({ children }: { children: ReactNode }) {
+export function ConvexAuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthKitProvider>
       <ConvexProviderWithAuth client={convex} useAuth={useConvexAuthFromWorkOS}>

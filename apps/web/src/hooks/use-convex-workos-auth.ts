@@ -9,9 +9,9 @@ import { useAccessToken, useAuth } from "@workos-inc/authkit-nextjs/components";
  * and Convex functions can read the caller via `ctx.auth.getUserIdentity()`
  * (see convex/identity.ts and convex/auth.config.ts).
  *
- * Requires `AuthKitProvider` above it in the tree (mounted in
- * ConvexClientProvider.tsx). Token refresh is owned by AuthKit's tokenStore;
- * when Convex reports an expired token it passes `forceRefreshToken: true`
+ * Requires `AuthKitProvider` above it in the tree (ConvexAuthProvider in
+ * ConvexClientProvider.tsx, mounted by the dashboard layout). Token refresh
+ * is owned by AuthKit's tokenStore; when Convex reports an expired token it passes `forceRefreshToken: true`
  * and we map that to a forced refresh.
  */
 export function useConvexAuthFromWorkOS() {

@@ -76,12 +76,16 @@ export default authkitMiddleware({
   },
 });
 
-// Configure which routes the middleware should run on
+// Each match is a billed Node function call on Vercel, so the matcher skips
+// everything that never reads the session: _next, static files, the public
+// marketing pages, and the APIs that authenticate with their own bearer
+// token. `.+` instead of `.*` keeps the home page `/` out too.
+//
+// A skipped path must not call withAuth(), which throws outside the
+// middleware. Marketing pages are safe because AuthKitProvider only mounts
+// in the dashboard layout (ConvexAuthProvider), not the root layout.
 export const config = {
   matcher: [
-    // Everything but _next and static files. Public pages stay matched:
-    // AuthKitProvider's server action calls withAuth() on them.
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api|trpc)(.*)",
+    "/((?!_next|changelog|faq|vs/|wishlist|privacy|terms|logo|support|contact|pricing|sitemap\\.xml|robots\\.txt|api/(?:mcp|v1/|version|config|telemetry-envelope|extension/|webhooks/)|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).+)",
   ],
 };
