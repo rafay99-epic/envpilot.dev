@@ -398,7 +398,7 @@ export const _search = internalQuery({
         skippedProjects += 1;
         continue;
       }
-      rowsRead += listed.variables.length;
+      rowsRead += listed.rowsRead;
       if (listed.truncatedAt !== undefined) skippedProjects += 1;
       const rows = listed.variables.filter((row) => row.hasAccess);
       for (const row of rows) {

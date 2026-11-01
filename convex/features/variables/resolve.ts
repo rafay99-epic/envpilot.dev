@@ -46,7 +46,7 @@ export async function resolveEffectiveVariablesWithin(
   ctx: QueryCtx,
   args: { projectId: Id<"projects"> },
   readLimit: number
-): Promise<{ rows: ResolvedVariable[]; complete: boolean }> {
+): Promise<{ rows: ResolvedVariable[]; complete: boolean; read: number }> {
   return await resolveWithin(ctx, args, readLimit);
 }
 
@@ -54,7 +54,7 @@ async function resolveWithin(
   ctx: QueryCtx,
   args: { projectId: Id<"projects">; environment?: string },
   readLimit: number | undefined
-): Promise<{ rows: ResolvedVariable[]; complete: boolean }> {
+): Promise<{ rows: ResolvedVariable[]; complete: boolean; read: number }> {
   let read = 0;
   let complete = true;
   const readRows = async (
@@ -116,7 +116,7 @@ async function resolveWithin(
 
   const resolved = [...own, ...inherited];
   assertNoDuplicatePairs(resolved);
-  return { rows: resolved, complete };
+  return { rows: resolved, complete, read };
 }
 
 /** Active rows of one project, at most `limit` when given. */

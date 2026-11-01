@@ -22,7 +22,6 @@ import {
 import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { createAuditLog } from "../../lib/audit";
-import { checkBooleanFeature } from "../featureRegistry/gates";
 import { createBody } from "../docs/content";
 import { readBody } from "../docs/content";
 import { normalizePrUrl, scanDocBody, slugifyTitle } from "../docs/guards";
@@ -30,6 +29,7 @@ import { templateFor } from "../docs/templates";
 import {
   applyDraftEdit,
   requireDocCapacity,
+  requireDocsFeature,
   uniqueSlug,
 } from "../docs/helpers";
 import {
@@ -215,16 +215,7 @@ export async function searchPublishedDocs(
     limit?: number;
   }
 ): Promise<DocSummary[]> {
-  const gate = await checkBooleanFeature(
-    ctx.db,
-    args.organizationId,
-    "project_docs"
-  );
-  if (!gate.allowed) {
-    throw new ConvexError(
-      gate.reason ?? "Project documentation requires a higher tier."
-    );
-  }
+  await requireDocsFeature(ctx, args.organizationId);
 
   // Closes the gap where another tenant's projectId is passed with a valid key.
   const project = await ctx.db.get(args.projectId);
@@ -452,16 +443,7 @@ export const _locatePublishedDoc = internalQuery({
     docId: v.id("docs"),
   },
   handler: async (ctx, args): Promise<LocatedDoc> => {
-    const gate = await checkBooleanFeature(
-      ctx.db,
-      args.organizationId,
-      "project_docs"
-    );
-    if (!gate.allowed) {
-      throw new ConvexError(
-        gate.reason ?? "Project documentation requires a higher tier."
-      );
-    }
+    await requireDocsFeature(ctx, args.organizationId);
 
     const doc = await ctx.db.get(args.docId);
     // PUBLISHED ONLY. A draft is unreviewed text; handing one to an agent
@@ -597,16 +579,7 @@ export const _createDocDraft = internalMutation({
   },
   returns: createdDraftValidator,
   handler: async (ctx, args): Promise<CreatedDraft> => {
-    const gate = await checkBooleanFeature(
-      ctx.db,
-      args.organizationId,
-      "project_docs"
-    );
-    if (!gate.allowed) {
-      throw new ConvexError(
-        gate.reason ?? "Project documentation requires a higher tier."
-      );
-    }
+    await requireDocsFeature(ctx, args.organizationId);
 
     const project = await ctx.db.get(args.projectId);
     if (
@@ -806,16 +779,7 @@ export const _updateDocDraft = internalMutation({
   },
   returns: updatedDraftValidator,
   handler: async (ctx, args): Promise<UpdatedDraft> => {
-    const gate = await checkBooleanFeature(
-      ctx.db,
-      args.organizationId,
-      "project_docs"
-    );
-    if (!gate.allowed) {
-      throw new ConvexError(
-        gate.reason ?? "Project documentation requires a higher tier."
-      );
-    }
+    await requireDocsFeature(ctx, args.organizationId);
 
     const doc = await ctx.db.get(args.docId);
     if (
