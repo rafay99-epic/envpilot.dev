@@ -20,6 +20,7 @@ import {
   CreditCard,
   CheckCircle2,
   XCircle,
+  KeyRound,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -83,6 +84,11 @@ function DashboardPage() {
 
   const tierEnforcement = settings?.tierEnforcement === "true";
   const paymentsEnabled = settings?.paymentsEnabled === "true";
+  // MCP sign-in announcement (convex/lib/mcpRetirement.ts). The MCP server
+  // already refuses API keys; this tells people. The first switch-on emails
+  // the people behind old MCP keys once; later toggles show or hide the card.
+  const mcpOAuthOnly = settings?.mcpApiKeysRetired === "true";
+  const mcpNoticesSent = settings?.mcpApiKeysRetiredNoticesAt !== undefined;
 
   const handleToggleEnforcement = async () => {
     await updateSetting({
@@ -121,12 +127,61 @@ function DashboardPage() {
     });
   };
 
+  const handleToggleMcpOAuthOnly = async () => {
+    const ok = await confirm(
+      mcpOAuthOnly
+        ? {
+            title: "Hide the MCP sign-in card?",
+            message:
+              "The dashboard card goes away for everyone. Nobody is emailed, and API keys still do not work with MCP.",
+            confirmLabel: "Hide card",
+            cancelLabel: "Keep showing",
+            variant: "warning",
+          }
+        : {
+            title: "Announce MCP sign-in?",
+            message: mcpNoticesSent
+              ? "The dashboard card shows again for people who have not pressed OK. Everyone was already emailed, so nobody is emailed again."
+              : "Everyone behind an API key MCP used to accept gets one email and a dashboard card asking them to sign in with OAuth. REST, GitHub Action and Docker keys are not affected.",
+            confirmLabel: "Announce",
+            cancelLabel: "Cancel",
+            variant: "warning",
+          }
+    );
+    if (!ok) return;
+    await updateSetting({
+      key: "mcpApiKeysRetired",
+      value: mcpOAuthOnly ? "false" : "true",
+    });
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
 
         <div className="flex items-center gap-3">
+          {/* MCP OAuth migration toggle */}
+          <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5">
+            <KeyRound className="h-4 w-4 text-ink-muted" />
+            <label
+              htmlFor="mcp-oauth-only-toggle"
+              className="text-sm text-ink-muted"
+            >
+              MCP sign-in notice
+            </label>
+            <Switch
+              checked={mcpOAuthOnly}
+              onChange={handleToggleMcpOAuthOnly}
+              disabled={!settings}
+              size="sm"
+              id="mcp-oauth-only-toggle"
+            />
+            <Badge variant={mcpOAuthOnly ? "success" : "default"}>
+              {mcpOAuthOnly ? "Shown" : "Off"}
+            </Badge>
+          </div>
+
           {/* Payment Gateway Toggle */}
           <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5">
             <CreditCard className="h-4 w-4 text-ink-muted" />

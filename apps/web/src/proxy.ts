@@ -48,10 +48,11 @@ export default authkitMiddleware({
       // projects/[slug]/accounts) so new endpoints never need a proxy change.
       "/api/v1/(.*)",
       // Remote MCP server (Streamable HTTP, stateless) — authenticates with
-      // the SAME Bearer envpk_ API keys as /api/v1/* via its own withMcpAuth
-      // wrapper, never a WorkOS session cookie. No sub-path variants: the
-      // route only lives at this exact path (SSE is disabled).
+      // a Bearer envpk_ API key or an AuthKit OAuth access token via its own
+      // withMcpAuth wrapper, never a WorkOS session cookie. No sub-path
+      // variants: the route only lives at this exact path (SSE is disabled).
       "/api/mcp",
+      "/.well-known/oauth-protected-resource/api/mcp",
       // The CLI now calls Convex directly for everything, including secret
       // VALUES (Stage 3): the last /api/cli/* vault routes were deleted, so no
       // CLI path needs an unauthenticated bypass anymore.
@@ -86,6 +87,6 @@ export default authkitMiddleware({
 // in the dashboard layout (ConvexAuthProvider), not the root layout.
 export const config = {
   matcher: [
-    "/((?!_next|changelog|faq|vs/|wishlist|privacy|terms|logo|support|contact|pricing|sitemap\\.xml|robots\\.txt|api/(?:mcp|v1/|version|config|telemetry-envelope|extension/|webhooks/)|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).+)",
+    "/((?!_next|changelog|faq|vs/|wishlist|privacy|terms|logo|support|contact|pricing|sitemap\\.xml|robots\\.txt|\\.well-known/oauth-protected-resource|api/(?:mcp|v1/|version|config|telemetry-envelope|extension/|webhooks/)|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).+)",
   ],
 };

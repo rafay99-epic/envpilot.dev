@@ -3,6 +3,7 @@ import {
   mutation,
   internalMutation,
   MutationCtx,
+  QueryCtx,
 } from "../../../_generated/server";
 import { internal } from "../../../_generated/api";
 import {
@@ -273,122 +274,12 @@ export const create = mutation({
   },
 });
 
-// Anti-spam bounds for machine-originated requests. The per-key rate
-// limiter (machineRequestCreate) throttles bursts; these bound STANDING
-// state. ponytail: fixed constants, config knobs when a real org needs them.
-const MAX_OPEN_MACHINE_REQUESTS_PER_KEY = 5;
-const REJECTION_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-
-/**
- * Machine-originated request create. Internal — only
- * features/api/requests.ts's `createVariableRequest` action calls it, AFTER
- * `_authorizeRequest` validated the key (resource "requests", surface, org)
- * and resolved the project into the key's scope. This skips createCore's
- * human checks (org role, project assignment — meaningless for a
- * credential) and enforces the machine-specific bounds instead; everything
- * downstream (conflict check, dedupe, insert, audit, email) is the SAME
- * insertRequest core the human path uses.
- */
-export const _createFromKey = internalMutation({
-  args: {
-    keyId: v.id("apiKeys"),
-    projectId: v.id("projects"),
-    key: v.string(),
-    environments: v.array(v.string()),
-    // The agent's justification — the approver's only context. Required.
-    justification: v.string(),
-    isSensitive: v.optional(v.boolean()),
-  },
-  returns: v.id("environmentVariableRequests"),
-  handler: async (ctx, args) => {
-    const apiKey = await ctx.db.get(args.keyId);
-    if (
-      !apiKey ||
-      apiKey.revokedAt !== undefined ||
-      (apiKey.expiresAt !== undefined && apiKey.expiresAt <= Date.now())
-    ) {
-      throw new ConvexError("Invalid or revoked API key");
-    }
-
-    if (args.justification.trim().length === 0) {
-      throw new ConvexError(
-        "A justification is required — it is the only context the reviewer sees"
-      );
-    }
-    if (args.justification.length > 500) {
-      throw new ConvexError("Justification must be at most 500 characters");
-    }
-
-    // Standing-state cap: an agent loop must not pile up pendings.
-    const openForKey = await ctx.db
-      .query("environmentVariableRequests")
-      .withIndex("by_requested_key_and_status", (q) =>
-        q.eq("requestedByKeyId", args.keyId).eq("status", "pending")
-      )
-      .take(MAX_OPEN_MACHINE_REQUESTS_PER_KEY);
-    if (openForKey.length >= MAX_OPEN_MACHINE_REQUESTS_PER_KEY) {
-      throw new ConvexError(
-        `This API key already has ${MAX_OPEN_MACHINE_REQUESTS_PER_KEY} pending requests — wait for a human to review them before filing more`
-      );
-    }
-
-    // Rejection cooldown: a rejected ask may not be immediately re-filed —
-    // return the reviewer's reason so the agent learns WHY and stops.
-    const recentForKey = await ctx.db
-      .query("environmentVariableRequests")
-      .withIndex("by_project_and_key", (q) =>
-        q.eq("projectId", args.projectId).eq("key", args.key)
-      )
-      .collect();
-    const now = Date.now();
-    const recentRejection = recentForKey.find(
-      (r) =>
-        r.status === "rejected" &&
-        r.requestedByKeyId === args.keyId &&
-        (r.reviewedAt ?? 0) > now - REJECTION_COOLDOWN_MS &&
-        r.environments.some((env) => args.environments.includes(env))
-    );
-    if (recentRejection) {
-      throw new ConvexError(
-        `A request for "${args.key}" was rejected in the last 24 hours${
-          recentRejection.reviewReason
-            ? ` ("${recentRejection.reviewReason}")`
-            : ""
-        } — do not re-file it; ask the user to talk to their reviewer instead`
-      );
-    }
-
-    // Tier pre-check so the agent learns "project is at its variable limit"
-    // at create time instead of a human discovering it at approve time. The
-    // approve-time check in `review` stays the enforcement of record.
-    const varCheck = await checkCountedLimit(
-      ctx.db,
-      apiKey.organizationId,
-      "max_variables_per_project",
-      (limit) => countActiveVariables(ctx.db, args.projectId, limit)
-    );
-    if (!varCheck.allowed) {
-      throw new ConvexError(varCheck.reason!);
-    }
-
-    // requestedBy = the key's creator: the field is load-bearing (dedupe,
-    // visibility, verdict email) and a machine has no user id of its own.
-    // requestedByKeyId marks the real principal; UI/emails render the key.
-    return insertRequest(ctx, {
-      key: args.key,
-      // Valueless by design: agents never propose secret values — the
-      // reviewer supplies one at approval (approveWithValue).
-      vaultRef: undefined,
-      description: args.justification,
-      environments: args.environments,
-      projectId: args.projectId,
-      isSensitive: args.isSensitive ?? false,
-      requestedBy: apiKey.createdBy,
-      requestedByKeyId: args.keyId,
-      requesterLabel: `API key "${apiKey.name}"`,
-    });
-  },
-});
+const requestStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("approved"),
+  v.literal("rejected"),
+  v.literal("canceled")
+);
 
 /**
  * TTL sweep (cron): auto-cancel machine-originated requests that sat

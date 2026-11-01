@@ -1,15 +1,15 @@
 import { v, ConvexError } from "convex/values";
 import { MAX_PROJECT_FILES } from "../../lib/fileLimits";
 import { resolveEffectiveVariables } from "../variables/resolve";
-import { activeProjectsQuery } from "../../lib/projectKind";
+import { activeProjectsQuery, isWorkspace } from "../../lib/projectKind";
 import {
   action,
   internalQuery,
   internalMutation,
 } from "../../_generated/server";
-import type { ActionCtx } from "../../_generated/server";
+import type { ActionCtx, QueryCtx } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
-import type { Id } from "../../_generated/dataModel";
+import type { Doc, Id } from "../../_generated/dataModel";
 import { countActiveProjects } from "../featureRegistry/gates";
 import { resolveOrgGateContext } from "../featureRegistry/resolver";
 import {
@@ -21,6 +21,8 @@ import {
 } from "./helpers";
 import { open as openSealedFile, toBase64 } from "../files/crypto";
 import { get as blobStoreGet } from "../files/blobStore";
+import { vaultReadWithRetry } from "../vault/vault";
+import { pool, VAULT_POOL_WIDTH } from "../../lib/pool";
 
 /**
  * Public REST API v1 — read actions.
@@ -31,20 +33,11 @@ import { get as blobStoreGet } from "../files/blobStore";
  * gating, or revocation/expiry checks — it hashes the bearer token, picks a
  * rate bucket, and defers the decision entirely to `_authorizeRequest`.
  *
- * Two-step authorization for slug-addressed resources (variables/accounts):
- * `_authorizeRequest`'s `requirement.projectId` is what enforces project
- * scope, but resolving a slug into a projectId requires knowing the key's
- * organizationId first — which itself only comes back from a successful
- * authorize call. So these endpoints call `_authorizeRequest` TWICE:
- *   1. `projectId` omitted — establishes the key is valid and in scope for
- *      the resource/environment/tier gate, and yields `organizationId`.
- *   2. The project is resolved (by org + slug) and `_authorizeRequest` is
- *      called again with `projectId` set — this is what actually enforces
- *      project scope, and (for real value/account pulls) carries the
- *      `recordUse` that patches `lastUsedAt` and inserts the audit entry.
- * A denial of `"project_scope"` on the second call is deliberately mapped to
- * the SAME "Project not found" error as an unknown slug (PLAN §2/§5: never
- * confirm a project's existence to a key that can't see it).
+ * Slug-addressed resources pass `projectSlug` to `_authorizeRequest`, which
+ * resolves it inside the key's organization and enforces project scope in
+ * the same call. An unknown slug and an out-of-scope project both map to
+ * "Project not found" (PLAN §2/§5: never confirm a project's existence to a
+ * key that can't see it).
  *
  * Rate limiting mirrors cicd/pull.ts: picked by the CALLER before
  * authorizing (never inside `_authorizeRequest`), keyed by the token hash so
@@ -62,6 +55,13 @@ const MAX_PULL_ROWS = MAX_PROJECT_FILES;
 // Mirrors projects/helpers.ts's listWithStatsCore VARIABLE_COUNT_CAP — a
 // bounded reactive-safe count, not an exact total for pathological projects.
 const VARIABLE_COUNT_CAP = 500;
+
+function requireResolvedProject(
+  authorization: Extract<Authorization, { ok: true }>
+): { _id: Id<"projects">; name: string; slug: string } {
+  if (!authorization.project) throw new ConvexError("Project not found");
+  return authorization.project;
+}
 
 function environmentAllowedByScope(
   variableEnvironments: string[],
@@ -470,36 +470,18 @@ export const getProject = action({
     const tokenHash = await hashToken(args.token);
     await consumeRateLimit(ctx, "apiMetadata", tokenHash);
 
-    const bootstrap: Authorization = await ctx.runMutation(
-      internal.features.api.authorize._authorizeRequest,
-      {
-        tokenHash,
-        requirement: { resource: "projects" },
-        gateFeature: args.gateFeature,
-        surface: args.surface,
-      }
-    );
-    if (!bootstrap.ok) throwForDenial(bootstrap.denied);
-
-    const projectDoc = await ctx.runQuery(
-      internal.features.projects.queries._getBySlug,
-      {
-        organizationId: bootstrap.organizationId,
-        slug: args.projectSlug,
-      }
-    );
-    if (!projectDoc) throw new ConvexError("Project not found");
-
     const scoped: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
       {
         tokenHash,
-        requirement: { resource: "projects", projectId: projectDoc._id },
+        requirement: { resource: "projects" },
+        projectSlug: args.projectSlug,
         gateFeature: args.gateFeature,
         surface: args.surface,
       }
     );
     if (!scoped.ok) throwForDenial(scoped.denied);
+    const projectDoc = requireResolvedProject(scoped);
 
     const variableCount = await ctx.runQuery(
       internal.features.api.reads._countActiveVariablesForProject,
@@ -561,38 +543,12 @@ export const getProjectVariables = action({
       tokenHash
     );
 
-    // Step 1: bootstrap — resource/environment/tier gate, no project yet.
-    const bootstrap: Authorization = await ctx.runMutation(
-      internal.features.api.authorize._authorizeRequest,
-      {
-        tokenHash,
-        requirement: { resource: "variables", environment: args.environment },
-        gateFeature: args.gateFeature,
-        surface: args.surface,
-      }
-    );
-    if (!bootstrap.ok) throwForDenial(bootstrap.denied);
-
-    const projectDoc = await ctx.runQuery(
-      internal.features.projects.queries._getBySlug,
-      {
-        organizationId: bootstrap.organizationId,
-        slug: args.projectSlug,
-      }
-    );
-    if (!projectDoc) throw new ConvexError("Project not found");
-
-    // Step 2: project-scoped — this is what actually enforces project scope,
-    // and (for real value pulls) records the audit entry + lastUsedAt patch.
     const scoped: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
       {
         tokenHash,
-        requirement: {
-          resource: "variables",
-          environment: args.environment,
-          projectId: projectDoc._id,
-        },
+        requirement: { resource: "variables", environment: args.environment },
+        projectSlug: args.projectSlug,
         gateFeature: args.gateFeature,
         surface: args.surface,
         recordUse: metadataOnly
@@ -600,8 +556,6 @@ export const getProjectVariables = action({
           : {
               auditAction: "api.secrets_pulled",
               details: JSON.stringify({
-                keyId: bootstrap.keyId,
-                projectId: projectDoc._id,
                 projectSlug: args.projectSlug,
                 environment: args.environment,
                 keys: args.keys,
@@ -612,6 +566,7 @@ export const getProjectVariables = action({
       }
     );
     if (!scoped.ok) throwForDenial(scoped.denied);
+    const projectDoc = requireResolvedProject(scoped);
 
     const rows = await ctx.runQuery(
       internal.features.api.reads._readActiveVariables,
@@ -631,29 +586,20 @@ export const getProjectVariables = action({
       return true;
     });
 
-    const results: Array<{
-      key: string;
-      value?: string;
-      environments: string[];
-      isSensitive: boolean;
-      updatedAt: number;
-    }> = [];
-    for (const row of filtered) {
-      if (metadataOnly) {
-        results.push({
-          key: row.key,
-          environments: row.environments,
-          isSensitive: row.isSensitive,
-          updatedAt: row.updatedAt,
-        });
-        continue;
-      }
+    if (metadataOnly) {
+      return filtered.map((row) => ({
+        key: row.key,
+        environments: row.environments,
+        isSensitive: row.isSensitive,
+        updatedAt: row.updatedAt,
+      }));
+    }
+
+    return await pool(filtered, VAULT_POOL_WIDTH, async (row) => {
       let value: string;
       try {
-        value = await ctx.runAction(internal.features.vault.vault.readSecret, {
-          vaultRef: row.vaultRef,
-        });
-      } catch (error) {
+        value = await vaultReadWithRetry(row.vaultRef);
+      } catch {
         console.error("api.reads.getProjectVariables.decryptFailed", {
           projectId: projectDoc._id,
           key: row.key,
@@ -662,16 +608,14 @@ export const getProjectVariables = action({
           `Failed to decrypt "${row.key}" — pull aborted (transient vault errors are retryable; persistent ones need the variable re-saved)`
         );
       }
-      results.push({
+      return {
         key: row.key,
         value,
         environments: row.environments,
         isSensitive: row.isSensitive,
         updatedAt: row.updatedAt,
-      });
-    }
-
-    return results;
+      };
+    });
   },
 });
 
@@ -717,35 +661,12 @@ export const getProjectAccounts = action({
       tokenHash
     );
 
-    const bootstrap: Authorization = await ctx.runMutation(
-      internal.features.api.authorize._authorizeRequest,
-      {
-        tokenHash,
-        requirement: { resource: "accounts", environment: args.environment },
-        gateFeature: args.gateFeature,
-        surface: args.surface,
-      }
-    );
-    if (!bootstrap.ok) throwForDenial(bootstrap.denied);
-
-    const projectDoc = await ctx.runQuery(
-      internal.features.projects.queries._getBySlug,
-      {
-        organizationId: bootstrap.organizationId,
-        slug: args.projectSlug,
-      }
-    );
-    if (!projectDoc) throw new ConvexError("Project not found");
-
     const scoped: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
       {
         tokenHash,
-        requirement: {
-          resource: "accounts",
-          environment: args.environment,
-          projectId: projectDoc._id,
-        },
+        requirement: { resource: "accounts", environment: args.environment },
+        projectSlug: args.projectSlug,
         gateFeature: args.gateFeature,
         surface: args.surface,
         recordUse: metadataOnly
@@ -753,8 +674,6 @@ export const getProjectAccounts = action({
           : {
               auditAction: "api.secrets_pulled",
               details: JSON.stringify({
-                keyId: bootstrap.keyId,
-                projectId: projectDoc._id,
                 projectSlug: args.projectSlug,
                 environment: args.environment,
                 resource: "accounts",
@@ -764,6 +683,7 @@ export const getProjectAccounts = action({
       }
     );
     if (!scoped.ok) throwForDenial(scoped.denied);
+    const projectDoc = requireResolvedProject(scoped);
 
     const rows = await ctx.runQuery(
       internal.features.api.reads._readActiveAccounts,
@@ -782,30 +702,20 @@ export const getProjectAccounts = action({
       return true;
     });
 
-    const results: Array<{
-      name: string;
-      websiteUrl?: string;
-      environments: string[];
-      updatedAt: number;
-      username?: string;
-      password?: string;
-    }> = [];
-    for (const row of filtered) {
-      if (metadataOnly) {
-        results.push({
-          name: row.name,
-          websiteUrl: row.websiteUrl,
-          environments: row.environments,
-          updatedAt: row.updatedAt,
-        });
-        continue;
-      }
+    if (metadataOnly) {
+      return filtered.map((row) => ({
+        name: row.name,
+        websiteUrl: row.websiteUrl,
+        environments: row.environments,
+        updatedAt: row.updatedAt,
+      }));
+    }
+
+    return await pool(filtered, VAULT_POOL_WIDTH, async (row) => {
       let raw: string;
       try {
-        raw = await ctx.runAction(internal.features.vault.vault.readSecret, {
-          vaultRef: row.vaultRef,
-        });
-      } catch (error) {
+        raw = await vaultReadWithRetry(row.vaultRef);
+      } catch {
         console.error("api.reads.getProjectAccounts.decryptFailed", {
           projectId: projectDoc._id,
           account: row.name,
@@ -821,7 +731,7 @@ export const getProjectAccounts = action({
           password?: string;
         };
         credentials = { username: parsed.username, password: parsed.password };
-      } catch (error) {
+      } catch {
         console.error("api.reads.getProjectAccounts.malformedVaultPayload", {
           projectId: projectDoc._id,
           account: row.name,
@@ -830,17 +740,15 @@ export const getProjectAccounts = action({
           `Failed to decrypt account "${row.name}" — pull aborted (transient vault errors are retryable; persistent ones need the account re-saved)`
         );
       }
-      results.push({
+      return {
         name: row.name,
         websiteUrl: row.websiteUrl,
         environments: row.environments,
         updatedAt: row.updatedAt,
         username: credentials.username,
         password: credentials.password,
-      });
-    }
-
-    return results;
+      };
+    });
   },
 });
 
@@ -921,35 +829,12 @@ export const getProjectFiles = action({
       tokenHash
     );
 
-    const bootstrap: Authorization = await ctx.runMutation(
-      internal.features.api.authorize._authorizeRequest,
-      {
-        tokenHash,
-        requirement: { resource: "files", environment: args.environment },
-        gateFeature: args.gateFeature,
-        surface: args.surface,
-      }
-    );
-    if (!bootstrap.ok) throwForDenial(bootstrap.denied);
-
-    const projectDoc = await ctx.runQuery(
-      internal.features.projects.queries._getBySlug,
-      {
-        organizationId: bootstrap.organizationId,
-        slug: args.projectSlug,
-      }
-    );
-    if (!projectDoc) throw new ConvexError("Project not found");
-
     const scoped: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
       {
         tokenHash,
-        requirement: {
-          resource: "files",
-          environment: args.environment,
-          projectId: projectDoc._id,
-        },
+        requirement: { resource: "files", environment: args.environment },
+        projectSlug: args.projectSlug,
         gateFeature: args.gateFeature,
         surface: args.surface,
         recordUse: metadataOnly
@@ -957,8 +842,6 @@ export const getProjectFiles = action({
           : {
               auditAction: "api.secrets_pulled",
               details: JSON.stringify({
-                keyId: bootstrap.keyId,
-                projectId: projectDoc._id,
                 projectSlug: args.projectSlug,
                 environment: args.environment,
                 resource: "files",
@@ -968,6 +851,7 @@ export const getProjectFiles = action({
       }
     );
     if (!scoped.ok) throwForDenial(scoped.denied);
+    const projectDoc = requireResolvedProject(scoped);
 
     const rows = await ctx.runQuery(
       internal.features.api.reads._readActiveFiles,
@@ -1037,10 +921,7 @@ export const getProjectFiles = action({
       let plaintext: Uint8Array;
       try {
         const ciphertext = await blobStoreGet(ctx, row.storageId);
-        const keyMaterial = await ctx.runAction(
-          internal.features.vault.vault.readSecret,
-          { vaultRef: row.vaultRef }
-        );
+        const keyMaterial = await vaultReadWithRetry(row.vaultRef);
         plaintext = await openSealedFile(ciphertext, keyMaterial);
       } catch (error) {
         console.error("api.reads.getProjectFiles.decryptFailed", {
@@ -1066,9 +947,9 @@ export const getProjectFiles = action({
     // every real pull.
     if (!metadataOnly && results.length > 0) {
       await ctx.runMutation(internal.features.api.reads._logFilePulls, {
-        organizationId: bootstrap.organizationId,
+        organizationId: scoped.organizationId,
         projectId: projectDoc._id,
-        userId: bootstrap.keyId,
+        userId: scoped.keyId,
         files: results.map((r) => ({ path: r.path, name: r.name })),
         environment: args.environment,
         surface: auditSurface,

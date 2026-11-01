@@ -1,69 +1,42 @@
 ---
 title: Tools
-description: All nine MCP tools, their parameters, and the API-key resource each one demands.
+description: The eight MCP tools, what each one does, and what it costs.
 icon: zap
 ---
 
 # Tools
 
-Every tool runs against the same scope, rate limits and plan gate as the REST API, and every value-returning call is audited.
+A [signed-in](/mcp/setup) connection gets eight tools. Your role decides what each one can see: the same projects, environments, variables and documentation you can read in the dashboard. Every value-returning call is audited against you.
 
 ## Read tools
 
-| Tool                     | What it does                                                                                          | Resource                                      |
-| ------------------------ | ----------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `envpilot_list_projects` | List every project in the key's scope                                                                 | `projects`                                    |
-| `envpilot_get_variables` | Variables for a project + environment, with optional `keys` / `prefix` / `metadata_only`              | `variables`                                   |
-| `envpilot_get_variable`  | One variable by exact key                                                                             | `variables`                                   |
-| `envpilot_list_accounts` | Shared accounts for a project, optionally filtered by environment                                     | `accounts`                                    |
-| `envpilot_list_files`    | Secret-file **metadata** for a project: path, size, mode, checksum. Never contents                    | `files`                                       |
-| `envpilot_get_file`      | The decrypted contents of **one** secret file, base64-encoded                                         | `files`                                       |
-| `envpilot_search`        | Search project names/slugs and variable **keys** — never values. Bounded to 20 projects / 100 matches | `projects` (plus `variables` for key matches) |
-| `envpilot_search_docs`   | Full-text search over **published** documentation — titles and page bodies. Never returns drafts      | `docs`                                        |
-| `envpilot_get_doc`       | One **published** documentation page with its markdown body                                           | `docs`                                        |
+| Tool                     | What it does                                                                                         |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `envpilot_list_projects` | List the projects you can see                                                                        |
+| `envpilot_get_variables` | Variables for a project + environment, with optional `keys` / `prefix` / `metadata_only`             |
+| `envpilot_get_variable`  | One variable by exact key                                                                            |
+| `envpilot_search`        | Search project names/slugs and variable **keys**, never values. Bounded to 20 projects / 100 matches |
+| `envpilot_search_docs`   | Full-text search over **published** documentation: titles and page bodies. Never returns drafts      |
+| `envpilot_get_doc`       | One **published** page: its outline, one section, or up to 60,000 characters at a time with a cursor |
 
-## Write-adjacent tools
+## Draft tools
 
-A machine credential can perform exactly two mutations, and both end at a human:
+An agent can write documentation drafts. Every draft ends at a person:
 
-| Tool                          | What it does                                                                                         | Resource   |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------- | ---------- |
-| `envpilot_request_variable`   | File a request with a **required justification**. A human approves it and supplies the value         | `requests` |
-| `envpilot_get_request_status` | Poll a filed request — `pending`, `approved`, `rejected` (with the reviewer's reason), or `canceled` | `requests` |
-| `envpilot_create_doc`         | Propose a documentation page. Always creates a **draft**; a human publishes it                       | `docs`     |
+| Tool                        | What it does                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------- |
+| `envpilot_create_doc`       | Propose a documentation page. Always creates a **draft**; a person publishes it |
+| `envpilot_update_doc_draft` | Replace, append to, or replace one section of a draft you wrote                 |
 
-Neither writes anything a reader sees on its own. A requested variable has no
-value until a person supplies one, and a proposed page is invisible to your
-team — and to every other agent — until a person publishes it.
+A draft page is invisible to your team, and to every other agent, until a person publishes it. In Claude both tools carry `destructiveHint`, so Claude asks before each one.
 
-## Secret file tools in detail
-
-### `envpilot_list_files`
-
-| Parameter     | Required | Notes                                                  |
-| ------------- | -------- | ------------------------------------------------------ |
-| `project`     | Yes      | Project slug                                           |
-| `environment` | No       | Omit to return files across every in-scope environment |
-
-Metadata only: destination path, size, mode, checksum, environments. Nothing is decrypted and no download is recorded, so an agent can safely explore what a build needs.
-
-### `envpilot_get_file`
-
-| Parameter     | Required                                     | Notes                                             |
-| ------------- | -------------------------------------------- | ------------------------------------------------- |
-| `project`     | Yes                                          | Project slug                                      |
-| `path`        | Yes                                          | Exact destination path from `envpilot_list_files` |
-| `environment` | When the path exists in several environments | Otherwise the call fails rather than guessing     |
-
-Returns real secret material. The tool description tells the agent as much: fetch only the file the task needs, never speculatively, never echo the contents back to the user, and write straight to the recorded path.
-
-If the path exists in more than one environment and no `environment` was given, the call fails with a message naming the count. Guessing which one a build wanted would be worse than asking.
+Shared accounts, secret files and variable requests were only ever available to API keys and were removed with them. Use the dashboard or the CLI for those.
 
 ## Documentation tools in detail
 
 ### Drafts are invisible
 
-`envpilot_create_doc` always writes a draft. Nothing on this surface can
+`envpilot_create_doc` always writes a draft. Nothing over MCP can
 publish, and `envpilot_search_docs` / `envpilot_get_doc` return **published
 pages only** — a draft is not merely hidden from search, it cannot be fetched
 by id either. That gate is what stops a page one agent wrote from reaching
@@ -76,18 +49,35 @@ page limit — 10 per project and 25 per organization on Free, unlimited on Pro.
 The caps are the same numbers the dashboard enforces, so an agent cannot use
 the MCP surface to walk around them. See [Plans & Limits](/limits/plans).
 
+### Long pages: write in parts, read in pages
+
+A single tool call carries its whole payload, so a very long page is slow for
+the agent to produce in one go. Create the page with its first part, then add
+the rest with `envpilot_update_doc_draft` (`mode: "append"`), or rewrite one
+part with `mode: "replace_section"` and a section id. Every edit re-checks the
+**whole** resulting body, so splitting text across calls cannot slip a secret
+or an injected instruction past the scanner. Published pages cannot be edited
+over MCP.
+
+`envpilot_get_doc` returns at most 60,000 characters per call. Pass
+`view: "outline"` for the section list, `section` for one section, and the
+`nextCursor` from a response as `cursor` to keep reading. Breaks fall on
+paragraph boundaries and never inside a code block, unless a single line or
+code block is itself longer than 60,000 characters; that one is split at the
+limit.
+
+### Retrying safely
+
+`envpilot_create_doc` accepts `client_ref`, a string the caller picks. A
+second call with the same `client_ref` returns the first page instead of
+creating a duplicate, as long as you can still reach that project. Use it when a call timed out and you cannot tell
+whether it landed.
+
 ### Pages name variables, never values
 
 A page may reference `API_BASE_URL`; it never contains the value. Resolving it
-is the reader's own `envpilot_get_variables` call under its own `variables` and
-environment scope, so reading documentation can never become reading secrets.
-
-### `docs` and `files` cannot share a key
-
-A key carrying `docs` may not also carry `files`, and the dashboard refuses to
-mint one. Documentation is prose an agent pulls into its context; `files`
-returns decrypted keystores and SSH keys. On one credential those two are an
-exfiltration chain, so they are kept apart at mint time. Use two keys.
+is the reader's own `envpilot_get_variables` call under their own role, so
+reading documentation can never become reading secrets.
 
 ### Content is scanned on write
 
@@ -99,23 +89,20 @@ payloads, commit SHAs — pass through untouched.
 
 ## Cost of each call
 
-| Tool                                                    | Bucket                                | Audited |
-| ------------------------------------------------------- | ------------------------------------- | ------- |
-| `list_projects`, `search`, `list_files`, metadata reads | 120/min metadata                      | No      |
-| `get_variables`, `get_variable`, `list_accounts`        | 30/min value pulls                    | Yes     |
-| `get_file`                                              | file reads: refill 60/min, burst 1000 | Yes     |
-| `request_variable`                                      | 5/hour per key, burst 2               | Yes     |
-| `search_docs`, `get_doc`                                | 120/min metadata                      | No      |
-| `create_doc`                                            | 30/hour per key, burst 10             | Yes     |
+| Tool                                                | Bucket                        | Audited |
+| --------------------------------------------------- | ----------------------------- | ------- |
+| `list_projects`, `search`, `search_docs`, `get_doc` | 120/min metadata              | No      |
+| `get_variables`, `get_variable`                     | 30/min value pulls            | Yes     |
+| `create_doc`                                        | 30/hour per person, burst 10  | Yes     |
+| `update_doc_draft`                                  | 120/hour per person, burst 40 | Yes     |
 
 ## Limits
 
-- A tool whose resource is missing from the key is denied with a message naming the resource — scopes are immutable, so the fix is a replacement key.
-- A project outside scope behaves exactly as if it does not exist.
+- A project you cannot see behaves exactly as if it does not exist.
 - `envpilot_search` never returns values, only names and keys.
 - There is no tool that writes a variable, uploads a file, publishes a documentation page, or approves a request. There is no plan on which one appears.
 - Documentation search is full-text: whole words, with only the last term prefix-matched. It is not a substring match and does not correct typos.
 
 ## Next
 
-- [Agent requests](/mcp/agent-requests) · [Setup](/mcp/setup)
+- [Setup](/mcp/setup) · [Clients](/mcp/clients) · [API keys (legacy)](/mcp/api-keys)

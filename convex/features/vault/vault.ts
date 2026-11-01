@@ -293,6 +293,18 @@ export async function vaultRead(vaultRef: string): Promise<string> {
   return data.value;
 }
 
+export async function vaultReadWithRetry(vaultRef: string): Promise<string> {
+  try {
+    return await vaultRead(vaultRef);
+  } catch (err) {
+    // Retry only what a second try can fix: a dropped connection, a timeout,
+    // a 429 or a 5xx. A missing ref or bad credentials fail the same way twice.
+    const message = err instanceof Error ? err.message : "";
+    if (!/code=network_error|status=(429|5\d\d)/.test(message)) throw err;
+    return await vaultRead(vaultRef);
+  }
+}
+
 /** Update the value; same id, new version. */
 export async function vaultUpdate(args: {
   vaultRef: string;

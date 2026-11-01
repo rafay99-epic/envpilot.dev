@@ -33,9 +33,9 @@ Full CRUD over the organization's colour-coded tag set — create, bulk-paste, e
 
 ### API keys
 
-Create org-scoped [API keys](/api/authentication) for the REST API, MCP server, and GitHub Action. For each key you choose:
+Create org-scoped [API keys](/api/authentication) for the REST API, the GitHub Action and the Docker image. The MCP server does not use keys: clients [sign in](/mcp/setup). For each key you choose:
 
-- **surfaces** — `rest_api`, `mcp_server`, `github_action`
+- **surfaces** — `rest_api`, `github_action`, `docker`
 - **projects** — specific ones, or all including future ones (owner-only)
 - **environments**
 - **resources** — `variables`, `accounts`, `projects`, `files`, `requests`

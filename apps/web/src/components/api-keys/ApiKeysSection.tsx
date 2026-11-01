@@ -27,6 +27,7 @@ import {
 } from "@/components/dashboard/terminal-ui";
 import { TerminalDatePicker } from "@/components/dashboard/terminal-date-picker";
 import { useOrganizationProjects, useNow } from "@/hooks";
+import { SITE_URLS } from "@/components/marketing";
 import { ENVIRONMENTS, type Environment } from "@/constants/project";
 
 /**
@@ -54,48 +55,15 @@ const ENV_CHIP_SELECTED: Record<Environment, string> = {
   production: "border-accent-line bg-accent-soft text-accent",
 };
 
-const RESOURCES = [
-  "variables",
-  "accounts",
-  "files",
-  "docs",
-  "projects",
-  "requests",
-] as const;
+// Resources the REST API, the Action and Docker read. "docs" and "requests"
+// only ever unlocked MCP tools, and MCP now signs in with OAuth instead.
+const RESOURCES = ["variables", "accounts", "files", "projects"] as const;
 type Resource = (typeof RESOURCES)[number];
 
-// Resource pairs the backend refuses to mint together
-// (convex/features/api/keys.ts::assertResourceCombination). Mirrored here so
-// the form disables the second chip instead of failing on submit.
-const MUTUALLY_EXCLUSIVE: Partial<Record<Resource, Resource>> = {
-  docs: "files",
-  files: "docs",
-};
-
-// "requests" is the one mutating capability: the key may FILE variable
-// requests (a human approves them). Not compatible with the GitHub Action
-// surface — CI can't wait on human approval.
 const RESOURCE_HINT: Partial<Record<Resource, string>> = {
-  requests: "may file variable requests for human approval (agents)",
   // Never on by default: this is the switch that lets a credential reach
   // keystores and signing material, not just env vars.
   files: "may read secret file contents (keystores, SSH keys, certificates)",
-  // Excludes "files" — see MUTUALLY_EXCLUSIVE.
-  docs: "may read published docs and propose drafts — not combinable with files",
-};
-
-// Which MCP tools each resource unlocks — mirrors the `requirement` each
-// Convex action enforces (convex/features/api/reads.ts / requests.ts).
-// Shown in the create form when the MCP surface is selected so keys aren't
-// minted with scopes that make every MCP call fail.
-const MCP_RESOURCE_TOOLS: Record<Resource, string> = {
-  projects:
-    "envpilot_list_projects, envpilot_search (key matches also need variables)",
-  variables: "envpilot_get_variables, envpilot_get_variable",
-  accounts: "envpilot_list_accounts",
-  files: "envpilot_list_files, envpilot_get_file",
-  docs: "envpilot_search_docs, envpilot_get_doc, envpilot_create_doc",
-  requests: "envpilot_request_variable, envpilot_get_request_status",
 };
 
 /**
@@ -107,13 +75,6 @@ const MCP_RESOURCE_TOOLS: Record<Resource, string> = {
  * a deliberate choice, because no default is safe for every org.
  */
 const PRESETS = [
-  {
-    id: "agent",
-    label: "Agent / MCP",
-    blurb: "Claude, Cursor, Codex",
-    surfaces: ["mcp_server"],
-    resources: ["variables", "projects"],
-  },
   {
     id: "action",
     label: "GitHub Action",
@@ -146,8 +107,10 @@ const PRESETS = [
 
 type PresetId = (typeof PRESETS)[number]["id"];
 
-const SURFACES = ["rest_api", "mcp_server", "github_action", "docker"] as const;
-type Surface = (typeof SURFACES)[number];
+// Surfaces a new key can be minted for. MCP is OAuth only, so it is not one;
+// older keys may still list it, which SURFACE_LABEL can show.
+const SURFACES = ["rest_api", "github_action", "docker"] as const;
+type Surface = (typeof SURFACES)[number] | "mcp_server";
 
 const SURFACE_LABEL: Record<Surface, string> = {
   rest_api: "REST API",
@@ -176,7 +139,7 @@ interface ApiKeysSectionProps {
 
 /**
  * "API Keys" organization settings section — org-scoped, multi-resource
- * keys for the public REST API, MCP server, GitHub Action and Docker image (the one
+ * keys for the public REST API, GitHub Action and Docker image (the one
  * machine credential). Pro-gated via the `public_api`
  * registry feature (server enforces the same gate — this is UX, not the
  * security boundary).
@@ -242,8 +205,10 @@ function ApiKeysSectionInner({
   return (
     <SettingsSection
       title="API keys"
-      description="Scoped keys for the public REST API, MCP server, GitHub Action, and Docker image. Read-only — except keys with the requests resource, which may file variable requests for human approval."
+      description="Scoped, read-only keys for the public REST API, the GitHub Action and the Docker image."
     >
+      <McpOAuthNote />
+
       <div className="flex justify-end">
         <TerminalButton type="button" variant="primary" onClick={openCreate}>
           New Key
@@ -266,7 +231,7 @@ function ApiKeysSectionInner({
         !showCreate && (
           <TerminalEmptyState
             command='curl -H "Authorization: Bearer $ENVPILOT_API_KEY" https://www.envpilot.dev/api/v1/projects'
-            message="No API keys yet. Create one to call the public REST API or connect the MCP server."
+            message="No API keys yet. Create one to call the public REST API, or for the GitHub Action or Docker."
             action={{
               label: "New Key",
               onClick: () => setShowCreate(true),
@@ -288,6 +253,40 @@ function ApiKeysSectionInner({
         </ul>
       )}
     </SettingsSection>
+  );
+}
+
+/** MCP signs in with OAuth, not API keys: how to connect a client. */
+function McpOAuthNote() {
+  return (
+    <div
+      data-testid="mcp-oauth-note"
+      className="border-l-2 border-line pl-3 text-xs leading-relaxed text-ink-muted"
+    >
+      <p>
+        <span className="font-medium text-ink">
+          The MCP server uses sign-in.
+        </span>{" "}
+        API keys are not used for MCP. They are for the REST API, the GitHub
+        Action and Docker.
+      </p>
+      <p className="mt-1">
+        To connect an MCP client, add{" "}
+        <code className="font-mono text-ink">
+          https://www.envpilot.dev/api/mcp
+        </code>{" "}
+        and sign in when your browser opens. Moving from a key? Remove the
+        Authorization header from the client first.{" "}
+        <a
+          href={`${SITE_URLS.docs}/mcp/setup`}
+          target="_blank"
+          rel="noreferrer"
+          className="font-mono text-ink underline underline-offset-2"
+        >
+          Setup guide
+        </a>
+      </p>
+    </div>
   );
 }
 
@@ -568,16 +567,13 @@ function CreateKeyDrawer({
   const [selectedEnvs, setSelectedEnvs] = useState<Set<Environment>>(
     new Set<Environment>(["production"])
   );
-  // projects is in the default set because the default surfaces include the
-  // MCP server, whose clients start every session by listing projects — a
-  // variables-only key makes every MCP call fail with a scope denial.
-  const [selectedResources, setSelectedResources] = useState<Set<Resource>>(
-    new Set<Resource>(["variables", "projects"])
-  );
-  // Seeded from the default preset ("agent"), so the chips the form opens on
+  // Seeded from the default preset ("rest"), so the chips the form opens on
   // and the preset it says it is on cannot disagree.
+  const [selectedResources, setSelectedResources] = useState<Set<Resource>>(
+    new Set<Resource>(["variables"])
+  );
   const [selectedSurfaces, setSelectedSurfaces] = useState<Set<Surface>>(
-    new Set<Surface>(["mcp_server"])
+    new Set<Surface>(["rest_api"])
   );
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [customExpiry, setCustomExpiry] = useState("");
@@ -586,7 +582,7 @@ function CreateKeyDrawer({
     ? new Date(nowMs + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
     : "";
 
-  const [preset, setPreset] = useState<PresetId>("agent");
+  const [preset, setPreset] = useState<PresetId>("rest");
   // Problems are computed on every render but only SHOWN once the user has
   // tried to create — an empty form should not open scolding.
   const [triedSubmit, setTriedSubmit] = useState(false);
@@ -628,10 +624,6 @@ function CreateKeyDrawer({
         next.delete(resource);
       } else {
         next.add(resource);
-        // Selecting one half of an exclusive pair clears the other, so the
-        // form can never submit a combination the backend refuses.
-        const excluded = MUTUALLY_EXCLUSIVE[resource];
-        if (excluded) next.delete(excluded);
       }
       return next;
     });
@@ -664,7 +656,6 @@ function CreateKeyDrawer({
   };
 
   const githubActionSelected = selectedSurfaces.has("github_action");
-  const mcpSelected = selectedSurfaces.has("mcp_server");
 
   const projectSelectionValid = githubActionSelected
     ? projectMode === "specific" && selectedProjectIds.size === 1
@@ -672,7 +663,7 @@ function CreateKeyDrawer({
   const envSelectionValid = envMode === "all" || selectedEnvs.size > 0;
   // Matches convex/features/api/keys.ts: an Action key must carry
   // "variables" and may additionally carry "files" — nothing else, so an
-  // Action credential never doubles as broader REST/MCP access. The form
+  // Action credential never doubles as broader REST access. The form
   // previously demanded EXACTLY variables, which made a files-capable Action
   // key impossible to create at all.
   const resourceSelectionValid =
@@ -751,21 +742,12 @@ function CreateKeyDrawer({
         'A GitHub Action key must carry "variables", and may additionally carry "files" — nothing else.',
     });
   }
-  if (selectedResources.has("docs") && selectedResources.has("files")) {
-    problems.push({
-      field: "resources",
-      message:
-        'A key cannot carry both "docs" and "files" — docs are text an agent reads into context, and file access returns decrypted key material. Mint two keys.',
-    });
-  }
   if (!customExpiryValid) {
     problems.push({
       field: "expiry",
       message: "Pick an expiry date in the future.",
     });
   }
-
-  const mcpToolCount = RESOURCES.filter((r) => selectedResources.has(r)).length;
 
   const showProblems = triedSubmit && problems.length > 0;
 
@@ -882,25 +864,6 @@ function CreateKeyDrawer({
               </TerminalButton>
             </div>
           </SettingsField>
-
-          {mcpSelected && (
-            <p
-              data-testid="api-key-mcp-rotation-hint"
-              className="text-xs text-ink-muted"
-            >
-              Replacing a key in an existing MCP setup? Swap this key into your
-              client&apos;s Authorization header (or the exported{" "}
-              <code className="rounded bg-surface-raised px-1 py-0.5">
-                ENVPILOT_API_KEY
-              </code>
-              ), confirm a tool call works, then revoke the old key below.
-              Claude Code refuses to re-add an existing server, so run{" "}
-              <code className="rounded bg-surface-raised px-1 py-0.5">
-                claude mcp remove envpilot
-              </code>{" "}
-              first.
-            </p>
-          )}
 
           <div>
             <button
@@ -1195,31 +1158,17 @@ function CreateKeyDrawer({
                 </div>
               </SettingsField>
 
-              <SettingsField
-                label="Resources"
-                required
-                hint={
-                  selectedResources.has("requests")
-                    ? "This key may file variable requests over MCP — a human approves them in the dashboard and supplies the value. Keys never write secrets."
-                    : undefined
-                }
-              >
+              <SettingsField label="Resources" required>
                 <div className="flex flex-wrap gap-2">
                   {RESOURCES.map((resource) => {
                     const selected = selectedResources.has(resource);
                     // The Action pulls variables and, optionally, secret files.
                     // Everything else stays off so an Action credential never
-                    // doubles as broader REST/MCP access.
+                    // doubles as broader REST access.
                     const disabled =
                       githubActionSelected &&
                       resource !== "variables" &&
                       resource !== "files";
-                    // The other half of an exclusive pair stays clickable — it
-                    // swaps the selection rather than being blocked — but says so.
-                    const excluded = MUTUALLY_EXCLUSIVE[resource];
-                    const swaps = Boolean(
-                      excluded && selectedResources.has(excluded)
-                    );
                     return (
                       <button
                         key={resource}
@@ -1230,9 +1179,7 @@ function CreateKeyDrawer({
                         title={
                           disabled
                             ? "GitHub Action keys carry variables, and optionally files — nothing else"
-                            : swaps
-                              ? `Selecting "${resource}" clears "${excluded}" — a key cannot carry both`
-                              : RESOURCE_HINT[resource]
+                            : RESOURCE_HINT[resource]
                         }
                         onClick={() => toggleResource(resource)}
                         className={`${CHIP_BASE} ${
@@ -1245,63 +1192,6 @@ function CreateKeyDrawer({
                   })}
                 </div>
               </SettingsField>
-
-              {mcpSelected && (
-                <div data-testid="api-key-mcp-requirements">
-                  {/* The full tool list is six lines of mono the moment MCP is
-                      picked, which buried the fields under it. Headline first,
-                      list on demand. */}
-                  <details>
-                    <summary className="cursor-pointer list-none text-xs font-medium text-ink-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
-                      <span aria-hidden className="mr-1.5 text-accent">
-                        &#9656;
-                      </span>
-                      MCP server: {mcpToolCount} of {RESOURCES.length} resource
-                      groups unlock tools
-                    </summary>
-                    <ul className="mt-2 space-y-1">
-                      {RESOURCES.map((resource) => {
-                        const enabled = selectedResources.has(resource);
-                        return (
-                          <li
-                            key={resource}
-                            data-testid={`api-key-mcp-tools-${resource}`}
-                            className={`flex gap-2 text-xs ${
-                              enabled ? "text-ink-muted" : "text-ink-faint"
-                            }`}
-                          >
-                            <span
-                              className={
-                                enabled ? "text-accent" : "text-ink-faint"
-                              }
-                            >
-                              {enabled ? "✓" : "✗"}
-                            </span>
-                            <span>
-                              <span className="capitalize">{resource}</span>:{" "}
-                              <span className="font-mono">
-                                {MCP_RESOURCE_TOOLS[resource]}
-                              </span>
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </details>
-                  {!selectedResources.has("projects") && (
-                    <p
-                      data-testid="api-key-mcp-projects-warning"
-                      className="mt-2 flex items-start gap-2 text-xs text-warning"
-                    >
-                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      Without the projects resource, MCP clients cannot list or
-                      search projects. Most assistants start there, so every
-                      session fails with a scope error. Enable projects for a
-                      usable MCP key.
-                    </p>
-                  )}
-                </div>
-              )}
 
               <SettingsField label="Expiry" optional>
                 <div className="flex flex-wrap gap-2">

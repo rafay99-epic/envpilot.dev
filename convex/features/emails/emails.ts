@@ -14,6 +14,7 @@ import {
   buttonRow,
   footerRow,
 } from "./templates";
+import { MCP_SETUP_URL } from "../../lib/mcpRetirement";
 
 // ============================================================
 // Helpers
@@ -617,6 +618,77 @@ export const sendRotationReminderEmail = internalAction({
           error: String(err),
         })
       );
+    }
+  },
+});
+
+// ============================================================
+// MCP OAuth migration
+// ============================================================
+
+/**
+ * Sent once per person when an admin moves the MCP server to sign-in
+ * (features/api/mcpRetirement.ts). Lists the keys they manage that MCP used
+ * to accept.
+ */
+export const sendMcpRetirementEmail = internalAction({
+  args: { email: v.string(), keys: v.array(v.string()) },
+  handler: async (_ctx, args) => {
+    const subject = "The Envpilot MCP server now uses sign-in";
+    const steps = [
+      "Remove the Authorization header from your MCP client config.",
+      "Reconnect. Your client opens the Envpilot sign-in page.",
+      "Sign in. Your agent sees exactly what your role sees.",
+    ];
+    const keyList = args.keys
+      .map((k) => `<code style="${CODE_STYLE}">${escapeHtml(k)}</code>`)
+      .join("<br>");
+
+    const html = emailWrapper(
+      subject,
+      [
+        iconRow("E"),
+        headingRow("The MCP server now uses sign-in"),
+        paragraphRow(
+          "We have moved the Envpilot MCP server from API keys to sign-in. API keys no longer work with MCP. The good news: no more keys to copy, rotate or leak."
+        ),
+        paragraphRow(`Keys you manage that MCP used to accept:<br>${keyList}`),
+        paragraphRow(
+          steps.map((step, i) => `${i + 1}. ${escapeHtml(step)}`).join("<br>"),
+          "font-size: 14px; line-height: 1.6; color: #a1a1aa; text-align: left;"
+        ),
+        buttonRow(MCP_SETUP_URL, "Set up sign-in"),
+        paragraphRow(
+          "These keys keep working for the REST API, the GitHub Action and the Docker image. Jobs that run without a person, like CI, should use those instead of MCP.",
+          "font-size: 14px; line-height: 1.5; color: #71717a;"
+        ),
+        footerRow(
+          "You manage API keys in an Envpilot organization. Questions? Just reply to this email."
+        ),
+      ].join("")
+    );
+
+    const text = [
+      "The MCP server now uses sign-in",
+      "",
+      "We have moved the Envpilot MCP server from API keys to sign-in. API keys no longer work with MCP.",
+      "",
+      "Keys you manage that MCP used to accept:",
+      ...args.keys,
+      "",
+      ...steps.map((step, i) => `${i + 1}. ${step}`),
+      "",
+      `Setup guide: ${MCP_SETUP_URL}`,
+      "",
+      "These keys keep working for the REST API, the GitHub Action and the Docker image.",
+    ].join("\n");
+
+    const result = await sendEmail(args.email, subject, html, text);
+    if (!result.success) {
+      console.error("emails.sendMcpRetirementEmail.sendFailed", {
+        recipient: args.email,
+        error: result.error,
+      });
     }
   },
 });

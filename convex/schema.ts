@@ -486,9 +486,7 @@ export default defineSchema({
     .index("by_project_and_status", ["projectId", "status"])
     .index("by_organization_and_status", ["organizationId", "status"])
     .index("by_project_and_requester", ["projectId", "requestedBy"])
-    .index("by_project_and_key", ["projectId", "key"])
-    // Per-key open-pendings cap + revoke-time visibility for machine requests
-    .index("by_requested_key_and_status", ["requestedByKeyId", "status"]),
+    .index("by_project_and_key", ["projectId", "key"]),
 
   // ==========================================
   // CHANGE REQUESTS (protected environments)
@@ -842,8 +840,11 @@ export default defineSchema({
     publishedAt: v.optional(v.number()),
     // Soft delete; daily GC purges past the retention window.
     deletedAt: v.optional(v.number()),
+    createdByKeyId: v.optional(v.id("apiKeys")),
+    clientRef: v.optional(v.string()),
   })
     .index("by_project", ["projectId"])
+    .index("by_author_and_client_ref", ["authorId", "clientRef", "projectId"])
     .index("by_project_and_status", ["projectId", "status"])
     .index("by_project_and_module", ["projectId", "module"])
     // A module share reads exactly the pages it serves. Without deletedAt and
@@ -1077,6 +1078,19 @@ export default defineSchema({
   })
     .index("by_token_hash", ["tokenHash"])
     .index("by_organization", ["organizationId"]),
+
+  // One row per person told about the MCP OAuth migration (see
+  // lib/mcpRetirement.ts): the MCP keys they manage, when the email went
+  // out, and when they pressed OK on the dashboard card.
+  mcpRetirementNotices: defineTable({
+    userId: v.id("users"),
+    // "key name · organization", capped at MAX_KEYS_PER_NOTICE
+    keys: v.array(v.string()),
+    emailedAt: v.optional(v.number()),
+    dismissedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_emailed", ["emailedAt"]),
 
   // ==========================================
   // ORG NOTIFICATION WEBHOOKS (Slack / Discord)

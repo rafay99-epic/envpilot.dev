@@ -15,6 +15,22 @@
 
 <!-- entry -->
 ---
+title: The MCP server signs you in with your Envpilot login
+version: v1.71.0
+date: 2026-11-01
+types: [feature, improvement, breaking]
+---
+
+The MCP server now connects with your Envpilot login instead of an API key. Add `https://www.envpilot.dev/api/mcp` to Claude, Claude Code, Codex, Cursor or VS Code with no header and sign in when your browser opens. The connection acts as you and sees what your role sees. Setup is on the [MCP setup](https://docs.envpilot.dev/mcp/setup) page.
+
+API keys no longer work with the MCP server. Remove the `Authorization` header from your MCP client and reconnect. The tools that needed a key, shared accounts, secret files and variable requests, are gone; use the dashboard or the CLI for those. Keys keep working for the REST API, the GitHub Action and the Docker image, and the API Keys page no longer creates MCP keys.
+
+The MCP server also answers faster. Variable values decrypt eight at a time, one flaky vault read is retried instead of failing the whole pull, and `envpilot_search` runs as a single bounded query.
+
+Long documentation pages work over MCP. `envpilot_get_doc` returns an outline, a single section, or up to 60,000 characters at a time with a cursor. The new `envpilot_update_doc_draft` tool appends to a draft, replaces it, or replaces one section, and every edit re-checks the whole page for credentials and injected instructions. `envpilot_create_doc` accepts `client_ref`, so a retried call returns the first page instead of a duplicate.
+
+<!-- entry -->
+---
 title: Lighter public pages
 version: v1.70.1
 date: 2026-11-01

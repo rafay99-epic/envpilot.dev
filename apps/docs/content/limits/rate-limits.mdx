@@ -1,12 +1,12 @@
 ---
 title: Rate limits
-description: Every machine-surface rate-limit bucket — REST API, MCP server, GitHub Action, Docker image, and variable requests — with exact limits and behavior when exceeded.
+description: Every machine-surface rate-limit bucket — REST API, MCP server, GitHub Action and Docker image — with exact limits and behavior when exceeded.
 icon: gauge
 ---
 
 # Rate limits
 
-Envpilot is an open-source platform, and its rate limits are documented so you can build integrations that respect them instead of discovering them by getting throttled. Every machine surface — the REST API, the MCP server, the GitHub Action, the Docker image, and machine-filed variable requests — is metered per credential with a token-bucket limiter.
+Envpilot is an open-source platform, and its rate limits are documented so you can build integrations that respect them instead of discovering them by getting throttled. Every machine surface — the REST API, the GitHub Action and the Docker image — is metered per credential with a token-bucket limiter; the MCP server is metered per signed-in person.
 
 ## The buckets
 
@@ -17,12 +17,12 @@ Each limit is scoped **per key**. Two keys never share a bucket.
 | Value pulls          | 30 / min                    | CI/CD secret pulls (GitHub Action), and any REST/MCP call that decrypts values |
 | Docker pulls         | refill 30 / min, burst 120  | Container secret pulls — every call the Docker image makes that returns values |
 | Metadata reads       | 120 / min                   | REST + MCP metadata calls — org, project lists, `metadata_only=true` reads     |
-| Secret file reads    | refill 60 / min, burst 1000 | Any call returning secret-file **contents** — CLI pull, Action, REST, MCP      |
+| Secret file reads    | refill 60 / min, burst 1000 | Any call returning secret-file **contents** — CLI pull, Action, REST           |
 | Secret file uploads  | 20 / min                    | Uploading a secret file (per user, dashboard or CLI)                           |
 | Variable writes      | 60 / min, burst 120         | Creating one variable at a time in the dashboard                               |
 | Bulk variable writes | refill 300 / min, burst 500 | Imports, `envpilot push`, and project templates — charged once per batch       |
-| Variable requests    | 5 / hour, burst 2           | Machine-filed variable requests (`envpilot_request_variable`)                  |
-| Documentation pages  | 30 / hour, burst 10         | Machine-authored documentation drafts (`envpilot_create_doc`)                  |
+| Documentation pages  | 30 / hour, burst 10         | Drafts created over MCP (`envpilot_create_doc`), per signed-in user            |
+| Documentation edits  | 120 / hour, burst 40        | Draft edits over MCP (`envpilot_update_doc_draft`), per signed-in user         |
 
 The **value-pull** bucket has full capacity available as a burst (deploys fan out matrix builds, so a spike is normal) while the sustained rate stays at 30/min. The **metadata** bucket is higher because those reads never touch the vault — no decrypt cost.
 
@@ -34,15 +34,9 @@ The **secret file read** bucket is the odd one, and deliberately: burst and refi
 
 Secret-file **uploads** are metered per user rather than per key, because every upload encrypts, writes a blob, and creates a vault object.
 
-## Variable requests are capped twice
+## Agent requests (removed)
 
-Machine-filed requests get an extra layer beyond the per-hour rate limit, because every created request emails a human reviewer — a retry-looping agent must be stopped before it becomes reviewer alert fatigue:
-
-- **Rate limit** — 5 per hour per key, with a burst of 2. This throttles how fast requests can be filed.
-- **Standing open-pendings cap** — a key may have at most **5 open pending requests** at once. Even within the rate limit, the 6th outstanding request is refused until a human reviews one of the existing five.
-- **Rejection cooldown** — after a request for a given key is **rejected**, the same key cannot re-file a request for that variable for **24 hours**. A rejected ask is a decision, not an invitation to immediately retry.
-
-The GitHub Action never files requests at all, so none of these apply to it — it only draws from the value-pull bucket. The Docker image never files requests either, and draws only from the Docker bucket.
+Machine-filed variable requests went away with API-key access to the MCP server, and so did their limits. The GitHub Action and the Docker image never filed requests; they draw only from their pull buckets.
 
 ## How many keys you may hold
 

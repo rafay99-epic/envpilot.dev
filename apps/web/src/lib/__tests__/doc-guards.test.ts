@@ -244,3 +244,12 @@ describe("slugifyTitle", () => {
     expect(slugifyTitle("a".repeat(200)).length).toBe(80);
   });
 });
+
+describe("scanDocBody — scales linearly", () => {
+  it("scans a long unbroken dotted run quickly", () => {
+    const body = "ab.".repeat(80_000);
+    const started = performance.now();
+    scanDocBody(body);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+});

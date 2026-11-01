@@ -6,6 +6,12 @@ icon: zap
 
 # Agent requests
 
+<Callout type="warning" title="Removed">
+  Agent requests needed an [API key](/mcp/api-keys) with the `requests` resource
+  and were removed when the MCP server moved to sign-in. This page is kept for
+  reference. Requests already filed still appear in the dashboard.
+</Callout>
+
 A machine credential can never write a secret value. The one thing it can do beyond reading is **ask** — and only if its key carries the `requests` resource. `envpilot_request_variable` takes the variable key and a required justification, and files a request into a human reviewer's dashboard queue. The agent never proposes a value; if the reviewer approves, **the reviewer supplies it**.
 
 The loop for an agent is:

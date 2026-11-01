@@ -6,43 +6,41 @@ icon: zap
 
 # MCP overview
 
-MCP (Model Context Protocol) lets an assistant call tools against your real data instead of guessing at it. Envpilot runs a remote MCP server, so Claude Code, Codex, or Cursor can look up your projects, read the variables you allow, and fetch a secret file a build needs — through the **same** auth, scope, rate limits and audit trail as the REST API. Nothing is re-implemented for agents.
+MCP (Model Context Protocol) lets an assistant call tools against your real data instead of guessing at it. Envpilot runs a remote MCP server, so Claude, Claude Code, Codex or Cursor can look up your projects and read the variables your role allows, with the same permissions, rate limits and audit trail as the dashboard.
 
-Requires the **Pro** plan (`mcp_server`) and an [API key](/mcp/setup).
+Requires the **Pro** plan (`mcp_server`). Connect by [signing in](/mcp/setup) with your Envpilot login. The old key-based setup lives on [API keys (legacy)](/mcp/api-keys).
 
 ```
 https://www.envpilot.dev/api/mcp
 ```
 
-Transport is Streamable HTTP; auth is `Authorization: Bearer envpk_…`.
+Transport is Streamable HTTP. Auth is an OAuth access token from the Envpilot sign-in.
 
 ## What an agent can do
 
-| Can                                                   | Cannot                                          |
-| ----------------------------------------------------- | ----------------------------------------------- |
-| List projects in the key's scope                      | Create, edit, or delete anything                |
-| Read variables and shared accounts                    | Read outside the key's projects or environments |
-| Read secret files, with the `files` resource          | Approve its own request                         |
-| Search project names and variable **keys**            | See variable **values** through search          |
-| File a variable request, with the `requests` resource | Propose a value for that request                |
+| Can                                        | Cannot                                            |
+| ------------------------------------------ | ------------------------------------------------- |
+| List the projects you can see              | Create, edit, or delete variables or files        |
+| Read the variables your role can read      | Read outside your role's projects or environments |
+| Search project names and variable **keys** | See variable **values** through search            |
+| Read and write documentation **drafts**    | Publish a page                                    |
 
-That last row is the whole trust model: **read-only keys, human-approved escalation.** An agent states what it needs and why; a human decides and supplies the value. See [Agent requests](/mcp/agent-requests).
+The agent reads and drafts; people change secrets and publish. Shared accounts, secret files and variable requests are not available over MCP.
 
 ## Getting connected
 
-1. [Mint a scoped key](/mcp/setup) and put it in the client's environment.
-2. [Register the server](/mcp/clients) in Claude Code, Codex, Cursor, or any Streamable HTTP client.
+1. [Add the server](/mcp/clients) to Claude, Claude Code, Codex, Cursor or VS Code, with no `Authorization` header.
+2. [Sign in](/mcp/setup) when your browser opens.
 3. Confirm with `/mcp` that the **tools** loaded, not merely that the server is listed.
 
 ## Limits
 
 - **Pro plan only**, re-checked on every call — a downgrade stops the agent immediately.
-- **Scope is immutable.** Projects, environments, resources and surfaces are fixed at creation; widening means a new key.
-- **Rate limits are shared with REST** for that key: 120/min metadata, 30/min value pulls, plus the file buckets. Request filing is 5/hour, burst 2.
-- **Every value-returning call is audited** against the key, including every secret-file fetch.
-- **Hosted Claude connectors are not supported** — they expect OAuth, and Envpilot uses a fixed bearer key. Use Claude Code.
+- **A connection acts as you.** Your role decides what it sees; there is no way yet to give it less.
+- **Rate limits apply per person**: 120/min metadata and 30/min value pulls.
+- **Every value-returning call is audited** against your user.
 
 ## Next
 
-- [Setup](/mcp/setup) · [Clients](/mcp/clients) · [Tools](/mcp/tools) · [Agent requests](/mcp/agent-requests)
+- [Setup](/mcp/setup) · [Clients](/mcp/clients) · [Tools](/mcp/tools) · [Agent requests](/mcp/agent-requests) · [API keys (legacy)](/mcp/api-keys)
 - [Agent workflow guide](/guides/agents)

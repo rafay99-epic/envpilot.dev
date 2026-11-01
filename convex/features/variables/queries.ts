@@ -6,7 +6,10 @@ import { requireAuthedUser } from "../../lib/identity";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { authorizeVariableAccess } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
-import { resolveEffectiveVariables } from "./resolve";
+import {
+  resolveEffectiveVariables,
+  resolveEffectiveVariablesWithin,
+} from "./resolve";
 import {
   getVariableAccess,
   isEnvironmentScopeAllowed,
@@ -428,12 +431,21 @@ export const getVersionHistory = query({
   },
 });
 
-async function listWithAccessCore(
+export async function listWithAccessCore(
   ctx: QueryCtx,
-  args: { projectId: Id<"projects">; userId: Id<"users">; limit?: number }
+  args: {
+    projectId: Id<"projects">;
+    userId: Id<"users">;
+    limit?: number;
+    // Caps raw rows read across the project and its workspaces. Only search
+    // passes it; everyone else reads the full list so truncation reflects
+    // the project's own effective rows.
+    readBudget?: number;
+  }
 ): Promise<{
   variables: ReturnType<typeof mapVariableRow>[];
   truncatedAt: number | undefined;
+  rowsRead: number;
 }> {
   const resolved = await resolveProjectAccessContext(
     ctx,
@@ -441,22 +453,26 @@ async function listWithAccessCore(
     args.userId
   );
   if (!resolved) {
-    return { variables: [], truncatedAt: undefined };
+    return { variables: [], truncatedAt: undefined, rowsRead: 0 };
   }
   const { access } = resolved;
 
   const limit = args.limit ?? LIST_READ_CAP;
 
-  const resolvedRows = (
-    await resolveEffectiveVariables(ctx, { projectId: args.projectId })
-  ).map((row) =>
+  const effective = await resolveEffectiveVariablesWithin(
+    ctx,
+    { projectId: args.projectId },
+    args.readBudget
+  );
+  const resolvedRows = effective.rows.map((row) =>
     row.source.kind === "own" ? row : { ...row, projectId: args.projectId }
   );
   const inherited = new Set(
     resolvedRows.filter((row) => row.source.kind !== "own").map((r) => r._id)
   );
 
-  const truncatedAt = resolvedRows.length > limit ? limit : undefined;
+  const truncatedAt =
+    !effective.complete || resolvedRows.length > limit ? limit : undefined;
   const allVariables = resolvedRows.slice(0, limit);
 
   const variables = allVariables.filter((variable) =>
@@ -478,10 +494,15 @@ async function listWithAccessCore(
     return {
       variables: variablesWithAccess.filter((v) => v.hasAccess),
       truncatedAt,
+      rowsRead: effective.read,
     };
   }
 
-  return { variables: variablesWithAccess, truncatedAt };
+  return {
+    variables: variablesWithAccess,
+    truncatedAt,
+    rowsRead: effective.read,
+  };
 }
 
 export const listWithAccess = query({

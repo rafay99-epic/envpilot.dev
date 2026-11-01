@@ -20,7 +20,7 @@ Rotation, if your plan includes it, is a checkbox in the same form with presets 
 
 A project's requests list links through to the reviewer inbox at `/dashboard/requests`, tabbed by **Pending / Approved / Rejected / Canceled**. Only reviewers can act.
 
-Before accepting, a reviewer picks which environments to approve for. A **machine-filed request** — from an API key over MCP — shows a masked input reading _"Enter the value to approve"_: the reviewer types the secret, and Accept stays disabled until both an environment and a value are supplied. The value is encrypted before the approval runs.
+Before accepting, a reviewer picks which environments to approve for. An older **machine-filed request** (from an API key over MCP, before MCP moved to sign-in) shows a masked input reading _"Enter the value to approve"_: the reviewer types the secret, and Accept stays disabled until both an environment and a value are supplied. The value is encrypted before the approval runs.
 
 Rejection on this screen is a plain confirm dialog; the free-text reason field lives in the CLI's `requests reject --reason`.
 

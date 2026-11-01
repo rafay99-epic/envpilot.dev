@@ -5,6 +5,7 @@ import { DashboardNavFallback } from "@/components/dashboard/dashboard-nav-fallb
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { CommandPalette } from "@/components/command-palette";
 import { UpdateBanner } from "@/components/dashboard/update-banner";
+import { McpMigrationCard } from "@/components/dashboard/mcp-migration-card";
 import { KeyboardShortcutsProvider } from "@/components/keyboard/keyboard-shortcuts-provider";
 import React from "react";
 
@@ -50,6 +51,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <Suspense fallback={<div className="mb-5 h-5" />}>
               <Breadcrumbs className="mb-5" />
             </Suspense>
+            <McpMigrationCard />
             {children}
           </div>
         </main>
