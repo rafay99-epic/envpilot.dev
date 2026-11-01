@@ -546,12 +546,15 @@ export const _listDocDrafts = internalQuery({
     await requireDocsFeature(ctx, organization._id);
     const drafts = await ctx.db
       .query("docs")
-      .withIndex("by_project_and_status", (q) =>
-        q.eq("projectId", project._id).eq("status", "draft")
+      .withIndex("by_project_author_status", (q) =>
+        q
+          .eq("projectId", project._id)
+          .eq("authorId", user._id)
+          .eq("status", "draft")
       )
       .take(DRAFT_SCAN_LIMIT);
     return drafts
-      .filter((doc) => doc.authorId === user._id && doc.deletedAt === undefined)
+      .filter((doc) => doc.deletedAt === undefined)
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, DRAFT_LIST_LIMIT)
       .map((doc) => ({
@@ -614,8 +617,9 @@ export const _getDoc = internalQuery({
       user._id,
       await ctx.db.get(args.docId)
     );
-    // A draft reaches only its author, so an agent can read back what it
-    // wrote. Everyone else, and every other agent, sees published pages only.
+    // A draft reaches only the person who wrote it (through any client they
+    // signed in), so an agent can read back what it wrote. Everyone else sees
+    // published pages only.
     if (doc.status !== "published" && doc.authorId !== user._id) {
       throw new ConvexError("Document not found");
     }

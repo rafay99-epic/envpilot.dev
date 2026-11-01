@@ -3,8 +3,10 @@
  * creation shared by the signed-in (OAuth) actions in oauth.ts.
  *
  * Two invariants:
- * 1. Reads are PUBLISHED ONLY — checked in the handler, since the slug index
- *    has no status component. Serving a draft would defeat the human gate.
+ * 1. Reads are PUBLISHED ONLY, except that a draft's own author may read it
+ *    back (oauth.ts `_getDoc`, `_listDocDrafts`). Checked in the handler,
+ *    since the slug index has no status component. Serving a draft to anyone
+ *    else would defeat the human gate.
  * 2. Writes only ever produce drafts. Publishing is a dashboard mutation.
  *
  * Docs name variable KEYS, never values — resolving one here would be a vault

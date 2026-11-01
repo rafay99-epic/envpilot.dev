@@ -14,6 +14,7 @@ import {
   authorizeAccountAccess,
   authorizeVariableAccess,
   requireAccountAccess,
+  requireFileAccess,
   requireVariableAccess,
 } from "../../lib/authHelpers";
 import {
@@ -369,14 +370,23 @@ export const _preflightVariableUpdate = internalQuery({
         row.deletedAt === undefined &&
         row.environments.includes(args.environment)
     );
-    if (!variable) {
+    // A variable this person cannot read answers exactly like a missing one,
+    // so the error never confirms that a key exists.
+    const access = variable
+      ? await requireVariableAccess(
+          ctx,
+          user._id,
+          variable,
+          "read",
+          project
+        ).catch(() => null)
+      : null;
+    if (!variable || !access) {
       throw new ConvexError(
         `No variable "${args.key}" in ${args.environment} for this project`
       );
     }
-    try {
-      await requireVariableAccess(ctx, user._id, variable, "write", project);
-    } catch {
+    if (access !== "write") {
       throw new ConvexError(
         `Your role cannot change "${args.key}" in this project`
       );
@@ -454,21 +464,24 @@ export const _listFiles = internalQuery({
 });
 
 /**
- * The active file at `path`. Paths are unique per environment, so a path
- * stored for several disjoint environment sets needs `environment` to pick.
+ * The active file at `path` that this person can read. Paths are unique per
+ * environment, so a path stored for several disjoint environment sets needs
+ * `environment` to pick. Files the person cannot read are skipped, so a
+ * missing file and an unreadable one answer the same way.
  */
 async function findFileAtPath(
   ctx: QueryCtx,
-  projectId: Id<"projects">,
+  userId: Id<"users">,
+  project: Doc<"projects">,
   rawPath: string,
   environment: string | undefined
 ): Promise<Doc<"projectFiles"> | null> {
   const path = normalizeFilePath(rawPath);
-  const matches = (
+  const candidates = (
     await ctx.db
       .query("projectFiles")
       .withIndex("by_project_and_path", (q) =>
-        q.eq("projectId", projectId).eq("path", path)
+        q.eq("projectId", project._id).eq("path", path)
       )
       .take(50)
   ).filter(
@@ -476,6 +489,17 @@ async function findFileAtPath(
       file.deletedAt === undefined &&
       (environment === undefined || file.environments.includes(environment))
   );
+  const matches: Doc<"projectFiles">[] = [];
+  for (const file of candidates) {
+    const readable = await requireFileAccess(
+      ctx,
+      userId,
+      file,
+      "read",
+      project
+    ).catch(() => null);
+    if (readable) matches.push(file);
+  }
   if (matches.length > 1) {
     throw new ConvexError(
       `"${path}" exists in several environment sets (${matches
@@ -558,7 +582,8 @@ export const _resolveFile = internalQuery({
     const { user, project } = await resolveProject(ctx, args);
     const file = await findFileAtPath(
       ctx,
-      project._id,
+      user._id,
+      project,
       args.path,
       args.environment
     );
@@ -681,7 +706,8 @@ export const _resolveUpload = internalQuery({
     if (!args.replace) return resolved;
     const existing = await findFileAtPath(
       ctx,
-      project._id,
+      user._id,
+      project,
       path,
       args.environments[0]
     );
@@ -927,6 +953,7 @@ export const createAccount = action({
           workosId: principal.workosId,
           organization: args.organization,
           projectSlug: args.projectSlug,
+          name: args.name,
           environments: args.environments,
         }
       );
@@ -961,7 +988,11 @@ export const createAccount = action({
  * reach the vault. The core runs the same checks again as the authority.
  */
 export const _preflightAccountCreate = internalQuery({
-  args: { ...projectArgs, environments: v.array(v.string()) },
+  args: {
+    ...projectArgs,
+    name: v.string(),
+    environments: v.array(v.string()),
+  },
   handler: async (
     ctx,
     args
@@ -987,6 +1018,19 @@ export const _preflightAccountCreate = internalQuery({
       preloadedProject: project,
     });
     assertWithinEnvironmentScope(environmentScope, args.environments);
+    // envpilot_get_account reads by name, and an agent retrying a timed-out
+    // create must not store the login twice, so names stay unique over MCP.
+    const sameName = await ctx.db
+      .query("projectAccounts")
+      .withIndex("by_project_and_name", (q) =>
+        q.eq("projectId", project._id).eq("name", args.name)
+      )
+      .take(20);
+    if (sameName.some((account) => account.deletedAt === undefined)) {
+      throw new ConvexError(
+        `An account named "${args.name}" already exists in this project`
+      );
+    }
     return {
       userId: user._id,
       organizationId: project.organizationId,
@@ -1076,11 +1120,12 @@ export const _listRequests = internalQuery({
     const status = args.status;
     const rows = await ctx.db
       .query("changeRequests")
-      .withIndex("by_requester_status", (q) =>
-        status === undefined
-          ? q.eq("requestedBy", user._id)
-          : q.eq("requestedBy", user._id).eq("status", status)
-      )
+      .withIndex("by_requester_org_status", (q) => {
+        const scoped = q
+          .eq("requestedBy", user._id)
+          .eq("organizationId", organization._id);
+        return status === undefined ? scoped : scoped.eq("status", status);
+      })
       .order("desc")
       .take(REQUEST_SCAN_LIMIT);
 
@@ -1088,7 +1133,6 @@ export const _listRequests = internalQuery({
     const results: RequestSummary[] = [];
     for (const row of rows.sort((a, b) => b.createdAt - a.createdAt)) {
       if (results.length >= REQUEST_LIST_LIMIT) break;
-      if (row.organizationId !== organization._id) continue;
       if (onlyProject && row.projectId !== onlyProject._id) continue;
       if (!slugs.has(row.projectId)) {
         const project = await ctx.db.get(row.projectId);

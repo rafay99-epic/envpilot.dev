@@ -556,6 +556,12 @@ export default defineSchema({
     .index("by_org_status", ["organizationId", "status"])
     .index("by_target_status", ["targetId", "status"])
     .index("by_requester_status", ["requestedBy", "status"])
+    // One person's requests in one organization (MCP envpilot_list_requests).
+    .index("by_requester_org_status", [
+      "requestedBy",
+      "organizationId",
+      "status",
+    ])
     .index("by_status_created", ["status", "createdAt"]),
 
   // ==========================================
@@ -846,6 +852,8 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_author_and_client_ref", ["authorId", "clientRef", "projectId"])
     .index("by_project_and_status", ["projectId", "status"])
+    // One author's drafts in a project (MCP envpilot_list_doc_drafts).
+    .index("by_project_author_status", ["projectId", "authorId", "status"])
     .index("by_project_and_module", ["projectId", "module"])
     // A module share reads exactly the pages it serves. Without deletedAt and
     // status in the key, a `take` over (project, module) fills up with drafts

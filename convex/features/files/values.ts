@@ -296,6 +296,7 @@ export async function uploadFileAs(
           storageId,
           label: preflight.path,
           source: args.source ?? "web",
+          requestedBy: userId,
         }
       );
       return { requested: true as const, requestId };

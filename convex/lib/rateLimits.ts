@@ -152,7 +152,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // Variable and account writes over MCP: 30 per minute per signed-in user.
   // Charged before the vault write, so a looping agent stops before it mints
   // vault objects. File uploads keep their own fileUpload bucket.
-  // Documented publicly in docs/rate-limits — keep the page in sync.
+  // Documented in apps/docs/content/limits/rate-limits.mdx — keep it in sync.
   mcpWrite: {
     kind: "token bucket",
     rate: 30,

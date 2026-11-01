@@ -65,12 +65,6 @@ export function serializeAccountVault(
   return JSON.stringify({ username, password });
 }
 
-/**
- * Replaces the WorkOS Vault write path of POST /api/accounts. Encrypts the
- * credentials first, then inserts the account with the returned ref; a failed
- * insert best-effort deletes the now-orphaned vault object (same ordering as the
- * route's create-rollback).
- */
 const createWithCredentialsArgs = {
   projectId: v.id("projects"),
   name: v.string(),
@@ -83,6 +77,12 @@ const createWithCredentialsArgs = {
   source: v.optional(sourceValidator),
 };
 
+/**
+ * Replaces the WorkOS Vault write path of POST /api/accounts. Encrypts the
+ * credentials first, then inserts the account with the returned ref; a failed
+ * insert best-effort deletes the now-orphaned vault object (same ordering as the
+ * route's create-rollback).
+ */
 export const createWithCredentials = action({
   args: createWithCredentialsArgs,
   returns: accountWriteResultValidator,
