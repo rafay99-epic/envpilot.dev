@@ -18,13 +18,13 @@ Transport is Streamable HTTP. Auth is an OAuth access token from the Envpilot si
 
 ## What an agent can do
 
-| Can                                                           | Cannot                                            |
-| ------------------------------------------------------------- | ------------------------------------------------- |
-| List the projects you can see                                 | Delete anything                                   |
-| Read variables, secret files and shared accounts you can read | Read outside your role's projects or environments |
-| Create and update variables, files and accounts you can write | Write a protected environment without approval    |
-| Search project names and variable **keys**                    | See variable **values** through search            |
-| Read and write documentation **drafts**                       | Publish a page                                    |
+| Can                                                                   | Cannot                                            |
+| --------------------------------------------------------------------- | ------------------------------------------------- |
+| List the projects you can see                                         | Delete anything                                   |
+| Read variables, secret files and shared accounts you can read         | Read outside your role's projects or environments |
+| Create variables, files and accounts; update variables; replace files | Write a protected environment without approval    |
+| Search project names and variable **keys**                            | See variable **values** through search            |
+| Read and write documentation **drafts**                               | Publish a page                                    |
 
 The agent does what your role allows, nothing more. A write into a [protected environment](/platform/protected-environments) becomes a change request that a second person approves, and documentation stays a draft until a person publishes it.
 
@@ -38,7 +38,7 @@ The agent does what your role allows, nothing more. A write into a [protected en
 
 - **Pro plan only**, re-checked on every call — a downgrade stops the agent immediately.
 - **A connection acts as you.** Your role decides what it sees; there is no way yet to give it less.
-- **Rate limits apply per person**: 120/min metadata, 30/min value pulls and 30/min writes. See [Tools](/mcp/tools#cost-of-each-call).
+- **Rate limits apply per person**: 120/min metadata, 30/min value pulls, 30/min variable and account writes, 20/min file uploads. See [Tools](/mcp/tools#cost-of-each-call).
 - **Every value-returning call and every write is audited** against your user.
 
 ## Next

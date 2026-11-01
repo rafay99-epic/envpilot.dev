@@ -30,7 +30,7 @@ The MCP server now covers variables, secret files and shared accounts, not just 
 - `envpilot_list_doc_drafts` lists the drafts you wrote, and `envpilot_get_doc` now reads them back, so `replace_section` edits work.
 - `envpilot_list_organizations` lists your organizations and their slugs.
 
-Every tool acts as you, under your role and environment scope, with the same plan limits as the dashboard. Values, files and credentials are encrypted before they are stored, and every read and write is in the audit log. A write into a protected environment is never applied directly: it becomes a change request a second person approves. Nothing over MCP deletes. See [MCP tools](https://docs.envpilot.dev/mcp/tools).
+Every tool acts as you, under your role and environment scope, with the same plan limits as the dashboard. Values, files and credentials are encrypted before they are stored, and every value, file or credential read and every write is in the audit log. A write into a protected environment is never applied directly: it becomes a change request a second person approves. Nothing over MCP deletes. See [MCP tools](https://docs.envpilot.dev/mcp/tools).
 
 <!-- entry -->
 ---
