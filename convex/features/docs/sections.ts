@@ -51,15 +51,19 @@ export function parseSections(body: string): DocSection[] {
   const sections: DocSection[] = [];
   const open: DocSection[] = [];
   const used = new Set<string>();
+  const nextSuffix = new Map<string, number>();
   for (const line of lines(body)) {
     if (line.inFence) continue;
     const [, hashes = "", raw = ""] = HEADING.exec(line.text) ?? [];
     if (!hashes) continue;
     const title = raw.trim();
     const base = slugifyTitle(title);
-    // "Setup", "Setup" and "Setup 2" must not share an id.
+    // "Setup", "Setup" and "Setup 2" must not share an id. Each base resumes
+    // from its last suffix, so many repeated headings stay linear.
     let id = base;
-    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+    let n = nextSuffix.get(base) ?? 2;
+    while (used.has(id)) id = `${base}-${n++}`;
+    nextSuffix.set(base, n);
     used.add(id);
     const section: DocSection = {
       id,

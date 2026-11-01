@@ -304,19 +304,22 @@ export const _readVariables = internalQuery({
       organization._id,
       args.projectSlug
     );
-    // A project the user is not assigned to and holds no variable grants in
-    // reads as missing, before any pull is recorded against it.
-    const resolved = await resolveProjectAccessContext(
-      ctx,
-      project._id,
-      user._id
-    );
     const rows = await readableVariables(ctx, project._id, user._id);
-    if (
-      !resolved ||
-      (!resolved.access.isOwner && !resolved.access.assigned && !rows.length)
-    ) {
-      throw new ConvexError("Project not found");
+    // An empty read may mean the project is not the user's at all: not
+    // assigned and no variable grants. That reads as missing, before any
+    // pull is recorded against it. Only empty reads pay for the check.
+    if (!rows.length) {
+      const resolved = await resolveProjectAccessContext(
+        ctx,
+        project._id,
+        user._id
+      );
+      if (
+        !resolved ||
+        (!resolved.access.isOwner && !resolved.access.assigned)
+      ) {
+        throw new ConvexError("Project not found");
+      }
     }
     return {
       organizationId: organization._id,
