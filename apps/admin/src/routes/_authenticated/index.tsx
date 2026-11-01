@@ -20,6 +20,7 @@ import {
   CreditCard,
   CheckCircle2,
   XCircle,
+  KeyRound,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -83,6 +84,11 @@ function DashboardPage() {
 
   const tierEnforcement = settings?.tierEnforcement === "true";
   const paymentsEnabled = settings?.paymentsEnabled === "true";
+  // MCP OAuth migration: on = the MCP server refuses API keys (see
+  // convex/lib/mcpRetirement.ts). The first switch-on also emails key
+  // managers and shows them a dashboard card; later toggles only flip access.
+  const mcpOAuthOnly = settings?.mcpApiKeysRetired === "true";
+  const mcpNoticesSent = settings?.mcpApiKeysRetiredNoticesAt !== undefined;
 
   const handleToggleEnforcement = async () => {
     await updateSetting({
@@ -121,12 +127,56 @@ function DashboardPage() {
     });
   };
 
+  const handleToggleMcpOAuthOnly = async () => {
+    const ok = await confirm(
+      mcpOAuthOnly
+        ? {
+            title: "Accept API keys on MCP again?",
+            message:
+              "API keys start working on the MCP server again. Nobody is emailed.",
+            confirmLabel: "Accept API keys",
+            cancelLabel: "Keep OAuth only",
+            variant: "warning",
+          }
+        : {
+            title: "Move the MCP server to OAuth only?",
+            message: mcpNoticesSent
+              ? "The MCP server stops accepting API keys right away. Everyone was already emailed the first time, so nobody is emailed again."
+              : "The MCP server stops accepting API keys right away. Everyone who manages an API key MCP accepted gets one email and a dashboard card asking them to sign in with OAuth. REST, GitHub Action and Docker keys keep working.",
+            confirmLabel: "Move to OAuth only",
+            cancelLabel: "Cancel",
+            variant: "warning",
+          }
+    );
+    if (!ok) return;
+    await updateSetting({
+      key: "mcpApiKeysRetired",
+      value: mcpOAuthOnly ? "false" : "true",
+    });
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
 
         <div className="flex items-center gap-3">
+          {/* MCP OAuth migration toggle */}
+          <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5">
+            <KeyRound className="h-4 w-4 text-ink-muted" />
+            <span className="text-sm text-ink-muted">MCP OAuth only</span>
+            <Switch
+              checked={mcpOAuthOnly}
+              onChange={handleToggleMcpOAuthOnly}
+              disabled={!settings}
+              size="sm"
+              id="mcp-oauth-only-toggle"
+            />
+            <Badge variant={mcpOAuthOnly ? "success" : "default"}>
+              {mcpOAuthOnly ? "Active" : "Keys allowed"}
+            </Badge>
+          </div>
+
           {/* Payment Gateway Toggle */}
           <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5">
             <CreditCard className="h-4 w-4 text-ink-muted" />

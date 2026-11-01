@@ -26,6 +26,7 @@ import {
 } from "../../lib/surfaces";
 import type { Surface } from "../../lib/surfaces";
 import { createAuditLog } from "../../lib/audit";
+import { mcpKeysRetired } from "../../lib/mcpRetirement";
 
 /**
  * API keys — the generalized token platform.
@@ -253,10 +254,21 @@ export const _store = internalMutation({
   returns: v.id("apiKeys"),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
+    // Once MCP is OAuth only, a new key never carries the MCP surface. The
+    // dashboard hides it; an older client that defaults to it just loses it.
+    let surfaces = args.surfaces;
+    if (surfaces.includes("mcp_server") && (await mcpKeysRetired(ctx.db))) {
+      surfaces = surfaces.filter((surface) => surface !== "mcp_server");
+      if (surfaces.length === 0) {
+        throw new ConvexError(
+          "The MCP server uses sign-in now, not API keys. Pick another surface for this key."
+        );
+      }
+    }
     assertValidName(args.name);
     assertValidEnvironments(args.scopeEnvironments);
     assertValidResources(args.scopeResources);
-    assertValidSurfaces(args.surfaces, args.scopeProjects, args.scopeResources);
+    assertValidSurfaces(surfaces, args.scopeProjects, args.scopeResources);
     assertValidExpiry(args.expiresAt);
 
     const org = await ctx.db.get(args.organizationId);
@@ -303,7 +315,7 @@ export const _store = internalMutation({
 
     // Every selected surface's gate must pass — a key minted for a surface
     // the org's plan doesn't include would be dead on arrival there.
-    const gates = [...new Set(args.surfaces.map((s) => SURFACE_GATE[s]))];
+    const gates = [...new Set(surfaces.map((s) => SURFACE_GATE[s]))];
     for (const gateFeature of gates) {
       const gate = await checkBooleanFeature(
         ctx.db,
@@ -319,7 +331,7 @@ export const _store = internalMutation({
     // cannot use a surface at all hears that first rather than a quota
     // message. checkCountedLimit (not checkNumericLimit) so an org whose tier
     // resolves to unlimited never pays for the scan.
-    for (const surface of new Set(args.surfaces)) {
+    for (const surface of new Set(surfaces)) {
       const limitKey = SURFACE_LIMIT[surface];
       if (!limitKey) continue;
       const limit = await checkCountedLimit(
@@ -362,7 +374,7 @@ export const _store = internalMutation({
       scopeProjects: args.scopeProjects,
       scopeEnvironments: args.scopeEnvironments,
       scopeResources: args.scopeResources,
-      surfaces: args.surfaces,
+      surfaces,
       createdBy: actor._id,
       createdAt: now,
       expiresAt: args.expiresAt,
@@ -378,7 +390,7 @@ export const _store = internalMutation({
         scopeProjects: args.scopeProjects,
         scopeEnvironments: args.scopeEnvironments,
         scopeResources: args.scopeResources,
-        surfaces: args.surfaces,
+        surfaces,
         expiresAt: args.expiresAt,
       },
     });

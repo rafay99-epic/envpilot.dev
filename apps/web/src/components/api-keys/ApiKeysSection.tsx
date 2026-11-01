@@ -27,6 +27,7 @@ import {
 } from "@/components/dashboard/terminal-ui";
 import { TerminalDatePicker } from "@/components/dashboard/terminal-date-picker";
 import { useOrganizationProjects, useNow } from "@/hooks";
+import { SITE_URLS } from "@/components/marketing";
 import { ENVIRONMENTS, type Environment } from "@/constants/project";
 
 /**
@@ -214,6 +215,8 @@ function ApiKeysSectionInner({
   );
   const isLoading = organizationId ? keys === undefined : true;
   const keyList = keys ?? [];
+  const mcpRetired =
+    useQuery(api.features.api.mcpRetirement.status, {})?.retired === true;
 
   // Recent activity per key, derived from bounded audit-log reads (window
   // = the org's audit retention, labeled as such in the row). Live keys
@@ -244,6 +247,8 @@ function ApiKeysSectionInner({
       title="API keys"
       description="Scoped keys for the public REST API, MCP server, GitHub Action, and Docker image. Read-only — except keys with the requests resource, which may file variable requests for human approval."
     >
+      {mcpRetired && <McpOAuthNote />}
+
       <div className="flex justify-end">
         <TerminalButton type="button" variant="primary" onClick={openCreate}>
           New Key
@@ -255,6 +260,7 @@ function ApiKeysSectionInner({
           key={createSession}
           organizationId={organizationId}
           isOwner={isOwner}
+          mcpRetired={mcpRetired}
           isOpen={showCreate}
           onClose={() => setShowCreate(false)}
         />
@@ -288,6 +294,37 @@ function ApiKeysSectionInner({
         </ul>
       )}
     </SettingsSection>
+  );
+}
+
+/** Permanent while MCP is OAuth only: keys stopped working there, and how
+ *  to connect an MCP client instead. */
+function McpOAuthNote() {
+  return (
+    <div
+      data-testid="mcp-oauth-note"
+      className="border-l-2 border-line pl-3 text-xs leading-relaxed text-ink-muted"
+    >
+      <p>
+        <span className="font-medium text-ink">
+          The MCP server uses sign-in.
+        </span>{" "}
+        API keys no longer work with MCP. They keep working for the REST API,
+        the GitHub Action and Docker.
+      </p>
+      <p className="mt-1">
+        To connect an MCP client: remove the Authorization header from its
+        config, reconnect, and sign in when your browser opens.{" "}
+        <a
+          href={`${SITE_URLS.docs}/mcp/setup`}
+          target="_blank"
+          rel="noreferrer"
+          className="font-mono text-ink underline underline-offset-2"
+        >
+          Setup guide
+        </a>
+      </p>
+    </div>
   );
 }
 
@@ -547,11 +584,14 @@ const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 function CreateKeyDrawer({
   organizationId,
   isOwner,
+  mcpRetired,
   isOpen,
   onClose,
 }: {
   organizationId: Id<"organizations">;
   isOwner: boolean;
+  /** MCP is OAuth only: no MCP preset or surface, open on REST instead. */
+  mcpRetired: boolean;
   isOpen: boolean;
   onClose: () => void;
 }) {
@@ -572,12 +612,12 @@ function CreateKeyDrawer({
   // MCP server, whose clients start every session by listing projects — a
   // variables-only key makes every MCP call fail with a scope denial.
   const [selectedResources, setSelectedResources] = useState<Set<Resource>>(
-    new Set<Resource>(["variables", "projects"])
+    new Set<Resource>(mcpRetired ? ["variables"] : ["variables", "projects"])
   );
-  // Seeded from the default preset ("agent"), so the chips the form opens on
-  // and the preset it says it is on cannot disagree.
+  // Seeded from the default preset ("agent", or "rest" once MCP is OAuth
+  // only), so the chips the form opens on and the preset cannot disagree.
   const [selectedSurfaces, setSelectedSurfaces] = useState<Set<Surface>>(
-    new Set<Surface>(["mcp_server"])
+    new Set<Surface>([mcpRetired ? "rest_api" : "mcp_server"])
   );
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [customExpiry, setCustomExpiry] = useState("");
@@ -586,7 +626,13 @@ function CreateKeyDrawer({
     ? new Date(nowMs + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
     : "";
 
-  const [preset, setPreset] = useState<PresetId>("agent");
+  const [preset, setPreset] = useState<PresetId>(mcpRetired ? "rest" : "agent");
+  const presets = mcpRetired
+    ? PRESETS.filter((option) => option.id !== "agent")
+    : PRESETS;
+  const surfaceOptions = mcpRetired
+    ? SURFACES.filter((surface) => surface !== "mcp_server")
+    : SURFACES;
   // Problems are computed on every render but only SHOWN once the user has
   // tried to create — an empty form should not open scolding.
   const [triedSubmit, setTriedSubmit] = useState(false);
@@ -1002,7 +1048,7 @@ function CreateKeyDrawer({
             hint="Presets pick a surface and resources that are known to work together. Everything stays editable under Advanced."
           >
             <div className="grid gap-2 sm:grid-cols-2">
-              {PRESETS.map((option) => {
+              {presets.map((option) => {
                 const selected = preset === option.id;
                 return (
                   <button
@@ -1175,7 +1221,7 @@ function CreateKeyDrawer({
                 }
               >
                 <div className="flex flex-wrap gap-2">
-                  {SURFACES.map((surface) => {
+                  {surfaceOptions.map((surface) => {
                     const selected = selectedSurfaces.has(surface);
                     return (
                       <button

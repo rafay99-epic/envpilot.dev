@@ -6,6 +6,13 @@ icon: zap
 
 # MCP setup
 
+<Callout type="warning" title="MCP is moving to sign-in">
+Connect with your Envpilot login instead of an API key: see [Sign in with OAuth](/mcp/clients#sign-in-with-oauth). Once the move is switched on, API keys stop working with the MCP server. They keep working for the REST API, the GitHub Action and the Docker image.
+
+To switch a client, remove the `Authorization` header from its MCP config and reconnect. Clients that support OAuth open the sign-in page. A client that still sends the header will not offer sign-in.
+
+</Callout>
+
 ## Create an MCP key
 
 Create a dedicated key in **Organization → Settings → API Keys → New API Key**:

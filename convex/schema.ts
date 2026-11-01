@@ -1083,6 +1083,19 @@ export default defineSchema({
     .index("by_token_hash", ["tokenHash"])
     .index("by_organization", ["organizationId"]),
 
+  // One row per person told about the MCP OAuth migration (see
+  // lib/mcpRetirement.ts): the MCP keys they manage, when the email went
+  // out, and when they pressed OK on the dashboard card.
+  mcpRetirementNotices: defineTable({
+    userId: v.id("users"),
+    // "key name · organization", capped at MAX_KEYS_PER_NOTICE
+    keys: v.array(v.string()),
+    emailedAt: v.optional(v.number()),
+    dismissedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_emailed", ["emailedAt"]),
+
   // ==========================================
   // ORG NOTIFICATION WEBHOOKS (Slack / Discord)
   // ==========================================

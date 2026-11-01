@@ -5,6 +5,7 @@ import { checkBooleanFeature } from "../featureRegistry/gates";
 import { SURFACE_GATE, surfaceValidator } from "../../lib/surfaces";
 import { createAuditLog, resolveAuditProjectId } from "../../lib/audit";
 import { isWorkspace } from "../../lib/projectKind";
+import { mcpKeysRetired } from "../../lib/mcpRetirement";
 
 /**
  * THE single enforcement core for the public API key platform.
@@ -80,6 +81,7 @@ export const _authorizeRequest = internalMutation({
         v.literal("environment_scope"),
         v.literal("project_scope"),
         v.literal("surface_scope"),
+        v.literal("mcp_keys_retired"),
         v.literal("tier_gate")
       ),
     })
@@ -153,6 +155,12 @@ export const _authorizeRequest = internalMutation({
     if (key.surfaces !== undefined && !key.surfaces.includes(surface)) {
       await logDenied(key, "surface_out_of_scope");
       return { ok: false as const, denied: "surface_scope" as const };
+    }
+
+    // The admin-panel MCP migration: once on, MCP is OAuth only.
+    if (surface === "mcp_server" && (await mcpKeysRetired(ctx.db))) {
+      await logDenied(key, "mcp_keys_retired");
+      return { ok: false as const, denied: "mcp_keys_retired" as const };
     }
 
     // "organization" is a PSEUDO-RESOURCE: org-level metadata (name, slug,

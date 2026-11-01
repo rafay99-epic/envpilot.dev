@@ -29,6 +29,8 @@ Long documentation pages work over MCP. `envpilot_get_doc` returns an outline, a
 
 Claude on the web, Desktop, mobile and Cowork can now connect with your Envpilot login. Add `https://www.envpilot.dev/api/mcp` as a custom connector and sign in; Claude Code works the same way without an API key. The connection acts as you and sees what your role sees. Shared accounts, secret files and variable requests still need an API key.
 
+The MCP server is moving to sign-in. When the switch happens, API keys stop working with MCP, everyone who manages an MCP key gets one email, and the dashboard shows a short card until you press OK. The API Keys page keeps the setup steps. REST, GitHub Action and Docker keys are not affected.
+
 <!-- entry -->
 ---
 title: Lighter public pages
