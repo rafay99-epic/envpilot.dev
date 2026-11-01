@@ -1,45 +1,27 @@
 /**
- * MCP / public-API surface for project documentation.
+ * Project documentation for the MCP server: search, paging and draft
+ * creation shared by the signed-in (OAuth) actions in oauth.ts.
  *
- * Three invariants:
+ * Two invariants:
  * 1. Reads are PUBLISHED ONLY — checked in the handler, since the slug index
  *    has no status component. Serving a draft would defeat the human gate.
  * 2. Writes only ever produce drafts. Publishing is a dashboard mutation.
- * 3. The `project_docs` gate is checked caller-side; `_authorizeRequest`
- *    derives its gate from the surface alone and cannot carry a third key.
  *
  * Docs name variable KEYS, never values — resolving one here would be a vault
  * read that skips every control in reads.ts.
  */
 import { v, ConvexError } from "convex/values";
-import {
-  action,
-  internalQuery,
-  internalMutation,
-  type MutationCtx,
-  type QueryCtx,
-} from "../../_generated/server";
-import { internal } from "../../_generated/api";
+import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { createAuditLog } from "../../lib/audit";
 import { createBody } from "../docs/content";
-import { readBody } from "../docs/content";
 import { normalizePrUrl, scanDocBody, slugifyTitle } from "../docs/guards";
 import { templateFor } from "../docs/templates";
 import {
-  applyDraftEdit,
   requireDocCapacity,
   requireDocsFeature,
   uniqueSlug,
 } from "../docs/helpers";
-import {
-  hashToken,
-  assertKeyFormat,
-  consumeRateLimit,
-  normalizeClientRef,
-  throwForDenial,
-  type Authorization,
-} from "./helpers";
 import {
   findSection,
   pageOf,
@@ -75,17 +57,6 @@ function moduleMatchesTerm(moduleName: string, term: string): boolean {
       : tokens.includes(needle)
   );
 }
-
-const gateFeatureArg = v.optional(
-  v.union(v.literal("public_api"), v.literal("mcp_server"))
-);
-const surfaceArg = v.optional(
-  v.union(
-    v.literal("github_action"),
-    v.literal("rest_api"),
-    v.literal("mcp_server")
-  )
-);
 
 export const docSummaryValidator = v.object({
   docId: v.id("docs"),
@@ -152,58 +123,6 @@ export type UpdatedDraft = {
   bytes: number;
   warnings: string[];
 };
-
-/** Search a project's PUBLISHED documentation. */
-export const searchDocs = action({
-  args: {
-    token: v.string(),
-    projectSlug: v.string(),
-    query: v.optional(v.string()),
-    module: v.optional(v.string()),
-    limit: v.optional(v.number()),
-    gateFeature: gateFeatureArg,
-    surface: surfaceArg,
-  },
-  returns: v.array(docSummaryValidator),
-  handler: async (ctx, args): Promise<DocSummary[]> => {
-    assertKeyFormat(args.token);
-    const tokenHash = await hashToken(args.token);
-    await consumeRateLimit(ctx, "apiMetadata", tokenHash);
-
-    const scoped: Authorization = await ctx.runMutation(
-      internal.features.api.authorize._authorizeRequest,
-      {
-        tokenHash,
-        requirement: { resource: "docs" },
-        projectSlug: args.projectSlug,
-        gateFeature: args.gateFeature,
-        surface: args.surface,
-      }
-    );
-    if (!scoped.ok) throwForDenial(scoped.denied);
-    if (!scoped.project) throw new ConvexError("Project not found");
-
-    return await ctx.runQuery(internal.features.api.docs._searchScopedDocs, {
-      organizationId: scoped.organizationId,
-      projectId: scoped.project._id,
-      query: args.query,
-      module: args.module,
-      limit: args.limit,
-    });
-  },
-});
-
-export const _searchScopedDocs = internalQuery({
-  args: {
-    organizationId: v.id("organizations"),
-    projectId: v.id("projects"),
-    query: v.optional(v.string()),
-    module: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  returns: v.array(docSummaryValidator),
-  handler: async (ctx, args) => searchPublishedDocs(ctx, args),
-});
 
 export async function searchPublishedDocs(
   ctx: QueryCtx,
@@ -338,63 +257,6 @@ export const docViewArg = v.optional(
   v.union(v.literal("outline"), v.literal("content"))
 );
 
-/** Fetch ONE published page, its outline, or one page of its body. */
-export const getDoc = action({
-  args: {
-    token: v.string(),
-    docId: v.id("docs"),
-    view: docViewArg,
-    section: v.optional(v.string()),
-    cursor: v.optional(v.string()),
-    gateFeature: gateFeatureArg,
-    surface: surfaceArg,
-  },
-  returns: docPageValidator,
-  handler: async (ctx, args): Promise<DocPage> => {
-    assertKeyFormat(args.token);
-    const tokenHash = await hashToken(args.token);
-    await consumeRateLimit(ctx, "apiMetadata", tokenHash);
-
-    const authorization: Authorization = await ctx.runMutation(
-      internal.features.api.authorize._authorizeRequest,
-      {
-        tokenHash,
-        requirement: { resource: "docs" },
-        gateFeature: args.gateFeature,
-        surface: args.surface,
-      }
-    );
-    if (!authorization.ok) throwForDenial(authorization.denied);
-
-    const located: LocatedDoc = await ctx.runQuery(
-      internal.features.api.docs._locatePublishedDoc,
-      {
-        organizationId: authorization.organizationId,
-        scopeProjects: authorization.scopeProjects,
-        docId: args.docId,
-      }
-    );
-
-    // A project the key cannot see must be indistinguishable from a missing
-    // one — never confirm a document's existence to a key out of scope.
-    if (!located.inScope) {
-      await ctx.runMutation(internal.features.api.authorize._authorizeRequest, {
-        tokenHash,
-        requirement: { resource: "docs", projectId: located.projectId },
-        gateFeature: args.gateFeature,
-        surface: args.surface,
-      });
-      throw new ConvexError("Document not found");
-    }
-
-    return pageDoc(located.doc, args);
-  },
-});
-
-type LocatedDoc =
-  | { inScope: false; projectId: Id<"projects"> }
-  | { inScope: true; projectId: Id<"projects">; doc: DocDetail };
-
 export function pageDoc(
   doc: DocDetail,
   args: { view?: "outline" | "content"; section?: string; cursor?: string }
@@ -436,60 +298,10 @@ export function pageDoc(
   };
 }
 
-export const _locatePublishedDoc = internalQuery({
-  args: {
-    organizationId: v.id("organizations"),
-    scopeProjects: v.union(v.literal("all"), v.array(v.id("projects"))),
-    docId: v.id("docs"),
-  },
-  handler: async (ctx, args): Promise<LocatedDoc> => {
-    await requireDocsFeature(ctx, args.organizationId);
-
-    const doc = await ctx.db.get(args.docId);
-    // PUBLISHED ONLY. A draft is unreviewed text; handing one to an agent
-    // would defeat the human publication gate. Deleted, draft, cross-org and
-    // missing all collapse to the same answer.
-    if (!doc || doc.deletedAt !== undefined || doc.status !== "published") {
-      throw new ConvexError("Document not found");
-    }
-    const project = await ctx.db.get(doc.projectId);
-    if (
-      !project ||
-      project.deletedAt !== undefined ||
-      project.organizationId !== args.organizationId
-    ) {
-      throw new ConvexError("Document not found");
-    }
-    if (
-      args.scopeProjects !== "all" &&
-      !args.scopeProjects.includes(doc.projectId)
-    ) {
-      return { inScope: false, projectId: doc.projectId };
-    }
-
-    return {
-      inScope: true,
-      projectId: doc.projectId,
-      doc: {
-        docId: doc._id,
-        title: doc.title,
-        slug: doc.slug,
-        module: doc.module,
-        type: doc.type,
-        body: await readBody(ctx, doc._id),
-        prUrl: doc.prUrl,
-        updatedAt: doc.updatedAt,
-        publishedAt: doc.publishedAt,
-      },
-    };
-  },
-});
-
 async function findDocByClientRef(
   ctx: QueryCtx,
   projectId: Id<"projects">,
   authorId: Id<"users">,
-  keyId: Id<"apiKeys"> | undefined,
   clientRef: string
 ): Promise<Doc<"docs"> | null> {
   const rows = await ctx.db
@@ -501,121 +313,14 @@ async function findDocByClientRef(
         .eq("projectId", projectId)
     )
     .take(20);
-  return (
-    rows.find(
-      (row) => row.createdByKeyId === keyId && row.deletedAt === undefined
-    ) ?? null
-  );
+  return rows.find((row) => row.deletedAt === undefined) ?? null;
 }
-
-/**
- * Propose a documentation page. Creates a DRAFT — always.
- *
- * Modelled on `requests.createVariableRequest`: an agent proposes, a human
- * decides, and nothing is visible to anyone else until they do. The audit
- * entry is written here in the mutation rather than through
- * `_authorizeRequest`'s `recordUse`, whose `auditAction` is hard-coded to
- * `api.secrets_pulled` — auditing here keeps the doc actions honest and
- * changes no shared contract.
- */
-export const createDoc = action({
-  args: {
-    token: v.string(),
-    projectSlug: v.string(),
-    module: v.string(),
-    type: v.union(v.literal("api"), v.literal("guide")),
-    title: v.string(),
-    body: v.optional(v.string()),
-    prUrl: v.optional(v.string()),
-    clientRef: v.optional(v.string()),
-    gateFeature: gateFeatureArg,
-    surface: surfaceArg,
-  },
-  returns: createdDraftValidator,
-  handler: async (ctx, args): Promise<CreatedDraft> => {
-    assertKeyFormat(args.token);
-    const clientRef = normalizeClientRef(args.clientRef);
-    const tokenHash = await hashToken(args.token);
-    await consumeRateLimit(ctx, "docCreate", tokenHash);
-
-    const scoped: Authorization = await ctx.runMutation(
-      internal.features.api.authorize._authorizeRequest,
-      {
-        tokenHash,
-        requirement: { resource: "docs" },
-        projectSlug: args.projectSlug,
-        gateFeature: args.gateFeature,
-        surface: args.surface,
-      }
-    );
-    if (!scoped.ok) throwForDenial(scoped.denied);
-    if (!scoped.project) throw new ConvexError("Project not found");
-
-    return await ctx.runMutation(internal.features.api.docs._createDocDraft, {
-      organizationId: scoped.organizationId,
-      keyId: scoped.keyId,
-      projectId: scoped.project._id,
-      module: args.module,
-      type: args.type,
-      title: args.title,
-      body: args.body,
-      prUrl: args.prUrl,
-      clientRef,
-    });
-  },
-});
-
-export const _createDocDraft = internalMutation({
-  args: {
-    organizationId: v.id("organizations"),
-    keyId: v.id("apiKeys"),
-    projectId: v.id("projects"),
-    module: v.string(),
-    type: v.union(v.literal("api"), v.literal("guide")),
-    title: v.string(),
-    body: v.optional(v.string()),
-    prUrl: v.optional(v.string()),
-    clientRef: v.optional(v.string()),
-  },
-  returns: createdDraftValidator,
-  handler: async (ctx, args): Promise<CreatedDraft> => {
-    await requireDocsFeature(ctx, args.organizationId);
-
-    const project = await ctx.db.get(args.projectId);
-    if (
-      !project ||
-      project.deletedAt !== undefined ||
-      project.organizationId !== args.organizationId
-    ) {
-      throw new ConvexError("Project not found");
-    }
-
-    // An API key has no user identity, so the key's creator owns the draft —
-    // a real users row, which every downstream permission check needs.
-    const key = await ctx.db.get(args.keyId);
-    if (!key) throw new ConvexError("Invalid key");
-
-    return await insertAgentDraft(ctx, {
-      project,
-      authorId: key.createdBy,
-      keyId: key._id,
-      module: args.module,
-      type: args.type,
-      title: args.title,
-      body: args.body,
-      prUrl: args.prUrl,
-      clientRef: args.clientRef,
-      auditDetails: { via: "api_key", keyId: args.keyId },
-    });
-  },
-});
 
 export async function insertAgentDraft(
   ctx: MutationCtx,
   args: {
     project: Doc<"projects">;
     authorId: Id<"users">;
-    keyId?: Id<"apiKeys">;
     module: string;
     type: "api" | "guide";
     title: string;
@@ -632,7 +337,6 @@ export async function insertAgentDraft(
       ctx,
       project._id,
       args.authorId,
-      args.keyId,
       args.clientRef
     );
     if (existing) {
@@ -685,7 +389,6 @@ export async function insertAgentDraft(
     // href in the reviewer's dashboard, so `javascript:` must never reach
     // the database.
     prUrl: normalizePrUrl(args.prUrl),
-    createdByKeyId: args.keyId,
     clientRef: args.clientRef,
     createdAt: now,
     updatedAt: now,
@@ -727,99 +430,3 @@ export const draftEditModeArg = v.union(
   v.literal("append"),
   v.literal("replace_section")
 );
-
-export const updateDocDraft = action({
-  args: {
-    token: v.string(),
-    docId: v.id("docs"),
-    mode: draftEditModeArg,
-    body: v.string(),
-    section: v.optional(v.string()),
-    gateFeature: gateFeatureArg,
-    surface: surfaceArg,
-  },
-  returns: updatedDraftValidator,
-  handler: async (ctx, args): Promise<UpdatedDraft> => {
-    assertKeyFormat(args.token);
-    const tokenHash = await hashToken(args.token);
-    await consumeRateLimit(ctx, "docUpdate", tokenHash);
-
-    const authorization: Authorization = await ctx.runMutation(
-      internal.features.api.authorize._authorizeRequest,
-      {
-        tokenHash,
-        requirement: { resource: "docs" },
-        gateFeature: args.gateFeature,
-        surface: args.surface,
-      }
-    );
-    if (!authorization.ok) throwForDenial(authorization.denied);
-
-    return await ctx.runMutation(internal.features.api.docs._updateDocDraft, {
-      organizationId: authorization.organizationId,
-      scopeProjects: authorization.scopeProjects,
-      keyId: authorization.keyId,
-      docId: args.docId,
-      mode: args.mode,
-      body: args.body,
-      section: args.section,
-    });
-  },
-});
-
-export const _updateDocDraft = internalMutation({
-  args: {
-    organizationId: v.id("organizations"),
-    scopeProjects: v.union(v.literal("all"), v.array(v.id("projects"))),
-    keyId: v.id("apiKeys"),
-    docId: v.id("docs"),
-    mode: draftEditModeArg,
-    body: v.string(),
-    section: v.optional(v.string()),
-  },
-  returns: updatedDraftValidator,
-  handler: async (ctx, args): Promise<UpdatedDraft> => {
-    await requireDocsFeature(ctx, args.organizationId);
-
-    const doc = await ctx.db.get(args.docId);
-    if (
-      !doc ||
-      doc.deletedAt !== undefined ||
-      doc.createdByKeyId !== args.keyId
-    ) {
-      throw new ConvexError("Document not found");
-    }
-    const project = await ctx.db.get(doc.projectId);
-    if (
-      !project ||
-      project.deletedAt !== undefined ||
-      project.organizationId !== args.organizationId ||
-      (args.scopeProjects !== "all" &&
-        !args.scopeProjects.includes(doc.projectId))
-    ) {
-      throw new ConvexError("Document not found");
-    }
-    const key = await ctx.db.get(args.keyId);
-    if (!key) throw new ConvexError("Invalid key");
-
-    const { bytes, warnings } = await applyDraftEdit(
-      ctx,
-      doc,
-      { mode: args.mode, body: args.body, section: args.section },
-      {
-        organizationId: args.organizationId,
-        userId: key.createdBy,
-        details: { via: "api_key", keyId: args.keyId },
-      }
-    );
-
-    return {
-      docId: doc._id,
-      slug: doc.slug,
-      projectSlug: project.slug,
-      status: "draft",
-      bytes,
-      warnings,
-    };
-  },
-});

@@ -84,9 +84,9 @@ function DashboardPage() {
 
   const tierEnforcement = settings?.tierEnforcement === "true";
   const paymentsEnabled = settings?.paymentsEnabled === "true";
-  // MCP OAuth migration: on = the MCP server refuses API keys (see
-  // convex/lib/mcpRetirement.ts). The first switch-on also emails key
-  // managers and shows them a dashboard card; later toggles only flip access.
+  // MCP sign-in announcement (convex/lib/mcpRetirement.ts). The MCP server
+  // already refuses API keys; this tells people. The first switch-on emails
+  // the people behind old MCP keys once; later toggles show or hide the card.
   const mcpOAuthOnly = settings?.mcpApiKeysRetired === "true";
   const mcpNoticesSent = settings?.mcpApiKeysRetiredNoticesAt !== undefined;
 
@@ -131,19 +131,19 @@ function DashboardPage() {
     const ok = await confirm(
       mcpOAuthOnly
         ? {
-            title: "Accept API keys on MCP again?",
+            title: "Hide the MCP sign-in card?",
             message:
-              "API keys start working on the MCP server again. Nobody is emailed.",
-            confirmLabel: "Accept API keys",
-            cancelLabel: "Keep OAuth only",
+              "The dashboard card goes away for everyone. Nobody is emailed, and API keys still do not work with MCP.",
+            confirmLabel: "Hide card",
+            cancelLabel: "Keep showing",
             variant: "warning",
           }
         : {
-            title: "Move the MCP server to OAuth only?",
+            title: "Announce MCP sign-in?",
             message: mcpNoticesSent
-              ? "The MCP server stops accepting API keys right away. Everyone was already emailed the first time, so nobody is emailed again."
-              : "The MCP server stops accepting API keys right away. Everyone who manages an API key MCP accepted gets one email and a dashboard card asking them to sign in with OAuth. REST, GitHub Action and Docker keys keep working.",
-            confirmLabel: "Move to OAuth only",
+              ? "The dashboard card shows again for people who have not pressed OK. Everyone was already emailed, so nobody is emailed again."
+              : "Everyone behind an API key MCP used to accept gets one email and a dashboard card asking them to sign in with OAuth. REST, GitHub Action and Docker keys are not affected.",
+            confirmLabel: "Announce",
             cancelLabel: "Cancel",
             variant: "warning",
           }
@@ -168,7 +168,7 @@ function DashboardPage() {
               htmlFor="mcp-oauth-only-toggle"
               className="text-sm text-ink-muted"
             >
-              MCP OAuth only
+              MCP sign-in notice
             </label>
             <Switch
               checked={mcpOAuthOnly}
@@ -178,7 +178,7 @@ function DashboardPage() {
               id="mcp-oauth-only-toggle"
             />
             <Badge variant={mcpOAuthOnly ? "success" : "default"}>
-              {mcpOAuthOnly ? "Active" : "Keys allowed"}
+              {mcpOAuthOnly ? "Shown" : "Off"}
             </Badge>
           </div>
 

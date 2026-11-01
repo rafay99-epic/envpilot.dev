@@ -4,7 +4,6 @@ import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { Id } from "@convex/_generated/dataModel";
 import { sanitizeConvexError } from "@/lib/error-messages";
 import { createLogger } from "@/lib/logger";
-import type { McpPrincipal } from "./auth";
 import { mcpBackend, type McpBackend } from "./backend";
 
 type ToolResult = {
@@ -29,26 +28,6 @@ const variableShape = {
   updatedAt: z.number(),
 };
 
-const accountShape = {
-  name: z.string(),
-  websiteUrl: z.string().optional(),
-  environments: z.array(z.string()),
-  updatedAt: z.number(),
-  username: z.string().optional(),
-  password: z.string().optional(),
-};
-
-const fileShape = {
-  name: z.string(),
-  path: z.string(),
-  mode: z.string(),
-  size: z.number(),
-  sha256: z.string(),
-  contentType: z.string().optional(),
-  environments: z.array(z.string()),
-  updatedAt: z.number(),
-};
-
 const docSummaryShape = {
   docId: z.string(),
   title: z.string(),
@@ -57,15 +36,6 @@ const docSummaryShape = {
   type: z.enum(["api", "guide"]),
   excerpt: z.string().optional(),
   updatedAt: z.number(),
-};
-
-const requestStatusShape = {
-  requestId: z.string(),
-  key: z.string(),
-  environments: z.array(z.string()),
-  status: z.enum(["pending", "approved", "rejected", "canceled"]),
-  reviewReason: z.string().nullable(),
-  createdAt: z.number(),
 };
 
 const draftResultShape = {
@@ -80,7 +50,7 @@ const organizationInput = z
   .string()
   .optional()
   .describe(
-    "Organization slug, for OAuth sign-ins that belong to more than one organization. API keys ignore it."
+    "Organization slug, for accounts that belong to more than one organization."
   );
 
 const clientRefInput = z
@@ -112,14 +82,7 @@ function docReviewUrl(projectSlug: string, docSlug: string): string {
   return `${APP_URL}/dashboard/projects/${encodeURIComponent(projectSlug)}/docs/${encodeURIComponent(docSlug)}`;
 }
 
-function requestReviewUrl(projectSlug: string): string {
-  return `${APP_URL}/dashboard/projects/${encodeURIComponent(projectSlug)}/requests`;
-}
-
-export function registerMcpTools(
-  server: McpServer,
-  kind: McpPrincipal["kind"]
-): void {
+export function registerMcpTools(server: McpServer): void {
   const run = async (
     tool: string,
     authInfo: AuthInfo | undefined,
@@ -129,13 +92,12 @@ export function registerMcpTools(
     let result: ToolResult;
     try {
       if (!authInfo) throw new Error("Missing or invalid credentials.");
-      result = await fn(mcpBackend({ kind, token: authInfo.token }));
+      result = await fn(mcpBackend(authInfo.token));
     } catch (err) {
       result = toolError(err);
     }
     log.info("tool_call", {
       tool,
-      principal: kind,
       duration_ms: Math.round(performance.now() - started),
       result_chars: result.content[0].text.length,
       is_error: result.isError === true,
@@ -411,7 +373,7 @@ export function registerMcpTools(
     {
       title: "Edit a Documentation Draft",
       description:
-        "Edits a draft page. An API key can edit only drafts it created; a signed-in person can edit drafts they wrote while their role still allows it. mode=replace swaps the whole body, mode=append adds text to the end, mode=replace_section replaces one section by its id from the outline. Published pages cannot be edited here. The full resulting body is checked again for credentials and injected instructions.",
+        "Edits a draft page you wrote, while your role still allows it. mode=replace swaps the whole body, mode=append adds text to the end, mode=replace_section replaces one section by its id from the outline. Published pages cannot be edited here. The full resulting body is checked again for credentials and injected instructions.",
       inputSchema: {
         doc_id: z.string().describe("docId returned by envpilot_create_doc"),
         mode: z.enum(["replace", "append", "replace_section"]),
@@ -448,185 +410,5 @@ export function registerMcpTools(
           reviewUrl: docReviewUrl(updated.projectSlug, updated.slug),
         });
       })
-  );
-
-  if (kind === "oauth") return;
-
-  server.registerTool(
-    "envpilot_list_accounts",
-    {
-      title: "List Shared Accounts",
-      description:
-        "Returns shared accounts, including credentials, for a project this API key is scoped to. Omit environment for every in-scope environment. Reads are recorded in the audit log.",
-      inputSchema: {
-        project: z.string().describe("Project slug"),
-        environment: environmentEnum
-          .optional()
-          .describe(
-            "Exact environment name. Omit for all in-scope environments."
-          ),
-      },
-      outputSchema: { accounts: z.array(z.object(accountShape)) },
-      annotations: { readOnlyHint: true },
-    },
-    (args, extra) =>
-      run("envpilot_list_accounts", extra.authInfo, async (b) =>
-        structured({
-          accounts: await b.listAccounts({
-            projectSlug: args.project,
-            environment: args.environment,
-          }),
-        })
-      )
-  );
-
-  server.registerTool(
-    "envpilot_list_files",
-    {
-      title: "List Secret Files",
-      description:
-        "Lists secret files (keystores, SSH keys, certificates, service-account JSON) for a project: destination path, size, mode and checksum. Never returns contents and is not audited. Requires the key to carry the 'files' resource.",
-      inputSchema: {
-        project: z.string().describe("Project slug"),
-        environment: environmentEnum
-          .optional()
-          .describe(
-            "Exact environment name. Omit for all in-scope environments."
-          ),
-      },
-      outputSchema: { files: z.array(z.object(fileShape)) },
-      annotations: { readOnlyHint: true },
-    },
-    (args, extra) =>
-      run("envpilot_list_files", extra.authInfo, async (b) =>
-        structured({
-          files: await b.listFiles({
-            projectSlug: args.project,
-            environment: args.environment,
-          }),
-        })
-      )
-  );
-
-  server.registerTool(
-    "envpilot_get_file",
-    {
-      title: "Get Secret File Contents",
-      description:
-        "Returns the decrypted contents of one secret file, base64-encoded, by its exact path from envpilot_list_files. Every call is recorded in the audit log. Requires the key to carry the 'files' resource. Pass environment when the path exists in more than one environment.",
-      inputSchema: {
-        project: z.string().describe("Project slug"),
-        path: z
-          .string()
-          .describe("Exact destination path, e.g. android/app/upload.jks"),
-        environment: environmentEnum
-          .optional()
-          .describe(
-            "Required when the same path exists in several environments."
-          ),
-      },
-      annotations: { readOnlyHint: true },
-    },
-    (args, extra) =>
-      run("envpilot_get_file", extra.authInfo, async (b) => {
-        const files = await b.getFile({
-          projectSlug: args.project,
-          path: args.path,
-          environment: args.environment,
-        });
-        if (files.length === 0) {
-          return toolError(
-            new Error(`No secret file at "${args.path}" in scope for this key.`)
-          );
-        }
-        if (files.length > 1) {
-          return toolError(
-            new Error(
-              `"${args.path}" exists in ${files.length} environments. Pass environment to choose one.`
-            )
-          );
-        }
-        return textOnly({ file: files[0] });
-      })
-  );
-
-  server.registerTool(
-    "envpilot_request_variable",
-    {
-      title: "Request a Variable",
-      description:
-        "Files a request for a variable this key cannot read. A person approves it in the Envpilot dashboard and supplies the value; nothing is created before that. The justification is the reviewer's only context. Requires the 'requests' resource. Limited to 5 requests per hour per key. Returns the request id and its review URL.",
-      inputSchema: {
-        project: z.string().describe("Project slug"),
-        key: z
-          .string()
-          .describe("Variable key in UPPER_SNAKE_CASE, e.g. STRIPE_KEY"),
-        environments: z
-          .array(environmentEnum)
-          .min(1)
-          .describe("Environments the variable is needed in"),
-        justification: z
-          .string()
-          .min(1)
-          .max(500)
-          .describe("Why the variable is needed"),
-        is_sensitive: z
-          .boolean()
-          .optional()
-          .describe("Mark the variable sensitive (default false)"),
-        client_ref: clientRefInput,
-      },
-      outputSchema: {
-        requestId: z.string(),
-        status: z.enum(["pending", "approved", "rejected", "canceled"]),
-        message: z.string(),
-        reviewUrl: z.string(),
-      },
-      annotations: { readOnlyHint: false, destructiveHint: true },
-    },
-    (args, extra) =>
-      run("envpilot_request_variable", extra.authInfo, async (b) => {
-        const filed = await b.requestVariable({
-          projectSlug: args.project,
-          key: args.key,
-          environments: args.environments,
-          justification: args.justification,
-          isSensitive: args.is_sensitive,
-          clientRef: args.client_ref,
-        });
-        return structured({
-          requestId: filed.requestId,
-          status: filed.status,
-          message: filed.message,
-          reviewUrl: requestReviewUrl(filed.projectSlug),
-        });
-      })
-  );
-
-  server.registerTool(
-    "envpilot_get_request_status",
-    {
-      title: "Get Variable Request Status",
-      description:
-        "Returns the status of variable requests filed by this key: one request by request_id, or the most recent 20. A rejected request includes the reviewer's reason.",
-      inputSchema: {
-        request_id: z
-          .string()
-          .optional()
-          .describe("A requestId returned by envpilot_request_variable"),
-      },
-      outputSchema: { requests: z.array(z.object(requestStatusShape)) },
-      annotations: { readOnlyHint: true },
-    },
-    (args, extra) =>
-      run("envpilot_get_request_status", extra.authInfo, async (b) =>
-        structured({
-          requests: await b.getRequestStatus({
-            requestId: args.request_id as
-              | Id<"environmentVariableRequests">
-              | undefined,
-          }),
-        })
-      )
   );
 }

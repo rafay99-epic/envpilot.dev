@@ -1,24 +1,19 @@
 import type { DatabaseReader } from "../_generated/server";
 
 /**
- * The one-click MCP OAuth migration. An admin flips the `mcpApiKeysRetired`
- * setting (admin panel, Dashboard) and from then on the MCP server refuses
- * API keys: `_authorizeRequest` denies every `mcp_server` call with
- * `mcp_keys_retired`. Turning it off restores keys. REST, the GitHub Action
- * and Docker never read it.
- *
- * The first time it turns on, features/api/mcpRetirement.ts emails everyone
- * who manages a key MCP accepted and shows them a dashboard card until they
- * press OK. `NOTICES_STARTED_SETTING` records that, so re-toggling never
- * mails anyone twice.
+ * The MCP sign-in announcement. The MCP server only accepts OAuth sign-in;
+ * API keys are not read by it at all. An admin flips the
+ * `mcpApiKeysRetired` setting (admin panel, Dashboard) to tell people: the
+ * first time it turns on, features/api/mcpRetirement.ts emails the creator
+ * of each key MCP used to accept (or the org's API-key managers if the
+ * creator left), once, and shows them a dashboard card until they press OK. Turning it off hides the card. `NOTICES_STARTED_SETTING`
+ * records the first run, so re-toggling never mails anyone twice.
  */
 
 export const MCP_KEYS_RETIRED_SETTING = "mcpApiKeysRetired";
 export const NOTICES_STARTED_SETTING = "mcpApiKeysRetiredNoticesAt";
 
 export const MCP_SETUP_URL = "https://docs.envpilot.dev/mcp/setup";
-
-export const MCP_KEYS_RETIRED_MESSAGE = `API keys no longer work on the Envpilot MCP server. Remove the Authorization header from your MCP config and reconnect with sign-in: ${MCP_SETUP_URL}`;
 
 export async function mcpKeysRetired(db: DatabaseReader): Promise<boolean> {
   const row = await db

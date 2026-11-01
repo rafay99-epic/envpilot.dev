@@ -49,9 +49,9 @@ export const updateAdminSetting = mutation({
       });
     }
 
-    // The MCP OAuth migration (lib/mcpRetirement.ts). The first time it
-    // turns on, tell everyone who manages an MCP key; later toggles only
-    // flip enforcement.
+    // The MCP sign-in announcement (lib/mcpRetirement.ts). The first time
+    // it turns on, email the people behind old MCP keys; later toggles only
+    // show or hide the dashboard card.
     if (args.key === MCP_KEYS_RETIRED_SETTING && args.value === "true") {
       const started = await ctx.db
         .query("adminSettings")

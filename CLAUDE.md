@@ -181,29 +181,38 @@ Add a `count*` helper in `convex/features/featureRegistry/gates.ts` for each lim
 
 ### Public API & MCP server (pro features)
 
-One enforcement core, three faces: the REST API (`/api/v1/*`), the MCP
-server (`/api/mcp`), and the GitHub Action all authenticate with `apiKeys`
-(org-scoped, dynamic scope: projects all|list, environments, resources,
-optional expiry; SHA-256 hash only) and route EVERY request through
+**API keys** serve the REST API (`/api/v1/*`), the GitHub Action and the
+Docker image: `apiKeys` (org-scoped, dynamic scope: projects all|list,
+environments, resources, optional expiry; SHA-256 hash only), and EVERY
+request routes through
 `convex/features/api/authorize.ts::_authorizeRequest` — never re-implement
-authorization for a new surface. Denials are returned (not thrown) so audit
-writes survive; unknown/revoked/expired keys get one uniform answer; the
-tier gate (`public_api` / `mcp_server` per surface) re-checks on every
+authorization for a new key surface. Denials are returned (not thrown) so
+audit writes survive; unknown/revoked/expired keys get one uniform answer;
+the tier gate (`public_api` / `docker_image` per surface) re-checks on every
 request. Read paths live in `convex/features/api/reads.ts` (bounded
 active-only reads, refuse-partial >1000, loud decrypt aborts — never
 partial data or sentinel values). Keys are managed in Organization →
-Settings → API Keys (org-wide creation is owner-only).
-**MCP OAuth migration**: the admin Dashboard's "MCP OAuth only" switch
-(`adminSettings.mcpApiKeysRetired`, `convex/lib/mcpRetirement.ts`) makes
-`_authorizeRequest` deny every `mcp_server` key call with
-`mcp_keys_retired`; turning it off restores keys. The FIRST switch-on emails,
-once, the creator of each MCP-capable key (or the org's `org.api_keys` holders
-when the creator has left) and shows them a dashboard card until they press OK
-(`features/api/mcpRetirement.ts`). REST, the Action and Docker
-never read the setting. Legacy
-`serviceTokens` (CI/CD tab) still work via a compat fallback in
+Settings → API Keys (org-wide creation is owner-only). New keys cannot carry
+the `mcp_server` surface or the old `docs`/`requests` resources; older rows
+may still list them and nothing reads them.
+
+**The MCP server (`/api/mcp`) accepts WorkOS AuthKit OAuth only.** API keys
+get a 401. The route verifies the token for the challenge, and every action
+in `convex/features/api/oauth.ts` verifies it again before reading anything
+(`convex/lib/mcpToken.ts`); access comes from the person's role
+(`listWithAccessCore`, `requireDocAccess`) plus the `mcp_server` tier gate.
+The MCP issuer is deliberately NOT in `convex/auth.config.ts`, so an MCP
+token cannot call dashboard functions. Needs `MCP_OAUTH_ISSUER` +
+`MCP_OAUTH_RESOURCE` in BOTH the web env and the Convex env.
+**MCP sign-in announcement**: the admin Dashboard's "MCP sign-in notice"
+switch (`adminSettings.mcpApiKeysRetired`, `convex/lib/mcpRetirement.ts`).
+The FIRST switch-on emails, once, the creator of each key MCP used to accept
+(or the org's `org.api_keys` holders when the creator has left) and shows
+them a dashboard card until they press OK (`features/api/mcpRetirement.ts`);
+later toggles only show or hide the card.
+Legacy `serviceTokens` (CI/CD tab) still work via a compat fallback in
 `cicd/pull.ts`; `migrate-service-tokens` copies them into `apiKeys`.
-Docs are MDX files in `apps/web/content/docs/` (never Convex-stored).
+Docs are MDX files in `apps/docs/content/` (never Convex-stored).
 
 ### GitHub Action release flow (public repo from a private monorepo)
 

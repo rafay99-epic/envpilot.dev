@@ -475,7 +475,6 @@ export default defineSchema({
     reviewedAt: v.optional(v.number()),
     // If approved, the created variable
     createdVariableId: v.optional(v.id("environmentVariables")),
-    clientRef: v.optional(v.string()),
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -487,14 +486,7 @@ export default defineSchema({
     .index("by_project_and_status", ["projectId", "status"])
     .index("by_organization_and_status", ["organizationId", "status"])
     .index("by_project_and_requester", ["projectId", "requestedBy"])
-    .index("by_project_and_key", ["projectId", "key"])
-    // Per-key open-pendings cap + revoke-time visibility for machine requests
-    .index("by_requested_key_and_status", ["requestedByKeyId", "status"])
-    .index("by_requester_and_client_ref", [
-      "requestedBy",
-      "clientRef",
-      "projectId",
-    ]),
+    .index("by_project_and_key", ["projectId", "key"]),
 
   // ==========================================
   // CHANGE REQUESTS (protected environments)

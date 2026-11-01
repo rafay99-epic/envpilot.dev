@@ -34,7 +34,6 @@ import type * as features_api_keys from "../features/api/keys.js";
 import type * as features_api_mcpRetirement from "../features/api/mcpRetirement.js";
 import type * as features_api_oauth from "../features/api/oauth.js";
 import type * as features_api_reads from "../features/api/reads.js";
-import type * as features_api_requests from "../features/api/requests.js";
 import type * as features_audit_compliance from "../features/audit/compliance.js";
 import type * as features_audit_helpers from "../features/audit/helpers.js";
 import type * as features_audit_queries from "../features/audit/queries.js";
@@ -196,7 +195,6 @@ declare const fullApi: ApiFromModules<{
   "features/api/mcpRetirement": typeof features_api_mcpRetirement;
   "features/api/oauth": typeof features_api_oauth;
   "features/api/reads": typeof features_api_reads;
-  "features/api/requests": typeof features_api_requests;
   "features/audit/compliance": typeof features_audit_compliance;
   "features/audit/helpers": typeof features_audit_helpers;
   "features/audit/queries": typeof features_audit_queries;

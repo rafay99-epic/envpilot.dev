@@ -42,14 +42,12 @@ afterAll(() => {
 const request = new Request(RESOURCE);
 
 describe("verifyMcpToken", () => {
-  it("passes API keys through for Convex to enforce", async () => {
-    const info = await verifyMcpToken(request, "envpk_abc");
-    expect(info?.extra?.kind).toBe("key");
+  it("refuses API keys, so the client is sent to sign-in", async () => {
+    expect(await verifyMcpToken(request, "envpk_abc")).toBeUndefined();
   });
 
   it("accepts a token issued for this resource", async () => {
     const info = await verifyMcpToken(request, await sign({}));
-    expect(info?.extra?.kind).toBe("oauth");
     expect(info?.clientId).toBe("claude");
   });
 

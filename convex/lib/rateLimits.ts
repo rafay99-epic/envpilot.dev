@@ -129,21 +129,8 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: MAX_PROJECT_FILES,
   },
 
-  // Machine-originated variable requests: 5 per hour per key, burst 2.
-  // Each create fans out a reviewer email — a retry-looping agent must be
-  // blocked before it becomes reviewer alert fatigue. A standing cap on
-  // open pendings per key lives in the mutation (requests/mutations.ts).
-  // Documented publicly in docs/rate-limits — keep the page in sync.
-  machineRequestCreate: {
-    kind: "token bucket",
-    rate: 5,
-    period: 3_600_000,
-    capacity: 2,
-  },
-
-  // Machine-authored documentation drafts: 30 per hour per key, burst 10.
-  // Looser than machineRequestCreate because the unit of work is different:
-  // an agent finishing a feature legitimately writes one page per endpoint
+  // Agent-authored documentation drafts over MCP: 30 per hour per signed-in
+  // user, burst 10. An agent finishing a feature legitimately writes one page per endpoint
   // in a single burst, and a draft costs no email and no vault call. The cap
   // still exists because every draft is a human review item, and review
   // capacity — not storage — is the scarce resource here.

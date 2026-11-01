@@ -2,9 +2,6 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getConvexUrl } from "@/lib/public-api";
-import type { McpPrincipal } from "./auth";
-
-const surface = "mcp_server";
 
 type Org = { organization?: string };
 type DocView = {
@@ -34,162 +31,51 @@ function convexClient(): ConvexHttpClient {
   return new ConvexHttpClient(url);
 }
 
-export function mcpBackend({ kind, token }: McpPrincipal) {
+/**
+ * The Convex calls behind each MCP tool. Every call carries the raw OAuth
+ * access token; the Convex action verifies it again before reading anything,
+ * so no user id ever crosses this boundary.
+ */
+export function mcpBackend(token: string) {
   const convex = convexClient();
-  const oauth = kind === "oauth";
 
   return {
     listProjects: ({ organization }: Org) =>
-      oauth
-        ? convex.action(api.features.api.oauth.listProjects, {
-            token,
-            organization,
-          })
-        : convex.action(api.features.api.reads.listProjects, {
-            token,
-            surface,
-          }),
+      convex.action(api.features.api.oauth.listProjects, {
+        token,
+        organization,
+      }),
 
-    getVariables: ({
-      organization,
-      ...args
-    }: Org & {
-      projectSlug: string;
-      environment?: string;
-      keys?: string[];
-      prefix?: string;
-      metadataOnly?: boolean;
-    }) =>
-      oauth
-        ? convex.action(api.features.api.oauth.getVariables, {
-            token,
-            organization,
-            ...args,
-          })
-        : convex.action(api.features.api.reads.getProjectVariables, {
-            token,
-            surface,
-            ...args,
-          }),
+    getVariables: (
+      args: Org & {
+        projectSlug: string;
+        environment?: string;
+        keys?: string[];
+        prefix?: string;
+        metadataOnly?: boolean;
+      }
+    ) => convex.action(api.features.api.oauth.getVariables, { token, ...args }),
 
-    search: ({ organization, query }: Org & { query: string }) =>
-      oauth
-        ? convex.action(api.features.api.oauth.search, {
-            token,
-            organization,
-            query,
-          })
-        : convex.action(api.features.api.reads.searchKeys, {
-            token,
-            surface,
-            query,
-          }),
+    search: (args: Org & { query: string }) =>
+      convex.action(api.features.api.oauth.search, { token, ...args }),
 
-    searchDocs: ({
-      organization,
-      ...args
-    }: Org & {
-      projectSlug: string;
-      query?: string;
-      module?: string;
-      limit?: number;
-    }) =>
-      oauth
-        ? convex.action(api.features.api.oauth.searchDocs, {
-            token,
-            organization,
-            ...args,
-          })
-        : convex.action(api.features.api.docs.searchDocs, {
-            token,
-            surface,
-            ...args,
-          }),
+    searchDocs: (
+      args: Org & {
+        projectSlug: string;
+        query?: string;
+        module?: string;
+        limit?: number;
+      }
+    ) => convex.action(api.features.api.oauth.searchDocs, { token, ...args }),
 
     getDoc: (args: DocView & { docId: Id<"docs"> }) =>
-      oauth
-        ? convex.action(api.features.api.oauth.getDoc, { token, ...args })
-        : convex.action(api.features.api.docs.getDoc, {
-            token,
-            surface,
-            ...args,
-          }),
+      convex.action(api.features.api.oauth.getDoc, { token, ...args }),
 
-    createDoc: ({ organization, ...args }: NewDoc) =>
-      oauth
-        ? convex.action(api.features.api.oauth.createDoc, {
-            token,
-            organization,
-            ...args,
-          })
-        : convex.action(api.features.api.docs.createDoc, {
-            token,
-            surface,
-            ...args,
-          }),
+    createDoc: (args: NewDoc) =>
+      convex.action(api.features.api.oauth.createDoc, { token, ...args }),
 
     updateDocDraft: (args: DraftEdit) =>
-      oauth
-        ? convex.action(api.features.api.oauth.updateDocDraft, {
-            token,
-            ...args,
-          })
-        : convex.action(api.features.api.docs.updateDocDraft, {
-            token,
-            surface,
-            ...args,
-          }),
-
-    listAccounts: (args: { projectSlug: string; environment?: string }) =>
-      convex.action(api.features.api.reads.getProjectAccounts, {
-        token,
-        surface,
-        ...args,
-      }),
-
-    listFiles: (args: { projectSlug: string; environment?: string }) =>
-      convex.action(api.features.api.reads.getProjectFiles, {
-        token,
-        surface,
-        metadataOnly: true,
-        ...args,
-      }),
-
-    getFile: (args: {
-      projectSlug: string;
-      path: string;
-      environment?: string;
-    }) =>
-      convex.action(api.features.api.reads.getProjectFiles, {
-        token,
-        surface,
-        projectSlug: args.projectSlug,
-        environment: args.environment,
-        paths: [args.path],
-      }),
-
-    requestVariable: (args: {
-      projectSlug: string;
-      key: string;
-      environments: string[];
-      justification: string;
-      isSensitive?: boolean;
-      clientRef?: string;
-    }) =>
-      convex.action(api.features.api.requests.createVariableRequest, {
-        token,
-        surface,
-        ...args,
-      }),
-
-    getRequestStatus: (args: {
-      requestId?: Id<"environmentVariableRequests">;
-    }) =>
-      convex.action(api.features.api.requests.getRequestStatus, {
-        token,
-        surface,
-        ...args,
-      }),
+      convex.action(api.features.api.oauth.updateDocDraft, { token, ...args }),
   };
 }
 

@@ -3,7 +3,6 @@ import type { ActionCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { rateLimiter } from "../../lib/rateLimits";
 import { isRateLimitError } from "@convex-dev/rate-limiter";
-import { MCP_KEYS_RETIRED_MESSAGE } from "../../lib/mcpRetirement";
 
 /**
  * Shared key-auth plumbing for the machine-surface action modules
@@ -35,7 +34,6 @@ export type Denied =
   | "environment_scope"
   | "project_scope"
   | "surface_scope"
-  | "mcp_keys_retired"
   | "tier_gate";
 
 export type Authorization =
@@ -78,9 +76,6 @@ export function throwForDenial(
   if (denied === "surface_scope") {
     throw new ConvexError("This API key is not enabled for this surface");
   }
-  if (denied === "mcp_keys_retired") {
-    throw new ConvexError(MCP_KEYS_RETIRED_MESSAGE);
-  }
   // tier_gate
   throw new ConvexError(
     "The public API is available on the Pro plan — this organization's plan no longer includes it"
@@ -96,13 +91,7 @@ export function throwForDenial(
  */
 export async function consumeRateLimit(
   ctx: ActionCtx,
-  bucket:
-    | "apiMetadata"
-    | "cicdPull"
-    | "dockerPull"
-    | "machineRequestCreate"
-    | "docCreate"
-    | "docUpdate",
+  bucket: "apiMetadata" | "cicdPull" | "dockerPull" | "docCreate" | "docUpdate",
   tokenHash: string
 ): Promise<void> {
   try {
