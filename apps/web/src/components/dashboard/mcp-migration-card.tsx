@@ -20,14 +20,17 @@ export function McpMigrationCard() {
   const card = status?.card;
   if (!card) return null;
 
-  const handleOk = async () => {
+  // Promise.finally, not try/finally: the React Compiler skips any
+  // component containing a try/finally block.
+  const handleOk = () => {
     setIsSaving(true);
-    await dismiss({}).catch((err: unknown) => {
-      toast.error(
-        err instanceof Error ? err.message : "Could not save. Try again."
-      );
-    });
-    setIsSaving(false);
+    void dismiss({})
+      .catch((err: unknown) => {
+        toast.error(
+          err instanceof Error ? err.message : "Could not save. Try again."
+        );
+      })
+      .finally(() => setIsSaving(false));
   };
 
   return (
