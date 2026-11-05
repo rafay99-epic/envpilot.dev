@@ -10,20 +10,36 @@ A [signed-in](/mcp/setup) connection gets nineteen tools. Your role decides what
 
 ## Read tools
 
-| Tool                          | What it does                                                                                                |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `envpilot_list_organizations` | The organizations you belong to, your role, and whether MCP is on their plan                                |
-| `envpilot_list_projects`      | List the projects you can see                                                                               |
-| `envpilot_get_variables`      | Variables for a project + environment, with optional `keys` / `prefix` / `metadata_only`                    |
-| `envpilot_get_variable`       | One variable by exact key                                                                                   |
-| `envpilot_search`             | Search project names/slugs and variable **keys**, never values. Bounded to 20 projects / 100 matches        |
-| `envpilot_search_docs`        | Full-text search over **published** documentation: titles and page bodies. Never returns drafts             |
-| `envpilot_get_doc`            | One published page, or a draft you wrote: its outline, one section, or up to 60,000 characters at a time    |
-| `envpilot_list_files`         | Secret files in a project: path, size, sha256, environments. Never contents                                 |
-| `envpilot_get_file`           | One secret file's contents by path. Text as `utf8`, binary as `base64`                                      |
-| `envpilot_list_accounts`      | Shared accounts in a project: name, website, environments. Never credentials                                |
-| `envpilot_get_account`        | One shared account's username and password by exact name                                                    |
-| `envpilot_list_requests`      | Change requests you filed and their status: pending, applied, rejected (with the reason), canceled, expired |
+| Tool                          | What it does                                                                                                                                                |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `envpilot_whoami`             | Orientation: the signed-in account, every organization it can reach, the plan, which features are on, the limits, and each project's PROTECTED environments |
+| `envpilot_list_organizations` | The organizations you belong to, your role, and whether MCP is on their plan                                                                                |
+| `envpilot_list_projects`      | List the projects you can see                                                                                                                               |
+| `envpilot_get_variables`      | Variables for a project + environment, with optional `keys` / `prefix` / `metadata_only`                                                                    |
+| `envpilot_get_variable`       | One variable by exact key                                                                                                                                   |
+| `envpilot_search`             | Search project names/slugs and variable **keys**, never values. Bounded to 20 projects / 100 matches                                                        |
+| `envpilot_search_docs`        | Full-text search over **published** documentation: titles and page bodies. Never returns drafts                                                             |
+| `envpilot_get_doc`            | One published page, or a draft you wrote: its outline, one section, or up to 60,000 characters at a time                                                    |
+| `envpilot_list_files`         | Secret files in a project: path, size, sha256, environments. Never contents                                                                                 |
+| `envpilot_get_file`           | One secret file's contents by path. Text as `utf8`, binary as `base64`                                                                                      |
+| `envpilot_list_accounts`      | Shared accounts in a project: name, website, environments. Never credentials                                                                                |
+| `envpilot_get_account`        | One shared account's username and password by exact name                                                                                                    |
+| `envpilot_list_requests`      | Change requests you filed and their status: pending, applied, rejected (with the reason), canceled, expired                                                 |
+
+### Start with `envpilot_whoami`
+
+One call answers the questions every other tool depends on: which organization
+slug to pass, which project slugs exist, what the plan allows, and which
+environments are protected.
+
+That last field is the one worth reading before any write. A variable or file
+write touching a protected environment does not apply; it becomes a change
+request a second person approves. Knowing that up front is the difference
+between proposing a change and reporting that you made one.
+
+It reports organization-level usage (projects against `max_projects`) but not
+per-project counts, because those need a scan per project. `envpilot_list_projects`
+has the per-project variable counts.
 
 ## Write tools
 
@@ -121,15 +137,15 @@ payloads, commit SHAs — pass through untouched.
 
 ## Cost of each call
 
-| Tool                                                                                                                                         | Bucket                        | Audited |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ------- |
-| `list_projects`, `search`, `search_docs`, `get_doc`, `list_doc_drafts`, `list_files`, `list_accounts`, `list_requests`, `list_organizations` | 120/min metadata              | No      |
-| `get_variables`, `get_variable`, `get_account`                                                                                               | 30/min value pulls            | Yes     |
-| `get_file`                                                                                                                                   | File downloads, per person    | Yes     |
-| `create_variable`, `update_variable`, `create_account`                                                                                       | 30/min writes, per person     | Yes     |
-| `upload_file`                                                                                                                                | 20/min file uploads           | Yes     |
-| `create_doc`                                                                                                                                 | 30/hour per person, burst 10  | Yes     |
-| `update_doc_draft`                                                                                                                           | 120/hour per person, burst 40 | Yes     |
+| Tool                                                                                                                                                   | Bucket                        | Audited |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- | ------- |
+| `whoami`, `list_projects`, `search`, `search_docs`, `get_doc`, `list_doc_drafts`, `list_files`, `list_accounts`, `list_requests`, `list_organizations` | 120/min metadata              | No      |
+| `get_variables`, `get_variable`, `get_account`                                                                                                         | 30/min value pulls            | Yes     |
+| `get_file`                                                                                                                                             | File downloads, per person    | Yes     |
+| `create_variable`, `update_variable`, `create_account`                                                                                                 | 30/min writes, per person     | Yes     |
+| `upload_file`                                                                                                                                          | 20/min file uploads           | Yes     |
+| `create_doc`                                                                                                                                           | 30/hour per person, burst 10  | Yes     |
+| `update_doc_draft`                                                                                                                                     | 120/hour per person, burst 40 | Yes     |
 
 ## Limits
 

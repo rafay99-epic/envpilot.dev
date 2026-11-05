@@ -148,6 +148,54 @@ export function registerMcpTools(server: McpServer): void {
   };
 
   server.registerTool(
+    "envpilot_whoami",
+    {
+      title: "Who Am I and What Can I Do",
+      description:
+        "Reports the signed-in account and what this connection can reach: every organization available to it (which is what a call rejected for a missing `organization` needs), the active organization's plan and whether tier enforcement is on, which features are enabled, the numeric limits with usage where it is known, and every project together with the environments that are PROTECTED. A write touching a protected environment becomes a change request a person approves rather than applying directly. Per-project variable counts are not included; envpilot_list_projects has those.",
+      inputSchema: { organization: organizationInput },
+      outputSchema: {
+        user: z.object({ name: z.string().optional(), email: z.string() }),
+        organizations: z.array(
+          z.object({
+            slug: z.string(),
+            name: z.string(),
+            role: z.string(),
+            isActive: z.boolean(),
+          })
+        ),
+        organization: z.object({
+          slug: z.string(),
+          name: z.string(),
+          plan: z.string(),
+          enforcement: z.boolean(),
+        }),
+        features: z.array(z.object({ key: z.string(), enabled: z.boolean() })),
+        limits: z.array(
+          z.object({
+            key: z.string(),
+            limit: z.number().nullable(),
+            used: z.number().optional(),
+          })
+        ),
+        projects: z.array(
+          z.object({
+            slug: z.string(),
+            name: z.string(),
+            protectedEnvironments: z.array(z.string()),
+          })
+        ),
+        environments: z.array(z.string()),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (args, extra) =>
+      run("envpilot_whoami", extra.authInfo, async (b) =>
+        structured(await b.whoami({ organization: args.organization }))
+      )
+  );
+
+  server.registerTool(
     "envpilot_list_projects",
     {
       title: "List Projects",

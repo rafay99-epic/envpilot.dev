@@ -8,6 +8,8 @@ import {
 import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { createAuditLog } from "../../lib/audit";
+import { isSuspendedMembership } from "../../lib/authz";
+import { VALID_ENVIRONMENTS } from "../../lib/environments";
 import {
   oauthRateKey,
   requireMcpGate,
@@ -15,6 +17,12 @@ import {
   resolveOAuthOrganization,
   verifyOAuthToken,
 } from "../../lib/mcpOAuth";
+import { isEnforcementEnabledFromDb } from "../billing/tierLimits";
+import {
+  checkBooleanFeature,
+  checkNumericLimit,
+  countActiveProjects,
+} from "../featureRegistry/gates";
 import { pool, VAULT_POOL_WIDTH } from "../../lib/pool";
 import { isWorkspace } from "../../lib/projectKind";
 import {
@@ -165,6 +173,207 @@ async function readableVariables(
       : []
   );
 }
+
+/**
+ * What `envpilot_whoami` reports.
+ *
+ * Deliberately bounded. Org-level counts come from the existing bounded
+ * counters; per-project counts (variables, files, accounts) would need a scan
+ * per project, so they are left to `envpilot_list_projects` and the tool
+ * description says so.
+ */
+const whoamiValidator = v.object({
+  user: v.object({
+    name: v.optional(v.string()),
+    email: v.string(),
+  }),
+  organizations: v.array(
+    v.object({
+      slug: v.string(),
+      name: v.string(),
+      role: v.string(),
+      isActive: v.boolean(),
+    })
+  ),
+  organization: v.object({
+    slug: v.string(),
+    name: v.string(),
+    plan: v.string(),
+    enforcement: v.boolean(),
+  }),
+  features: v.array(
+    v.object({
+      key: v.string(),
+      enabled: v.boolean(),
+    })
+  ),
+  limits: v.array(
+    v.object({
+      key: v.string(),
+      limit: v.union(v.number(), v.null()),
+      used: v.optional(v.number()),
+    })
+  ),
+  projects: v.array(
+    v.object({
+      slug: v.string(),
+      name: v.string(),
+      protectedEnvironments: v.array(v.string()),
+    })
+  ),
+  environments: v.array(v.string()),
+});
+
+type Whoami = {
+  user: { name?: string; email: string };
+  organizations: Array<{
+    slug: string;
+    name: string;
+    role: string;
+    isActive: boolean;
+  }>;
+  organization: {
+    slug: string;
+    name: string;
+    plan: string;
+    enforcement: boolean;
+  };
+  features: Array<{ key: string; enabled: boolean }>;
+  limits: Array<{ key: string; limit: number | null; used?: number }>;
+  projects: Array<{
+    slug: string;
+    name: string;
+    protectedEnvironments: string[];
+  }>;
+  environments: string[];
+};
+
+/** Booleans an agent's behaviour actually depends on. */
+const WHOAMI_FEATURES = [
+  "mcp_server",
+  "protected_environments",
+  "public_api",
+  "docker_image",
+  "secret_files",
+  "shared_accounts",
+  "project_docs",
+  "variable_version_history",
+  "bulk_import",
+] as const;
+
+/** Numeric limits, with usage only where a bounded counter already exists. */
+const WHOAMI_LIMITS = [
+  "max_projects",
+  "max_variables_per_project",
+  "max_team_members",
+  "secret_files_limit",
+  "shared_accounts_limit",
+  "max_docs_per_project",
+] as const;
+
+export const whoami = action({
+  args: { token: v.string(), organization: organizationArg },
+  returns: whoamiValidator,
+  handler: async (ctx, args): Promise<Whoami> => {
+    const principal = await verifyOAuthToken(args.token);
+    await consumeRateLimit(ctx, "apiMetadata", oauthRateKey(principal));
+    return await ctx.runQuery(internal.features.api.oauth._whoami, {
+      workosId: principal.workosId,
+      organization: args.organization,
+    });
+  },
+});
+
+export const _whoami = internalQuery({
+  args: { workosId: v.string(), organization: organizationArg },
+  returns: whoamiValidator,
+  handler: async (ctx, args): Promise<Whoami> => {
+    const user = await requireOAuthUser(ctx, args.workosId);
+    const organization = await resolveOAuthOrganization(
+      ctx,
+      user._id,
+      args.organization
+    );
+
+    // Every organization this account can reach, so a multi-org caller can
+    // see what to pass as `organization` without first eating an error.
+    const memberships = (
+      await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .collect()
+    ).filter((m) => !isSuspendedMembership(m));
+    const organizations = (
+      await Promise.all(
+        memberships.map(async (m) => {
+          const org = await ctx.db.get(m.organizationId);
+          return org
+            ? {
+                slug: org.slug,
+                name: org.name,
+                role: m.role,
+                isActive: org._id === organization._id,
+              }
+            : null;
+        })
+      )
+    ).filter((row): row is NonNullable<typeof row> => row !== null);
+
+    const enforcement = await isEnforcementEnabledFromDb(ctx.db);
+
+    const features = await Promise.all(
+      WHOAMI_FEATURES.map(async (key) => ({
+        key,
+        enabled: (await checkBooleanFeature(ctx.db, organization._id, key))
+          .allowed,
+      }))
+    );
+
+    // Usage is attached only for the two org-level counters that are already
+    // bounded. checkNumericLimit short-circuits an unlimited tier before it
+    // looks at the count, so the count is computed first only where cheap.
+    const projectCount = await countActiveProjects(ctx.db, organization._id);
+    const limits = await Promise.all(
+      WHOAMI_LIMITS.map(async (key) => {
+        const used = key === "max_projects" ? projectCount : undefined;
+        const resolved = await checkNumericLimit(
+          ctx.db,
+          organization._id,
+          key,
+          used ?? 0
+        );
+        return { key, limit: resolved.limit, used };
+      })
+    );
+
+    const projects = (
+      await visibleProjects(ctx, user._id, organization._id)
+    ).map((project) => ({
+      slug: project.slug,
+      name: project.name,
+      // The agent-relevant bit: a write touching one of these becomes a
+      // change request a person approves, rather than applying.
+      protectedEnvironments: project.protection?.environments ?? [],
+    }));
+
+    return {
+      user: { name: user.name, email: user.email },
+      organizations,
+      organization: {
+        slug: organization.slug,
+        name: organization.name,
+        plan: (
+          await checkBooleanFeature(ctx.db, organization._id, "mcp_server")
+        ).tierName,
+        enforcement,
+      },
+      features,
+      limits,
+      projects,
+      environments: [...VALID_ENVIRONMENTS],
+    };
+  },
+});
 
 export const listProjects = action({
   args: { token: v.string(), organization: organizationArg },
