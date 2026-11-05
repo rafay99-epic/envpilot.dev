@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "dev.envpilot/mcp",
+  "title": "Envpilot",
+  "description": "Scoped, audited access to your team's environment variables, secret files and shared logins.",
+  "version": "1.0.0",
+  "websiteUrl": "https://www.envpilot.dev",
+  "repository": {
+    "url": "https://github.com/rafay99-epic/envpilot.dev",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://www.envpilot.dev/api/mcp"
+    }
+  ]
+}
