@@ -58,33 +58,24 @@ export const _getByWorkosId = internalQuery({
 });
 
 /**
- * Look up a colleague by email address.
+ * Look up a user by email. INTERNAL ONLY.
  *
- * Authenticated callers only, and the row is narrowed. This was a public
- * query returning the whole user document, so anyone holding the public
- * Convex URL — which ships in the web bundle, the CLI and the extension —
- * could probe any address and read back that person's name and their
- * moderation state (`isBanned`, `banReason`, `bannedBy`). An email is
- * guessable, which is what separates this from the two lookups above.
+ * This was a public query returning the whole user document, so anyone
+ * holding the public Convex URL could probe any address and read back that
+ * person's name and their moderation state. Narrowing the row was not enough:
+ * it still returned a user id, and `getById` above is still public, so the
+ * moderation fields stayed reachable in two hops.
+ *
+ * There is now no public email lookup at all. Its one caller, organization
+ * ownership transfer, resolves the address inside its own mutation.
  */
-export const getByEmail = query({
+export const _getByEmail = internalQuery({
   args: { email: v.string() },
-  returns: v.union(
-    v.null(),
-    v.object({
-      _id: v.id("users"),
-      email: v.string(),
-      name: v.optional(v.string()),
-    })
-  ),
   handler: async (ctx, args) => {
-    await requireAuthedUser(ctx);
-    const user = await ctx.db
+    return await ctx.db
       .query("users")
       .withIndex("by_email", (q) => q.eq("email", args.email))
       .first();
-    if (!user) return null;
-    return { _id: user._id, email: user.email, name: user.name };
   },
 });
 

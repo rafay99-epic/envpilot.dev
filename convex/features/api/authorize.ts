@@ -3,7 +3,11 @@ import type { Id } from "../../_generated/dataModel";
 import { internalMutation } from "../../_generated/server";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { SURFACE_GATE, surfaceValidator } from "../../lib/surfaces";
-import { createAuditLog, resolveAuditProjectId } from "../../lib/audit";
+import {
+  createAuditLog,
+  resolveAuditProjectId,
+  type AuditResourceType,
+} from "../../lib/audit";
 import { isWorkspace } from "../../lib/projectKind";
 
 /**
@@ -22,6 +26,22 @@ import { isWorkspace } from "../../lib/projectKind";
  * (metadata vs value-pull vs accounts-pull) before calling this, exactly
  * like cicd/pull.ts's `cicdPull` limiter sits in the caller, not here.
  */
+/**
+ * A key's scope resource to the audit log's resource type.
+ *
+ * Two separate vocabularies that happen to describe the same things: scopes
+ * are plural (VALID_RESOURCES in keys.ts), audit rows are singular
+ * (AuditResourceType in lib/audit.ts). Undefined for anything unmapped, which
+ * createAuditLog treats the same as not passing it.
+ */
+const AUDIT_RESOURCE_FOR_SCOPE: Record<string, AuditResourceType | undefined> =
+  {
+    variables: "variable",
+    accounts: "account",
+    projects: "project",
+    files: "file",
+  };
+
 export const _authorizeRequest = internalMutation({
   args: {
     tokenHash: v.string(),
@@ -251,6 +271,13 @@ export const _authorizeRequest = internalMutation({
         projectId: usedProjectId,
         userId: key.createdBy,
         action: args.recordUse.auditAction,
+        // createAuditLog has no ACTION_RESOURCE_MAP entry for
+        // api.secrets_pulled, so without this the row is unclassified and
+        // variable, account and file pulls become indistinguishable in
+        // resource-type reporting. The two vocabularies differ: a key's
+        // scope uses plurals (VALID_RESOURCES in keys.ts), the audit log
+        // uses singulars (AuditResourceType).
+        resourceType: AUDIT_RESOURCE_FOR_SCOPE[requirement.resource],
         details: {
           keyId: key._id,
           projectId: requirement.projectId,

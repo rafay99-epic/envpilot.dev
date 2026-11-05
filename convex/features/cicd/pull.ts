@@ -206,6 +206,9 @@ export const _authorizePull = internalMutation({
         projectId,
         userId: apiKey.createdBy,
         action: "api.secrets_pulled",
+        // Not inferred for this action, and this path only ever pulls
+        // variables.
+        resourceType: "variable",
         details: {
           keyId: apiKey._id,
           keyName: apiKey.name,
@@ -269,8 +272,10 @@ export const _readScopedVariables = internalQuery({
         // The schema makes vaultRef non-optional, so a missing one means the
         // row was written by a path that skipped the vault. This used to be
         // reported as `value: ""`, which the Action masks and exports, so CI
-        // deployed with an empty secret and a green check. Refuse the pull
-        // instead, matching api/reads.ts.
+        // deployed with an empty secret and a green check. api/reads.ts has
+        // no equivalent check; it declares vaultRef as v.string(), so the
+        // validator rejects the row instead. This path declared it nullable,
+        // which is why the sentinel was reachable here and not there.
         throw new ConvexError(
           `"${variable.key}" has no stored value — pull aborted. Re-save the variable in Envpilot.`
         );

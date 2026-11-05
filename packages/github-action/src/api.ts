@@ -110,6 +110,34 @@ function baseUrl(apiUrl: string): URL {
 }
 
 /**
+ * One fetch with a timeout that explains itself.
+ *
+ * `AbortSignal.timeout` rejects with a bare "The operation was aborted due to
+ * timeout", which names neither the endpoint nor the limit, and the whole
+ * point of having a timeout is that the log says what stalled.
+ */
+async function fetchWithTimeout(url: URL, token: string): Promise<Response> {
+  try {
+    return await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    const name = (error as { name?: string } | undefined)?.name;
+    if (name === "TimeoutError" || name === "AbortError") {
+      throw new Error(
+        `request to ${url.pathname} timed out after ${REQUEST_TIMEOUT_MS / 1000}s`
+      );
+    }
+    throw error;
+  }
+}
+
+/**
  * Fetch a project's secret files.
  *
  * The API key must carry the `files` resource, which Envpilot never grants
@@ -127,14 +155,7 @@ export async function pullFiles(
   if (params.metadataOnly) url.searchParams.set("metadataOnly", "1");
   for (const path of params.paths ?? []) url.searchParams.append("path", path);
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${params.token}`,
-      Accept: "application/json",
-    },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
+  const response = await fetchWithTimeout(url, params.token);
 
   if (!response.ok) {
     throw new EnvpilotApiError(
@@ -172,14 +193,7 @@ export async function pullSecrets(
   const url = new URL("/api/v1/secrets", baseUrl(params.apiUrl));
   url.searchParams.set("environment", params.environment);
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${params.token}`,
-      Accept: "application/json",
-    },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
+  const response = await fetchWithTimeout(url, params.token);
 
   if (!response.ok) {
     throw new EnvpilotApiError(

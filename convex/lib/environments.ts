@@ -1,10 +1,16 @@
 /**
  * The platform's environment names.
  *
- * This triple was copy-pasted into nine places (the API key validator, the
- * admin role validator, a migration, the MCP tool schema, and five CLI
- * modules), which is how the MCP write path ended up with no server-side
- * check at all. New code imports from here.
+ * This triple is copy-pasted across the codebase, which is how the MCP write
+ * path ended up with no server-side check at all. This module is where it
+ * belongs, and the read surfaces now import it.
+ *
+ * NOT yet migrated, deliberately, to keep this change reviewable:
+ * features/api/keys.ts, features/admin/roles.ts,
+ * features/changeRequests/mutations.ts,
+ * features/variables/requests/mutations.ts, features/admin/migrations.ts,
+ * and five CLI modules under apps/cli/src/. Until those move, an
+ * environment change still has to touch them by hand.
  */
 export const VALID_ENVIRONMENTS = [
   "development",

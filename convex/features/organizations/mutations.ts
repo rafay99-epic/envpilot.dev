@@ -762,8 +762,21 @@ export const updateMemberRole = mutation({
 export const transferOwnership = mutation({
   args: {
     organizationId: v.id("organizations"),
-    targetUserId: v.id("users"),
+    targetUserEmail: v.string(),
   },
+  // Denials are RETURNED, not thrown, like api/authorize.ts: the caller needs
+  // to map them to a status code, and a thrown message would be redacted to
+  // "Server Error" in production anyway.
+  returns: v.union(
+    v.object({ ok: v.literal(true), organizationId: v.id("organizations") }),
+    v.object({
+      ok: v.literal(false),
+      reason: v.union(
+        v.literal("target_not_found"),
+        v.literal("target_is_caller")
+      ),
+    })
+  ),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
 
@@ -782,15 +795,20 @@ export const transferOwnership = mutation({
       throw new Error("Organization not found");
     }
 
-    // Verify target user exists
-    const targetUser = await ctx.db.get(args.targetUserId);
+    // Resolve the target INSIDE the mutation. This used to be a public
+    // users.getByEmail query, which meant any signed-in account could probe
+    // an arbitrary address and get back a user id. Exact match, matching the
+    // previous behaviour: addresses are not normalised on write.
+    const targetUser = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.targetUserEmail))
+      .first();
     if (!targetUser) {
-      throw new Error("Target user not found");
+      return { ok: false as const, reason: "target_not_found" as const };
     }
 
-    // Cannot transfer to yourself
-    if (args.targetUserId === actor._id) {
-      throw new Error("Cannot transfer ownership to yourself");
+    if (targetUser._id === actor._id) {
+      return { ok: false as const, reason: "target_is_caller" as const };
     }
 
     // Tier check — ownership transfer is allowed for all tiers
@@ -800,9 +818,7 @@ export const transferOwnership = mutation({
     const targetMembership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", args.organizationId)
-          .eq("userId", args.targetUserId)
+        q.eq("organizationId", args.organizationId).eq("userId", targetUser._id)
       )
       .first();
 
@@ -811,7 +827,7 @@ export const transferOwnership = mutation({
     } else {
       await ctx.db.insert("organizationMembers", {
         organizationId: args.organizationId,
-        userId: args.targetUserId,
+        userId: targetUser._id,
         role: "owner",
         joinedAt: now,
         invitedBy: actor._id,
@@ -823,7 +839,7 @@ export const transferOwnership = mutation({
 
     // Update org creator
     await ctx.db.patch(args.organizationId, {
-      createdBy: args.targetUserId,
+      createdBy: targetUser._id,
     });
 
     // Audit log
@@ -833,11 +849,11 @@ export const transferOwnership = mutation({
       action: "org.transferred",
       details: JSON.stringify({
         transferredFrom: actor._id,
-        transferredTo: args.targetUserId,
+        transferredTo: targetUser._id,
       }),
       createdAt: now,
     });
 
-    return args.organizationId;
+    return { ok: true as const, organizationId: args.organizationId };
   },
 });

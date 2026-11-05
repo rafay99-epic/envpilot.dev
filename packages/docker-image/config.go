@@ -53,7 +53,9 @@ func resolveToken(getenv func(string) string) (string, error) {
 // clear. Loopback stays allowed so a local dev server can be exercised.
 func assertSecureAPIURL(raw string) error {
 	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Host == "" {
+	// Scheme-relative input like //host parses with an empty Scheme and
+	// would otherwise reach the message below as "over . Use an https".
+	if err != nil || parsed.Host == "" || parsed.Scheme == "" {
 		return configErrorf("API URL is not a valid URL: %s", raw)
 	}
 	if parsed.Scheme == "https" {

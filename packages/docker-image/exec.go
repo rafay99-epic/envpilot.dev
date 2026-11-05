@@ -12,13 +12,21 @@ import (
 
 var forwardedSignals = []os.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT}
 
-// Environment names that must never reach the child process.
+// Environment names that are not passed to the child process.
 //
-// The child is the user's application. Handing it the API key means anything
-// that dumps its own environment (a crash reporter, /proc/self/environ, a
-// debug endpoint, a sidecar reading the process table) walks away with a
-// credential that can read the whole project and environment. The usage text
-// already promises the key is not passed through; this makes it true.
+// The child is the user's application, and it used to inherit the API key,
+// so anything that dumps its own environment (a crash reporter, a debug
+// endpoint, printenv in an entrypoint script) handed out a credential that
+// reads the whole project.
+//
+// Scope of the fix, stated precisely: the key is no longer in the child's
+// OWN environment. A child running as a descendant of envpilot can still
+// read it from /proc/<ppid>/environ, because Linux snapshots the initial
+// environment block at exec and os.Unsetenv does not rewrite it. Closing
+// that would mean replacing this process with the child via syscall.Exec,
+// which was tried and REVERTED: as PID 1 under the documented
+// ENTRYPOINT ["envpilot", "exec", "--"], it dropped signal handling.
+// Treat this as removing the easy path, not as isolation.
 var strippedChildEnv = map[string]struct{}{
 	"ENVPILOT_TOKEN":      {},
 	"ENVPILOT_TOKEN_FILE": {},

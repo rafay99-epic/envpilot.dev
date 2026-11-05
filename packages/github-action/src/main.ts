@@ -100,7 +100,7 @@ function parseBooleanInput(raw: string, fallback: boolean): boolean {
  *
  * Two things this buys over a plain `writeFileSync`: a pre-existing file
  * never holds secret contents at its old (possibly world-readable) mode,
- * and a symlink at the destination is replaced rather than written through.
+ * and a symlink at the destination is REFUSED rather than written through.
  *
  * Used by both the secret-files path and `env-file`, which previously wrote
  * straight to the caller's path with neither protection.
@@ -233,22 +233,37 @@ function maskValue(value: string): boolean {
  */
 const RESERVED_ENV_KEYS = new Set([
   "BASH_ENV",
-  "DYLD_INSERT_LIBRARIES",
-  "DYLD_LIBRARY_PATH",
   "ENV",
   "GEM_PATH",
   "IFS",
-  "LD_AUDIT",
-  "LD_LIBRARY_PATH",
-  "LD_PRELOAD",
+  "JAVA_TOOL_OPTIONS",
+  "JDK_JAVA_OPTIONS",
   "NODE_OPTIONS",
   "PATH",
   "PERL5LIB",
+  "PYTHONHOME",
   "PYTHONPATH",
   "PYTHONSTARTUP",
+  "RUBYOPT",
 ]);
 
-const RESERVED_ENV_PREFIXES = ["ACTIONS_", "GITHUB_", "RUNNER_"];
+// Prefixes, because each family has more members than is worth listing:
+//
+//   GIT_CONFIG_  GIT_CONFIG_COUNT with GIT_CONFIG_KEY_n / GIT_CONFIG_VALUE_n
+//                injects arbitrary git config, and core.sshCommand is config,
+//                so a later checkout or push executes it.
+//   BASH_FUNC_   exported shell functions, the Shellshock shape.
+//   LD_ DYLD_    dynamic loader hooks: LD_PRELOAD, LD_AUDIT and relatives.
+//   GITHUB_ RUNNER_ ACTIONS_  the runner's own namespaces, token included.
+const RESERVED_ENV_PREFIXES = [
+  "ACTIONS_",
+  "BASH_FUNC_",
+  "DYLD_",
+  "GIT_CONFIG_",
+  "GITHUB_",
+  "LD_",
+  "RUNNER_",
+];
 
 export function isReservedEnvKey(key: string): boolean {
   const upper = key.toUpperCase();

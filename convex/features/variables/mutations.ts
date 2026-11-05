@@ -1379,10 +1379,12 @@ export async function rollbackCore(
   const envClashes = await findEnvironmentConflicts(ctx, {
     projectId: variable.projectId,
     key: variable.key,
-    environments: touchedEnvironments(
-      variable.environments,
-      targetVersionRecord.environments
-    ),
+    // The PROPOSED state only, matching updateCore. Using the union of
+    // before and after would check environments the rollback REMOVES, so a
+    // clash the rollback itself resolves would block it. The union is still
+    // right for assertProtectedWrite above, which asks a different question:
+    // which protected environments does this write touch.
+    environments: targetVersionRecord.environments,
     excludeVariableId: variable._id,
     appliesTo: variable.appliesTo,
   });

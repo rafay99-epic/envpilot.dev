@@ -29,7 +29,7 @@ A security and correctness pass across the machine surfaces: the GitHub Action, 
 
 **Reserved environment names are refused.** A variable called `PATH`, `LD_PRELOAD` or anything starting with `GITHUB_` is no longer written to `$GITHUB_ENV`, where it would have taken over every later step in the job.
 
-**The Docker image stops leaking its own credential.** `envpilot exec` passed `ENVPILOT_TOKEN` through to the child process, so the application inherited a key that can read the whole project. Both token variables are now stripped from the child's environment. Both clients also refuse a plaintext `http://` API URL, since the key travels in a request header.
+**The Docker image stops leaking its own credential.** `envpilot exec` passed `ENVPILOT_TOKEN` through to the child process, so the application inherited a key that can read the whole project. Both token variables are now stripped from the child's environment. Both clients also refuse a plaintext `http://` API URL, since the key travels in a request header. Loopback hosts (`localhost`, `127.0.0.1`, `::1`) stay allowed so a local dev server still works.
 
 Also in this release: successful API pulls are recorded against their project in the audit log (previously only denials were, so a project's audit view showed refusals and hid real pulls), looking a user up by email requires an authenticated caller and no longer returns their moderation state, rolling a variable back re-checks per-environment key uniqueness, and `env-file` is written through the same staged, symlink-refusing path the secret-files output already used.
 

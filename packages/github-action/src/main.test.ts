@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as core from "@actions/core";
 import { buildDotenvContent, escapeSingleQuoted } from "./dotenv.js";
-import { run } from "./main.js";
+import { isReservedEnvKey, run } from "./main.js";
 
 describe("dotenv serialization", () => {
   it("single-quotes plain values", () => {
@@ -383,5 +383,58 @@ describe("secret-file pulls: rate-limit retry", () => {
     await run();
 
     expect(core.setFailed).toHaveBeenCalled();
+  });
+});
+
+describe("reserved environment names", () => {
+  it("refuses the loader and interpreter hooks", () => {
+    for (const key of [
+      "PATH",
+      "LD_PRELOAD",
+      "LD_LIBRARY_PATH",
+      "DYLD_INSERT_LIBRARIES",
+      "NODE_OPTIONS",
+      "PYTHONPATH",
+      "BASH_ENV",
+    ]) {
+      expect(isReservedEnvKey(key), key).toBe(true);
+    }
+  });
+
+  it("refuses the runner's own namespaces", () => {
+    for (const key of [
+      "GITHUB_TOKEN",
+      "GITHUB_ENV",
+      "RUNNER_TEMP",
+      "ACTIONS_RUNTIME_TOKEN",
+    ]) {
+      expect(isReservedEnvKey(key), key).toBe(true);
+    }
+  });
+
+  it("refuses GIT_CONFIG_*, which is a command-execution vector", () => {
+    // GIT_CONFIG_COUNT with GIT_CONFIG_KEY_n / GIT_CONFIG_VALUE_n injects
+    // arbitrary git config into later steps, and core.sshCommand is config,
+    // so a later checkout or push would execute it.
+    expect(isReservedEnvKey("GIT_CONFIG_COUNT")).toBe(true);
+    expect(isReservedEnvKey("GIT_CONFIG_KEY_0")).toBe(true);
+    expect(isReservedEnvKey("GIT_CONFIG_VALUE_0")).toBe(true);
+  });
+
+  it("is case insensitive, since $GITHUB_ENV does not care", () => {
+    expect(isReservedEnvKey("path")).toBe(true);
+    expect(isReservedEnvKey("github_token")).toBe(true);
+  });
+
+  it("allows ordinary application keys", () => {
+    for (const key of [
+      "DATABASE_URL",
+      "STRIPE_SECRET_KEY",
+      "GIT_AUTHOR_NAME",
+      "GITHUBBER",
+      "MY_PATH_PREFIX",
+    ]) {
+      expect(isReservedEnvKey(key), key).toBe(false);
+    }
   });
 });
