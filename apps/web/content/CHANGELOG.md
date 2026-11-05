@@ -15,6 +15,26 @@
 
 <!-- entry -->
 ---
+title: Secrets stay masked, and a misspelled environment now fails instead of pulling nothing
+version: v1.72.1
+date: 2026-11-06
+types: [security, fix]
+---
+
+A security and correctness pass across the machine surfaces: the GitHub Action, the Docker image and the public REST API.
+
+**Multiline values are now fully masked in workflow logs.** The Action registered each value with GitHub's log masker as a single string, but the masker works line by line, so a PEM private key or a pretty-printed service-account JSON was never matched against the lines a later step printed. Every line of a multiline value is now registered as well. Values too short to mask safely are left alone and counted in the log, because masking a one-character value replaces that character everywhere for the rest of the job.
+
+**A misspelled environment fails loudly.** `?environment=prod` used to resolve to zero rows and answer `200` with an empty body, so the Action reported "pulled 0 variables" and the deploy continued with nothing set. Every read surface now rejects an unknown environment name with `400 UNKNOWN_ENVIRONMENT` and lists the valid ones. A variable whose stored value is missing also aborts the pull rather than being reported as an empty string.
+
+**Reserved environment names are refused.** A variable called `PATH`, `LD_PRELOAD` or anything starting with `GITHUB_` is no longer written to `$GITHUB_ENV`, where it would have taken over every later step in the job.
+
+**The Docker image stops leaking its own credential.** `envpilot exec` passed `ENVPILOT_TOKEN` through to the child process, so the application inherited a key that can read the whole project. Both token variables are now stripped from the child's environment. Both clients also refuse a plaintext `http://` API URL, since the key travels in a request header.
+
+Also in this release: successful API pulls are recorded against their project in the audit log (previously only denials were, so a project's audit view showed refusals and hid real pulls), looking a user up by email requires an authenticated caller and no longer returns their moderation state, rolling a variable back re-checks per-environment key uniqueness, and `env-file` is written through the same staged, symlink-refusing path the secret-files output already used.
+
+<!-- entry -->
+---
 title: Agents can manage variables, secret files and shared accounts over MCP
 version: v1.72.0
 date: 2026-11-01
