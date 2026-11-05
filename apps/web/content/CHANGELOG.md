@@ -26,7 +26,7 @@ Every surface an agent or a CI job can reach used to require Pro, while the CLI,
 On the free plan now:
 
 - **MCP server** (`mcp_server`), so any Claude, Claude Code, Codex, Cursor or VS Code session can sign in.
-- **Public REST API** (`public_api`), uncapped.
+- **Public REST API** (`public_api`), with no cap on how many keys you hold. Per-key rate limits still apply: 120 metadata requests a minute and 30 value pulls.
 - **Docker image** (`docker_image`), two keys.
 - **GitHub Action**, two keys.
 - **Protected environments**, unlimited.

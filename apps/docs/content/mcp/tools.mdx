@@ -1,12 +1,12 @@
 ---
 title: Tools
-description: The nineteen MCP tools, what each one does, and what it costs.
+description: The twenty MCP tools, what each one does, and what it costs.
 icon: zap
 ---
 
 # Tools
 
-A [signed-in](/mcp/setup) connection gets nineteen tools. Your role decides what each one can see and change: the same projects, environments, variables, secret files, shared accounts and documentation you can use in the dashboard. Every value-returning call and every write is audited against you.
+A [signed-in](/mcp/setup) connection gets twenty tools. Your role decides what each one can see and change: the same projects, environments, variables, secret files, shared accounts and documentation you can use in the dashboard. Every value-returning call and every write is audited against you.
 
 ## Read tools
 
@@ -28,18 +28,28 @@ A [signed-in](/mcp/setup) connection gets nineteen tools. Your role decides what
 
 ### Start with `envpilot_whoami`
 
-One call answers the questions every other tool depends on: which organization
-slug to pass, which project slugs exist, what the plan allows, and which
-environments are protected.
+One call answers the questions the project-scoped tools depend on: which
+organization slug to pass, which project slugs exist, what the plan allows, and
+which environments are protected. The documentation tools are the exception:
+`envpilot_get_doc` and `envpilot_update_doc_draft` take a doc id instead of a
+project and organization.
 
 That last field is the one worth reading before any write. A variable or file
 write touching a protected environment does not apply; it becomes a change
 request a second person approves. Knowing that up front is the difference
 between proposing a change and reporting that you made one.
 
+If your account belongs to several organizations and you pass none, the call
+still succeeds: `organization` comes back `null` with the full list in
+`organizations`, so you can pick a slug and repeat the call. The
+per-organization fields are empty until then.
+
 It reports organization-level usage (projects against `max_projects`) but not
-per-project counts, because those need a scan per project. `envpilot_list_projects`
-has the per-project variable counts.
+per-project counts, because those need a scan per project.
+`envpilot_list_projects` has the per-project variable counts. The limits also
+include `docker_image_limit` and `github_action_limit`, which cap how many
+keys of each surface an organization may hold, so a CI setup task can check
+before it tries.
 
 ## Write tools
 

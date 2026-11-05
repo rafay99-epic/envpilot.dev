@@ -17,12 +17,15 @@ import {
   resolveOAuthOrganization,
   verifyOAuthToken,
 } from "../../lib/mcpOAuth";
-import { isEnforcementEnabledFromDb } from "../billing/tierLimits";
 import {
   checkBooleanFeature,
   checkNumericLimit,
   countActiveProjects,
 } from "../featureRegistry/gates";
+import {
+  getOrgOwnerTier,
+  resolveOrgGateContext,
+} from "../featureRegistry/resolver";
 import { pool, VAULT_POOL_WIDTH } from "../../lib/pool";
 import { isWorkspace } from "../../lib/projectKind";
 import {
@@ -182,6 +185,26 @@ async function readableVariables(
  * per project, so they are left to `envpilot_list_projects` and the tool
  * description says so.
  */
+/**
+ * What `envpilot_whoami` reports.
+ *
+ * `organization` is NULLABLE on purpose. An account in several organizations
+ * that names none of them still needs the list back, so discovery works
+ * before anything is resolved; returning an error there would defeat the
+ * whole point of the tool. In that case the per-organization fields come
+ * back empty and the caller retries with a slug.
+ *
+ * Bounded deliberately. Org-level counts come from existing bounded
+ * counters; per-project counts (variables, files, accounts) would need a
+ * scan per project, so they stay in `envpilot_list_projects`.
+ */
+const whoamiOrganizationValidator = v.object({
+  slug: v.string(),
+  name: v.string(),
+  plan: v.string(),
+  enforcement: v.boolean(),
+});
+
 const whoamiValidator = v.object({
   user: v.object({
     name: v.optional(v.string()),
@@ -195,18 +218,8 @@ const whoamiValidator = v.object({
       isActive: v.boolean(),
     })
   ),
-  organization: v.object({
-    slug: v.string(),
-    name: v.string(),
-    plan: v.string(),
-    enforcement: v.boolean(),
-  }),
-  features: v.array(
-    v.object({
-      key: v.string(),
-      enabled: v.boolean(),
-    })
-  ),
+  organization: v.union(v.null(), whoamiOrganizationValidator),
+  features: v.array(v.object({ key: v.string(), enabled: v.boolean() })),
   limits: v.array(
     v.object({
       key: v.string(),
@@ -224,6 +237,13 @@ const whoamiValidator = v.object({
   environments: v.array(v.string()),
 });
 
+type WhoamiOrganization = {
+  slug: string;
+  name: string;
+  plan: string;
+  enforcement: boolean;
+};
+
 type Whoami = {
   user: { name?: string; email: string };
   organizations: Array<{
@@ -232,12 +252,7 @@ type Whoami = {
     role: string;
     isActive: boolean;
   }>;
-  organization: {
-    slug: string;
-    name: string;
-    plan: string;
-    enforcement: boolean;
-  };
+  organization: WhoamiOrganization | null;
   features: Array<{ key: string; enabled: boolean }>;
   limits: Array<{ key: string; limit: number | null; used?: number }>;
   projects: Array<{
@@ -261,7 +276,12 @@ const WHOAMI_FEATURES = [
   "bulk_import",
 ] as const;
 
-/** Numeric limits, with usage only where a bounded counter already exists. */
+/**
+ * Numeric limits worth reporting, with usage only where a bounded counter
+ * already exists. The two key quotas are here because the free tier allows a
+ * finite number of Docker and GitHub Action keys, so an agent asked to set up
+ * CI needs to know before it tries.
+ */
 const WHOAMI_LIMITS = [
   "max_projects",
   "max_variables_per_project",
@@ -269,6 +289,8 @@ const WHOAMI_LIMITS = [
   "secret_files_limit",
   "shared_accounts_limit",
   "max_docs_per_project",
+  "docker_image_limit",
+  "github_action_limit",
 ] as const;
 
 export const whoami = action({
@@ -289,49 +311,80 @@ export const _whoami = internalQuery({
   returns: whoamiValidator,
   handler: async (ctx, args): Promise<Whoami> => {
     const user = await requireOAuthUser(ctx, args.workosId);
-    const organization = await resolveOAuthOrganization(
-      ctx,
-      user._id,
-      args.organization
-    );
 
-    // Every organization this account can reach, so a multi-org caller can
-    // see what to pass as `organization` without first eating an error.
+    // Memberships FIRST, before resolving an active organization. The shared
+    // resolver throws on ambiguous membership, which would make this tool
+    // unable to answer the very question a multi-organization caller has.
     const memberships = (
       await ctx.db
         .query("organizationMembers")
         .withIndex("by_user", (q) => q.eq("userId", user._id))
         .collect()
     ).filter((m) => !isSuspendedMembership(m));
-    const organizations = (
+    const orgDocs = (
       await Promise.all(
-        memberships.map(async (m) => {
-          const org = await ctx.db.get(m.organizationId);
-          return org
-            ? {
-                slug: org.slug,
-                name: org.name,
-                role: m.role,
-                isActive: org._id === organization._id,
-              }
-            : null;
-        })
+        memberships.map(async (m) => ({
+          membership: m,
+          org: await ctx.db.get(m.organizationId),
+        }))
       )
-    ).filter((row): row is NonNullable<typeof row> => row !== null);
+    ).flatMap((row) => (row.org ? [{ ...row, org: row.org }] : []));
 
-    const enforcement = await isEnforcementEnabledFromDb(ctx.db);
+    const active =
+      args.organization !== undefined
+        ? orgDocs.find((row) => row.org.slug === args.organization)
+        : orgDocs.length === 1
+          ? orgDocs[0]
+          : undefined;
+
+    if (args.organization !== undefined && !active) {
+      throw new ConvexError("Organization not found");
+    }
+    if (orgDocs.length === 0) {
+      throw new ConvexError("This account is not a member of any organization");
+    }
+
+    const organizations = orgDocs.map((row) => ({
+      slug: row.org.slug,
+      name: row.org.name,
+      role: row.membership.role,
+      isActive: active !== undefined && row.org._id === active.org._id,
+    }));
+
+    const base = {
+      user: { name: user.name, email: user.email },
+      organizations,
+      environments: [...VALID_ENVIRONMENTS],
+    };
+
+    // Ambiguous: hand back the list so the caller can pick, rather than an
+    // error it has to parse.
+    if (!active) {
+      return {
+        ...base,
+        organization: null,
+        features: [],
+        limits: [],
+        projects: [],
+      };
+    }
+
+    const organization = active.org;
+    await requireMcpGate(ctx, organization._id);
+
+    // One shared context for every gate check below, instead of re-resolving
+    // the org, the owner's tier and the grace period per feature key.
+    const gateContext = await resolveOrgGateContext(ctx.db, organization._id);
 
     const features = await Promise.all(
       WHOAMI_FEATURES.map(async (key) => ({
         key,
-        enabled: (await checkBooleanFeature(ctx.db, organization._id, key))
-          .allowed,
+        enabled: (
+          await checkBooleanFeature(ctx.db, organization._id, key, gateContext)
+        ).allowed,
       }))
     );
 
-    // Usage is attached only for the two org-level counters that are already
-    // bounded. checkNumericLimit short-circuits an unlimited tier before it
-    // looks at the count, so the count is computed first only where cheap.
     const projectCount = await countActiveProjects(ctx.db, organization._id);
     const limits = await Promise.all(
       WHOAMI_LIMITS.map(async (key) => {
@@ -340,7 +393,8 @@ export const _whoami = internalQuery({
           ctx.db,
           organization._id,
           key,
-          used ?? 0
+          used ?? 0,
+          gateContext
         );
         return { key, limit: resolved.limit, used };
       })
@@ -356,21 +410,25 @@ export const _whoami = internalQuery({
       protectedEnvironments: project.protection?.environments ?? [],
     }));
 
+    // The real plan, not a gate's tierName: when enforcement is off every
+    // gate resolves as "unlimited", which would have misreported a free org.
+    const { tierName } = await getOrgOwnerTier(
+      ctx.db,
+      organization._id,
+      organization
+    );
+
     return {
-      user: { name: user.name, email: user.email },
-      organizations,
+      ...base,
       organization: {
         slug: organization.slug,
         name: organization.name,
-        plan: (
-          await checkBooleanFeature(ctx.db, organization._id, "mcp_server")
-        ).tierName,
-        enforcement,
+        plan: tierName,
+        enforcement: gateContext.enforced,
       },
       features,
       limits,
       projects,
-      environments: [...VALID_ENVIRONMENTS],
     };
   },
 });
