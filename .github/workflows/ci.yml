@@ -70,6 +70,8 @@ jobs:
       run_jetbrains: ${{ steps.flags.outputs.run_jetbrains }}
       run_action: ${{ steps.flags.outputs.run_action }}
       run_docker_image: ${{ steps.flags.outputs.run_docker_image }}
+      run_mcp_registry: ${{ steps.flags.outputs.run_mcp_registry }}
+      run_devcontainer_feature: ${{ steps.flags.outputs.run_devcontainer_feature }}
       run_convex: ${{ steps.flags.outputs.run_convex }}
       deploy_convex: ${{ steps.flags.outputs.deploy_convex }}
       seed_features: ${{ steps.filter.outputs.seed_features }}
@@ -124,6 +126,12 @@ jobs:
               - 'packages/docker-image/**'
               - '.github/workflows/deploy-docker-image.yml'
               - '.github/workflows/smoke-docker-image.yml'
+            mcp_registry:
+              - 'server.json'
+              - '.github/workflows/deploy-mcp-registry.yml'
+            devcontainer_feature:
+              - 'packages/devcontainer-feature/**'
+              - '.github/workflows/deploy-devcontainer-feature.yml'
             convex:
               - 'convex/**'
               - '.github/workflows/deploy-convex.yml'
@@ -167,6 +175,8 @@ jobs:
           JETBRAINS: ${{ steps.filter.outputs.jetbrains }}
           ACTION: ${{ steps.filter.outputs.action }}
           DOCKER_IMAGE: ${{ steps.filter.outputs.docker_image }}
+          MCP_REGISTRY: ${{ steps.filter.outputs.mcp_registry }}
+          DEVCONTAINER_FEATURE: ${{ steps.filter.outputs.devcontainer_feature }}
           CONVEX: ${{ steps.filter.outputs.convex }}
           SHARED: ${{ steps.filter.outputs.shared }}
           VERCEL_SHARED: ${{ steps.filter.outputs.vercel_shared }}
@@ -188,6 +198,11 @@ jobs:
           run_jetbrains=$(bool "$JETBRAINS" "$SHARED")
           run_action=$(bool "$ACTION" "$SHARED")
           run_docker_image=$(bool "$DOCKER_IMAGE" "$SHARED")
+          # Not widened by SHARED on purpose: both publish IMMUTABLE artifacts
+          # (a registry version, an OCI tag), so only a direct change to their
+          # own files should trigger them.
+          run_mcp_registry="$MCP_REGISTRY"
+          run_devcontainer_feature="$DEVCONTAINER_FEATURE"
           # Shared changes (lockfile, configs) can break convex typecheck,
           # so they re-run the convex CHECK — but only convex/** changes
           # trigger a convex DEPLOY.
@@ -195,7 +210,7 @@ jobs:
           deploy_convex="$CONVEX"
 
           any=false
-          for f in "$run_web" "$run_blog" "$run_docs" "$run_admin" "$run_cli" "$run_extension" "$run_jetbrains" "$run_convex" "$run_action" "$run_docker_image"; do
+          for f in "$run_web" "$run_blog" "$run_docs" "$run_admin" "$run_cli" "$run_extension" "$run_jetbrains" "$run_convex" "$run_action" "$run_docker_image" "$run_mcp_registry" "$run_devcontainer_feature"; do
             [ "$f" = "true" ] && any=true
           done
 
@@ -213,6 +228,8 @@ jobs:
             echo "run_jetbrains=$run_jetbrains"
             echo "run_action=$run_action"
             echo "run_docker_image=$run_docker_image"
+            echo "run_mcp_registry=$run_mcp_registry"
+            echo "run_devcontainer_feature=$run_devcontainer_feature"
             echo "run_convex=$run_convex"
             echo "deploy_convex=$deploy_convex"
             echo "any=$any"
@@ -769,6 +786,31 @@ jobs:
       # fine-grained PATs, so this permission is what makes the push possible.
       packages: write
 
+  deploy-mcp-registry:
+    name: Deploy MCP registry listing
+    needs: [changes, checks-passed]
+    if: |
+      !failure() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.run_mcp_registry == 'true'
+    uses: ./.github/workflows/deploy-mcp-registry.yml
+    secrets: inherit
+    permissions:
+      contents: read
+
+  deploy-devcontainer-feature:
+    name: Deploy devcontainer feature
+    needs: [changes, checks-passed]
+    if: |
+      !failure() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.run_devcontainer_feature == 'true'
+    uses: ./.github/workflows/deploy-devcontainer-feature.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      packages: write
+
   deploy-extension:
     name: Deploy extension
     needs: [changes, build-extension, e2e, deploy-convex]
@@ -833,6 +875,8 @@ jobs:
       - deploy-homebrew
       - deploy-action
       - deploy-docker-image
+      - deploy-mcp-registry
+      - deploy-devcontainer-feature
     # Skipped deploys (surface unchanged) must not block the release,
     # so check for failure/cancelled explicitly instead of success().
     # A failed e2e gate DOES block the release — nothing shipped.
@@ -871,7 +915,11 @@ jobs:
       needs.deploy-action.result != 'failure' &&
       needs.deploy-action.result != 'cancelled' &&
       needs.deploy-docker-image.result != 'failure' &&
-      needs.deploy-docker-image.result != 'cancelled'
+      needs.deploy-docker-image.result != 'cancelled' &&
+      needs.deploy-mcp-registry.result != 'failure' &&
+      needs.deploy-mcp-registry.result != 'cancelled' &&
+      needs.deploy-devcontainer-feature.result != 'failure' &&
+      needs.deploy-devcontainer-feature.result != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       contents: write

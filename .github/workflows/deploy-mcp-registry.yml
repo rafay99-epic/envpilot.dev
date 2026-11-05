@@ -1,0 +1,98 @@
+name: Deploy MCP Registry Listing
+
+# Publishes server.json to the official MCP registry
+# (registry.modelcontextprotocol.io).
+#
+# Why this matters more than it looks: the registry feeds VS Code's MCP
+# gallery and is ingested by third-party directories, and those listings are
+# what an assistant retrieves when someone asks how to manage environment
+# variables. Being absent from them is why Envpilot never gets named.
+#
+# No ordering dependency on deploy-convex, unlike the CLI, extension and
+# action: the listing contains a URL and a description, not a client that
+# calls a backend contract.
+#
+# Registry versions are IMMUTABLE. The publish step therefore runs only when
+# server.json's version differs from what is already listed, so a re-run or an
+# unrelated merge cannot fail the pipeline.
+
+on:
+  workflow_call:
+    secrets:
+      ENVPILOT_PROD_TOKEN:
+        required: false
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-mcp-registry-main
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish server.json
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/load-env
+        with:
+          token: ${{ secrets.ENVPILOT_PROD_TOKEN }}
+          environment: production
+          required: MCP_REGISTRY_PRIVATE_KEY
+
+      - name: Verify the signing key is configured
+        run: |
+          if [ -z "$MCP_REGISTRY_PRIVATE_KEY" ]; then
+            echo "::error::MCP_REGISTRY_PRIVATE_KEY is missing. Add the ed25519 private key (hex) for the envpilot.dev DNS namespace to the Envpilot production environment. The matching TXT record on envpilot.dev must read: v=MCPv1; k=ed25519; p=<base64 public key>"
+            exit 1
+          fi
+
+      - name: Read the declared version
+        id: meta
+        run: |
+          VERSION=$(jq -r '.version' server.json)
+          NAME=$(jq -r '.name' server.json)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Declared: $NAME@$VERSION"
+
+      - name: Skip when this version is already listed
+        id: check
+        env:
+          NAME: ${{ steps.meta.outputs.name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          # A tolerant check. If the registry cannot be read, fall through to
+          # the publish, which fails loudly on a duplicate version rather
+          # than silently doing nothing.
+          LISTED=$(curl -sS --max-time 20 \
+            "https://registry.modelcontextprotocol.io/v0.1/servers?search=$(jq -rn --arg n "$NAME" '$n|@uri')" \
+            | jq -r --arg n "$NAME" '[.servers[]? | select(.name == $n) | .version] | last // ""' 2>/dev/null || echo "")
+          echo "Listed version: ${LISTED:-<none or unreadable>}"
+          if [ -n "$LISTED" ] && [ "$LISTED" = "$VERSION" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$NAME@$VERSION is already listed. Bump server.json to publish a new version."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install mcp-publisher
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          VERSION=1.2.3
+          curl -sSfL "https://github.com/modelcontextprotocol/registry/releases/download/v${VERSION}/mcp-publisher_${VERSION}_linux_amd64.tar.gz" \
+            | tar xz -C /tmp mcp-publisher
+          /tmp/mcp-publisher --version
+
+      - name: Publish
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          /tmp/mcp-publisher login dns \
+            --domain envpilot.dev \
+            --private-key "$MCP_REGISTRY_PRIVATE_KEY"
+          /tmp/mcp-publisher publish

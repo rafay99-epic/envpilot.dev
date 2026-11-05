@@ -1,0 +1,78 @@
+name: Deploy Devcontainer Feature
+
+# Publishes the Envpilot devcontainer Feature to GHCR, so a Codespace or dev
+# container can install the CLI with one line:
+#
+#   "ghcr.io/rafay99-epic/devcontainer-features/envpilot:1": {}
+#
+# The Feature installs the already-published @envpilot/cli from npm, so there
+# is no ordering dependency on deploy-convex or deploy-cli. It ships no code
+# that calls a backend contract.
+#
+# The version in packages/devcontainer-feature/src/envpilot/devcontainer-feature.json
+# is the release trigger, the same convention the Docker image uses. OCI tags
+# are meant to be immutable, so the publish is skipped when the tag already
+# exists rather than quietly replacing bytes under a version someone pinned.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-devcontainer-feature-main
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish envpilot feature
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read the declared version
+        id: meta
+        run: |
+          VERSION=$(jq -r '.version' packages/devcontainer-feature/src/envpilot/devcontainer-feature.json)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Declared: envpilot@$VERSION"
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Skip when this version is already published
+        id: check
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          REF="ghcr.io/rafay99-epic/devcontainer-features/envpilot:${VERSION}"
+          if docker manifest inspect "$REF" > /dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$REF already exists. Bump devcontainer-feature.json to publish a new version."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate the feature manifest
+        if: steps.check.outputs.skip != 'true'
+        uses: devcontainers/action@v1
+        with:
+          validate-only: "true"
+          base-path-to-features: "./packages/devcontainer-feature/src"
+
+      - name: Publish
+        if: steps.check.outputs.skip != 'true'
+        uses: devcontainers/action@v1
+        with:
+          publish-features: "true"
+          base-path-to-features: "./packages/devcontainer-feature/src"
+          oci-registry: "ghcr.io"
+          # Without this the namespace defaults to the repo name, which would
+          # publish to ghcr.io/rafay99-epic/envpilot.dev/envpilot and collide
+          # conceptually with the Docker image at ghcr.io/rafay99-epic/envpilot.
+          features-namespace: "rafay99-epic/devcontainer-features"
