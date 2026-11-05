@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to coding agents working in this repository. It is the single source of truth; `CLAUDE.md` is a symlink to it.
+This file provides guidance to coding agents working in this repository. It is the single source of truth. `CLAUDE.md` was a symlink to it and is now a separate file that has diverged, so a change made here may need mirroring there.
 
 ## Important Rules
 
@@ -210,6 +210,9 @@ Package versions to bump when making changes:
 - **Blog / Docs apps** (`apps/blog/`, `apps/docs/`): bump their package.json —
   NOT in `versions.ts`/`APP_VERSIONS` (static sites, not polling clients).
 - **GitHub Action** (`packages/github-action/`): bump `packages/github-action/package.json` — the bump IS the release trigger (deploy-action publishes it, tags `vX.Y.Z`, and moves the floating `v1` so `@v1` consumers always get the latest). Does NOT go in `versions.ts`/`APP_VERSIONS` — the action is tag-pinned, not a polling client.
+- **MCP registry listing** (`server.json` at the repo root): bump `version` to publish a new listing to registry.modelcontextprotocol.io. The bump IS the release trigger (deploy-mcp-registry). Registry versions are IMMUTABLE, so the workflow skips when the declared version is already listed. Does NOT go in `versions.ts`/`APP_VERSIONS`. Needs `MCP_REGISTRY_PRIVATE_KEY` in Envpilot plus a one-time TXT record on `envpilot.dev`.
+- **Devcontainer Feature** (`packages/devcontainer-feature/src/envpilot/devcontainer-feature.json`): bump `version` to publish `ghcr.io/rafay99-epic/devcontainer-features/envpilot`. The bump IS the release trigger (deploy-devcontainer-feature), which skips when the OCI tag already exists. Does NOT go in `versions.ts`/`APP_VERSIONS`.
+- **Claude Code plugin** (`plugins/envpilot/.claude-plugin/plugin.json`): bump `version` on every change, or installed users keep the old copy. There is no publish step: the marketplace is this repo, so pushing to `main` is the release. Validate with `claude plugin validate ./plugins/envpilot` and `claude plugin validate .`.
 - **Root monorepo** (`package.json`): bump when features span multiple packages
 
 #### Release manifest — `package.json` is NOT the only file (CRITICAL)

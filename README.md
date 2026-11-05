@@ -91,6 +91,43 @@ envpilot pull           # fetch variables for your environment
 envpilot run -- npm run dev
 ```
 
+## Connect your coding agent
+
+Agents hit the same wall as a new teammate: `.env` is gitignored, so a fresh
+clone or a new git worktree has the code and none of the configuration. These
+connect Envpilot to the agent so it can fetch what it needs, with every read
+recorded and writes to a protected environment turned into a change request a
+person approves.
+
+```bash
+# Claude Code: the MCP server on its own
+claude mcp add --transport http envpilot https://www.envpilot.dev/api/mcp
+
+# Claude Code: the plugin, which adds the server plus a skill that
+# bootstraps a checkout without reading secrets into the transcript
+/plugin install envpilot --marketplace rafay99-epic/envpilot.dev
+
+# Codex
+codex mcp add envpilot --url https://www.envpilot.dev/api/mcp && codex mcp login envpilot
+```
+
+[Add to Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=envpilot&config=eyJ1cmwiOiJodHRwczovL3d3dy5lbnZwaWxvdC5kZXYvYXBpL21jcCJ9)
+
+For a dev container or a Codespace, install the CLI as a feature:
+
+```jsonc
+// .devcontainer/devcontainer.json
+{
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/rafay99-epic/devcontainer-features/envpilot:1": {},
+  },
+}
+```
+
+Sign-in is a browser flow, so it is a one-time human step on each machine. See
+[Connecting a client](https://docs.envpilot.dev/mcp/clients).
+
 ## Security
 
 Envpilot is a secrets manager, so the boring details matter:
