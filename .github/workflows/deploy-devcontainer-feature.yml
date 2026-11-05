@@ -68,6 +68,11 @@ jobs:
       - name: Publish
         if: steps.check.outputs.skip != 'true'
         uses: devcontainers/action@v1
+        env:
+          # The docker login above authenticates the Docker CLI only. The
+          # action pushes and tags through its own code path and needs a
+          # token of its own.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           publish-features: "true"
           base-path-to-features: "./packages/devcontainer-feature/src"
@@ -76,3 +81,12 @@ jobs:
           # publish to ghcr.io/rafay99-epic/envpilot.dev/envpilot and collide
           # conceptually with the Docker image at ghcr.io/rafay99-epic/envpilot.
           features-namespace: "rafay99-epic/devcontainer-features"
+
+      # A newly created GHCR package is PRIVATE, so the documented one-line
+      # install fails for everyone outside this repository until it is made
+      # public. There is no reliable API call for this, so say it loudly once
+      # rather than leave a broken install in the docs.
+      - name: Remind about package visibility
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          echo "::notice title=Check GHCR visibility::If this was the first publish, set ghcr.io/rafay99-epic/devcontainer-features/envpilot to Public under Packages settings. A private package makes the documented devcontainer install fail for anyone outside this repo."

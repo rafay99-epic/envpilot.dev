@@ -61,18 +61,39 @@ Check for it:
 command -v envpilot
 ```
 
-If present, the best outcome is not writing a file at all. Running the command
-with the environment injected leaves nothing on disk:
+Always pass the project and environment explicitly. Without them the CLI uses
+whatever project is active in the nearest `.envpilot`, which is not
+necessarily the one matched in step 1, and in a monorepo it may not be the
+one you are standing in.
+
+The best outcome is not writing a file at all:
 
 ```bash
-envpilot run -- <the project's dev command>
+envpilot run --no-cache -e development -p <project-slug> \
+  --require DATABASE_URL,STRIPE_SECRET_KEY -- <the project's dev command>
 ```
 
-When a file is genuinely needed, for a tool that reads `.env` directly:
+Three parts of that matter:
+
+- **`run` fails closed.** If a required secret is missing or cannot be
+  decrypted, it refuses to start the command rather than running with a gap.
+  `--allow-partial` turns that off; do not pass it.
+- **`--require`** lists the keys the code actually needs, so a missing one is
+  named up front instead of surfacing as a confusing runtime error.
+- **`--no-cache`.** By default `run` writes a decrypted copy to
+  `~/.config/envpilot/run-cache` at mode 0600. That is a real file on disk, so
+  do not describe `run` as leaving nothing behind. `envpilot logout` purges it.
+
+When a file is genuinely needed, because a tool reads `.env` directly:
 
 ```bash
-envpilot pull
+envpilot pull -e development --project <project-slug>
 ```
+
+`pull` does **not** have `run`'s refusal: it writes the rows it received, so
+it can leave a partial file. Use `--dry-run` first to see what it would write,
+and after writing, confirm the keys the code needs are present. Prefer `run`
+whenever the thing you are trying to do is start a process.
 
 If the CLI reports that the directory is not linked, link it once:
 
@@ -88,14 +109,20 @@ no secrets.
 Without the CLI, call `envpilot_get_variables` with the project slug and
 environment, then write the file with the Write tool.
 
-Two things to get right:
+**Establish completeness yourself.** The response does not tell you what it
+could not read: variables you lack a grant for are dropped before the response
+is built, so a short list looks exactly like a complete one. Call
+`envpilot_get_variables` once with `metadata_only: true`, which lists key names
+without decrypting, and compare that list against the keys you got values for.
+If any are missing, say which, and do not write a file that pretends to be
+complete.
 
-- **Quote every value.** Write `KEY='value'`, escaping an embedded single
-  quote as `'\''`. An unquoted value containing a space, `#`, `$` or a
-  backtick breaks or, worse, gets executed by whatever sources the file.
-- **Check the count.** If the response reports keys it could not read, the
-  file is incomplete. Say which keys are missing and that a project member
-  has to grant access. Do not write a partial file and report success.
+**Do not hand-escape dotenv.** Quoting rules differ between parsers, and the
+shell idiom for a single quote inside a single-quoted string is not dotenv
+syntax; it corrupts the value in most parsers, including this product's own.
+If `envpilot export --format env` is available, use its output verbatim. If
+you must write the file yourself, use double quotes and escape `"` as `\"`
+and newlines as `\n` inside the value, and keep one key per line.
 
 Write to `.env.local` when the framework prefers it (Next.js, Vite), otherwise
 `.env`. Confirm the path is gitignored before writing. If it is not, add it.

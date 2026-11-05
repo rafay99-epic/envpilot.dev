@@ -95,20 +95,25 @@ envpilot run -- npm run dev
 
 Agents hit the same wall as a new teammate: `.env` is gitignored, so a fresh
 clone or a new git worktree has the code and none of the configuration. These
-connect Envpilot to the agent so it can fetch what it needs, with every read
-recorded and writes to a protected environment turned into a change request a
-person approves.
+connect Envpilot to the agent so it can fetch what it needs, with every value
+read recorded in the audit log and writes to a protected environment turned
+into a change request a person approves. Metadata and list calls are not
+audited, deliberately, because the volume would bury the reads that matter.
 
 ```bash
 # Claude Code: the MCP server on its own
 claude mcp add --transport http envpilot https://www.envpilot.dev/api/mcp
 
-# Claude Code: the plugin, which adds the server plus a skill that
-# bootstraps a checkout without reading secrets into the transcript
-/plugin install envpilot --marketplace rafay99-epic/envpilot.dev
-
 # Codex
 codex mcp add envpilot --url https://www.envpilot.dev/api/mcp && codex mcp login envpilot
+```
+
+Inside a Claude Code session, install the plugin instead. It adds the server
+plus a skill that bootstraps a checkout without reading secret values into the
+transcript:
+
+```
+/plugin install envpilot --marketplace rafay99-epic/envpilot.dev
 ```
 
 [Add to Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=envpilot&config=eyJ1cmwiOiJodHRwczovL3d3dy5lbnZwaWxvdC5kZXYvYXBpL21jcCJ9)

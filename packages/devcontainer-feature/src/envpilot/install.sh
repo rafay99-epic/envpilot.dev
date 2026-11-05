@@ -24,9 +24,31 @@ echo "envpilot: installing @envpilot/cli@${VERSION}"
 npm install -g "@envpilot/cli@${VERSION}"
 
 # Fail the build rather than hand over a container with a broken binary.
-if ! envpilot --version > /dev/null 2>&1; then
-  echo "envpilot: installed, but 'envpilot --version' did not run." >&2
+#
+# The global bin directory is not always on $PATH while a Feature runs: base
+# images differ on whether npm's prefix is /usr/local or a user-local path, so
+# a plain `envpilot --version` can fail for a CLI that installed correctly.
+# Resolve the prefix and look there.
+GLOBAL_BIN="$(npm prefix -g 2>/dev/null)/bin"
+if [ -x "${GLOBAL_BIN}/envpilot" ]; then
+  ENVPILOT_BIN="${GLOBAL_BIN}/envpilot"
+elif command -v envpilot > /dev/null 2>&1; then
+  ENVPILOT_BIN="$(command -v envpilot)"
+else
+  echo "envpilot: installed, but no envpilot binary was found." >&2
+  echo "envpilot: looked in ${GLOBAL_BIN} and on \$PATH." >&2
   exit 1
 fi
 
-echo "envpilot: $(envpilot --version) ready. Sign in with 'envpilot login'."
+if ! VERSION_OUT="$("$ENVPILOT_BIN" --version 2>&1)"; then
+  echo "envpilot: found ${ENVPILOT_BIN}, but --version did not run:" >&2
+  echo "envpilot: ${VERSION_OUT}" >&2
+  exit 1
+fi
+
+if ! command -v envpilot > /dev/null 2>&1; then
+  echo "envpilot: note - ${GLOBAL_BIN} is not on \$PATH in this build step." >&2
+  echo "envpilot: it is normally on \$PATH for the container user at runtime." >&2
+fi
+
+echo "envpilot: ${VERSION_OUT} ready. Sign in with 'envpilot login'."

@@ -65,33 +65,59 @@ jobs:
           NAME: ${{ steps.meta.outputs.name }}
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
-          # A tolerant check. If the registry cannot be read, fall through to
-          # the publish, which fails loudly on a duplicate version rather
-          # than silently doing nothing.
-          LISTED=$(curl -sS --max-time 20 \
-            "https://registry.modelcontextprotocol.io/v0.1/servers?search=$(jq -rn --arg n "$NAME" '$n|@uri')" \
-            | jq -r --arg n "$NAME" '[.servers[]? | select(.name == $n) | .version] | last // ""' 2>/dev/null || echo "")
-          echo "Listed version: ${LISTED:-<none or unreadable>}"
-          if [ -n "$LISTED" ] && [ "$LISTED" = "$VERSION" ]; then
+          # Registry entries nest the server under `.server`, and the match
+          # has to be for THIS exact version rather than the newest one:
+          # versions are immutable, so republishing any already-listed
+          # version fails.
+          #
+          # Tolerant by design. If the registry cannot be read, fall through
+          # to the publish, which fails loudly on a duplicate rather than
+          # silently doing nothing.
+          ENCODED=$(jq -rn --arg n "$NAME" '$n|@uri')
+          BODY=$(curl -sS --max-time 20 \
+            "https://registry.modelcontextprotocol.io/v0.1/servers?search=${ENCODED}" || echo "")
+          MATCH=$(printf '%s' "$BODY" | jq -r --arg n "$NAME" --arg v "$VERSION" '
+            [ .servers[]? | (.server // .) | select(.name == $n and .version == $v) ] | length
+          ' 2>/dev/null || echo 0)
+          if [ "${MATCH:-0}" -gt 0 ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "::notice::$NAME@$VERSION is already listed. Bump server.json to publish a new version."
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "$NAME@$VERSION is not listed yet."
           fi
 
       - name: Install mcp-publisher
         if: steps.check.outputs.skip != 'true'
+        env:
+          # Pinned release AND pinned content digest. This job holds the
+          # ed25519 key that authorizes publishes for the envpilot.dev
+          # namespace, so a tampered release asset would be a key
+          # compromise, not just a bad build. Bump both together; the digest
+          # comes from the release asset's own `digest` field.
+          PUBLISHER_VERSION: v1.8.7
+          PUBLISHER_SHA256: 00b21004149a4ce66f0782508ae4a2bce67d1bea395a8da0bd8028159fb59579
         run: |
           set -euo pipefail
-          VERSION=1.2.3
-          curl -sSfL "https://github.com/modelcontextprotocol/registry/releases/download/v${VERSION}/mcp-publisher_${VERSION}_linux_amd64.tar.gz" \
-            | tar xz -C /tmp mcp-publisher
+          ASSET=mcp-publisher_linux_amd64.tar.gz
+          curl -sSfL -o "/tmp/${ASSET}" \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${PUBLISHER_VERSION}/${ASSET}"
+          echo "${PUBLISHER_SHA256}  /tmp/${ASSET}" | sha256sum -c -
+          tar xzf "/tmp/${ASSET}" -C /tmp mcp-publisher
           /tmp/mcp-publisher --version
 
       - name: Publish
         if: steps.check.outputs.skip != 'true'
         run: |
           set -euo pipefail
+          # The key goes on the command line because that is the only
+          # interface mcp-publisher offers: `--private-key` is the single
+          # source, with no env-var or file alternative (cmd/publisher/
+          # commands/login.go). It is read from the environment rather than
+          # interpolated into the script, which is already stricter than the
+          # upstream example, but it is still visible in the process list for
+          # the life of the call. Acceptable only because a GitHub-hosted
+          # runner is ephemeral and runs nothing else.
           /tmp/mcp-publisher login dns \
             --domain envpilot.dev \
             --private-key "$MCP_REGISTRY_PRIVATE_KEY"

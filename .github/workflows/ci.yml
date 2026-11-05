@@ -153,6 +153,7 @@ jobs:
               - 'packages/**'
               - '!packages/docker-image/**'
               - '!packages/github-action/**'
+              - '!packages/devcontainer-feature/**'
               - '.github/workflows/**'
               - '!.github/workflows/deploy-*.yml'
               - '!.github/workflows/smoke-docker-image.yml'

@@ -108,9 +108,12 @@ deeplink:
 cursor://anysphere.cursor-deeplink/mcp/install?name=envpilot&config=eyJ1cmwiOiJodHRwczovL3d3dy5lbnZwaWxvdC5kZXYvYXBpL21jcCJ9
 ```
 
-**MCP registry.** The server is published as `dev.envpilot/mcp`, which is what
-feeds the VS Code MCP gallery and the third-party directories. Search for
-`envpilot` rather than pasting a URL.
+**MCP registry.** The server is published to the official registry as
+`dev.envpilot/mcp`. The registry is an upstream source rather than something a
+client browses directly: host applications read a gallery or subregistry
+configured for them, and the third-party catalogs ingest from it. So where
+`envpilot` turns up searchable depends on which of those a given client is
+pointed at.
 
 ### Dev containers and Codespaces
 
