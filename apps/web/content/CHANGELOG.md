@@ -15,6 +15,26 @@
 
 <!-- entry -->
 ---
+title: Install Envpilot from a plugin, a deeplink, the MCP registry or a devcontainer Feature
+version: v1.60.0
+date: 2026-11-06
+types: [feature]
+---
+
+Connecting an agent took a command nobody knew to run. Four new ways in, none of which require reading the docs first.
+
+**Claude Code plugin.** `/plugin install envpilot --marketplace rafay99-epic/envpilot.dev` installs the MCP server and a `bootstrap-env` skill. The skill is the part worth describing: it teaches the agent to get a fresh clone or a new git worktree running, and to prefer `envpilot run` and `envpilot pull` over reading values, so secrets stay out of the transcript. It also tells the agent to check protected environments before proposing a change, and to refuse to write a partial file when some keys are not readable.
+
+**MCP registry.** The server is published as `dev.envpilot/mcp`. That listing is what feeds the VS Code MCP gallery and the third-party server directories, which is where clients and assistants look when someone asks how to manage environment variables.
+
+**Cursor deeplink.** An "Add to Cursor" button in the README, instead of hand-editing `mcp.json`.
+
+**Devcontainer Feature.** `ghcr.io/rafay99-epic/devcontainer-features/envpilot:1` puts the CLI on `$PATH` in a Codespace or dev container, so a container can fetch its own environment rather than waiting for someone to paste one in. It needs the `node` Feature alongside it and says so clearly instead of half-installing.
+
+Both publish steps skip when the version they declare is already published, because a registry version and an OCI tag are supposed to be immutable and something people pin.
+
+<!-- entry -->
+---
 title: The MCP server, public API and Docker image are now on the free plan
 version: v1.73.0
 date: 2026-11-06
