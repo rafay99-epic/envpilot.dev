@@ -1,0 +1,17 @@
+{
+  "id": "envpilot",
+  "version": "1.0.0",
+  "name": "Envpilot CLI",
+  "documentationURL": "https://docs.envpilot.dev/cli/install",
+  "licenseURL": "https://github.com/rafay99-epic/envpilot.dev/blob/main/LICENSE",
+  "description": "Installs the Envpilot CLI so a container can pull its environment variables instead of waiting for a .env file to be pasted in.",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["latest"],
+      "default": "latest",
+      "description": "npm dist-tag or exact version of @envpilot/cli to install."
+    }
+  },
+  "installsAfter": ["ghcr.io/devcontainers/features/node"]
+}
