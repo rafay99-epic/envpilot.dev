@@ -56,9 +56,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Authorization is enforced in the Convex mutation (assertOrgAction)
 
     // Look up target user by email
-    const targetUser = await convex.query(api.features.users.users.getByEmail, {
-      email: targetUserEmail,
-    });
+    // Authed client: getByEmail requires a Convex identity, because an email
+    // is guessable and the lookup used to expose the whole user row.
+    const targetUser = await createAuthedConvexClient(accessToken!).query(
+      api.features.users.users.getByEmail,
+      { email: targetUserEmail }
+    );
 
     if (!targetUser) {
       return NextResponse.json(

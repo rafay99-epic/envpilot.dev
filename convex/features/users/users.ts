@@ -8,6 +8,20 @@ import { assertOrgAction } from "../../lib/authz";
  * User Queries and Mutations
  */
 
+/**
+ * Bootstrap lookups for the server-side Next.js routes.
+ *
+ * These two stay public and unauthenticated deliberately: every API route
+ * calls `getOrCreateConvexUser` at the top of the request through the SHARED
+ * UNAUTHENTICATED client (apps/web/src/lib/convex-client.ts), before any
+ * Convex identity exists, and `dashboard-auth` reads ban state off the
+ * result to block a banned session. Both take an opaque identifier the
+ * caller must already hold, so neither is enumerable.
+ *
+ * They are still more than a caller needs, and the Stage 2/3 auth cutover
+ * that deletes the per-route lookup is what closes them for good. Do not add
+ * new callers; use the internal twins below from inside Convex.
+ */
 export const getById = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
@@ -25,13 +39,52 @@ export const getByWorkosId = query({
   },
 });
 
-export const getByEmail = query({
-  args: { email: v.string() },
+/** Internal twins for Convex-side callers, which already hold a ctx. */
+export const _getById = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.userId);
+  },
+});
+
+export const _getByWorkosId = internalQuery({
+  args: { workosId: v.string() },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("users")
+      .withIndex("by_workos_id", (q) => q.eq("workosId", args.workosId))
+      .first();
+  },
+});
+
+/**
+ * Look up a colleague by email address.
+ *
+ * Authenticated callers only, and the row is narrowed. This was a public
+ * query returning the whole user document, so anyone holding the public
+ * Convex URL — which ships in the web bundle, the CLI and the extension —
+ * could probe any address and read back that person's name and their
+ * moderation state (`isBanned`, `banReason`, `bannedBy`). An email is
+ * guessable, which is what separates this from the two lookups above.
+ */
+export const getByEmail = query({
+  args: { email: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      _id: v.id("users"),
+      email: v.string(),
+      name: v.optional(v.string()),
+    })
+  ),
+  handler: async (ctx, args) => {
+    await requireAuthedUser(ctx);
+    const user = await ctx.db
+      .query("users")
       .withIndex("by_email", (q) => q.eq("email", args.email))
       .first();
+    if (!user) return null;
+    return { _id: user._id, email: user.email, name: user.name };
   },
 });
 

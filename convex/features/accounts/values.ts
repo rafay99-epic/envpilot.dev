@@ -48,9 +48,12 @@ async function requireCurrentUserId(ctx: ActionCtx): Promise<Id<"users">> {
   if (!identity) {
     throw new Error("Unauthenticated: no verified user identity on request");
   }
-  const user = await ctx.runQuery(api.features.users.users.getByWorkosId, {
-    workosId: identity.subject,
-  });
+  const user = await ctx.runQuery(
+    internal.features.users.users._getByWorkosId,
+    {
+      workosId: identity.subject,
+    }
+  );
   if (!user) {
     throw new Error("User not found");
   }
