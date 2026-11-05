@@ -42,7 +42,12 @@ paths = [
   '''(^|/)node_modules/''',
   '''(^|/)\.next/''',
   '''(^|/)\.turbo/''',
-  '''(^|/)dist/''',
+  # packages/github-action/dist/ is deliberately NOT skipped. It is the only
+  # COMMITTED dist/ in the repo and it is the exact artifact published to the
+  # public rafay99-epic/envpilot-action repo, so it is the one build output
+  # that has to be scanned. A blanket `dist/` rule skipped precisely it.
+  '''^apps/[^/]+/dist/''',
+  '''^packages/(ui|secret-files)/dist/''',
   '''(^|/)build/''',
   '''(^|/)out/''',
   '''(^|/)\.vercel/''',
