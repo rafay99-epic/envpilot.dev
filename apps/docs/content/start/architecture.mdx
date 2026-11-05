@@ -57,4 +57,4 @@ The MCP server signs an agent in as a person, so it reads what that person's rol
 - **No machine credential can write a secret.** There is no endpoint, tool, or flag that changes this.
 - **Scope is immutable** on an API key — widening access means minting a replacement.
 - **Human surfaces need a browser** for the device flow; a headless machine cannot sign in as a person.
-- **Machine surfaces are Pro-gated** (`public_api`, `mcp_server`) and re-checked per request.
+- **Machine surfaces are available on every plan** (`public_api`, `mcp_server`, `docker_image`) and the gate is re-checked per request.
