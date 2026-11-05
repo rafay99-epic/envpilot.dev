@@ -352,10 +352,11 @@ export const pullSecrets = action({
         );
       }
       if (authorization.denied === "tier_gate_public_api") {
-        // "Pro plan" phrase — the /api/v1/secrets route's 403 regex matches
-        // it — naming the gate that actually denied the pull.
+        // The wording is load bearing: the /api/v1/secrets route classifies
+        // a tier denial by matching the message, and it accepts both this
+        // phrasing and the older "Pro plan" one.
         throw new ConvexError(
-          "The public API is available on the Pro plan — this organization's plan no longer includes it"
+          "The public API is not available on this plan — this organization's plan no longer includes it"
         );
       }
       throw new ConvexError("Invalid or revoked service token");

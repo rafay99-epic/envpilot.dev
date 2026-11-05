@@ -255,7 +255,7 @@ export const COMPARISONS: Comparison[] = [
       {
         feature: "Editor and agent access",
         envpilot:
-          "VS Code and JetBrains plugins, plus a read-only MCP server with scoped keys",
+          "VS Code and JetBrains plugins, plus an MCP server an agent signs in to, where a write to a protected environment becomes a change request a person approves",
         competitor: "CLI and SDKs; integrations for deployment targets",
       },
       {

@@ -97,7 +97,7 @@ export async function GET(request: Request) {
         { status: 403 }
       );
     }
-    if (/pro plan/i.test(message)) {
+    if (/pro plan|not available on this plan/i.test(message)) {
       // Pass the action's wording through — it names the gate that actually
       // denied the pull (cicd_service_tokens for legacy tokens, public_api
       // for apiKeys credentials), and rewriting it here pointed users at
