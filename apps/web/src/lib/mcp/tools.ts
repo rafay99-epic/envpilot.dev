@@ -118,7 +118,20 @@ function writeResult(projectSlug: string, result: ConvexWriteResult) {
 }
 
 // Connector review rules: anything not read-only is marked destructive.
-const writeAnnotations = {
+// A write tool declares one of readOnlyHint or destructiveHint, and a host
+// uses destructiveHint to decide whether a call can be auto-approved.
+//
+// A pure create is NOT destructive: this surface has no delete tool at all,
+// so marking creates destructive blocked a CI agent configured to allow
+// additive writes from every write Envpilot offers.
+const createAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+} as const;
+
+/** For writes that can overwrite existing content. */
+const replaceAnnotations = {
   readOnlyHint: false,
   destructiveHint: true,
   idempotentHint: false,
@@ -460,10 +473,12 @@ export function registerMcpTools(server: McpServer): void {
         client_ref: clientRefInput,
       },
       outputSchema: draftResultShape,
+      // A create, not a replace, and it genuinely dedupes when client_ref is
+      // supplied (features/api/docs.ts), so idempotentHint was wrong too.
       annotations: {
         readOnlyHint: false,
-        destructiveHint: true,
-        idempotentHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
       },
     },
     (args, extra) =>
@@ -555,7 +570,7 @@ export function registerMcpTools(server: McpServer): void {
         description: z.string().optional().describe("What the variable is for"),
       },
       outputSchema: writeResultShape,
-      annotations: writeAnnotations,
+      annotations: createAnnotations,
     },
     (args, extra) =>
       run("envpilot_create_variable", extra.authInfo, async (b) =>
@@ -596,7 +611,7 @@ export function registerMcpTools(server: McpServer): void {
           .array(z.string())
           .describe("Every environment the changed variable covers"),
       },
-      annotations: writeAnnotations,
+      annotations: replaceAnnotations,
     },
     (args, extra) =>
       run("envpilot_update_variable", extra.authInfo, async (b) => {
@@ -736,7 +751,7 @@ export function registerMcpTools(server: McpServer): void {
         requestId: z.string().optional(),
         reviewUrl: z.string().optional(),
       },
-      annotations: writeAnnotations,
+      annotations: replaceAnnotations,
     },
     (args, extra) =>
       run("envpilot_upload_file", extra.authInfo, async (b) => {
@@ -852,7 +867,7 @@ export function registerMcpTools(server: McpServer): void {
         description: z.string().optional(),
       },
       outputSchema: writeResultShape,
-      annotations: writeAnnotations,
+      annotations: createAnnotations,
     },
     (args, extra) =>
       run("envpilot_create_account", extra.authInfo, async (b) =>

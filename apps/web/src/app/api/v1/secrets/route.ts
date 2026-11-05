@@ -7,6 +7,7 @@ import { ConvexHttpClient } from "convex/browser";
 import * as Sentry from "@sentry/nextjs";
 import { api } from "@convex/_generated/api";
 import { reportApiError } from "@/lib/api-errors";
+import { getBearerToken } from "@/lib/public-api";
 import { sanitizeConvexError } from "@/lib/error-messages";
 
 /**
@@ -23,10 +24,8 @@ import { sanitizeConvexError } from "@/lib/error-messages";
  * redirect this route to the WorkOS sign-in page.
  */
 export async function GET(request: Request) {
-  const authorization = request.headers.get("authorization") ?? "";
-  const token = authorization.startsWith("Bearer ")
-    ? authorization.slice("Bearer ".length).trim()
-    : "";
+  // Shared helper: the scheme is matched case insensitively, per RFC 7235.
+  const token = getBearerToken(request);
 
   if (!token) {
     return NextResponse.json(

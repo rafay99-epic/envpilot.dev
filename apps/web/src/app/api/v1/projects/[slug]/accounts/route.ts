@@ -12,6 +12,7 @@ import {
   getBearerToken,
   getConvexUrl,
   mapPublicApiError,
+  parseMetadataOnly,
 } from "@/lib/public-api";
 
 type RouteParams = { params: Promise<{ slug: string }> };
@@ -50,9 +51,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   const { searchParams } = new URL(request.url);
   const parsed = querySchema.safeParse({
     environment: searchParams.get("environment") ?? undefined,
-    metadataOnly: searchParams.has("metadata_only")
-      ? searchParams.get("metadata_only") === "true"
-      : undefined,
+    metadataOnly: parseMetadataOnly(searchParams),
   });
   if (!parsed.success) {
     return NextResponse.json(

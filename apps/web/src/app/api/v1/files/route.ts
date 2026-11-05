@@ -7,6 +7,7 @@ import { ConvexHttpClient } from "convex/browser";
 import * as Sentry from "@sentry/nextjs";
 import { api } from "@convex/_generated/api";
 import { reportApiError } from "@/lib/api-errors";
+import { getBearerToken, parseMetadataOnly } from "@/lib/public-api";
 import { sanitizeConvexError } from "@/lib/error-messages";
 
 /**
@@ -26,10 +27,8 @@ import { sanitizeConvexError } from "@/lib/error-messages";
  * redirect this route to the WorkOS sign-in page.
  */
 export async function GET(request: Request) {
-  const authorization = request.headers.get("authorization") ?? "";
-  const token = authorization.startsWith("Bearer ")
-    ? authorization.slice("Bearer ".length).trim()
-    : "";
+  // Shared helper: the scheme is matched case insensitively, per RFC 7235.
+  const token = getBearerToken(request);
 
   if (!token) {
     return NextResponse.json(
@@ -65,9 +64,7 @@ export async function GET(request: Request) {
 
   // Opt-in metadata mode: path/size/checksum with nothing decrypted, so a
   // caller can diff against local state without pulling any secret.
-  const metadataOnly =
-    searchParams.get("metadataOnly") === "1" ||
-    searchParams.get("metadataOnly") === "true";
+  const metadataOnly = parseMetadataOnly(searchParams) ?? false;
   const paths = searchParams.getAll("path");
   // Clients that hold a surface-scoped key identify themselves so authorize.ts
   // checks the right key scope AND the right tier gate: the Action presents
