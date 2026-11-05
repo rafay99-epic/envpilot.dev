@@ -27,6 +27,15 @@ export const listMigrations = query({
         runOnce: false,
       },
       {
+        name: "resync-agent-surface-tier-features",
+        description:
+          "Force-sets the six agent-surface tier values (public_api, mcp_server, docker_image, docker_image_limit, github_action_limit, protected_environments) from TIER_CONFIGS. Run ONCE after the deploy that moved them onto the free tier; seed-tier-features only inserts, so it is a no-op on any deployment that has already been seeded. Do NOT add this to the deploy loop — it would clobber deliberate admin edits on every release.",
+        category: "Core",
+        priority: 8,
+        destructive: false,
+        runOnce: false,
+      },
+      {
         name: "resync-shared-variables-tier-features",
         description:
           "Force-sets the five shared-variables tier values (workspaces, max_workspaces, max_projects_per_workspace, max_workspaces_per_project, max_variables_per_workspace) from TIER_CONFIGS. Run once after a deploy that changed them; seed-tier-features never overwrites.",
@@ -160,7 +169,71 @@ const RETIRED_FEATURE_KEYS = [
   "anomaly_detection_limit",
 ];
 
-const TIER_CONFIGS: Record<string, Record<string, string>> = {
+/**
+ * Force-set specific tier values from TIER_CONFIGS, for every tier.
+ *
+ * `seed-tier-features` only INSERTS, so an admin edit survives a reseed. That
+ * also means changing a value in TIER_CONFIGS is a no-op on any deployment
+ * already seeded, which is why flipping a value ships with a resync scoped to
+ * exactly the keys that changed. Scoped on purpose: a blanket resync would
+ * discard deliberate per-tier admin edits.
+ *
+ * Returns how many rows were written.
+ */
+async function forceSetTierValues(
+  ctx: MutationCtx,
+  keys: readonly string[]
+): Promise<number> {
+  const now = Date.now();
+  let updated = 0;
+  for (const [tierName, features] of Object.entries(TIER_CONFIGS)) {
+    for (const featureKey of keys) {
+      const value = features[featureKey];
+      if (value === undefined) continue;
+      const existing = await ctx.db
+        .query("tierFeatures")
+        .withIndex("by_tier_and_feature", (q) =>
+          q.eq("tierName", tierName).eq("featureKey", featureKey)
+        )
+        .first();
+      if (existing) {
+        await ctx.db.patch(existing._id, { value, updatedAt: now });
+      } else {
+        await ctx.db.insert("tierFeatures", {
+          tierName,
+          featureKey,
+          value,
+          updatedAt: now,
+        });
+      }
+      updated++;
+    }
+  }
+  return updated;
+}
+
+/**
+ * Default tier values.
+ *
+ * Policy note on the machine surfaces: `public_api`, `mcp_server`,
+ * `docker_image`, `github_action_limit` and `protected_environments` are ON
+ * for free. They used to be Pro-only, which meant the CLI, the editor
+ * extensions and the JetBrains plugin were free while every surface an agent
+ * or a CI job can reach was paid. Nobody could evaluate the agent workflow,
+ * so nobody wrote about it. Worse, `protected_environments` is what turns an
+ * agent write into a change request a human approves, so the one feature that
+ * makes agent access SAFE was the one behind the paywall.
+ *
+ * Pro still differentiates on volume (projects, variables, members,
+ * organizations), 365-day audit retention against 7, version history, bulk
+ * import and export, secret rotation, secret sharing, security hold,
+ * workspaces, public doc links, custom branding and priority support.
+ *
+ * The two surface limits count ACTIVE KEYS, not pulls (see lib/surfaces.ts),
+ * and pull volume is bounded separately by the rate limiter. Two of each is
+ * enough to run a real side project while a CI fleet still needs Pro.
+ */
+export const TIER_CONFIGS: Record<string, Record<string, string>> = {
   free: {
     max_projects: "3",
     max_variables_per_project: "50",
@@ -180,18 +253,18 @@ const TIER_CONFIGS: Record<string, Record<string, string>> = {
     granular_permissions: "true",
     audit_log_retention_days: "7",
     sso_enabled: "false",
-    public_api: "false",
-    mcp_server: "false",
-    docker_image: "false",
-    docker_image_limit: "0",
-    github_action_limit: "0",
+    public_api: "true",
+    mcp_server: "true",
+    docker_image: "true",
+    docker_image_limit: "2",
+    github_action_limit: "2",
     team_notifications: "false",
     team_notifications_limit: "0",
     secret_rotation: "false",
     secret_rotation_limit: "7",
     secret_sharing: "false",
     security_hold: "false",
-    protected_environments: "false",
+    protected_environments: "true",
     max_active_shares: "0",
     shared_accounts: "true",
     shared_accounts_limit: "5",
@@ -279,37 +352,26 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
   // Keeps the original `args.name` references below working untouched.
   const args = { name };
 
+  if (args.name === "resync-agent-surface-tier-features") {
+    const updated = await forceSetTierValues(ctx, [
+      "public_api",
+      "mcp_server",
+      "docker_image",
+      "docker_image_limit",
+      "github_action_limit",
+      "protected_environments",
+    ]);
+    return { success: true, updated };
+  }
+
   if (args.name === "resync-shared-variables-tier-features") {
-    const keys = [
+    const updated = await forceSetTierValues(ctx, [
       "workspaces",
       "max_workspaces",
       "max_projects_per_workspace",
       "max_workspaces_per_project",
       "max_variables_per_workspace",
-    ] as const;
-    let updated = 0;
-    for (const [tierName, features] of Object.entries(TIER_CONFIGS)) {
-      for (const featureKey of keys) {
-        const value = features[featureKey];
-        const existing = await ctx.db
-          .query("tierFeatures")
-          .withIndex("by_tier_and_feature", (q) =>
-            q.eq("tierName", tierName).eq("featureKey", featureKey)
-          )
-          .first();
-        if (existing) {
-          await ctx.db.patch(existing._id, { value, updatedAt: Date.now() });
-        } else {
-          await ctx.db.insert("tierFeatures", {
-            tierName,
-            featureKey,
-            value,
-            updatedAt: Date.now(),
-          });
-        }
-        updated++;
-      }
-    }
+    ]);
     return { success: true, updated };
   }
 
