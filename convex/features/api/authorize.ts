@@ -235,16 +235,27 @@ export const _authorizeRequest = internalMutation({
       if (!key.lastUsedAt || now - key.lastUsedAt >= 60_000) {
         await ctx.db.patch(key._id, { lastUsedAt: now });
       }
-      await ctx.db.insert("auditLogs", {
+      // Route through createAuditLog, like the denial path, so the row
+      // carries projectId, severity and resourceType. The raw insert this
+      // replaces left the projectId COLUMN unset (it only appeared inside
+      // the stringified details), and the project audit view reads
+      // `by_project` — so a project listed its denied pulls and hid every
+      // successful one.
+      const usedProjectId = await resolveAuditProjectId(
+        ctx.db,
+        key.organizationId,
+        requirement.projectId
+      );
+      await createAuditLog(ctx, {
         organizationId: key.organizationId,
+        projectId: usedProjectId,
         userId: key.createdBy,
         action: args.recordUse.auditAction,
-        details: JSON.stringify({
+        details: {
           keyId: key._id,
           projectId: requirement.projectId,
           ...(JSON.parse(args.recordUse.details) as Record<string, unknown>),
-        }),
-        createdAt: now,
+        },
       });
     }
 

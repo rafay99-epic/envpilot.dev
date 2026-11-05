@@ -11,6 +11,10 @@ import { rateLimiter } from "../../lib/rateLimits";
 import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { createAuditLog, resolveAuditProjectId } from "../../lib/audit";
+import {
+  ENVIRONMENT_LIST_TEXT,
+  isValidEnvironment,
+} from "../../lib/environments";
 
 /**
  * CI/CD secret pull — the GitHub Action's read path.
@@ -188,19 +192,27 @@ export const _authorizePull = internalMutation({
         return { ok: false as const, denied: "tier_gate_public_api" as const };
       }
 
-      await ctx.db.patch(apiKey._id, { lastUsedAt: now });
-      await ctx.db.insert("auditLogs", {
+      // Same 60s throttle as authorize.ts: lastUsedAt is a coarse "recently
+      // active" signal, and patching the key row on every pull makes the
+      // parallel pulls of a build matrix OCC-contend on one document.
+      if (!apiKey.lastUsedAt || now - apiKey.lastUsedAt >= 60_000) {
+        await ctx.db.patch(apiKey._id, { lastUsedAt: now });
+      }
+      // createAuditLog rather than a raw insert, so the row carries the
+      // projectId COLUMN (the project audit view reads `by_project`) plus
+      // severity and resourceType.
+      await createAuditLog(ctx, {
         organizationId: apiKey.organizationId,
+        projectId,
         userId: apiKey.createdBy,
         action: "api.secrets_pulled",
-        details: JSON.stringify({
+        details: {
           keyId: apiKey._id,
           keyName: apiKey.name,
           projectId,
           environment: args.environment,
           source: "cicd_pull_compat",
-        }),
-        createdAt: now,
+        },
       });
 
       return {
@@ -231,7 +243,7 @@ export const _readScopedVariables = internalQuery({
   returns: v.array(
     v.object({
       key: v.string(),
-      vaultRef: v.union(v.string(), v.null()),
+      vaultRef: v.string(),
     })
   ),
   handler: async (ctx, args) => {
@@ -252,10 +264,19 @@ export const _readScopedVariables = internalQuery({
       );
     }
 
-    return variables.map((variable) => ({
-      key: variable.key,
-      vaultRef: variable.vaultRef ?? null,
-    }));
+    return variables.map((variable) => {
+      if (!variable.vaultRef) {
+        // The schema makes vaultRef non-optional, so a missing one means the
+        // row was written by a path that skipped the vault. This used to be
+        // reported as `value: ""`, which the Action masks and exports, so CI
+        // deployed with an empty secret and a green check. Refuse the pull
+        // instead, matching api/reads.ts.
+        throw new ConvexError(
+          `"${variable.key}" has no stored value — pull aborted. Re-save the variable in Envpilot.`
+        );
+      }
+      return { key: variable.key, vaultRef: variable.vaultRef };
+    });
   },
 });
 
@@ -279,6 +300,15 @@ export const pullSecrets = action({
   }> => {
     if (!args.token.startsWith("envpk_")) {
       throw new ConvexError("Invalid or revoked service token");
+    }
+
+    // Checked here as well as in the route, because this action is public
+    // and a direct caller skips the Next.js layer entirely. An unknown name
+    // resolved to zero rows and reported success.
+    if (!isValidEnvironment(args.environment)) {
+      throw new ConvexError(
+        `Unknown environment "${args.environment}". Valid environments: ${ENVIRONMENT_LIST_TEXT}.`
+      );
     }
 
     const digest = await crypto.subtle.digest(
@@ -334,28 +364,25 @@ export const pullSecrets = action({
 
     const variables: Array<{ key: string; value: string }> = [];
     for (const row of rows) {
-      let value = "";
-      if (row.vaultRef) {
-        try {
-          value = await ctx.runAction(
-            internal.features.vault.vault.readSecret,
-            { vaultRef: row.vaultRef }
-          );
-        } catch (error) {
-          // FAIL LOUDLY. Exporting a sentinel here would hand CI a broken
-          // secret value that gets masked by the Action (setSecret) and
-          // silently deployed. A failed decrypt must fail the pull — the
-          // Action surfaces it via setFailed and the pipeline stops.
-          console.error("cicd.pull.decryptFailed", {
-            projectId: scope.projectId,
-            key: row.key,
-          });
-          throw new ConvexError(
-            `Failed to decrypt "${row.key}" — pull aborted (transient vault errors are retryable; persistent ones need the variable re-saved)`
-          );
-        }
+      let value: string;
+      try {
+        value = await ctx.runAction(internal.features.vault.vault.readSecret, {
+          vaultRef: row.vaultRef,
+        });
+      } catch (error) {
+        // FAIL LOUDLY. Exporting a sentinel here would hand CI a broken
+        // secret value that gets masked by the Action (setSecret) and
+        // silently deployed. A failed decrypt must fail the pull — the
+        // Action surfaces it via setFailed and the pipeline stops.
+        console.error("cicd.pull.decryptFailed", {
+          projectId: scope.projectId,
+          key: row.key,
+        });
+        throw new ConvexError(
+          `Failed to decrypt "${row.key}" — pull aborted (transient vault errors are retryable; persistent ones need the variable re-saved)`
+        );
       }
-      variables.push({ key: row.key, value: value || "" });
+      variables.push({ key: row.key, value });
     }
 
     return {
