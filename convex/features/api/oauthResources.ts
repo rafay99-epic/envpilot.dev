@@ -10,6 +10,10 @@ import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { createAuditLog } from "../../lib/audit";
 import {
+  ENVIRONMENT_LIST_TEXT,
+  unknownEnvironments,
+} from "../../lib/environments";
+import {
   getRoleProfile,
   isEnvironmentScopeAllowed,
   isSuspendedMembership,
@@ -115,12 +119,35 @@ async function deleteVaultObject(ctx: ActionCtx, vaultRef: string) {
     });
 }
 
+/**
+ * Refuse an environment name the platform does not have.
+ *
+ * The MCP tool schema carries a zod enum, but that lives in the Next.js layer
+ * and every action in this file is a PUBLIC Convex endpoint that any valid MCP
+ * token can call directly. An unknown name used to be written straight
+ * through, and because protection matching is exact, "Production" never
+ * matched a protected "production": the write APPLIED instead of becoming a
+ * change request, and landed a row no reader ever resolves.
+ */
+function assertKnownEnvironments(environments: readonly string[]): void {
+  const unknown = unknownEnvironments(environments);
+  if (unknown.length === 0) return;
+  const names = unknown.map((name) => `"${name}"`).join(", ");
+  throw new ConvexError(
+    `Unknown environment${unknown.length > 1 ? "s" : ""} ${names}. Valid environments: ${ENVIRONMENT_LIST_TEXT}.`
+  );
+}
+
 async function startWrite(
   ctx: ActionCtx,
-  token: string
+  token: string,
+  environments?: readonly string[]
 ): Promise<OAuthPrincipal> {
   const principal = await verifyOAuthToken(token);
   await consumeRateLimit(ctx, "mcpWrite", oauthRateKey(principal));
+  // After the rate limit on purpose: a typo should cost the caller quota
+  // rather than give an unauthenticated prober a free validity oracle.
+  if (environments) assertKnownEnvironments(environments);
   return principal;
 }
 
@@ -139,7 +166,7 @@ export const createVariable = action({
   },
   returns: writeResultValidator,
   handler: async (ctx, args): Promise<WriteResult> => {
-    const principal = await startWrite(ctx, args.token);
+    const principal = await startWrite(ctx, args.token, args.environments);
     const target: ResolvedProject & { protectedEnvironments: string[] } =
       await ctx.runQuery(
         internal.features.api.oauthResources._preflightVariableCreate,
@@ -276,7 +303,7 @@ export const updateVariable = action({
     if (args.value === undefined && args.description === undefined) {
       throw new ConvexError("Pass a new value, a new description, or both");
     }
-    const principal = await startWrite(ctx, args.token);
+    const principal = await startWrite(ctx, args.token, [args.environment]);
     const target: ResolvedProject & {
       variableId: Id<"environmentVariables">;
       environments: string[];
@@ -635,6 +662,9 @@ export const uploadFile = action({
     | { status: "proposed"; requestId: Id<"changeRequests"> }
   > => {
     const principal = await verifyOAuthToken(args.token);
+    // This action verifies the token itself rather than going through
+    // startWrite, so the environment check has to be repeated here.
+    assertKnownEnvironments(args.environments);
     const target: ResolvedProject & {
       path: string;
       environments: string[];
@@ -949,7 +979,7 @@ export const createAccount = action({
   },
   returns: writeResultValidator,
   handler: async (ctx, args): Promise<WriteResult> => {
-    const principal = await startWrite(ctx, args.token);
+    const principal = await startWrite(ctx, args.token, args.environments);
     const target: ResolvedProject & { protectedEnvironments: string[] } =
       await ctx.runQuery(
         internal.features.api.oauthResources._preflightAccountCreate,
