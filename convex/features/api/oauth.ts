@@ -62,15 +62,31 @@ const SEARCH_MAX_PROJECTS = 20;
 const SEARCH_MAX_RESULTS = 100;
 const SEARCH_ROW_BUDGET = 8000;
 const VARIABLE_COUNT_CAP = 500;
+/**
+ * Shared ceiling for the per-project counting in listProjects.
+ *
+ * Counting each project with its own take(500) had no total bound, so an
+ * organization with 34 projects of 500 active variables read 17,000 documents
+ * in one query and blew Convex's 16,384-document transaction limit. That threw
+ * a non-ConvexError, so the FIRST tool an agent calls answered "Server Error"
+ * with no hint. Matches SEARCH_ROW_BUDGET in spirit.
+ */
+const LIST_PROJECTS_ROW_BUDGET = 8000;
 
 const organizationArg = v.optional(v.string());
 
 const projectSummaryValidator = v.object({
   name: v.string(),
   slug: v.string(),
-  variableCount: v.number(),
+  /**
+   * Absent when the organization is large enough that counting every project
+   * would exceed the shared read budget. Absent means "not counted", never
+   * zero: reporting zero would be a sentinel, and the whole point is that the
+   * caller can tell the difference.
+   */
+  variableCount: v.optional(v.number()),
 });
-type ProjectSummary = { name: string; slug: string; variableCount: number };
+type ProjectSummary = { name: string; slug: string; variableCount?: number };
 
 const variableValidator = v.object({
   key: v.string(),
@@ -92,6 +108,14 @@ type ReadableVariables = {
   projectId: Id<"projects">;
   userId: Id<"users">;
   rows: Array<Omit<VariableRow, "value"> & { vaultRef: string }>;
+  /**
+   * Keys the caller can SEE but not read, with the environments they cover.
+   *
+   * Without this a filtered-out variable is indistinguishable from one that
+   * does not exist, so an agent writes a .env missing a key and the app fails
+   * later for an unrelated-looking reason. Names only, never values.
+   */
+  inaccessible: Array<{ key: string; environments: string[] }>;
 };
 
 const searchResultValidator = v.object({
@@ -152,7 +176,7 @@ async function readableVariables(
   ctx: QueryCtx,
   projectId: Id<"projects">,
   userId: Id<"users">
-): Promise<ReadableVariables["rows"]> {
+): Promise<Pick<ReadableVariables, "rows" | "inaccessible">> {
   const { variables, truncatedAt } = await listWithAccessCore(ctx, {
     projectId,
     userId,
@@ -162,19 +186,28 @@ async function readableVariables(
       `Project has more than ${truncatedAt} active variables — refusing a partial pull. Contact support to raise the limit.`
     );
   }
-  return variables.flatMap((variable) =>
-    variable.hasAccess && variable.vaultRef !== undefined
-      ? [
-          {
-            key: variable.key,
-            environments: variable.environments,
-            isSensitive: variable.isSensitive,
-            updatedAt: variable.updatedAt,
-            vaultRef: variable.vaultRef,
-          },
-        ]
-      : []
-  );
+  const rows: ReadableVariables["rows"] = [];
+  const inaccessible: ReadableVariables["inaccessible"] = [];
+  for (const variable of variables) {
+    if (variable.hasAccess && variable.vaultRef !== undefined) {
+      rows.push({
+        key: variable.key,
+        environments: variable.environments,
+        isSensitive: variable.isSensitive,
+        updatedAt: variable.updatedAt,
+        vaultRef: variable.vaultRef,
+      });
+      continue;
+    }
+    // The row-count truncation above is loud, but this filter was silent:
+    // a variable the caller lacks a grant for was simply dropped, so a
+    // short list looked exactly like a complete one.
+    inaccessible.push({
+      key: variable.key,
+      environments: variable.environments,
+    });
+  }
+  return { rows, inaccessible };
 }
 
 /**
@@ -457,21 +490,30 @@ export const _listProjects = internalQuery({
       args.organization
     );
     const projects = await visibleProjects(ctx, user._id, organization._id);
-    return await Promise.all(
-      projects.map(async (project) => {
-        const active = await ctx.db
-          .query("environmentVariables")
-          .withIndex("by_project_deleted", (q) =>
-            q.eq("projectId", project._id).eq("deletedAt", undefined)
-          )
-          .take(VARIABLE_COUNT_CAP);
-        return {
-          name: project.name,
-          slug: project.slug,
-          variableCount: active.length,
-        };
-      })
-    );
+    // Sequential on purpose: the budget has to be spent in order so the
+    // projects that do get counted are counted correctly, rather than every
+    // project racing to read its own 500.
+    let budget = LIST_PROJECTS_ROW_BUDGET;
+    const summaries: ProjectSummary[] = [];
+    for (const project of projects) {
+      if (budget <= 0) {
+        summaries.push({ name: project.name, slug: project.slug });
+        continue;
+      }
+      const active = await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project_deleted", (q) =>
+          q.eq("projectId", project._id).eq("deletedAt", undefined)
+        )
+        .take(Math.min(VARIABLE_COUNT_CAP, budget));
+      budget -= active.length;
+      summaries.push({
+        name: project.name,
+        slug: project.slug,
+        variableCount: active.length,
+      });
+    }
+    return summaries;
   },
 });
 
@@ -485,8 +527,14 @@ export const getVariables = action({
     prefix: v.optional(v.string()),
     metadataOnly: v.optional(v.boolean()),
   },
-  returns: v.array(variableValidator),
-  handler: async (ctx, args): Promise<VariableRow[]> => {
+  returns: v.object({
+    variables: v.array(variableValidator),
+    inaccessibleKeys: v.array(v.string()),
+  }),
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ variables: VariableRow[]; inaccessibleKeys: string[] }> => {
     const principal = await verifyOAuthToken(args.token);
     const metadataOnly = args.metadataOnly ?? false;
     if (!metadataOnly && !args.environment) {
@@ -510,15 +558,23 @@ export const getVariables = action({
     );
 
     const keySet = args.keys ? new Set(args.keys) : null;
-    const filtered = readable.rows.filter(
-      (row) =>
-        (!args.environment || row.environments.includes(args.environment)) &&
-        (!keySet || keySet.has(row.key)) &&
-        (!args.prefix || row.key.startsWith(args.prefix))
-    );
+    const matches = (row: { key: string; environments: string[] }): boolean =>
+      (!args.environment || row.environments.includes(args.environment)) &&
+      (!keySet || keySet.has(row.key)) &&
+      (!args.prefix || row.key.startsWith(args.prefix));
+
+    const filtered = readable.rows.filter(matches);
+    // Narrowed by the same filters, so the caller is told about the keys it
+    // actually asked for rather than everything in the project.
+    const inaccessibleKeys = readable.inaccessible
+      .filter(matches)
+      .map((row) => row.key);
 
     if (metadataOnly) {
-      return filtered.map(({ vaultRef: _vaultRef, ...row }) => row);
+      return {
+        variables: filtered.map(({ vaultRef: _vaultRef, ...row }) => row),
+        inaccessibleKeys,
+      };
     }
 
     const values = await pool(
@@ -549,7 +605,7 @@ export const getVariables = action({
       },
     });
 
-    return values;
+    return { variables: values, inaccessibleKeys };
   },
 });
 
@@ -571,7 +627,11 @@ export const _readVariables = internalQuery({
       organization._id,
       args.projectSlug
     );
-    const rows = await readableVariables(ctx, project._id, user._id);
+    const { rows, inaccessible } = await readableVariables(
+      ctx,
+      project._id,
+      user._id
+    );
     // An empty read may mean the project is not the user's at all: not
     // assigned and no variable grants. That reads as missing, before any
     // pull is recorded against it. Only empty reads pay for the check.
@@ -593,6 +653,7 @@ export const _readVariables = internalQuery({
       projectId: project._id,
       userId: user._id,
       rows,
+      inaccessible,
     };
   },
 });

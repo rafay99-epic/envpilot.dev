@@ -215,14 +215,14 @@ export function registerMcpTools(server: McpServer): void {
     {
       title: "List Projects",
       description:
-        "Lists the projects this connection can see, with each project's name, slug and active variable count.",
+        "Lists the projects this connection can see, with each project's name and slug. `variableCount` is the number of active variables, and is omitted for projects beyond the per-call read budget in a large organization; an omitted count means not counted, never zero.",
       inputSchema: { organization: organizationInput },
       outputSchema: {
         projects: z.array(
           z.object({
             name: z.string(),
             slug: z.string(),
-            variableCount: z.number(),
+            variableCount: z.number().optional(),
           })
         ),
       },
@@ -239,7 +239,7 @@ export function registerMcpTools(server: McpServer): void {
     {
       title: "Get Variables",
       description:
-        "Returns environment variables for one project and environment. Filters by exact keys or a key prefix. With metadata_only, returns keys and metadata without decrypting values, and environment becomes optional. Value reads are recorded in the audit log.",
+        "Returns environment variables for one project and environment, together with inaccessibleKeys: the names of variables that exist and match the filters but that this connection has no grant to read. A non-empty inaccessibleKeys means the result is INCOMPLETE: variables exist that match the filters but are unreadable here, and a .env file written from this response would be missing them. Those keys need a grant from a project member. Filters by exact keys or a key prefix. With metadata_only, returns keys and metadata without decrypting values, and environment becomes optional. Value reads are recorded in the audit log.",
       inputSchema: {
         organization: organizationInput,
         project: z.string().describe("Project slug"),
@@ -261,21 +261,24 @@ export function registerMcpTools(server: McpServer): void {
           .optional()
           .describe("Return keys and metadata only, without values"),
       },
-      outputSchema: { variables: z.array(z.object(variableShape)) },
+      outputSchema: {
+        variables: z.array(z.object(variableShape)),
+        inaccessibleKeys: z.array(z.string()),
+      },
       annotations: { readOnlyHint: true },
     },
     (args, extra) =>
       run("envpilot_get_variables", extra.authInfo, async (b) =>
-        structured({
-          variables: await b.getVariables({
+        structured(
+          await b.getVariables({
             organization: args.organization,
             projectSlug: args.project,
             environment: args.environment,
             keys: args.keys,
             prefix: args.prefix,
             metadataOnly: args.metadata_only,
-          }),
-        })
+          })
+        )
       )
   );
 
@@ -296,13 +299,13 @@ export function registerMcpTools(server: McpServer): void {
     },
     (args, extra) =>
       run("envpilot_get_variable", extra.authInfo, async (b) => {
-        const rows = await b.getVariables({
+        const { variables } = await b.getVariables({
           organization: args.organization,
           projectSlug: args.project,
           environment: args.environment,
           keys: [args.key],
         });
-        return structured({ variable: rows[0] ?? null });
+        return structured({ variable: variables[0] ?? null });
       })
   );
 
