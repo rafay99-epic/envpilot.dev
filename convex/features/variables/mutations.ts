@@ -1323,9 +1323,11 @@ export async function rollbackCore(
 ) {
   const now = Date.now();
 
+  // ConvexError throughout: production Convex redacts a plain Error to
+  // "Server Error", so these never reached the person who triggered them.
   const variable = await ctx.db.get(args.variableId);
   if (!variable || variable.deletedAt) {
-    throw new Error("Variable not found");
+    throw new ConvexError("Variable not found");
   }
 
   const targetVersionRecord = await ctx.db
@@ -1336,12 +1338,12 @@ export async function rollbackCore(
     .first();
 
   if (!targetVersionRecord) {
-    throw new Error("Target version not found");
+    throw new ConvexError("Target version not found");
   }
 
   const project = await ctx.db.get(variable.projectId);
   if (!project) {
-    throw new Error("Project not found");
+    throw new ConvexError("Project not found");
   }
 
   // Authorization: owner only
@@ -1366,6 +1368,27 @@ export async function rollbackCore(
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
+
+  // A rollback REWRITES `environments` from the historical version, so it is
+  // a write path like any other and has to re-check per-environment key
+  // uniqueness. Without this, narrowing a variable to [development], letting
+  // someone else create a [production] twin of the same key, then rolling
+  // back to the version that spanned both leaves two active variables
+  // claiming production — and pull, extension sync and /api/v1/secrets then
+  // resolve that key nondeterministically.
+  const envClashes = await findEnvironmentConflicts(ctx, {
+    projectId: variable.projectId,
+    key: variable.key,
+    environments: touchedEnvironments(
+      variable.environments,
+      targetVersionRecord.environments
+    ),
+    excludeVariableId: variable._id,
+    appliesTo: variable.appliesTo,
+  });
+  if (envClashes.length > 0) {
+    throw new ConvexError(environmentConflictMessage(variable.key, envClashes));
+  }
 
   const newVersion = variable.version + 1;
 
