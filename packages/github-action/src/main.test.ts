@@ -163,8 +163,14 @@ describe("run (fetch handler)", () => {
     // GitHub's masker is line oriented. A PEM key registered only as one
     // multi-line string is never matched against the lines a later step
     // prints, so it used to appear in full in the log.
+    //
+    // The armour deliberately says TEST KEY, not PRIVATE KEY: real armour
+    // trips the gitleaks private-key rule, and this repo now scans the
+    // github-action directory because its bundle is published publicly.
+    // What the test needs is a multiline value whose lines clear the mask
+    // floor, which this is.
     const pem =
-      "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBg\n-----END PRIVATE KEY-----";
+      "-----BEGIN TEST KEY-----\nMIIEvQIBADANBg\n-----END TEST KEY-----";
     vi.mocked(fetch).mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -181,7 +187,7 @@ describe("run (fetch handler)", () => {
     expect(core.setFailed).not.toHaveBeenCalled();
     expect(core.setSecret).toHaveBeenCalledWith(pem);
     expect(core.setSecret).toHaveBeenCalledWith("MIIEvQIBADANBg");
-    expect(core.setSecret).toHaveBeenCalledWith("-----BEGIN PRIVATE KEY-----");
+    expect(core.setSecret).toHaveBeenCalledWith("-----BEGIN TEST KEY-----");
   });
 
   it("leaves a trivially short value unmasked and reports the count", async () => {

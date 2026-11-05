@@ -46,6 +46,10 @@ paths = [
   # COMMITTED dist/ in the repo and it is the exact artifact published to the
   # public rafay99-epic/envpilot-action repo, so it is the one build output
   # that has to be scanned. A blanket `dist/` rule skipped precisely it.
+  #
+  # In CI nothing else matches: the gitleaks step runs before the Turborepo
+  # cache restore and before any build, so no other dist/ exists yet. These
+  # two entries are for a local `gitleaks dir .` in a built tree.
   '''^apps/[^/]+/dist/''',
   '''^packages/(ui|secret-files)/dist/''',
   '''(^|/)build/''',
