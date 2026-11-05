@@ -15,6 +15,30 @@
 
 <!-- entry -->
 ---
+title: The MCP server, public API and Docker image are now on the free plan
+version: v1.73.0
+date: 2026-11-06
+types: [feature, improvement]
+---
+
+Every surface an agent or a CI job can reach used to require Pro, while the CLI, the editor extensions and the JetBrains plugin were free. That was backwards. Nobody could try the agent workflow without paying first, and `protected_environments`, the feature that turns an agent's write into a change request a person approves, was itself behind the paywall, so the thing that makes agent access safe was unavailable on the plan most people start on.
+
+On the free plan now:
+
+- **MCP server** (`mcp_server`), so any Claude, Claude Code, Codex, Cursor or VS Code session can sign in.
+- **Public REST API** (`public_api`), uncapped.
+- **Docker image** (`docker_image`), two keys.
+- **GitHub Action**, two keys.
+- **Protected environments**, unlimited.
+
+Pro still carries the volume: unlimited projects, variables, members and organizations, 365-day audit retention instead of 7, variable version history, bulk import and export, secret rotation, secret sharing, security hold, shared variable workspaces, public documentation links, custom branding and priority support.
+
+**New tool: `envpilot_whoami`.** One call returns the signed-in account, every organization it can reach, the active organization's plan, which features are enabled, the numeric limits with usage where it is known, and every project along with the environments that are protected. That last field matters most: a write touching a protected environment becomes a change request rather than applying, and an agent that reads this first knows the difference between proposing a change and having made one.
+
+Denial messages for the three surfaces no longer say "upgrade to Pro", because they are no longer Pro. The MCP one also stopped referring to "MCP keys", which have not existed since the server moved to OAuth-only sign-in.
+
+<!-- entry -->
+---
 title: Secrets stay masked, and a misspelled environment now fails instead of pulling nothing
 version: v1.72.1
 date: 2026-11-06
