@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -474,5 +475,78 @@ func TestNothingWrittenWhenAnyFileInvalid(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "a.pem")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("a.pem was written before b.pem was validated: %v", err)
+	}
+}
+
+// ── Credential containment ─────────────────────────────────────────────────
+
+func TestChildEnvStripsTheCredential(t *testing.T) {
+	parent := []string{
+		"PATH=/usr/bin",
+		"ENVPILOT_TOKEN=envpk_secret",
+		"ENVPILOT_TOKEN_FILE=/run/secrets/token",
+		"ENVPILOT_PROJECT=checkout",
+	}
+	value := "postgres://db"
+	env := childEnv(parent, []Variable{{Key: "DATABASE_URL", Value: &value}})
+
+	for _, entry := range env {
+		if strings.HasPrefix(entry, "ENVPILOT_TOKEN=") ||
+			strings.HasPrefix(entry, "ENVPILOT_TOKEN_FILE=") {
+			t.Fatalf("credential reached the child: %q", entry)
+		}
+	}
+	if !slices.Contains(env, "PATH=/usr/bin") {
+		t.Fatal("unrelated parent variables must survive")
+	}
+	if !slices.Contains(env, "ENVPILOT_PROJECT=checkout") {
+		t.Fatal("non-secret envpilot variables must survive")
+	}
+	if !slices.Contains(env, "DATABASE_URL=postgres://db") {
+		t.Fatal("pulled variables must be appended")
+	}
+}
+
+func TestChildEnvKeepsAValuelessVariable(t *testing.T) {
+	env := childEnv(nil, []Variable{{Key: "EMPTY", Value: nil}})
+	if !slices.Contains(env, "EMPTY=") {
+		t.Fatalf("got %v, want EMPTY= present", env)
+	}
+}
+
+func TestPlaintextAPIURLRefused(t *testing.T) {
+	_, err := resolveConfig(
+		&Args{APIURL: "http://staging.internal"},
+		envFrom(base(map[string]string{"ENVPILOT_TOKEN": "envpk_x"})),
+	)
+	if err == nil {
+		t.Fatal("http:// must be refused — the key rides in a header")
+	}
+	if !strings.Contains(err.Error(), "https") {
+		t.Fatalf("the message must name the fix, got %q", err.Error())
+	}
+}
+
+func TestLoopbackOverPlaintextAllowed(t *testing.T) {
+	for _, raw := range []string{"http://localhost:3000", "http://127.0.0.1:3000"} {
+		if _, err := resolveConfig(
+			&Args{APIURL: raw},
+			envFrom(base(map[string]string{"ENVPILOT_TOKEN": "envpk_x"})),
+		); err != nil {
+			t.Fatalf("%s must stay usable for local dev: %v", raw, err)
+		}
+	}
+}
+
+func TestHTTPSAPIURLAccepted(t *testing.T) {
+	cfg, err := resolveConfig(
+		&Args{APIURL: "https://www.envpilot.dev/"},
+		envFrom(base(map[string]string{"ENVPILOT_TOKEN": "envpk_x"})),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.APIURL != "https://www.envpilot.dev" {
+		t.Fatalf("got %q", cfg.APIURL)
 	}
 }
