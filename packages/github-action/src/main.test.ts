@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as core from "@actions/core";
@@ -157,6 +157,107 @@ describe("run (fetch handler)", () => {
 
     const failMessage = vi.mocked(core.setFailed).mock.calls[0]?.[0];
     expect(String(failMessage)).not.toContain("envpk_test_token");
+  });
+
+  it("masks every LINE of a multiline value, not just the whole blob", async () => {
+    // GitHub's masker is line oriented. A PEM key registered only as one
+    // multi-line string is never matched against the lines a later step
+    // prints, so it used to appear in full in the log.
+    const pem =
+      "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBg\n-----END PRIVATE KEY-----";
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          project: { name: "Acme", slug: "acme" },
+          environment: "production",
+          variables: [{ key: "SSH_KEY", value: pem }],
+        }),
+        { status: 200 }
+      )
+    );
+
+    await run();
+
+    expect(core.setFailed).not.toHaveBeenCalled();
+    expect(core.setSecret).toHaveBeenCalledWith(pem);
+    expect(core.setSecret).toHaveBeenCalledWith("MIIEvQIBADANBg");
+    expect(core.setSecret).toHaveBeenCalledWith("-----BEGIN PRIVATE KEY-----");
+  });
+
+  it("leaves a trivially short value unmasked and reports the count", async () => {
+    // setSecret("1") would replace every "1" in the job's logs for the rest
+    // of the run, which destroys the log and protects nothing.
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          project: { name: "Acme", slug: "acme" },
+          environment: "production",
+          variables: [{ key: "DEBUG", value: "1" }],
+        }),
+        { status: 200 }
+      )
+    );
+
+    await run();
+
+    expect(core.setSecret).not.toHaveBeenCalled();
+    const infoCalls = vi.mocked(core.info).mock.calls.flat().join(" ");
+    expect(infoCalls).toContain("too short to mask");
+    // The notice must not name the key or echo the value.
+    expect(infoCalls).not.toContain("DEBUG");
+  });
+
+  it("refuses to export a reserved environment name", async () => {
+    // $GITHUB_ENV is inherited by every later step, so a variable called
+    // LD_PRELOAD would take over the rest of the job.
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          project: { name: "Acme", slug: "acme" },
+          environment: "production",
+          variables: [
+            { key: "DB_URL", value: "postgres://secret" },
+            { key: "LD_PRELOAD", value: "/tmp/evil.so" },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
+
+    await run();
+
+    expect(core.setFailed).toHaveBeenCalledWith(
+      expect.stringContaining("LD_PRELOAD")
+    );
+    expect(core.exportVariable).not.toHaveBeenCalled();
+  });
+
+  it("writes env-file through the staged 0600 path", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "envpilot-envfile-"));
+    const target = path.join(dir, "nested", ".env");
+    inputs["env-file"] = target;
+    inputs["export-env"] = "false";
+
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          project: { name: "Acme", slug: "acme" },
+          environment: "production",
+          variables: [{ key: "DB_URL", value: "postgres://secret" }],
+        }),
+        { status: 200 }
+      )
+    );
+
+    try {
+      await run();
+
+      expect(core.setFailed).not.toHaveBeenCalled();
+      expect(readFileSync(target, "utf8")).toBe("DB_URL='postgres://secret'\n");
+      expect(statSync(target).mode & 0o777).toBe(0o600);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
