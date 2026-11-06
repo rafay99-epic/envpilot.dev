@@ -153,3 +153,9 @@ Envpilot's public API fails **closed**: every denial and every partial-data risk
 - 120 requests/min for metadata, 30/min for value pulls, per key.
 - No pagination: a response that cannot be complete is an error, not a page.
 - No CORS — keys belong on a server, never in a browser bundle.
+- The `Authorization` scheme is matched case insensitively, per RFC 7235, so
+  `bearer envpk_...` works as well as `Bearer envpk_...`.
+- `metadata_only` and `metadataOnly` are both accepted, as are `1`, `true`,
+  `yes` and `on`.
+- `variableCount` on a project listing is omitted, never zero, for projects
+  past the per-request read budget in a large organization.

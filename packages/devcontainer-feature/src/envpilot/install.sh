@@ -46,9 +46,34 @@ if ! VERSION_OUT="$("$ENVPILOT_BIN" --version 2>&1)"; then
   exit 1
 fi
 
-if ! command -v envpilot > /dev/null 2>&1; then
-  echo "envpilot: note - ${GLOBAL_BIN} is not on \$PATH in this build step." >&2
-  echo "envpilot: it is normally on \$PATH for the container user at runtime." >&2
+# Make it reachable rather than hope. A user-local npm prefix is not
+# necessarily on the container user's PATH at runtime, which would leave
+# `envpilot` as "command not found" in the Codespace even though the install
+# succeeded. install.sh runs as root, so link it somewhere that always is.
+#
+# A failure here is fatal: reporting a successful install while the binary is
+# unreachable is the kind of quiet half-success this Feature should not ship.
+LINK_DIR=/usr/local/bin
+LINK_PATH="${LINK_DIR}/envpilot"
+
+if [ "$ENVPILOT_BIN" = "$LINK_PATH" ]; then
+  : # Already installed exactly where we would link it.
+elif [ -e "$LINK_PATH" ] && [ ! -L "$LINK_PATH" ]; then
+  # Something else owns this path. Replacing a real binary from another
+  # install silently would be worse than leaving it alone.
+  echo "envpilot: ${LINK_PATH} already exists and is not a symlink; leaving it alone." >&2
+  echo "envpilot: using ${ENVPILOT_BIN}. Ensure it is on PATH for the container user." >&2
+else
+  mkdir -p "$LINK_DIR"
+  # -n as well as -f: without it, a destination symlink pointing at a
+  # directory is FOLLOWED, so the link lands inside that directory and the
+  # command succeeds while envpilot stays unusable.
+  if ! ln -sfn "$ENVPILOT_BIN" "$LINK_PATH"; then
+    echo "envpilot: could not link ${ENVPILOT_BIN} to ${LINK_PATH}." >&2
+    echo "envpilot: refusing to report a successful install for a binary the container cannot run." >&2
+    exit 1
+  fi
+  echo "envpilot: linked ${ENVPILOT_BIN} to ${LINK_PATH}"
 fi
 
 echo "envpilot: ${VERSION_OUT} ready. Sign in with 'envpilot login'."

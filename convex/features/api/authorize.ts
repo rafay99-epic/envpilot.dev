@@ -11,22 +11,6 @@ import {
 import { isWorkspace } from "../../lib/projectKind";
 
 /**
- * THE single enforcement core for the public API key platform.
- *
- * One function every surface calls — the REST API, the MCP server, and
- * (indirectly, via a compat lookup) the legacy CI/CD pull endpoint all
- * authenticate through `_authorizeRequest`. New surfaces never re-implement
- * authorization; they hash their bearer credential and call this.
- *
- * Denials are RETURNED, not thrown: a throwing mutation rolls back its own
- * writes, which would erase the denial audit entry. Callers map `ok: false`
- * back onto whatever HTTP status / MCP error shape their surface uses.
- *
- * Rate limiting is deliberately NOT here — callers pick their own bucket
- * (metadata vs value-pull vs accounts-pull) before calling this, exactly
- * like cicd/pull.ts's `cicdPull` limiter sits in the caller, not here.
- */
-/**
  * A key's scope resource to the audit log's resource type.
  *
  * Two separate vocabularies that happen to describe the same things: scopes
@@ -42,6 +26,22 @@ const AUDIT_RESOURCE_FOR_SCOPE: Record<string, AuditResourceType | undefined> =
     files: "file",
   };
 
+/**
+ * THE single enforcement core for the public API key platform.
+ *
+ * One function every surface calls — the REST API, the MCP server, and
+ * (indirectly, via a compat lookup) the legacy CI/CD pull endpoint all
+ * authenticate through `_authorizeRequest`. New surfaces never re-implement
+ * authorization; they hash their bearer credential and call this.
+ *
+ * Denials are RETURNED, not thrown: a throwing mutation rolls back its own
+ * writes, which would erase the denial audit entry. Callers map `ok: false`
+ * back onto whatever HTTP status / MCP error shape their surface uses.
+ *
+ * Rate limiting is deliberately NOT here — callers pick their own bucket
+ * (metadata vs value-pull vs accounts-pull) before calling this, exactly
+ * like cicd/pull.ts's `cicdPull` limiter sits in the caller, not here.
+ */
 export const _authorizeRequest = internalMutation({
   args: {
     tokenHash: v.string(),
@@ -234,16 +234,53 @@ export const _authorizeRequest = internalMutation({
     // fallback for pre-surface callers. Never honor a mismatched pair — a
     // caller must not check the mcp_server surface against the public_api
     // gate (or vice versa) to outlive its own surface's gate being off.
-    const gate = await checkBooleanFeature(
-      ctx.db,
-      key.organizationId,
+    const claimedGate =
       args.surface !== undefined
         ? SURFACE_GATE[args.surface]
-        : (args.gateFeature ?? "public_api")
-    );
-    if (!gate.allowed) {
-      await logDenied(key, "tier_gate");
-      return { ok: false as const, denied: "tier_gate" as const };
+        : (args.gateFeature ?? "public_api");
+
+    // A grandfathered key (no `surfaces` array) is valid on every surface,
+    // which also meant it could pick WHICH GATE was checked. In an
+    // organization with public_api off and docker_image on, such a key could
+    // claim surface "docker" and read anyway. The in-file note above says no
+    // claimed surface can widen access past the tier gates; choosing the gate
+    // is how it could.
+    //
+    // So a legacy key must satisfy public_api as well as whatever it claims.
+    // That is an ADDED policy requirement, not a restatement of how those
+    // keys were minted: pre-surfaces keys were also accepted by the MCP path
+    // (see api/mcpRetirement.ts), so they were never purely REST or Action
+    // credentials. public_api is simply the floor we hold them to now, so
+    // that a credential with no declared surfaces cannot reach for whichever
+    // gate happens to be open. An explicit key cannot shop at all: its
+    // claimed surface has to appear in `surfaces`, checked above.
+    //
+    // DELIBERATE EXCEPTION to "Docker is gated only on docker_image": that
+    // rule holds for every key that names its surfaces, which is every key
+    // minted since the field existed. A grandfathered key presenting
+    // "docker" needs docker_image AND public_api, because the alternative is
+    // letting it pick the more permissive of the two. The only organizations
+    // affected are those that deliberately turned public_api off while
+    // leaving docker_image on, which is exactly the case the bypass
+    // exploited. Documented in apps/docs/content/docker/reference.mdx.
+    //
+    // The eventual cleanup is backfilling `surfaces: ["rest_api"]` onto the
+    // remaining legacy rows, after which this branch can go.
+    const requiredGates =
+      key.surfaces === undefined
+        ? [...new Set([claimedGate, "public_api" as const])]
+        : [claimedGate];
+
+    for (const feature of requiredGates) {
+      const gate = await checkBooleanFeature(
+        ctx.db,
+        key.organizationId,
+        feature
+      );
+      if (!gate.allowed) {
+        await logDenied(key, "tier_gate");
+        return { ok: false as const, denied: "tier_gate" as const };
+      }
     }
 
     if (args.recordUse) {
