@@ -1369,8 +1369,8 @@ export async function rollbackCore(
   // would surface at approval time instead, the apply would throw, and the
   // request would sit pending with no way to apply it until the 30-day
   // expiry. Checking first refuses an impossible rollback up front. This
-  // leaks nothing: assertOrgAction above already restricts rollback to the
-  // owner.
+  // leaks nothing: assertOrgAction above already limits rollback to an
+  // actor whose role holds the rollback capability.
   const envClashes = await findEnvironmentConflicts(ctx, {
     projectId: variable.projectId,
     key: variable.key,
