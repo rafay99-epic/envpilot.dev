@@ -668,9 +668,16 @@ export const uploadFile = action({
     //
     // A rejection has to cost quota. The fileUpload bucket is consumed inside
     // uploadFileAs, so returning before it meant a malformed upload was free
-    // and could be repeated without limit. Charge the same bucket a real
-    // upload would pay, on the rejection path only, so a valid upload is not
-    // billed twice.
+    // and could be repeated without limit.
+    //
+    // Precisely what this does: it charges the fileUpload BUCKET, keyed by the
+    // caller's OAuth identity (`oauth:<workosId>`). uploadFileAs keys the same
+    // bucket by the Convex user id, so these are two separate counters, not
+    // one shared allowance. That is enough for the goal here, which is that a
+    // rejected upload is no longer free to repeat, and a malformed upload does
+    // no vault or blob work, so letting it draw on its own counter costs
+    // nothing real. Charged on the rejection path only, so a valid upload is
+    // not billed on this counter at all.
     const unknownEnvs = unknownEnvironments(args.environments);
     if (unknownEnvs.length > 0) {
       await consumeRateLimit(ctx, "fileUpload", oauthRateKey(principal));

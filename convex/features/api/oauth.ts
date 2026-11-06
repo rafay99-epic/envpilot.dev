@@ -9,7 +9,11 @@ import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { createAuditLog } from "../../lib/audit";
 import { isSuspendedMembership } from "../../lib/authz";
-import { VALID_ENVIRONMENTS } from "../../lib/environments";
+import {
+  ENVIRONMENT_LIST_TEXT,
+  isValidEnvironment,
+  VALID_ENVIRONMENTS,
+} from "../../lib/environments";
 import {
   oauthRateKey,
   requireMcpGate,
@@ -476,20 +480,25 @@ export const _whoami = internalQuery({
       protectedEnvironments: project.protection?.environments ?? [],
     }));
 
-    // The real plan, not a gate's tierName: when enforcement is off every
-    // gate resolves as "unlimited", which would have misreported a free org.
-    const { tierName } = await getOrgOwnerTier(
-      ctx.db,
-      organization._id,
-      organization
-    );
+    // `plan` must be the tier the features above were resolved against, or
+    // the response contradicts itself. When enforcement is on that is the
+    // context's effectiveTier, which honours an active grace period: an org
+    // that downgraded but is still in grace keeps its old tier's features,
+    // and reporting the raw owner tier there would have said "free" next to
+    // Pro-level limits. When enforcement is off every gate resolves as
+    // "unlimited", so the context carries no real tier and the stored one is
+    // read instead, with `enforcement: false` saying it does not bind.
+    const plan = gateContext.enforced
+      ? gateContext.effectiveTier
+      : (await getOrgOwnerTier(ctx.db, organization._id, organization))
+          .tierName;
 
     return {
       ...base,
       organization: {
         slug: organization.slug,
         name: organization.name,
-        plan: tierName,
+        plan,
         enforcement: gateContext.enforced,
       },
       features,
@@ -550,6 +559,19 @@ export const getVariables = action({
     if (!metadataOnly && !args.environment) {
       throw new ConvexError(
         "Missing required param: environment (or pass metadata_only=true)"
+      );
+    }
+    // Validated here as well as by the tool layer's zod enum, because this
+    // action is public and a direct caller skips that layer. An unknown name
+    // matched no rows and answered with an empty list, which is the same
+    // silent-empty result the REST surface already refuses with
+    // UNKNOWN_ENVIRONMENT, and an agent would write an empty .env from it.
+    if (
+      args.environment !== undefined &&
+      !isValidEnvironment(args.environment)
+    ) {
+      throw new ConvexError(
+        `Unknown environment "${args.environment}". Valid environments: ${ENVIRONMENT_LIST_TEXT}.`
       );
     }
     await consumeRateLimit(
