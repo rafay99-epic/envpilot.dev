@@ -1,0 +1,17 @@
+{
+  "name": "envpilot",
+  "owner": {
+    "name": "Envpilot",
+    "url": "https://www.envpilot.dev"
+  },
+  "description": "Official Envpilot plugin: the MCP server plus a skill that gets a fresh checkout running without pasting secrets into a chat.",
+  "plugins": [
+    {
+      "name": "envpilot",
+      "source": "./plugins/envpilot",
+      "description": "Connects the Envpilot MCP server and teaches Claude to bootstrap a repo's environment without reading secret values into the transcript.",
+      "category": "devops",
+      "tags": ["secrets", "environment-variables", "dotenv", "ci"]
+    }
+  ]
+}

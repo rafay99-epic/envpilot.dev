@@ -84,6 +84,61 @@ Add the server to `.vscode/mcp.json` in a workspace, or to your user MCP configu
 
 Start the server from the MCP view and follow the sign-in prompt.
 
+### One-click installs
+
+The connector is also listed where clients look for servers, so you can skip
+the command.
+
+**Claude Code plugin.** Installs the server and a `bootstrap-env` skill that
+gets a fresh checkout running without reading secret values into the
+transcript:
+
+```bash
+/plugin install envpilot --marketplace rafay99-epic/envpilot.dev
+```
+
+The plugin registers the server as `plugin:envpilot:envpilot`, so its tools
+appear as `mcp__plugin_envpilot_envpilot__*` in permission rules.
+
+**Cursor.** Use the "Add to Cursor" button in the
+[repository README](https://github.com/rafay99-epic/envpilot.dev), or the
+deeplink:
+
+```
+cursor://anysphere.cursor-deeplink/mcp/install?name=envpilot&config=eyJ1cmwiOiJodHRwczovL3d3dy5lbnZwaWxvdC5kZXYvYXBpL21jcCJ9
+```
+
+**MCP registry.** The server is published to the official registry as
+`dev.envpilot/mcp`. The registry is an upstream source rather than something a
+client browses directly: host applications read a gallery or subregistry
+configured for them, and the third-party catalogs ingest from it. So where
+`envpilot` turns up searchable depends on which of those a given client is
+pointed at.
+
+### Dev containers and Codespaces
+
+A container has the same problem a new clone does: the code is there and
+`.env` is not. Install the CLI as a Feature so the container can fetch its own
+environment:
+
+```jsonc
+// .devcontainer/devcontainer.json
+{
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/rafay99-epic/devcontainer-features/envpilot:1": {},
+  },
+}
+```
+
+The `node` Feature is required: the CLI is an npm package, and the Envpilot
+Feature fails with a clear message rather than half-installing if npm is
+absent. Pin a CLI version with `{ "version": "1.23.1" }` if you need one.
+
+Sign-in still needs a browser once per container, so `envpilot login` is a
+human step. For an unattended container, use an API key and the
+[REST API](/api/quickstart) instead.
+
 ### Other clients
 
 Any client that supports MCP authorization works: give it the URL and no header. It discovers the sign-in from the server's `401` response. A client that only supports static headers cannot connect; use the [REST API](/api/quickstart) or `envpilot run` for those jobs.
