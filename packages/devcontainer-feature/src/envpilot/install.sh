@@ -65,7 +65,10 @@ elif [ -e "$LINK_PATH" ] && [ ! -L "$LINK_PATH" ]; then
   echo "envpilot: using ${ENVPILOT_BIN}. Ensure it is on PATH for the container user." >&2
 else
   mkdir -p "$LINK_DIR"
-  if ! ln -sf "$ENVPILOT_BIN" "$LINK_PATH"; then
+  # -n as well as -f: without it, a destination symlink pointing at a
+  # directory is FOLLOWED, so the link lands inside that directory and the
+  # command succeeds while envpilot stays unusable.
+  if ! ln -sfn "$ENVPILOT_BIN" "$LINK_PATH"; then
     echo "envpilot: could not link ${ENVPILOT_BIN} to ${LINK_PATH}." >&2
     echo "envpilot: refusing to report a successful install for a binary the container cannot run." >&2
     exit 1

@@ -127,17 +127,16 @@ complete.
 **Do not hand-escape dotenv.** Quoting rules differ between parsers, and the
 shell idiom for a single quote inside a single-quoted string is not dotenv
 syntax; it corrupts the value in most parsers, including this product's own.
-If the CLI is present, do not reach for `envpilot export` here. It prints the
-whole payload to stdout, which puts every secret in your transcript, which is
-the one thing this skill exists to avoid. Use the path that writes the file
-itself, with the project and environment you selected:
 
-```bash
-envpilot pull --no-cache -e development --project <project-slug>
-```
+If you got here and the CLI turns out to be available after all, go back to
+step 3a rather than writing the file from tool output. It covers `pull`
+properly, including the `--dry-run` check and the fact that `pull` has no
+refusal of its own. Do not use `envpilot export` for this: it prints the whole
+payload to stdout, which puts every secret in your transcript, which is the
+one thing this skill exists to avoid.
 
-If you must write the file yourself, use double quotes and escape `"` as `\"`
-and newlines as `\n` inside the value, and keep one key per line.
+Writing it yourself, then: use double quotes, escape `"` as `\"` and newlines
+as `\n` inside the value, and keep one key per line.
 
 Write to `.env.local` when the framework prefers it (Next.js, Vite), otherwise
 `.env`. Confirm the path is gitignored before writing. If it is not, add it.
