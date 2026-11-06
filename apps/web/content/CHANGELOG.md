@@ -27,7 +27,7 @@ A security and correctness pass across the machine surfaces: the GitHub Action, 
 
 **A misspelled environment fails loudly.** `?environment=prod` used to resolve to zero rows and answer `200` with an empty body, so the Action reported "pulled 0 variables" and the deploy continued with nothing set. Every read surface now rejects an unknown environment name with `400 UNKNOWN_ENVIRONMENT` and lists the valid ones. A variable whose stored value is missing also aborts the pull rather than being reported as an empty string.
 
-**Reserved environment names are refused.** A variable called `PATH`, `LD_PRELOAD` or anything starting with `GITHUB_` is no longer written to `$GITHUB_ENV`, where it would have taken over every later step in the job.
+**Reserved environment names are refused.** A variable that would hijack later steps, such as `PATH`, `LD_PRELOAD`, `NODE_OPTIONS`, `GITHUB_TOKEN` or `GITHUB_API_URL`, is no longer written to `$GITHUB_ENV`. The list names the dangerous variables individually rather than refusing whole prefixes, so ordinary application config like `GITHUB_CLIENT_ID` or LaunchDarkly's `LD_SDK_KEY` still exports normally.
 
 **The Docker image stops leaking its own credential.** `envpilot exec` passed `ENVPILOT_TOKEN` through to the child process, so the application inherited a key that can read the whole project. Both token variables are now stripped from the child's environment. Both clients also refuse a plaintext `http://` API URL, since the key travels in a request header. Loopback hosts (`localhost`, `127.0.0.1`, `::1`) stay allowed so a local dev server still works.
 

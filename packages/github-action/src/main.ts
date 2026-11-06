@@ -232,6 +232,7 @@ function maskValue(value: string): boolean {
  * create variables, so the key is not fully under the repo owner's control.
  */
 const RESERVED_ENV_KEYS = new Set([
+  // Interpreter and shell startup hooks.
   "BASH_ENV",
   "ENV",
   "GEM_PATH",
@@ -245,23 +246,48 @@ const RESERVED_ENV_KEYS = new Set([
   "PYTHONPATH",
   "PYTHONSTARTUP",
   "RUBYOPT",
+  // Dynamic loader. Named, not a blanket LD_ prefix: the loader honours a
+  // specific set, and these three are the ones that load attacker code.
+  // LaunchDarkly's own SDK and Relay Proxy use LD_ names (LD_SDK_KEY,
+  // LD_ENV_*), so a prefix match failed real projects' jobs.
+  "LD_AUDIT",
+  "LD_LIBRARY_PATH",
+  "LD_PRELOAD",
+  // The runner's control surface. Named, not a blanket GITHUB_ prefix:
+  // these redirect a later step's token, output files or API calls, while
+  // ordinary application config such as GITHUB_CLIENT_ID and
+  // GITHUB_CLIENT_SECRET, the standard "Sign in with GitHub" pair, has to
+  // keep working.
+  "GITHUB_ACTION_PATH",
+  "GITHUB_API_URL",
+  "GITHUB_ENV",
+  "GITHUB_EVENT_PATH",
+  "GITHUB_GRAPHQL_URL",
+  "GITHUB_OUTPUT",
+  "GITHUB_PATH",
+  "GITHUB_SERVER_URL",
+  "GITHUB_STATE",
+  "GITHUB_STEP_SUMMARY",
+  "GITHUB_TOKEN",
+  "GITHUB_WORKSPACE",
 ]);
 
-// Prefixes, because each family has more members than is worth listing:
+// Prefixes only where no application plausibly names its own variables:
 //
 //   GIT_CONFIG_  GIT_CONFIG_COUNT with GIT_CONFIG_KEY_n / GIT_CONFIG_VALUE_n
 //                injects arbitrary git config, and core.sshCommand is config,
 //                so a later checkout or push executes it.
 //   BASH_FUNC_   exported shell functions, the Shellshock shape.
-//   LD_ DYLD_    dynamic loader hooks: LD_PRELOAD, LD_AUDIT and relatives.
-//   GITHUB_ RUNNER_ ACTIONS_  the runner's own namespaces, token included.
+//   DYLD_        the macOS loader; no application convention uses it.
+//   RUNNER_ ACTIONS_  the runner's internal namespaces.
+//
+// LD_ and GITHUB_ are deliberately NOT here. A blanket match on either fails
+// the WHOLE job, and both collide with widely used application variables.
 const RESERVED_ENV_PREFIXES = [
   "ACTIONS_",
   "BASH_FUNC_",
   "DYLD_",
   "GIT_CONFIG_",
-  "GITHUB_",
-  "LD_",
   "RUNNER_",
 ];
 

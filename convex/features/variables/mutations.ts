@@ -1354,6 +1354,39 @@ export async function rollbackCore(
     "org:rollback_variable"
   );
 
+  // A rollback REWRITES `environments` from the historical version, so it is
+  // a write path like any other and has to re-check per-environment key
+  // uniqueness. Without this, narrowing a variable to [development], letting
+  // someone else create a [production] twin of the same key, then rolling
+  // back to the version that spanned both leaves two active variables
+  // claiming production — and pull, extension sync and /api/v1/secrets then
+  // resolve that key nondeterministically.
+  //
+  // It runs BEFORE assertProtectedWrite on purpose. On a protected
+  // environment that check throws PROTECTED_ENVIRONMENT_CODE, the UI files a
+  // rollback change request, and approving it re-runs this function with
+  // viaRequestId. If the conflict were only caught after protection, it
+  // would surface at approval time instead, the apply would throw, and the
+  // request would sit pending with no way to apply it until the 30-day
+  // expiry. Checking first refuses an impossible rollback up front. This
+  // leaks nothing: assertOrgAction above already restricts rollback to the
+  // owner.
+  const envClashes = await findEnvironmentConflicts(ctx, {
+    projectId: variable.projectId,
+    key: variable.key,
+    // The PROPOSED state only, matching updateCore. Using the union of
+    // before and after would check environments the rollback REMOVES, so a
+    // clash the rollback itself resolves would block it. The union is still
+    // right for assertProtectedWrite below, which asks a different question:
+    // which protected environments does this write touch.
+    environments: targetVersionRecord.environments,
+    excludeVariableId: variable._id,
+    appliesTo: variable.appliesTo,
+  });
+  if (envClashes.length > 0) {
+    throw new ConvexError(environmentConflictMessage(variable.key, envClashes));
+  }
+
   await assertProtectedWrite(ctx, {
     project,
     // A rollback writes the target version's environment set too, so a
@@ -1368,29 +1401,6 @@ export async function rollbackCore(
     viaRequestId: args.viaRequestId,
     override: args.override,
   });
-
-  // A rollback REWRITES `environments` from the historical version, so it is
-  // a write path like any other and has to re-check per-environment key
-  // uniqueness. Without this, narrowing a variable to [development], letting
-  // someone else create a [production] twin of the same key, then rolling
-  // back to the version that spanned both leaves two active variables
-  // claiming production — and pull, extension sync and /api/v1/secrets then
-  // resolve that key nondeterministically.
-  const envClashes = await findEnvironmentConflicts(ctx, {
-    projectId: variable.projectId,
-    key: variable.key,
-    // The PROPOSED state only, matching updateCore. Using the union of
-    // before and after would check environments the rollback REMOVES, so a
-    // clash the rollback itself resolves would block it. The union is still
-    // right for assertProtectedWrite above, which asks a different question:
-    // which protected environments does this write touch.
-    environments: targetVersionRecord.environments,
-    excludeVariableId: variable._id,
-    appliesTo: variable.appliesTo,
-  });
-  if (envClashes.length > 0) {
-    throw new ConvexError(environmentConflictMessage(variable.key, envClashes));
-  }
 
   const newVersion = variable.version + 1;
 

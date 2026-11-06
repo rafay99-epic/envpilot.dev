@@ -437,4 +437,36 @@ describe("reserved environment names", () => {
       expect(isReservedEnvKey(key), key).toBe(false);
     }
   });
+
+  it("allows real application config that shares a reserved family's prefix", () => {
+    // A match fails the WHOLE job, and @v1 floats, so a false positive here
+    // breaks every consumer storing these on their next run. The earlier
+    // blanket GITHUB_ and LD_ prefixes did exactly that.
+    for (const key of [
+      // "Sign in with GitHub", the most common OAuth pair there is.
+      "GITHUB_CLIENT_ID",
+      "GITHUB_CLIENT_SECRET",
+      "GITHUB_APP_ID",
+      "GITHUB_PRIVATE_KEY",
+      // LaunchDarkly's SDK and Relay Proxy.
+      "LD_SDK_KEY",
+      "LD_CLIENT_SIDE_ID",
+      "LD_ENV_production",
+    ]) {
+      expect(isReservedEnvKey(key), key).toBe(false);
+    }
+  });
+
+  it("still refuses the GITHUB_ names that redirect a later step", () => {
+    for (const key of [
+      "GITHUB_API_URL",
+      "GITHUB_SERVER_URL",
+      "GITHUB_PATH",
+      "GITHUB_OUTPUT",
+      "GITHUB_STEP_SUMMARY",
+      "LD_AUDIT",
+    ]) {
+      expect(isReservedEnvKey(key), key).toBe(true);
+    }
+  });
 });
