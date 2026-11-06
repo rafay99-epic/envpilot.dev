@@ -95,6 +95,47 @@ function parseBooleanInput(raw: string, fallback: boolean): boolean {
 }
 
 /**
+ * Stage secret bytes into a fresh exclusive temp file and rename them over
+ * `destination`.
+ *
+ * Two things this buys over a plain `writeFileSync`: a pre-existing file
+ * never holds secret contents at its old (possibly world-readable) mode,
+ * and a symlink at the destination is REFUSED rather than written through.
+ *
+ * Used by both the secret-files path and `env-file`, which previously wrote
+ * straight to the caller's path with neither protection.
+ */
+function writeSecretBytes(
+  destination: string,
+  body: Buffer,
+  mode: number
+): void {
+  try {
+    if (lstatSync(destination).isSymbolicLink()) {
+      throw new Error("refusing to write through a symlink");
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+
+  mkdirSync(dirname(destination), { recursive: true });
+  const temp = `${destination}.envpilot-${process.pid}-${randomBytes(8).toString("hex")}.tmp`;
+  try {
+    writeFileSync(temp, body, { mode, flag: "wx" });
+    chmodSync(temp, mode);
+    renameSync(temp, destination);
+  } catch (error) {
+    try {
+      unlinkSync(temp);
+    } catch {
+      // Nothing useful to do — the write already failed.
+    }
+    throw error;
+  }
+  chmodSync(destination, mode);
+}
+
+/**
  * Write one secret file to its recorded path.
  *
  * The path comes from the server and the server validates it, but this is
@@ -135,36 +176,127 @@ function writeSecretFile(root: string, file: EnvpilotFile): void {
       throw new Error("refusing a path that escapes through a symlink");
     }
   }
-  try {
-    if (lstatSync(destination).isSymbolicLink()) {
-      throw new Error("refusing to write through a symlink");
-    }
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-  }
+  writeSecretBytes(
+    destination,
+    Buffer.from(file.content, "base64"),
+    file.mode === "0400" ? 0o400 : 0o600
+  );
+}
 
-  // A pre-existing file keeps its old (possibly world-readable) mode while
-  // new secret contents land in it, so stage into a fresh exclusive temp at
-  // the restrictive mode and rename over the target instead.
-  mkdirSync(dirname(destination), { recursive: true });
-  const mode = file.mode === "0400" ? 0o400 : 0o600;
-  const temp = `${destination}.envpilot-${process.pid}-${randomBytes(8).toString("hex")}.tmp`;
-  try {
-    writeFileSync(temp, Buffer.from(file.content, "base64"), {
-      mode,
-      flag: "wx",
-    });
-    chmodSync(temp, mode);
-    renameSync(temp, destination);
-  } catch (error) {
-    try {
-      unlinkSync(temp);
-    } catch {
-      // Nothing useful to do — the write already failed.
+/**
+ * Values shorter than this are never registered as secrets.
+ *
+ * `core.setSecret("1")` replaces every `1` in the job's logs for the rest of
+ * the run, which destroys the log without protecting anything meaningful.
+ * `setSecret("")` is worse: it masks every line outright.
+ */
+const MIN_MASKABLE_VALUE = 4;
+
+/**
+ * Per-LINE floor for multiline values. One line of a larger secret is a
+ * fragment, and short fragments collide with ordinary log text far more often
+ * than whole values do, so the floor is higher.
+ */
+const MIN_MASKABLE_LINE = 6;
+
+/**
+ * Register `value` with the runner's log masker.
+ *
+ * The masker is LINE oriented: a value registered as a single multi-line blob
+ * is never matched against the individual lines a later step prints, so a PEM
+ * key or pretty-printed service-account JSON appeared in full in the log
+ * despite having been "masked". Register the whole value AND each of its
+ * lines.
+ *
+ * Returns false when the value was too short to mask safely, so the caller
+ * can report how many went unmasked without naming any key.
+ */
+function maskValue(value: string): boolean {
+  const maskable = value.trim().length >= MIN_MASKABLE_VALUE;
+  if (maskable) core.setSecret(value);
+  if (value.includes("\n")) {
+    for (const line of value.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (trimmed.length >= MIN_MASKABLE_LINE) core.setSecret(trimmed);
     }
-    throw error;
   }
-  chmodSync(destination, mode);
+  return maskable;
+}
+
+/**
+ * Environment names Envpilot data is never allowed to set.
+ *
+ * `core.exportVariable` writes to `$GITHUB_ENV`, which every later step in
+ * the job inherits. A variable named `PATH`, `LD_PRELOAD` or `GITHUB_TOKEN`
+ * would take over the rest of the job, and the MCP write tools let an agent
+ * create variables, so the key is not fully under the repo owner's control.
+ */
+const RESERVED_ENV_KEYS = new Set([
+  // Interpreter and shell startup hooks.
+  "BASH_ENV",
+  "ENV",
+  "GEM_PATH",
+  "IFS",
+  "JAVA_TOOL_OPTIONS",
+  "JDK_JAVA_OPTIONS",
+  "NODE_OPTIONS",
+  "PATH",
+  "PERL5LIB",
+  "PYTHONHOME",
+  "PYTHONPATH",
+  "PYTHONSTARTUP",
+  "RUBYOPT",
+  // Dynamic loader. Named, not a blanket LD_ prefix: the loader honours a
+  // specific set, and these three are the ones that load attacker code.
+  // LaunchDarkly's own SDK and Relay Proxy use LD_ names (LD_SDK_KEY,
+  // LD_ENV_*), so a prefix match failed real projects' jobs.
+  "LD_AUDIT",
+  "LD_LIBRARY_PATH",
+  "LD_PRELOAD",
+  // The runner's control surface. Named, not a blanket GITHUB_ prefix:
+  // these redirect a later step's token, output files or API calls, while
+  // ordinary application config such as GITHUB_CLIENT_ID and
+  // GITHUB_CLIENT_SECRET, the standard "Sign in with GitHub" pair, has to
+  // keep working.
+  "GITHUB_ACTION_PATH",
+  "GITHUB_API_URL",
+  "GITHUB_ENV",
+  "GITHUB_EVENT_PATH",
+  "GITHUB_GRAPHQL_URL",
+  "GITHUB_OUTPUT",
+  "GITHUB_PATH",
+  "GITHUB_SERVER_URL",
+  "GITHUB_STATE",
+  "GITHUB_STEP_SUMMARY",
+  "GITHUB_TOKEN",
+  "GITHUB_WORKSPACE",
+]);
+
+// Prefixes only where no application plausibly names its own variables:
+//
+//   GIT_CONFIG_  GIT_CONFIG_COUNT with GIT_CONFIG_KEY_n / GIT_CONFIG_VALUE_n
+//                injects arbitrary git config, and core.sshCommand is config,
+//                so a later checkout or push executes it.
+//   BASH_FUNC_   exported shell functions, the Shellshock shape.
+//   DYLD_        the macOS loader; no application convention uses it.
+//   RUNNER_ ACTIONS_  the runner's internal namespaces.
+//
+// LD_ and GITHUB_ are deliberately NOT here. A blanket match on either fails
+// the WHOLE job, and both collide with widely used application variables.
+const RESERVED_ENV_PREFIXES = [
+  "ACTIONS_",
+  "BASH_FUNC_",
+  "DYLD_",
+  "GIT_CONFIG_",
+  "RUNNER_",
+];
+
+export function isReservedEnvKey(key: string): boolean {
+  const upper = key.toUpperCase();
+  return (
+    RESERVED_ENV_KEYS.has(upper) ||
+    RESERVED_ENV_PREFIXES.some((prefix) => upper.startsWith(prefix))
+  );
 }
 
 export async function run(): Promise<void> {
@@ -191,26 +323,44 @@ export async function run(): Promise<void> {
 
     // CRITICAL ORDER: mask every value before anything that could export or
     // log it, so it is redacted in logs even if a later workflow step echoes
-    // it. Skip empty values — core.setSecret("") would mask every subsequent
-    // log line for the rest of the job.
+    // it. maskValue explains why a multiline value needs each of its lines
+    // registered separately.
+    let unmaskable = 0;
     for (const variable of variables) {
-      if (variable.value !== "") {
-        core.setSecret(variable.value);
-      }
+      if (!maskValue(variable.value)) unmaskable += 1;
+    }
+    if (unmaskable > 0) {
+      core.info(
+        `Envpilot: ${unmaskable} value(s) were too short to mask safely and are unmasked in this log.`
+      );
     }
 
     if (exportEnv) {
+      // A reserved name is refused rather than exported, because
+      // $GITHUB_ENV is inherited by every later step. The key is named in
+      // this one message, unlike anywhere else in the Action, because a
+      // failure the user cannot diagnose is worse than naming a variable
+      // the job is declining to use.
+      const reserved = variables
+        .map((variable) => variable.key)
+        .filter(isReservedEnvKey);
+      if (reserved.length > 0) {
+        core.setFailed(
+          `Envpilot: refusing to export reserved environment name(s): ${reserved.join(", ")}. Rename them, or scope them out of this environment.`
+        );
+        return;
+      }
       for (const variable of variables) {
         core.exportVariable(variable.key, variable.value);
       }
     }
 
     if (envFile) {
-      const content = buildDotenvContent(variables);
-      writeFileSync(envFile, content, { mode: 0o600 });
-      // writeFileSync only applies `mode` when creating a new file; chmod
-      // explicitly so an existing file at this path also ends up 0600.
-      chmodSync(envFile, 0o600);
+      writeSecretBytes(
+        resolve(envFile),
+        Buffer.from(buildDotenvContent(variables), "utf8"),
+        0o600
+      );
     }
 
     core.info(

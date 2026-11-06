@@ -8,6 +8,20 @@ import { assertOrgAction } from "../../lib/authz";
  * User Queries and Mutations
  */
 
+/**
+ * Bootstrap lookups for the server-side Next.js routes.
+ *
+ * These two stay public and unauthenticated deliberately: every API route
+ * calls `getOrCreateConvexUser` at the top of the request through the SHARED
+ * UNAUTHENTICATED client (apps/web/src/lib/convex-client.ts), before any
+ * Convex identity exists, and `dashboard-auth` reads ban state off the
+ * result to block a banned session. Both take an opaque identifier the
+ * caller must already hold, so neither is enumerable.
+ *
+ * They are still more than a caller needs, and the Stage 2/3 auth cutover
+ * that deletes the per-route lookup is what closes them for good. Do not add
+ * new callers; use the internal twins below from inside Convex.
+ */
 export const getById = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
@@ -25,7 +39,37 @@ export const getByWorkosId = query({
   },
 });
 
-export const getByEmail = query({
+/** Internal twins for Convex-side callers, which already hold a ctx. */
+export const _getById = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.userId);
+  },
+});
+
+export const _getByWorkosId = internalQuery({
+  args: { workosId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("users")
+      .withIndex("by_workos_id", (q) => q.eq("workosId", args.workosId))
+      .first();
+  },
+});
+
+/**
+ * Look up a user by email. INTERNAL ONLY.
+ *
+ * This was a public query returning the whole user document, so anyone
+ * holding the public Convex URL could probe any address and read back that
+ * person's name and their moderation state. Narrowing the row was not enough:
+ * it still returned a user id, and `getById` above is still public, so the
+ * moderation fields stayed reachable in two hops.
+ *
+ * There is now no public email lookup at all. Its one caller, organization
+ * ownership transfer, resolves the address inside its own mutation.
+ */
+export const _getByEmail = internalQuery({
   args: { email: v.string() },
   handler: async (ctx, args) => {
     return await ctx.db

@@ -51,42 +51,39 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const { targetUserEmail } = validation.data;
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Kept for its side effect: it ensures the caller has a Convex user row
+    // before the mutation resolves their identity. The returned row is no
+    // longer needed, because the self-transfer check moved into the mutation.
+    await getOrCreateConvexUser(convex, user);
 
-    // Authorization is enforced in the Convex mutation (assertOrgAction)
-
-    // Look up target user by email
-    const targetUser = await convex.query(api.features.users.users.getByEmail, {
-      email: targetUserEmail,
-    });
-
-    if (!targetUser) {
-      return NextResponse.json(
-        { error: "No user found with that email address" },
-        { status: 404 }
-      );
-    }
-
-    if (targetUser._id === convexUser._id) {
-      return NextResponse.json(
-        { error: "You cannot transfer ownership to yourself" },
-        { status: 400 }
-      );
-    }
+    // Authorization is enforced in the Convex mutation (assertOrgAction),
+    // which also resolves the target address. There is deliberately no public
+    // email lookup to call here: one would let any signed-in account probe
+    // arbitrary addresses.
 
     // Get org details for email notifications
     const org = await convex.query(api.features.organizations.queries.getById, {
       organizationId,
     });
 
-    // Execute the transfer
-    await createAuthedConvexClient(accessToken!).mutation(
+    // Execute the transfer. Denials come back as values, so the status code
+    // is decided here rather than by matching an error message.
+    const result = await createAuthedConvexClient(accessToken!).mutation(
       api.features.organizations.mutations.transferOwnership,
-      {
-        organizationId,
-        targetUserId: targetUser._id,
-      }
+      { organizationId, targetUserEmail }
     );
+
+    if (!result.ok) {
+      return result.reason === "target_not_found"
+        ? NextResponse.json(
+            { error: "No user found with that email address" },
+            { status: 404 }
+          )
+        : NextResponse.json(
+            { error: "You cannot transfer ownership to yourself" },
+            { status: 400 }
+          );
+    }
 
     const orgName = org?.name || "the organization";
     const previousOwnerName =

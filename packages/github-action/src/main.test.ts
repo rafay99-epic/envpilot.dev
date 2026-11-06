@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as core from "@actions/core";
 import { buildDotenvContent, escapeSingleQuoted } from "./dotenv.js";
-import { run } from "./main.js";
+import { isReservedEnvKey, run } from "./main.js";
 
 describe("dotenv serialization", () => {
   it("single-quotes plain values", () => {
@@ -158,6 +158,113 @@ describe("run (fetch handler)", () => {
     const failMessage = vi.mocked(core.setFailed).mock.calls[0]?.[0];
     expect(String(failMessage)).not.toContain("envpk_test_token");
   });
+
+  it("masks every LINE of a multiline value, not just the whole blob", async () => {
+    // GitHub's masker is line oriented. A PEM key registered only as one
+    // multi-line string is never matched against the lines a later step
+    // prints, so it used to appear in full in the log.
+    //
+    // The armour deliberately says TEST KEY, not PRIVATE KEY: real armour
+    // trips the gitleaks private-key rule, and this repo now scans the
+    // github-action directory because its bundle is published publicly.
+    // What the test needs is a multiline value whose lines clear the mask
+    // floor, which this is.
+    const pem =
+      "-----BEGIN TEST KEY-----\nMIIEvQIBADANBg\n-----END TEST KEY-----";
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          project: { name: "Acme", slug: "acme" },
+          environment: "production",
+          variables: [{ key: "SSH_KEY", value: pem }],
+        }),
+        { status: 200 }
+      )
+    );
+
+    await run();
+
+    expect(core.setFailed).not.toHaveBeenCalled();
+    expect(core.setSecret).toHaveBeenCalledWith(pem);
+    expect(core.setSecret).toHaveBeenCalledWith("MIIEvQIBADANBg");
+    expect(core.setSecret).toHaveBeenCalledWith("-----BEGIN TEST KEY-----");
+  });
+
+  it("leaves a trivially short value unmasked and reports the count", async () => {
+    // setSecret("1") would replace every "1" in the job's logs for the rest
+    // of the run, which destroys the log and protects nothing.
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          project: { name: "Acme", slug: "acme" },
+          environment: "production",
+          variables: [{ key: "DEBUG", value: "1" }],
+        }),
+        { status: 200 }
+      )
+    );
+
+    await run();
+
+    expect(core.setSecret).not.toHaveBeenCalled();
+    const infoCalls = vi.mocked(core.info).mock.calls.flat().join(" ");
+    expect(infoCalls).toContain("too short to mask");
+    // The notice must not name the key or echo the value.
+    expect(infoCalls).not.toContain("DEBUG");
+  });
+
+  it("refuses to export a reserved environment name", async () => {
+    // $GITHUB_ENV is inherited by every later step, so a variable called
+    // LD_PRELOAD would take over the rest of the job.
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          project: { name: "Acme", slug: "acme" },
+          environment: "production",
+          variables: [
+            { key: "DB_URL", value: "postgres://secret" },
+            { key: "LD_PRELOAD", value: "/tmp/evil.so" },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
+
+    await run();
+
+    expect(core.setFailed).toHaveBeenCalledWith(
+      expect.stringContaining("LD_PRELOAD")
+    );
+    expect(core.exportVariable).not.toHaveBeenCalled();
+  });
+
+  it("writes env-file through the staged 0600 path", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "envpilot-envfile-"));
+    const target = path.join(dir, "nested", ".env");
+    inputs["env-file"] = target;
+    inputs["export-env"] = "false";
+
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          project: { name: "Acme", slug: "acme" },
+          environment: "production",
+          variables: [{ key: "DB_URL", value: "postgres://secret" }],
+        }),
+        { status: 200 }
+      )
+    );
+
+    try {
+      await run();
+
+      expect(core.setFailed).not.toHaveBeenCalled();
+      expect(readFileSync(target, "utf8")).toBe("DB_URL='postgres://secret'\n");
+      expect(statSync(target).mode & 0o777).toBe(0o600);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("secret-file pulls: rate-limit retry", () => {
@@ -276,5 +383,90 @@ describe("secret-file pulls: rate-limit retry", () => {
     await run();
 
     expect(core.setFailed).toHaveBeenCalled();
+  });
+});
+
+describe("reserved environment names", () => {
+  it("refuses the loader and interpreter hooks", () => {
+    for (const key of [
+      "PATH",
+      "LD_PRELOAD",
+      "LD_LIBRARY_PATH",
+      "DYLD_INSERT_LIBRARIES",
+      "NODE_OPTIONS",
+      "PYTHONPATH",
+      "BASH_ENV",
+    ]) {
+      expect(isReservedEnvKey(key), key).toBe(true);
+    }
+  });
+
+  it("refuses the runner's own namespaces", () => {
+    for (const key of [
+      "GITHUB_TOKEN",
+      "GITHUB_ENV",
+      "RUNNER_TEMP",
+      "ACTIONS_RUNTIME_TOKEN",
+    ]) {
+      expect(isReservedEnvKey(key), key).toBe(true);
+    }
+  });
+
+  it("refuses GIT_CONFIG_*, which is a command-execution vector", () => {
+    // GIT_CONFIG_COUNT with GIT_CONFIG_KEY_n / GIT_CONFIG_VALUE_n injects
+    // arbitrary git config into later steps, and core.sshCommand is config,
+    // so a later checkout or push would execute it.
+    expect(isReservedEnvKey("GIT_CONFIG_COUNT")).toBe(true);
+    expect(isReservedEnvKey("GIT_CONFIG_KEY_0")).toBe(true);
+    expect(isReservedEnvKey("GIT_CONFIG_VALUE_0")).toBe(true);
+  });
+
+  it("is case insensitive, since $GITHUB_ENV does not care", () => {
+    expect(isReservedEnvKey("path")).toBe(true);
+    expect(isReservedEnvKey("github_token")).toBe(true);
+  });
+
+  it("allows ordinary application keys", () => {
+    for (const key of [
+      "DATABASE_URL",
+      "STRIPE_SECRET_KEY",
+      "GIT_AUTHOR_NAME",
+      "GITHUBBER",
+      "MY_PATH_PREFIX",
+    ]) {
+      expect(isReservedEnvKey(key), key).toBe(false);
+    }
+  });
+
+  it("allows real application config that shares a reserved family's prefix", () => {
+    // A match fails the WHOLE job, and @v1 floats, so a false positive here
+    // breaks every consumer storing these on their next run. The earlier
+    // blanket GITHUB_ and LD_ prefixes did exactly that.
+    for (const key of [
+      // "Sign in with GitHub", the most common OAuth pair there is.
+      "GITHUB_CLIENT_ID",
+      "GITHUB_CLIENT_SECRET",
+      "GITHUB_APP_ID",
+      "GITHUB_PRIVATE_KEY",
+      // LaunchDarkly's SDK and Relay Proxy.
+      "LD_SDK_KEY",
+      "LD_CLIENT_SIDE_ID",
+      "LD_ENV_production",
+    ]) {
+      expect(isReservedEnvKey(key), key).toBe(false);
+    }
+  });
+
+  it("still refuses the GITHUB_ names that redirect a later step", () => {
+    for (const key of [
+      "GITHUB_API_URL",
+      "GITHUB_SERVER_URL",
+      "GITHUB_PATH",
+      "GITHUB_OUTPUT",
+      "GITHUB_STEP_SUMMARY",
+      "LD_AUDIT",
+    ]) {
+      expect(isReservedEnvKey(key), key).toBe(true);
+    }
   });
 });

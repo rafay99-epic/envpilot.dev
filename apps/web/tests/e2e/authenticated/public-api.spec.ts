@@ -252,6 +252,39 @@ test.describe.serial("Public REST API v1", () => {
     expect(response.status(), await response.text()).toBe(403);
   });
 
+  test("an unknown environment NAME is rejected, not answered empty", async ({
+    page,
+  }) => {
+    test.skip(!plaintextToken, "no key from the mint test");
+
+    // A misspelled environment used to resolve to zero rows and answer 200.
+    // `format=env` made that a zero-byte dotenv, so the GitHub Action logged
+    // "pulled 0 variables" and the deploy carried on with nothing set.
+    const json = await page.request.get(
+      `/api/v1/projects/${projectSlug}/variables?environment=prod`,
+      { headers: { Authorization: `Bearer ${plaintextToken}` } }
+    );
+    expect(json.status(), await json.text()).toBe(400);
+    const body = (await json.json()) as { error: string; code: string };
+    expect(body.code).toBe("UNKNOWN_ENVIRONMENT");
+    // The message has to name the valid values, or the caller cannot fix it.
+    expect(body.error).toContain("production");
+
+    const dotenv = await page.request.get(
+      `/api/v1/projects/${projectSlug}/variables?environment=prod&format=env`,
+      { headers: { Authorization: `Bearer ${plaintextToken}` } }
+    );
+    expect(
+      dotenv.status(),
+      "format=env must fail too, never return an empty body"
+    ).toBe(400);
+
+    const secrets = await page.request.get("/api/v1/secrets?environment=prod", {
+      headers: { Authorization: `Bearer ${plaintextToken}` },
+    });
+    expect(secrets.status(), await secrets.text()).toBe(400);
+  });
+
   test("an unknown project slug 404s (never 403)", async ({ page }) => {
     test.skip(!plaintextToken, "no key from the mint test");
 

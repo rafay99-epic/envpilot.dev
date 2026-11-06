@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -45,6 +46,31 @@ func resolveToken(getenv func(string) string) (string, error) {
 	return "", configErrorf("No API key. Set ENVPILOT_TOKEN_FILE to a mounted secret (preferred) or ENVPILOT_TOKEN.")
 }
 
+// assertSecureAPIURL refuses a plaintext base URL.
+//
+// The token travels in an Authorization header on every request, so http://
+// puts a key that can read the whole project and environment on the wire in
+// clear. Loopback stays allowed so a local dev server can be exercised.
+func assertSecureAPIURL(raw string) error {
+	parsed, err := url.Parse(raw)
+	// Scheme-relative input like //host parses with an empty Scheme and
+	// would otherwise reach the message below as "over . Use an https".
+	if err != nil || parsed.Host == "" || parsed.Scheme == "" {
+		return configErrorf("API URL is not a valid URL: %s", raw)
+	}
+	if parsed.Scheme == "https" {
+		return nil
+	}
+	host := parsed.Hostname()
+	if parsed.Scheme == "http" && (host == "localhost" || host == "127.0.0.1" || host == "::1") {
+		return nil
+	}
+	return configErrorf(
+		"Refusing to send the API key over %s. Use an https API URL (got %s).",
+		parsed.Scheme, raw,
+	)
+}
+
 func resolveConfig(args *Args, getenv func(string) string) (*Config, error) {
 	project := args.Project
 	if project == "" {
@@ -70,6 +96,9 @@ func resolveConfig(args *Args, getenv func(string) string) (*Config, error) {
 		apiURL = DefaultAPIURL
 	}
 	apiURL = strings.TrimRight(apiURL, "/")
+	if err := assertSecureAPIURL(apiURL); err != nil {
+		return nil, err
+	}
 
 	token, err := resolveToken(getenv)
 	if err != nil {

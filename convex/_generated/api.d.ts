@@ -146,6 +146,7 @@ import type * as lib_authHelpers from "../lib/authHelpers.js";
 import type * as lib_authz from "../lib/authz.js";
 import type * as lib_batchLimits from "../lib/batchLimits.js";
 import type * as lib_capabilities from "../lib/capabilities.js";
+import type * as lib_environments from "../lib/environments.js";
 import type * as lib_fileLimits from "../lib/fileLimits.js";
 import type * as lib_identity from "../lib/identity.js";
 import type * as lib_integrationLimits from "../lib/integrationLimits.js";
@@ -308,6 +309,7 @@ declare const fullApi: ApiFromModules<{
   "lib/authz": typeof lib_authz;
   "lib/batchLimits": typeof lib_batchLimits;
   "lib/capabilities": typeof lib_capabilities;
+  "lib/environments": typeof lib_environments;
   "lib/fileLimits": typeof lib_fileLimits;
   "lib/identity": typeof lib_identity;
   "lib/integrationLimits": typeof lib_integrationLimits;
