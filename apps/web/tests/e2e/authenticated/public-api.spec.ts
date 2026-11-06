@@ -143,10 +143,17 @@ test.describe.serial("Public REST API v1", () => {
     });
     expect(response.status(), await response.text()).toBe(200);
     const body = (await response.json()) as {
-      projects: Array<{ slug: string; variableCount: number }>;
+      // variableCount is OPTIONAL: it is omitted, never zero, for projects
+      // past the per-request read budget in a large organization. A worker
+      // fixture project is nowhere near that, so it must be present here.
+      projects: Array<{ slug: string; variableCount?: number }>;
     };
     const scoped = body.projects.find((p) => p.slug === projectSlug);
     expect(scoped, "the scoped project should be listed").toBeTruthy();
+    expect(
+      scoped!.variableCount,
+      "a small fixture project should always be counted"
+    ).toBeDefined();
     expect(scoped!.variableCount).toBeGreaterThanOrEqual(2);
   });
 
