@@ -135,8 +135,24 @@ refusal of its own. Do not use `envpilot export` for this: it prints the whole
 payload to stdout, which puts every secret in your transcript, which is the
 one thing this skill exists to avoid.
 
-Writing it yourself, then: use double quotes, escape `"` as `\"` and newlines
-as `\n` inside the value, and keep one key per line.
+Writing it yourself, then: one `KEY="value"` per line, double quoted, with
+every escape applied **in this order**. The order matters: escaping the
+backslash last would re-escape the backslashes the earlier steps introduced.
+
+1. `\` becomes `\\` (first, always)
+2. `"` becomes `\"`
+3. a newline becomes `\n`
+4. a carriage return becomes `\r`
+5. a tab becomes `\t`
+
+Escaping only the quote and the newline, which is the obvious half of this,
+corrupts any value containing a literal backslash: a Windows path or a regex
+is read back with `\n` as a newline rather than as the two characters that
+were stored.
+
+If a value holds anything else unprintable, do not try to encode it by hand.
+Say so and leave that key out rather than write a file whose value differs
+from what is stored.
 
 Write to `.env.local` when the framework prefers it (Next.js, Vite), otherwise
 `.env`. Confirm the path is gitignored before writing. If it is not, add it.
