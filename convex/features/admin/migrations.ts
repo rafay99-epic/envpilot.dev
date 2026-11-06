@@ -29,7 +29,7 @@ export const listMigrations = query({
       {
         name: "resync-agent-surface-tier-features",
         description:
-          "Force-sets the six agent-surface tier values (public_api, mcp_server, docker_image, docker_image_limit, github_action_limit, protected_environments) from TIER_CONFIGS. Run ONCE after the deploy that moved them onto the free tier; seed-tier-features only inserts, so it is a no-op on any deployment that has already been seeded. Do NOT add this to the deploy loop — it would clobber deliberate admin edits on every release.",
+          "Force-sets the six agent-surface tier values (public_api, mcp_server, docker_image, docker_image_limit, github_action_limit, protected_environments) on the FREE tier only, from TIER_CONFIGS. Pro is left untouched, so admin edits to pro's values survive. Run ONCE after the deploy that moved them onto the free tier; seed-tier-features only inserts, so it is a no-op on any deployment that has already been seeded. Do NOT add this to the deploy loop — it would clobber deliberate admin edits on every release.",
         category: "Core",
         priority: 8,
         destructive: false,
@@ -170,23 +170,28 @@ const RETIRED_FEATURE_KEYS = [
 ];
 
 /**
- * Force-set specific tier values from TIER_CONFIGS, for every tier.
+ * Force-set specific tier values from TIER_CONFIGS.
  *
  * `seed-tier-features` only INSERTS, so an admin edit survives a reseed. That
  * also means changing a value in TIER_CONFIGS is a no-op on any deployment
- * already seeded, which is why flipping a value ships with a resync scoped to
- * exactly the keys that changed. Scoped on purpose: a blanket resync would
- * discard deliberate per-tier admin edits.
+ * already seeded, which is why flipping a value ships with a resync.
+ *
+ * Scope it by BOTH key and tier. Scoping by key alone still rewrites every
+ * tier's copy of that key, so a resync meant to flip `free` would also reset
+ * a deliberate admin edit on `pro`. Pass `tiers` as exactly the tiers whose
+ * values changed. Omit it only where every tier's value really did change.
  *
  * Returns how many rows were written.
  */
 async function forceSetTierValues(
   ctx: MutationCtx,
-  keys: readonly string[]
+  keys: readonly string[],
+  tiers?: readonly string[]
 ): Promise<number> {
   const now = Date.now();
   let updated = 0;
   for (const [tierName, features] of Object.entries(TIER_CONFIGS)) {
+    if (tiers && !tiers.includes(tierName)) continue;
     for (const featureKey of keys) {
       const value = features[featureKey];
       if (value === undefined) continue;
@@ -353,14 +358,21 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
   const args = { name };
 
   if (args.name === "resync-agent-surface-tier-features") {
-    const updated = await forceSetTierValues(ctx, [
-      "public_api",
-      "mcp_server",
-      "docker_image",
-      "docker_image_limit",
-      "github_action_limit",
-      "protected_environments",
-    ]);
+    // `free` only: these six moved onto the free tier and nothing changed on
+    // pro. Writing pro as well would reset an admin who had, say, raised
+    // pro's docker_image_limit above the seeded 10.
+    const updated = await forceSetTierValues(
+      ctx,
+      [
+        "public_api",
+        "mcp_server",
+        "docker_image",
+        "docker_image_limit",
+        "github_action_limit",
+        "protected_environments",
+      ],
+      ["free"]
+    );
     return { success: true, updated };
   }
 
