@@ -14,8 +14,8 @@ A [signed-in](/mcp/setup) connection gets twenty tools. Your role decides what e
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `envpilot_whoami`             | Orientation: the signed-in account, every organization it can reach, the plan, which features are on, the limits, and each project's PROTECTED environments |
 | `envpilot_list_organizations` | The organizations you belong to, your role, and whether MCP is on their plan                                                                                |
-| `envpilot_list_projects`      | List the projects you can see                                                                                                                               |
-| `envpilot_get_variables`      | Variables for a project + environment, with optional `keys` / `prefix` / `metadata_only`                                                                    |
+| `envpilot_list_projects`      | List the projects you can see. `variableCount` is omitted, not zero, past the per-call read budget                                                          |
+| `envpilot_get_variables`      | Variables for a project + environment, with optional `keys` / `prefix` / `metadata_only`. Also returns `inaccessibleKeys`                                   |
 | `envpilot_get_variable`       | One variable by exact key                                                                                                                                   |
 | `envpilot_search`             | Search project names/slugs and variable **keys**, never values. Bounded to 20 projects / 100 matches                                                        |
 | `envpilot_search_docs`        | Full-text search over **published** documentation: titles and page bodies. Never returns drafts                                                             |
@@ -50,6 +50,23 @@ per-project counts, because those need a scan per project.
 include `docker_image_limit` and `github_action_limit`, which cap how many
 keys of each surface an organization may hold, so a CI setup task can check
 before it tries.
+
+### An incomplete read says so
+
+`envpilot_get_variables` returns `inaccessibleKeys` alongside `variables`: the
+names of variables that exist and match your filters but that your role has no
+grant to read. Names only, never values, and narrowed by the same
+`environment`, `keys` and `prefix` filters, so it names what you asked for
+rather than everything in the project.
+
+This matters because the alternative was silence. Variables you cannot read
+were dropped before the response was built, so a short list looked exactly
+like a complete one, and a `.env` written from it was quietly missing keys. A
+non-empty `inaccessibleKeys` means the response is incomplete, and a project
+member has to grant access to those keys.
+
+Row-count truncation is separate and still fails loudly: a project over the
+active-variable bound refuses the pull rather than returning part of it.
 
 ## Write tools
 
