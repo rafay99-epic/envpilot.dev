@@ -8,7 +8,7 @@ icon: zap
 
 MCP (Model Context Protocol) lets an assistant call tools against your real data instead of guessing at it. Envpilot runs a remote MCP server, so Claude, Claude Code, Codex or Cursor can work with your projects' variables, secret files and shared accounts, with the same permissions, rate limits and audit trail as the dashboard.
 
-Requires the **Pro** plan (`mcp_server`). Connect by [signing in](/mcp/setup) with your Envpilot login. The old key-based setup lives on [API keys (legacy)](/mcp/api-keys).
+Available on every plan, including Free (`mcp_server`). Connect by [signing in](/mcp/setup) with your Envpilot login. The old key-based setup lives on [API keys (legacy)](/mcp/api-keys).
 
 ```
 https://www.envpilot.dev/api/mcp
@@ -36,7 +36,7 @@ The agent does what your role allows, nothing more. A write into a [protected en
 
 ## Limits
 
-- **Pro plan only**, re-checked on every call — a downgrade stops the agent immediately.
+- **Available on every plan, including Free**, and re-checked on every call, so a platform admin turning the surface off for a tier stops the agent immediately.
 - **A connection acts as you.** Your role decides what it sees; there is no way yet to give it less.
 - **Rate limits apply per person**: 120/min metadata, 30/min value pulls, 30/min variable and account writes, 20/min file uploads. See [Tools](/mcp/tools#cost-of-each-call).
 - **Every value-returning call and every write is audited** against your user.

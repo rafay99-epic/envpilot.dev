@@ -79,6 +79,9 @@ export function mcpBackend(token: string) {
   const convex = convexClient();
 
   return {
+    whoami: ({ organization }: Org) =>
+      convex.action(api.features.api.oauth.whoami, { token, organization }),
+
     listProjects: ({ organization }: Org) =>
       convex.action(api.features.api.oauth.listProjects, {
         token,

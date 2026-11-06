@@ -6,7 +6,7 @@ icon: zap
 
 # API Quickstart
 
-Envpilot's public REST API lets you read projects, variables, and shared accounts programmatically — no CLI or extension required. It's read-only in v1 and requires the **Pro** plan.
+Envpilot's public REST API lets you read projects, variables, and shared accounts programmatically — no CLI or extension required. It's read-only in v1 and is available on every plan, including Free.
 
 ## Create an API key
 
@@ -149,7 +149,7 @@ Envpilot's public API fails **closed**: every denial and every partial-data risk
 ## Limits
 
 - Read-only. Every endpoint, every surface.
-- Pro plan (`public_api`), and the gate is re-checked on every call.
+- Available on every plan, including Free (`public_api`). The gate is still re-checked on every call, so a platform admin can turn the surface off for a tier.
 - 120 requests/min for metadata, 30/min for value pulls, per key.
 - No pagination: a response that cannot be complete is an error, not a page.
 - No CORS — keys belong on a server, never in a browser bundle.

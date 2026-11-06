@@ -67,7 +67,10 @@ export function mapPublicApiError(error: unknown): MappedPublicApiError {
   if (/not enabled for this surface/i.test(message)) {
     return { status: 403, code: "FORBIDDEN_SURFACE", message };
   }
-  if (/pro plan/i.test(message)) {
+  // Both wordings: the surface gates stopped saying "Pro plan" when they
+  // moved onto the free tier, and an older Convex deployment can still be
+  // sending the previous text.
+  if (/pro plan|not available on this plan/i.test(message)) {
     return { status: 403, code: "TIER_GATE", message };
   }
   if (/project not found/i.test(message)) {
