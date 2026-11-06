@@ -182,6 +182,9 @@ export function registerMcpTools(server: McpServer): void {
             slug: z.string(),
             name: z.string(),
             plan: z.string(),
+            // Set while a downgrade is in its grace period: features and
+            // limits still come from this tier, not from `plan`.
+            gracePeriodTier: z.string().nullable(),
             enforcement: z.boolean(),
           })
           .nullable(),

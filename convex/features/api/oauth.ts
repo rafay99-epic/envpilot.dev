@@ -234,6 +234,7 @@ const whoamiOrganizationValidator = v.object({
   slug: v.string(),
   name: v.string(),
   plan: v.string(),
+  gracePeriodTier: v.union(v.string(), v.null()),
   enforcement: v.boolean(),
 });
 
@@ -273,6 +274,7 @@ type WhoamiOrganization = {
   slug: string;
   name: string;
   plan: string;
+  gracePeriodTier: string | null;
   enforcement: boolean;
 };
 
@@ -480,18 +482,21 @@ export const _whoami = internalQuery({
       protectedEnvironments: project.protection?.environments ?? [],
     }));
 
-    // `plan` must be the tier the features above were resolved against, or
-    // the response contradicts itself. When enforcement is on that is the
-    // context's effectiveTier, which honours an active grace period: an org
-    // that downgraded but is still in grace keeps its old tier's features,
-    // and reporting the raw owner tier there would have said "free" next to
-    // Pro-level limits. When enforcement is off every gate resolves as
-    // "unlimited", so the context carries no real tier and the stored one is
-    // read instead, with `enforcement: false` saying it does not bind.
+    // `plan` is the tier the owner is on, which is what a person means by
+    // "plan". During a downgrade's grace period the features and limits above
+    // still resolve against the previous tier; `gracePeriodTier` names it so
+    // the response explains itself instead of reporting a plan they left.
+    // With enforcement off the context carries no real tier ("unlimited"),
+    // so the stored one is read, and `enforcement: false` says it does not
+    // bind.
     const plan = gateContext.enforced
-      ? gateContext.effectiveTier
+      ? gateContext.ownerTierName
       : (await getOrgOwnerTier(ctx.db, organization._id, organization))
           .tierName;
+    const gracePeriodTier =
+      gateContext.effectiveTier !== gateContext.ownerTierName
+        ? gateContext.effectiveTier
+        : null;
 
     return {
       ...base,
@@ -499,6 +504,7 @@ export const _whoami = internalQuery({
         slug: organization.slug,
         name: organization.name,
         plan,
+        gracePeriodTier,
         enforcement: gateContext.enforced,
       },
       features,
