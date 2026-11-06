@@ -54,7 +54,9 @@ const FIXTURE_PROJECT_NAME = "E2E Fixture Project";
 // Untyped function references (avoids importing the generated `api`, which
 // lives under a path alias the Playwright transpiler doesn't resolve).
 const fn = {
-  getByEmail: makeFunctionReference<"query">("features/users/users:getByEmail"),
+  getByWorkosId: makeFunctionReference<"query">(
+    "features/users/users:getByWorkosId"
+  ),
   listForUser: makeFunctionReference<"query">(
     "features/organizations/queries:listForUser"
   ),
@@ -85,7 +87,10 @@ const DEVELOPER_TOKEN_SKIP =
  * saved session cookies → GET /api/auth/me. Convex then verifies the JWT on
  * every fixture read (post-cutover, unauthenticated reads are rejected).
  */
-async function fetchOwnerAccessToken(): Promise<string> {
+async function fetchOwnerSession(): Promise<{
+  accessToken: string;
+  workosId: string;
+}> {
   const state = JSON.parse(readFileSync(STORAGE_STATE_PATH, "utf-8")) as {
     cookies: Array<{ name: string; value: string; domain: string }>;
   };
@@ -102,11 +107,17 @@ async function fetchOwnerAccessToken(): Promise<string> {
         "still valid? Re-run the setup project."
     );
   }
-  const me = (await res.json()) as { accessToken: string | null };
+  const me = (await res.json()) as {
+    accessToken: string | null;
+    user: { id: string } | null;
+  };
   if (!me.accessToken) {
     throw new Error("/api/auth/me returned no accessToken for the e2e owner.");
   }
-  return me.accessToken;
+  if (!me.user?.id) {
+    throw new Error("/api/auth/me returned no user id for the e2e owner.");
+  }
+  return { accessToken: me.accessToken, workosId: me.user.id };
 }
 
 interface FixtureContext {
@@ -134,13 +145,18 @@ async function resolveFixtureContext(): Promise<FixtureContext> {
     );
   }
   const convex = new ConvexHttpClient(CONVEX_URL);
-  convex.setAuth(await fetchOwnerAccessToken());
+  // Resolved from the WorkOS id on the saved session rather than from an
+  // email lookup: users.getByEmail is internal now, because a public one let
+  // any signed-in account probe an arbitrary address.
+  const { accessToken, workosId } = await fetchOwnerSession();
+  convex.setAuth(accessToken);
 
-  const owner = await convex.query(fn.getByEmail, { email: E2E_TEST_EMAIL });
+  const owner = await convex.query(fn.getByWorkosId, { workosId });
   if (!owner) {
     throw new Error(
-      `No Convex user for E2E_TEST_EMAIL (${E2E_TEST_EMAIL}). Sign in through ` +
-        "the app once so the fixture owner has a profile. See tests/e2e/README.md."
+      `No Convex user for the e2e owner (${E2E_TEST_EMAIL}, WorkOS ${workosId}). ` +
+        "Sign in through the app once so the fixture owner has a profile. " +
+        "See tests/e2e/README.md."
     );
   }
 

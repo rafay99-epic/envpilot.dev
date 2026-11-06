@@ -46,9 +46,18 @@ if ! VERSION_OUT="$("$ENVPILOT_BIN" --version 2>&1)"; then
   exit 1
 fi
 
-if ! command -v envpilot > /dev/null 2>&1; then
-  echo "envpilot: note - ${GLOBAL_BIN} is not on \$PATH in this build step." >&2
-  echo "envpilot: it is normally on \$PATH for the container user at runtime." >&2
+# Make it reachable rather than hope. A user-local npm prefix is not
+# necessarily on the container user's PATH at runtime, which would leave
+# `envpilot` as "command not found" in the Codespace even though the install
+# succeeded. install.sh runs as root, so link it somewhere that always is.
+LINK_DIR=/usr/local/bin
+if [ "$ENVPILOT_BIN" != "${LINK_DIR}/envpilot" ] && [ -d "$LINK_DIR" ]; then
+  if ln -sf "$ENVPILOT_BIN" "${LINK_DIR}/envpilot" 2> /dev/null; then
+    echo "envpilot: linked ${ENVPILOT_BIN} to ${LINK_DIR}/envpilot"
+  else
+    echo "envpilot: could not link into ${LINK_DIR}." >&2
+    echo "envpilot: add ${GLOBAL_BIN} to PATH, or envpilot will not be found." >&2
+  fi
 fi
 
 echo "envpilot: ${VERSION_OUT} ready. Sign in with 'envpilot login'."

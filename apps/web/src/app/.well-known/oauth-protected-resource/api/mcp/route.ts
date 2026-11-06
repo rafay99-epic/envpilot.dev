@@ -24,6 +24,9 @@ export function GET(req: Request): Response {
         headers: {
           "content-type": "application/json",
           "cache-control": "no-store",
+          // Same as the metadata handler: a browser MCP client has to be
+          // able to read the diagnostic, not just the success case.
+          "access-control-allow-origin": "*",
         },
       }
     );

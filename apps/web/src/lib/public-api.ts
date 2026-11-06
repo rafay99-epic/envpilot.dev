@@ -14,7 +14,6 @@
 
 import { sanitizeConvexError } from "@/lib/error-messages";
 
-/** Extract the bearer credential from an Authorization header, or null. */
 /**
  * Parse the metadata-only flag.
  *

@@ -6,7 +6,7 @@ icon: zap
 
 # Tools
 
-A [signed-in](/mcp/setup) connection gets twenty tools. Your role decides what each one can see and change: the same projects, environments, variables, secret files, shared accounts and documentation you can use in the dashboard. Every value-returning call and every write is audited against you.
+A [signed-in](/mcp/setup) connection gets twenty tools. Your role decides what each one can see and change: the same projects, environments, variables, secret files, shared accounts and documentation you can use in the dashboard. Every secret-value read and every write is audited against you. Metadata and list calls, including `envpilot_whoami`, are not: the volume would bury the reads that matter. The cost table below says which bucket each tool falls in.
 
 ## Read tools
 
@@ -54,10 +54,16 @@ before it tries.
 ### An incomplete read says so
 
 `envpilot_get_variables` returns `inaccessibleKeys` alongside `variables`: the
-names of variables that exist and match your filters but that your role has no
-grant to read. Names only, never values, and narrowed by the same
-`environment`, `keys` and `prefix` filters, so it names what you asked for
-rather than everything in the project.
+names of variables your access to the project exposes but that you hold no
+grant to read. Names only, never values, deduplicated, and narrowed by the
+same `environment`, `keys` and `prefix` filters, so it names what you asked
+for rather than everything in the project.
+
+The wording is precise about scope. The list covers what your project
+assignment exposes. A role that cannot see a variable at all, rather than
+seeing it without a grant, never reaches this stage, so an empty
+`inaccessibleKeys` is not by itself proof that you were shown everything in
+the project.
 
 This matters because the alternative was silence. Variables you cannot read
 were dropped before the response was built, so a short list looked exactly

@@ -128,19 +128,34 @@ export const _listScopedProjects = internalQuery({
     // plus one take(500) per project meant a large organization blew the
     // transaction read limit, and since there is no pagination here a key
     // scoped to "all" could never enumerate reliably.
-    const projects = (
-      await activeProjectsQuery(ctx.db, args.organizationId).take(
+    //
+    // The two scopes are resolved DIFFERENTLY on purpose. Taking a bounded
+    // page of the organization and then filtering to the key's scope would
+    // silently drop an authorized project that sorts past the bound, which
+    // is the exact "looks complete but isn't" failure this file exists to
+    // avoid. An explicit scope is therefore resolved by id, which is both
+    // exact and bounded by the scope list itself.
+    let projects: Doc<"projects">[];
+    if (args.scopeProjects === "all") {
+      const page = await activeProjectsQuery(ctx.db, args.organizationId).take(
         MAX_PULL_ROWS + 1
-      )
-    ).filter((project) => {
-      if (args.scopeProjects === "all") return true;
-      const allowed = new Set(args.scopeProjects.map((id) => id as string));
-      return allowed.has(project._id as string);
-    });
-
-    if (projects.length > MAX_PULL_ROWS) {
-      throw new ConvexError(
-        `Organization has more than ${MAX_PULL_ROWS} active projects — refusing a partial list. Contact support to raise the limit.`
+      );
+      if (page.length > MAX_PULL_ROWS) {
+        throw new ConvexError(
+          `Organization has more than ${MAX_PULL_ROWS} active projects — refusing a partial list. Contact support to raise the limit.`
+        );
+      }
+      projects = page;
+    } else {
+      const resolved = await Promise.all(
+        args.scopeProjects.map((id) => ctx.db.get(id))
+      );
+      projects = resolved.filter(
+        (project): project is Doc<"projects"> =>
+          project !== null &&
+          project.organizationId === args.organizationId &&
+          project.deletedAt === undefined &&
+          !isWorkspace(project)
       );
     }
 
@@ -155,17 +170,24 @@ export const _listScopedProjects = internalQuery({
         summaries.push({ name: project.name, slug: project.slug });
         continue;
       }
+      const limit = Math.min(VARIABLE_COUNT_CAP, budget);
       const activeVariables = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project_deleted", (q) =>
           q.eq("projectId", project._id).eq("deletedAt", undefined)
         )
-        .take(Math.min(VARIABLE_COUNT_CAP, budget));
+        .take(limit);
       budget -= activeVariables.length;
+      // A read stopped by the REMAINING BUDGET rather than by the cap tells
+      // us nothing about the real total, so the count is omitted instead of
+      // reported as if it were exact. Hitting the cap is different: that
+      // bound is the documented one.
+      const budgetLimited =
+        limit < VARIABLE_COUNT_CAP && activeVariables.length === limit;
       summaries.push({
         name: project.name,
         slug: project.slug,
-        variableCount: activeVariables.length,
+        ...(budgetLimited ? {} : { variableCount: activeVariables.length }),
       });
     }
     return summaries;

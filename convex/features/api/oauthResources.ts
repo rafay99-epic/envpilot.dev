@@ -145,8 +145,9 @@ async function startWrite(
 ): Promise<OAuthPrincipal> {
   const principal = await verifyOAuthToken(token);
   await consumeRateLimit(ctx, "mcpWrite", oauthRateKey(principal));
-  // After the rate limit on purpose: a typo should cost the caller quota
-  // rather than give an unauthenticated prober a free validity oracle.
+  // After the rate limit on purpose, so a typo costs the caller quota. (The
+  // token is already verified above, so there is no unauthenticated prober to
+  // worry about either way.)
   if (environments) assertKnownEnvironments(environments);
   return principal;
 }
@@ -680,6 +681,24 @@ export const uploadFile = action({
         replace: args.replace ?? false,
       }
     );
+    // A replace persists the EXISTING row's environments, not the caller's
+    // (see _resolveUpload), so the resolved list is checked as well. A row
+    // written before this validation existed can hold an unknown name, and
+    // re-persisting it would keep a file no reader resolves and that
+    // protection matching never recognises.
+    if (target.environments !== args.environments) {
+      const unknown = unknownEnvironments(target.environments);
+      if (unknown.length > 0) {
+        throw new ConvexError(
+          `The existing file at "${target.path}" is stored against unknown environment${unknown.length > 1 ? "s" : ""} ${unknown
+            .map((name) => `"${name}"`)
+            .join(
+              ", "
+            )}. Fix that file in the dashboard before replacing it over MCP. Valid environments: ${ENVIRONMENT_LIST_TEXT}.`
+        );
+      }
+    }
+
     const content =
       args.encoding === "base64"
         ? args.content

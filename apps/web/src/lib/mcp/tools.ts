@@ -476,12 +476,14 @@ export function registerMcpTools(server: McpServer): void {
         client_ref: clientRefInput,
       },
       outputSchema: draftResultShape,
-      // A create, not a replace, and it genuinely dedupes when client_ref is
-      // supplied (features/api/docs.ts), so idempotentHint was wrong too.
+      // A create, not a replace, so destructiveHint is false. idempotentHint
+      // stays FALSE though: client_ref is optional, and a call without one
+      // creates a new draft every time, so advertising idempotency would be
+      // a promise this tool does not keep.
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
-        idempotentHint: true,
+        idempotentHint: false,
       },
     },
     (args, extra) =>

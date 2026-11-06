@@ -19,7 +19,9 @@ import {
 } from "../../lib/mcpOAuth";
 import {
   checkBooleanFeature,
+  checkCountedLimit,
   checkNumericLimit,
+  countActiveKeysForSurface,
   countActiveProjects,
 } from "../featureRegistry/gates";
 import {
@@ -418,16 +420,54 @@ export const _whoami = internalQuery({
       }))
     );
 
-    const projectCount = await countActiveProjects(ctx.db, organization._id);
+    // checkCountedLimit, not checkNumericLimit: the count runs ONLY when the
+    // tier actually resolves to a number. whoami is the first call an agent
+    // makes, so an eager scan here would put a full active-projects count on
+    // the hottest metadata path for every Pro org and every deployment with
+    // enforcement off, to decide a limit that can never bind.
+    const now = Date.now();
+    const counters: Partial<
+      Record<(typeof WHOAMI_LIMITS)[number], () => Promise<number>>
+    > = {
+      max_projects: () => countActiveProjects(ctx.db, organization._id),
+      // Named in the description as the thing an agent checks before trying
+      // to mint a key, so the usage has to actually be there.
+      docker_image_limit: () =>
+        countActiveKeysForSurface(ctx.db, organization._id, "docker", now),
+      github_action_limit: () =>
+        countActiveKeysForSurface(
+          ctx.db,
+          organization._id,
+          "github_action",
+          now
+        ),
+    };
+
     const limits = await Promise.all(
       WHOAMI_LIMITS.map(async (key) => {
-        const used = key === "max_projects" ? projectCount : undefined;
-        const resolved = await checkNumericLimit(
+        const counter = counters[key];
+        if (!counter) {
+          const resolved = await checkNumericLimit(
+            ctx.db,
+            organization._id,
+            key,
+            0,
+            gateContext
+          );
+          return { key, limit: resolved.limit };
+        }
+        let used: number | undefined;
+        const resolved = await checkCountedLimit(
           ctx.db,
           organization._id,
           key,
-          used ?? 0,
-          gateContext
+          async (limit) => {
+            used = await counter();
+            return used;
+          },
+          gateContext,
+          // Report usage as it stands rather than asking "could I add one".
+          0
         );
         return { key, limit: resolved.limit, used };
       })
@@ -500,17 +540,23 @@ export const _listProjects = internalQuery({
         summaries.push({ name: project.name, slug: project.slug });
         continue;
       }
+      const limit = Math.min(VARIABLE_COUNT_CAP, budget);
       const active = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project_deleted", (q) =>
           q.eq("projectId", project._id).eq("deletedAt", undefined)
         )
-        .take(Math.min(VARIABLE_COUNT_CAP, budget));
+        .take(limit);
       budget -= active.length;
+      // A read stopped by the REMAINING BUDGET rather than by the cap tells
+      // us nothing about the real total, so the count is omitted rather than
+      // reported as if exact. Hitting the cap is the documented bound.
+      const budgetLimited =
+        limit < VARIABLE_COUNT_CAP && active.length === limit;
       summaries.push({
         name: project.name,
         slug: project.slug,
-        variableCount: active.length,
+        ...(budgetLimited ? {} : { variableCount: active.length }),
       });
     }
     return summaries;
@@ -557,7 +603,10 @@ export const getVariables = action({
       }
     );
 
-    const keySet = args.keys ? new Set(args.keys) : null;
+    // An EMPTY array means no filter, not "match nothing". A truthy [] built
+    // an empty Set and returned zero variables, the same bug the REST route
+    // had with `?keys=,,,`.
+    const keySet = args.keys?.length ? new Set(args.keys) : null;
     const matches = (row: { key: string; environments: string[] }): boolean =>
       (!args.environment || row.environments.includes(args.environment)) &&
       (!keySet || keySet.has(row.key)) &&
@@ -566,9 +615,12 @@ export const getVariables = action({
     const filtered = readable.rows.filter(matches);
     // Narrowed by the same filters, so the caller is told about the keys it
     // actually asked for rather than everything in the project.
-    const inaccessibleKeys = readable.inaccessible
-      .filter(matches)
-      .map((row) => row.key);
+    // Deduplicated: the same key may exist on two active variables with
+    // disjoint environments, so without an environment filter both rows
+    // match and the name would appear twice.
+    const inaccessibleKeys = [
+      ...new Set(readable.inaccessible.filter(matches).map((row) => row.key)),
+    ];
 
     if (metadataOnly) {
       return {

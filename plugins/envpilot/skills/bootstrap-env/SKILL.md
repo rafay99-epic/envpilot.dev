@@ -70,7 +70,7 @@ The best outcome is not writing a file at all:
 
 ```bash
 envpilot run --no-cache -e development -p <project-slug> \
-  --require DATABASE_URL,STRIPE_SECRET_KEY -- <the project's dev command>
+  --require <keys this project actually reads> -- <the project's dev command>
 ```
 
 Three parts of that matter:
@@ -79,7 +79,11 @@ Three parts of that matter:
   decrypted, it refuses to start the command rather than running with a gap.
   `--allow-partial` turns that off; do not pass it.
 - **`--require`** lists the keys the code actually needs, so a missing one is
-  named up front instead of surfacing as a confusing runtime error.
+  named up front instead of surfacing as a confusing runtime error. Derive
+  that list from the repository, for example from `process.env.X` references
+  or a `.env.example`, and pass only keys this project really reads. Naming a
+  key the project does not define makes `run` refuse to start. Omit the flag
+  entirely rather than guess.
 - **`--no-cache`.** By default `run` writes a decrypted copy to
   `~/.config/envpilot/run-cache` at mode 0600. That is a real file on disk, so
   do not describe `run` as leaving nothing behind. `envpilot logout` purges it.
@@ -120,8 +124,15 @@ complete.
 **Do not hand-escape dotenv.** Quoting rules differ between parsers, and the
 shell idiom for a single quote inside a single-quoted string is not dotenv
 syntax; it corrupts the value in most parsers, including this product's own.
-If `envpilot export --format env` is available, use its output verbatim. If
-you must write the file yourself, use double quotes and escape `"` as `\"`
+If the CLI is present, prefer its own serializer, and pass the same project
+and environment you selected so it cannot emit another linked project's
+values:
+
+```bash
+envpilot export --format env --no-cache -e development -p <project-slug>
+```
+
+If you must write the file yourself, use double quotes and escape `"` as `\"`
 and newlines as `\n` inside the value, and keep one key per line.
 
 Write to `.env.local` when the framework prefers it (Next.js, Vite), otherwise

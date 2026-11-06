@@ -116,6 +116,8 @@ Create keys in **Organization → Settings → API Keys**.
 
 Docker is an independent surface. The key must carry the **Docker** surface, and your plan must include the `docker_image` feature. A key scoped only to the REST API or the GitHub Action is refused, and disabling the public API does not disable Docker.
 
+One exception, for old keys only. A key minted before keys carried a surface list has no list, so it is accepted on any surface. Because the surface is asserted by the caller, such a key could otherwise pick whichever plan gate was more permissive, so it has to satisfy `public_api` as well as `docker_image`. Every key minted since surfaces existed names its own, and is gated on that surface alone. Re-issuing an old key removes the exception.
+
 Every request the image makes sends `surface=docker`, so both the key's scope and the plan feature are checked on each call, not just at mint time.
 
 ## Behaviour worth knowing

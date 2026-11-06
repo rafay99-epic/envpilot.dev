@@ -4,6 +4,7 @@ import type { QueryCtx } from "../_generated/server";
 import { checkBooleanFeature } from "../features/featureRegistry/gates";
 import { isSuspendedMembership } from "./authz";
 import { mcpTokenConfig, verifyMcpAccessToken } from "./mcpToken";
+import { SURFACE_GATE_MESSAGE } from "./surfaces";
 
 export type OAuthPrincipal = { workosId: string; clientId?: string };
 
@@ -41,9 +42,10 @@ export async function requireMcpGate(
 ): Promise<void> {
   const gate = await checkBooleanFeature(ctx.db, organizationId, "mcp_server");
   if (!gate.allowed) {
-    throw new ConvexError(
-      "The MCP server is not included in this organization's plan"
-    );
+    // One source of truth for the wording: the route layer classifies a
+    // tier denial by matching this text, so a second hardcoded string here
+    // meant the documented message and the emitted one disagreed.
+    throw new ConvexError(SURFACE_GATE_MESSAGE.mcp_server);
   }
 }
 

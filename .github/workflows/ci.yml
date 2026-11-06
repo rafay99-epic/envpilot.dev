@@ -787,6 +787,23 @@ jobs:
       # fine-grained PATs, so this permission is what makes the push possible.
       packages: write
 
+  # The Feature is excluded from the `shared` filter, so without this its
+  # manifest and install.sh were only ever checked by the post-merge deploy.
+  validate-devcontainer-feature:
+    name: Validate devcontainer feature
+    needs: changes
+    if: needs.changes.outputs.run_devcontainer_feature == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Shellcheck install.sh
+        run: shellcheck packages/devcontainer-feature/src/envpilot/install.sh
+      - name: Validate the feature manifest
+        uses: devcontainers/action@v1
+        with:
+          validate-only: "true"
+          base-path-to-features: "./packages/devcontainer-feature/src"
+
   deploy-mcp-registry:
     name: Deploy MCP registry listing
     needs: [changes, checks-passed]

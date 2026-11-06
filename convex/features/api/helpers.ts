@@ -76,9 +76,12 @@ export function throwForDenial(
   if (denied === "surface_scope") {
     throw new ConvexError("This API key is not enabled for this surface");
   }
-  // tier_gate
+  // tier_gate. Kept in step with SURFACE_GATE_MESSAGE: these surfaces are on
+  // every plan now, so "available on the Pro plan" became false. Both the
+  // route mapper and /api/v1/secrets classify a tier denial by matching this
+  // text, and both accept the old wording too.
   throw new ConvexError(
-    "The public API is available on the Pro plan — this organization's plan no longer includes it"
+    "The public API is not available on this plan — this organization's plan no longer includes it"
   );
 }
 
