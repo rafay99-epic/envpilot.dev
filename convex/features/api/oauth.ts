@@ -234,7 +234,10 @@ const whoamiOrganizationValidator = v.object({
   slug: v.string(),
   name: v.string(),
   plan: v.string(),
-  gracePeriodTier: v.union(v.string(), v.null()),
+  gracePeriod: v.union(
+    v.object({ tier: v.string(), endsAt: v.string() }),
+    v.null()
+  ),
   enforcement: v.boolean(),
 });
 
@@ -274,7 +277,7 @@ type WhoamiOrganization = {
   slug: string;
   name: string;
   plan: string;
-  gracePeriodTier: string | null;
+  gracePeriod: { tier: string; endsAt: string } | null;
   enforcement: boolean;
 };
 
@@ -483,9 +486,11 @@ export const _whoami = internalQuery({
     }));
 
     // `plan` is the tier the owner is on, which is what a person means by
-    // "plan". During a downgrade's grace period the features and limits above
-    // still resolve against the previous tier; `gracePeriodTier` names it so
-    // the response explains itself instead of reporting a plan they left.
+    // "plan". `gracePeriod` comes from the same grace row the features above
+    // were resolved with, so it is set exactly when they came from that
+    // tier. It cannot be inferred from plan vs effective tier: a revoked
+    // subscription keeps the paid tier in userTiers until grace ends, so the
+    // two are often equal during grace.
     // With enforcement off the context carries no real tier ("unlimited"),
     // so the stored one is read, and `enforcement: false` says it does not
     // bind.
@@ -493,10 +498,13 @@ export const _whoami = internalQuery({
       ? gateContext.ownerTierName
       : (await getOrgOwnerTier(ctx.db, organization._id, organization))
           .tierName;
-    const gracePeriodTier =
-      gateContext.effectiveTier !== gateContext.ownerTierName
-        ? gateContext.effectiveTier
-        : null;
+    const gracePeriod =
+      gateContext.gracePeriodEndsAt === null
+        ? null
+        : {
+            tier: gateContext.effectiveTier,
+            endsAt: new Date(gateContext.gracePeriodEndsAt).toISOString(),
+          };
 
     return {
       ...base,
@@ -504,7 +512,7 @@ export const _whoami = internalQuery({
         slug: organization.slug,
         name: organization.name,
         plan,
-        gracePeriodTier,
+        gracePeriod,
         enforcement: gateContext.enforced,
       },
       features,

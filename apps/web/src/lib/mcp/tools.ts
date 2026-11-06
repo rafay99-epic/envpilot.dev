@@ -165,7 +165,7 @@ export function registerMcpTools(server: McpServer): void {
     {
       title: "Who Am I and What Can I Do",
       description:
-        "Reports the signed-in account and what this connection can reach: every organization available to it, the active organization's plan and whether tier enforcement is on, which features are enabled, the numeric limits with usage where it is known, and every project together with the environments that are PROTECTED. A write touching a protected environment becomes a change request a person approves rather than applying directly. When the account belongs to several organizations and none is named, `organization` comes back null with the list in `organizations`, so the slug can be chosen and the call repeated; the per-organization fields are empty until then. Per-project variable counts are not included; envpilot_list_projects has those.",
+        "Reports the signed-in account and what this connection can reach: every organization available to it, the active organization's plan and whether tier enforcement is on (with `gracePeriod` naming the tier features and limits still come from, and when that ends, while a cancelled subscription winds down; null otherwise), which features are enabled, the numeric limits with usage where it is known, and every project together with the environments that are PROTECTED. A write touching a protected environment becomes a change request a person approves rather than applying directly. When the account belongs to several organizations and none is named, `organization` comes back null with the list in `organizations`, so the slug can be chosen and the call repeated; the per-organization fields are empty until then. Per-project variable counts are not included; envpilot_list_projects has those.",
       inputSchema: { organization: organizationInput },
       outputSchema: {
         user: z.object({ name: z.string().optional(), email: z.string() }),
@@ -182,9 +182,9 @@ export function registerMcpTools(server: McpServer): void {
             slug: z.string(),
             name: z.string(),
             plan: z.string(),
-            // Set while a downgrade is in its grace period: features and
-            // limits still come from this tier, not from `plan`.
-            gracePeriodTier: z.string().nullable(),
+            gracePeriod: z
+              .object({ tier: z.string(), endsAt: z.string() })
+              .nullable(),
             enforcement: z.boolean(),
           })
           .nullable(),
