@@ -234,16 +234,41 @@ export const _authorizeRequest = internalMutation({
     // fallback for pre-surface callers. Never honor a mismatched pair — a
     // caller must not check the mcp_server surface against the public_api
     // gate (or vice versa) to outlive its own surface's gate being off.
-    const gate = await checkBooleanFeature(
-      ctx.db,
-      key.organizationId,
+    const claimedGate =
       args.surface !== undefined
         ? SURFACE_GATE[args.surface]
-        : (args.gateFeature ?? "public_api")
-    );
-    if (!gate.allowed) {
-      await logDenied(key, "tier_gate");
-      return { ok: false as const, denied: "tier_gate" as const };
+        : (args.gateFeature ?? "public_api");
+
+    // A grandfathered key (no `surfaces` array) is valid on every surface,
+    // which also meant it could pick WHICH GATE was checked. In an
+    // organization with public_api off and docker_image on, such a key could
+    // claim surface "docker" and read anyway. The in-file note above says no
+    // claimed surface can widen access past the tier gates; choosing the gate
+    // is how it could.
+    //
+    // So a legacy key must satisfy public_api as well as whatever it claims.
+    // Legacy keys predate the surface field and were REST or Action
+    // credentials, both of which ride public_api, so this is the gate they
+    // were actually minted under. An explicit key cannot shop: its claimed
+    // surface has to appear in `surfaces`, checked above.
+    //
+    // The eventual cleanup is backfilling `surfaces: ["rest_api"]` onto the
+    // remaining legacy rows, after which this branch can go.
+    const requiredGates =
+      key.surfaces === undefined
+        ? [...new Set([claimedGate, "public_api" as const])]
+        : [claimedGate];
+
+    for (const feature of requiredGates) {
+      const gate = await checkBooleanFeature(
+        ctx.db,
+        key.organizationId,
+        feature
+      );
+      if (!gate.allowed) {
+        await logDenied(key, "tier_gate");
+        return { ok: false as const, denied: "tier_gate" as const };
+      }
     }
 
     if (args.recordUse) {
