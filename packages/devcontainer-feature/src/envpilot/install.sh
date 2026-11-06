@@ -50,14 +50,27 @@ fi
 # necessarily on the container user's PATH at runtime, which would leave
 # `envpilot` as "command not found" in the Codespace even though the install
 # succeeded. install.sh runs as root, so link it somewhere that always is.
+#
+# A failure here is fatal: reporting a successful install while the binary is
+# unreachable is the kind of quiet half-success this Feature should not ship.
 LINK_DIR=/usr/local/bin
-if [ "$ENVPILOT_BIN" != "${LINK_DIR}/envpilot" ] && [ -d "$LINK_DIR" ]; then
-  if ln -sf "$ENVPILOT_BIN" "${LINK_DIR}/envpilot" 2> /dev/null; then
-    echo "envpilot: linked ${ENVPILOT_BIN} to ${LINK_DIR}/envpilot"
-  else
-    echo "envpilot: could not link into ${LINK_DIR}." >&2
-    echo "envpilot: add ${GLOBAL_BIN} to PATH, or envpilot will not be found." >&2
+LINK_PATH="${LINK_DIR}/envpilot"
+
+if [ "$ENVPILOT_BIN" = "$LINK_PATH" ]; then
+  : # Already installed exactly where we would link it.
+elif [ -e "$LINK_PATH" ] && [ ! -L "$LINK_PATH" ]; then
+  # Something else owns this path. Replacing a real binary from another
+  # install silently would be worse than leaving it alone.
+  echo "envpilot: ${LINK_PATH} already exists and is not a symlink; leaving it alone." >&2
+  echo "envpilot: using ${ENVPILOT_BIN}. Ensure it is on PATH for the container user." >&2
+else
+  mkdir -p "$LINK_DIR"
+  if ! ln -sf "$ENVPILOT_BIN" "$LINK_PATH"; then
+    echo "envpilot: could not link ${ENVPILOT_BIN} to ${LINK_PATH}." >&2
+    echo "envpilot: refusing to report a successful install for a binary the container cannot run." >&2
+    exit 1
   fi
+  echo "envpilot: linked ${ENVPILOT_BIN} to ${LINK_PATH}"
 fi
 
 echo "envpilot: ${VERSION_OUT} ready. Sign in with 'envpilot login'."

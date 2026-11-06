@@ -58,22 +58,15 @@ import {
   type DocSummary,
   type UpdatedDraft,
 } from "./docs";
-import { consumeRateLimit, normalizeClientRef } from "./helpers";
+import {
+  consumeRateLimit,
+  normalizeClientRef,
+  summarizeProjectsWithinBudget,
+} from "./helpers";
 
 const SEARCH_MAX_PROJECTS = 20;
 const SEARCH_MAX_RESULTS = 100;
 const SEARCH_ROW_BUDGET = 8000;
-const VARIABLE_COUNT_CAP = 500;
-/**
- * Shared ceiling for the per-project counting in listProjects.
- *
- * Counting each project with its own take(500) had no total bound, so an
- * organization with 34 projects of 500 active variables read 17,000 documents
- * in one query and blew Convex's 16,384-document transaction limit. That threw
- * a non-ConvexError, so the FIRST tool an agent calls answered "Server Error"
- * with no hint. Matches SEARCH_ROW_BUDGET in spirit.
- */
-const LIST_PROJECTS_ROW_BUDGET = 8000;
 
 const organizationArg = v.optional(v.string());
 
@@ -530,36 +523,7 @@ export const _listProjects = internalQuery({
       args.organization
     );
     const projects = await visibleProjects(ctx, user._id, organization._id);
-    // Sequential on purpose: the budget has to be spent in order so the
-    // projects that do get counted are counted correctly, rather than every
-    // project racing to read its own 500.
-    let budget = LIST_PROJECTS_ROW_BUDGET;
-    const summaries: ProjectSummary[] = [];
-    for (const project of projects) {
-      if (budget <= 0) {
-        summaries.push({ name: project.name, slug: project.slug });
-        continue;
-      }
-      const limit = Math.min(VARIABLE_COUNT_CAP, budget);
-      const active = await ctx.db
-        .query("environmentVariables")
-        .withIndex("by_project_deleted", (q) =>
-          q.eq("projectId", project._id).eq("deletedAt", undefined)
-        )
-        .take(limit);
-      budget -= active.length;
-      // A read stopped by the REMAINING BUDGET rather than by the cap tells
-      // us nothing about the real total, so the count is omitted rather than
-      // reported as if exact. Hitting the cap is the documented bound.
-      const budgetLimited =
-        limit < VARIABLE_COUNT_CAP && active.length === limit;
-      summaries.push({
-        name: project.name,
-        slug: project.slug,
-        ...(budgetLimited ? {} : { variableCount: active.length }),
-      });
-    }
-    return summaries;
+    return await summarizeProjectsWithinBudget(ctx, projects);
   },
 });
 

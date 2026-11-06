@@ -18,6 +18,8 @@ import {
   consumeRateLimit,
   throwForDenial,
   type Authorization,
+  summarizeProjectsWithinBudget,
+  VARIABLE_COUNT_CAP,
 } from "./helpers";
 import { open as openSealedFile, toBase64 } from "../files/crypto";
 import { get as blobStoreGet } from "../files/blobStore";
@@ -52,14 +54,6 @@ import { pool, VAULT_POOL_WIDTH } from "../../lib/pool";
 // cicd/pull.ts's _readScopedVariables exactly. A silent partial read would
 // let an integration "succeed" while missing secrets/accounts.
 const MAX_PULL_ROWS = MAX_PROJECT_FILES;
-// Mirrors projects/helpers.ts's listWithStatsCore VARIABLE_COUNT_CAP — a
-// bounded reactive-safe count, not an exact total for pathological projects.
-const VARIABLE_COUNT_CAP = 500;
-/**
- * Shared ceiling for the per-project counting in the projects listing, so the
- * total is bounded rather than (projects x 500).
- */
-const LIST_PROJECTS_ROW_BUDGET = 8000;
 
 function requireResolvedProject(
   authorization: Extract<Authorization, { ok: true }>
@@ -147,8 +141,10 @@ export const _listScopedProjects = internalQuery({
       }
       projects = page;
     } else {
+      // Deduplicated: a key whose scope list repeats an id would otherwise
+      // return that project twice and count it twice.
       const resolved = await Promise.all(
-        args.scopeProjects.map((id) => ctx.db.get(id))
+        [...new Set(args.scopeProjects)].map((id) => ctx.db.get(id))
       );
       projects = resolved.filter(
         (project): project is Doc<"projects"> =>
@@ -159,38 +155,7 @@ export const _listScopedProjects = internalQuery({
       );
     }
 
-    let budget = LIST_PROJECTS_ROW_BUDGET;
-    const summaries: Array<{
-      name: string;
-      slug: string;
-      variableCount?: number;
-    }> = [];
-    for (const project of projects) {
-      if (budget <= 0) {
-        summaries.push({ name: project.name, slug: project.slug });
-        continue;
-      }
-      const limit = Math.min(VARIABLE_COUNT_CAP, budget);
-      const activeVariables = await ctx.db
-        .query("environmentVariables")
-        .withIndex("by_project_deleted", (q) =>
-          q.eq("projectId", project._id).eq("deletedAt", undefined)
-        )
-        .take(limit);
-      budget -= activeVariables.length;
-      // A read stopped by the REMAINING BUDGET rather than by the cap tells
-      // us nothing about the real total, so the count is omitted instead of
-      // reported as if it were exact. Hitting the cap is different: that
-      // bound is the documented one.
-      const budgetLimited =
-        limit < VARIABLE_COUNT_CAP && activeVariables.length === limit;
-      summaries.push({
-        name: project.name,
-        slug: project.slug,
-        ...(budgetLimited ? {} : { variableCount: activeVariables.length }),
-      });
-    }
-    return summaries;
+    return await summarizeProjectsWithinBudget(ctx, projects);
   },
 });
 

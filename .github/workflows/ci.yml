@@ -358,6 +358,7 @@ jobs:
     needs:
       - changes
       - checks
+      - validate-devcontainer-feature
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -818,11 +819,12 @@ jobs:
 
   deploy-devcontainer-feature:
     name: Deploy devcontainer feature
-    needs: [changes, checks-passed]
+    needs: [changes, checks-passed, validate-devcontainer-feature]
     if: |
       !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      needs.changes.outputs.run_devcontainer_feature == 'true'
+      needs.changes.outputs.run_devcontainer_feature == 'true' &&
+      needs.validate-devcontainer-feature.result == 'success'
     uses: ./.github/workflows/deploy-devcontainer-feature.yml
     secrets: inherit
     permissions:

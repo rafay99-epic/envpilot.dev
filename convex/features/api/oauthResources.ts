@@ -664,8 +664,18 @@ export const uploadFile = action({
   > => {
     const principal = await verifyOAuthToken(args.token);
     // This action verifies the token itself rather than going through
-    // startWrite, so the environment check has to be repeated here.
-    assertKnownEnvironments(args.environments);
+    // startWrite, so the environment check is repeated here.
+    //
+    // A rejection has to cost quota. The fileUpload bucket is consumed inside
+    // uploadFileAs, so returning before it meant a malformed upload was free
+    // and could be repeated without limit. Charge the same bucket a real
+    // upload would pay, on the rejection path only, so a valid upload is not
+    // billed twice.
+    const unknownEnvs = unknownEnvironments(args.environments);
+    if (unknownEnvs.length > 0) {
+      await consumeRateLimit(ctx, "fileUpload", oauthRateKey(principal));
+      assertKnownEnvironments(args.environments);
+    }
     const target: ResolvedProject & {
       path: string;
       environments: string[];

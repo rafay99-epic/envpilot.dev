@@ -128,7 +128,9 @@ export function mapPublicApiError(error: unknown): MappedPublicApiError {
       sentryFailureTag: "vault-decrypt",
     };
   }
-  if (/refusing a partial pull/i.test(message)) {
+  // Also matches the projects LISTING overflow, which is the same class of
+  // refusal with a different noun.
+  if (/refusing a partial (pull|list)/i.test(message)) {
     return {
       status: 422,
       code: "OVERFLOW",

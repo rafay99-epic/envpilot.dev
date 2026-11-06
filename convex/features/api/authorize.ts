@@ -247,10 +247,13 @@ export const _authorizeRequest = internalMutation({
     // is how it could.
     //
     // So a legacy key must satisfy public_api as well as whatever it claims.
-    // Legacy keys predate the surface field and were REST or Action
-    // credentials, both of which ride public_api, so this is the gate they
-    // were actually minted under. An explicit key cannot shop: its claimed
-    // surface has to appear in `surfaces`, checked above.
+    // That is an ADDED policy requirement, not a restatement of how those
+    // keys were minted: pre-surfaces keys were also accepted by the MCP path
+    // (see api/mcpRetirement.ts), so they were never purely REST or Action
+    // credentials. public_api is simply the floor we hold them to now, so
+    // that a credential with no declared surfaces cannot reach for whichever
+    // gate happens to be open. An explicit key cannot shop at all: its
+    // claimed surface has to appear in `surfaces`, checked above.
     //
     // DELIBERATE EXCEPTION to "Docker is gated only on docker_image": that
     // rule holds for every key that names its surfaces, which is every key
@@ -259,7 +262,7 @@ export const _authorizeRequest = internalMutation({
     // letting it pick the more permissive of the two. The only organizations
     // affected are those that deliberately turned public_api off while
     // leaving docker_image on, which is exactly the case the bypass
-    // exploited. Documented in docs/docker/reference.mdx.
+    // exploited. Documented in apps/docs/content/docker/reference.mdx.
     //
     // The eventual cleanup is backfilling `surfaces: ["rest_api"]` onto the
     // remaining legacy rows, after which this branch can go.

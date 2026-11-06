@@ -75,9 +75,12 @@ envpilot run --no-cache -e development -p <project-slug> \
 
 Three parts of that matter:
 
-- **`run` fails closed.** If a required secret is missing or cannot be
-  decrypted, it refuses to start the command rather than running with a gap.
-  `--allow-partial` turns that off; do not pass it.
+- **`run` fails closed.** If a required secret is missing from both the
+  project and the surrounding shell, or cannot be decrypted, it refuses to
+  start the command rather than running with a gap. An existing non-empty
+  shell variable satisfies `--require`, so a key already exported in your
+  environment will pass even when the project does not define it.
+  `--allow-partial` turns the refusal off; do not pass it.
 - **`--require`** lists the keys the code actually needs, so a missing one is
   named up front instead of surfacing as a confusing runtime error. Derive
   that list from the repository, for example from `process.env.X` references
@@ -124,12 +127,13 @@ complete.
 **Do not hand-escape dotenv.** Quoting rules differ between parsers, and the
 shell idiom for a single quote inside a single-quoted string is not dotenv
 syntax; it corrupts the value in most parsers, including this product's own.
-If the CLI is present, prefer its own serializer, and pass the same project
-and environment you selected so it cannot emit another linked project's
-values:
+If the CLI is present, do not reach for `envpilot export` here. It prints the
+whole payload to stdout, which puts every secret in your transcript, which is
+the one thing this skill exists to avoid. Use the path that writes the file
+itself, with the project and environment you selected:
 
 ```bash
-envpilot export --format env --no-cache -e development -p <project-slug>
+envpilot pull --no-cache -e development --project <project-slug>
 ```
 
 If you must write the file yourself, use double quotes and escape `"` as `\"`

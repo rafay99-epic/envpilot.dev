@@ -121,7 +121,10 @@ export async function GET(request: Request) {
     if (/not scoped to|scope|not enabled for this surface/i.test(message)) {
       return NextResponse.json({ error: message }, { status: 403 });
     }
-    if (/pro plan|tier/i.test(message)) {
+    // Three classifiers match this message text: here, /api/v1/secrets,
+    // and mapPublicApiError. All three accept the current wording and the
+    // older "Pro plan" one, because web and convex ship separately.
+    if (/pro plan|tier|not available on this plan/i.test(message)) {
       return NextResponse.json({ error: message }, { status: 403 });
     }
     if (/rate ?limit/i.test(message)) {

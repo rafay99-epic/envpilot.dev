@@ -35,7 +35,7 @@ In Claude Code run `/mcp`; other clients show the server's tools in their MCP pa
 ## What a connection can see
 
 - **Your role decides.** The connection reads exactly what you can read in the dashboard: the same projects, environments, variable permissions and documentation. A suspended membership sees nothing.
-- **Nineteen tools** for projects, variables, secret files, shared accounts, change requests and documentation. See [Tools](/mcp/tools).
+- **Twenty tools** for orientation, projects, variables, secret files, shared accounts, change requests and documentation. See [Tools](/mcp/tools).
 - **Writes follow your role.** An agent can create and update what you can in the dashboard. A protected environment turns a write into a change request, and documentation stays a draft until a person publishes it. Clients that honour `destructiveHint`, such as Claude, ask you before each write.
 - **More than one organization:** pass `organization` (the organization's slug) to the project tools; `envpilot_list_organizations` lists them. `envpilot_get_doc` and `envpilot_update_doc_draft` take a doc id, which already names the project. The error message lists the slugs you can use.
 - **Audited and rate limited per person.** Every value read is logged against your user.
