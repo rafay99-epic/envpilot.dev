@@ -55,6 +55,17 @@ describe("MCP tool definitions", () => {
       "envpilot_update_doc_draft",
       "envpilot_update_variable",
       "envpilot_upload_file",
+      "envpilot_whoami",
     ]);
+  });
+
+  it("envpilot_whoami describes the protected-environment consequence", () => {
+    // The reason the tool exists: an agent needs to know, before it proposes
+    // anything, which environments turn a write into a change request.
+    const tool = registeredTools().get("envpilot_whoami");
+    expect(tool).toBeTruthy();
+    expect(tool!.description).toMatch(/protected/i);
+    expect(tool!.description).toMatch(/change request/i);
+    expect(tool!.annotations?.readOnlyHint).toBe(true);
   });
 });

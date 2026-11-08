@@ -52,14 +52,24 @@ export const SURFACE_GATE: Record<Surface, SurfaceGate> = {
   docker: "docker_image",
 };
 
-/** Upgrade copy per gate, so a denial names the thing the user must buy. */
+/**
+ * Copy per gate, so a denial names the surface that was refused.
+ *
+ * These no longer say "upgrade to Pro". All three surfaces are on for the
+ * free tier, so the only way to see one of these is a platform admin having
+ * turned the gate off for a tier. "Available on the Pro plan" would now be
+ * false, and the MCP line was doubly wrong: the MCP server has not accepted
+ * API keys since the OAuth cutover, so there is no such thing as an MCP key.
+ *
+ * The phrase is load bearing. `mapPublicApiError` and the /api/v1/secrets
+ * route classify a tier denial by matching the message text, and both accept
+ * the old "Pro plan" wording too, because the web app and the Convex
+ * deployment ship separately and an older backend can still send it.
+ */
 export const SURFACE_GATE_MESSAGE: Record<SurfaceGate, string> = {
-  public_api:
-    "The public API is available on the Pro plan. Upgrade to create API keys.",
-  mcp_server:
-    "The MCP server is available on the Pro plan. Upgrade to create MCP keys.",
-  docker_image:
-    "The Docker image is available on the Pro plan. Upgrade to create Docker keys.",
+  public_api: "The public API is not available on this plan.",
+  mcp_server: "The MCP server is not available on this plan.",
+  docker_image: "The Docker image is not available on this plan.",
 };
 
 /**

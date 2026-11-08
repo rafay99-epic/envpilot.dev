@@ -12,7 +12,7 @@ Protection is enforced in one place, the backend mutations that write variables,
 
 ## Turning it on
 
-Project Settings, Protection. Pick the environments to protect. Needs the `project.protection.manage` capability (owner, project manager, team lead by default) and the Pro plan.
+Project Settings, Protection. Pick the environments to protect. Needs the `project.protection.manage` capability (owner, project manager, team lead by default). Available on every plan, including Free: it is what turns an agent's write into a change request, so gating it would have made agent access less safe on the plan most agents run on.
 
 Turning it off never needs the plan. An organization that lost the feature can always remove protection on purpose. Doing so is audited as critical and sent to your security notification channel.
 
