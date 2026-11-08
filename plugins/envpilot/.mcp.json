@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "envpilot": {
+      "type": "http",
+      "url": "https://www.envpilot.dev/api/mcp"
+    }
+  }
+}

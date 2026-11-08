@@ -1,0 +1,13 @@
+{
+  "name": "envpilot",
+  "version": "0.1.0",
+  "description": "Bootstrap a repo's environment from Envpilot, and manage variables, secret files and shared logins over MCP.",
+  "author": {
+    "name": "Envpilot"
+  },
+  "homepage": "https://www.envpilot.dev",
+  "repository": "https://github.com/rafay99-epic/envpilot.dev",
+  "license": "MIT",
+  "privacyPolicyUrl": "https://www.envpilot.dev/privacy",
+  "keywords": ["secrets", "environment-variables", "dotenv", "mcp", "ci"]
+}
