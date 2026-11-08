@@ -118,7 +118,20 @@ function writeResult(projectSlug: string, result: ConvexWriteResult) {
 }
 
 // Connector review rules: anything not read-only is marked destructive.
-const writeAnnotations = {
+// A write tool declares one of readOnlyHint or destructiveHint, and a host
+// uses destructiveHint to decide whether a call can be auto-approved.
+//
+// A pure create is NOT destructive: this surface has no delete tool at all,
+// so marking creates destructive blocked a CI agent configured to allow
+// additive writes from every write Envpilot offers.
+const createAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+} as const;
+
+/** For writes that can overwrite existing content. */
+const replaceAnnotations = {
   readOnlyHint: false,
   destructiveHint: true,
   idempotentHint: false,
@@ -152,7 +165,7 @@ export function registerMcpTools(server: McpServer): void {
     {
       title: "Who Am I and What Can I Do",
       description:
-        "Reports the signed-in account and what this connection can reach: every organization available to it, the active organization's plan and whether tier enforcement is on, which features are enabled, the numeric limits with usage where it is known, and every project together with the environments that are PROTECTED. A write touching a protected environment becomes a change request a person approves rather than applying directly. When the account belongs to several organizations and none is named, `organization` comes back null with the list in `organizations`, so the slug can be chosen and the call repeated; the per-organization fields are empty until then. Per-project variable counts are not included; envpilot_list_projects has those.",
+        "Reports the signed-in account and what this connection can reach: every organization available to it, the active organization's plan and whether tier enforcement is on (with `gracePeriod` naming the tier features and limits still come from, and when that ends, while a cancelled subscription winds down; null otherwise), which features are enabled, the numeric limits with usage where it is known, and every project together with the environments that are PROTECTED. A write touching a protected environment becomes a change request a person approves rather than applying directly. When the account belongs to several organizations and none is named, `organization` comes back null with the list in `organizations`, so the slug can be chosen and the call repeated; the per-organization fields are empty until then. Per-project variable counts are not included; envpilot_list_projects has those.",
       inputSchema: { organization: organizationInput },
       outputSchema: {
         user: z.object({ name: z.string().optional(), email: z.string() }),
@@ -169,6 +182,9 @@ export function registerMcpTools(server: McpServer): void {
             slug: z.string(),
             name: z.string(),
             plan: z.string(),
+            gracePeriod: z
+              .object({ tier: z.string(), endsAt: z.string() })
+              .nullable(),
             enforcement: z.boolean(),
           })
           .nullable(),
@@ -202,14 +218,14 @@ export function registerMcpTools(server: McpServer): void {
     {
       title: "List Projects",
       description:
-        "Lists the projects this connection can see, with each project's name, slug and active variable count.",
+        "Lists the projects this connection can see, with each project's name and slug. `variableCount` is the number of active variables, and is omitted for projects beyond the per-call read budget in a large organization; an omitted count means not counted, never zero.",
       inputSchema: { organization: organizationInput },
       outputSchema: {
         projects: z.array(
           z.object({
             name: z.string(),
             slug: z.string(),
-            variableCount: z.number(),
+            variableCount: z.number().optional(),
           })
         ),
       },
@@ -226,7 +242,7 @@ export function registerMcpTools(server: McpServer): void {
     {
       title: "Get Variables",
       description:
-        "Returns environment variables for one project and environment. Filters by exact keys or a key prefix. With metadata_only, returns keys and metadata without decrypting values, and environment becomes optional. Value reads are recorded in the audit log.",
+        "Returns environment variables for one project and environment, together with inaccessibleKeys: the names of variables that exist and match the filters but that this connection has no grant to read. A non-empty inaccessibleKeys means the result is INCOMPLETE: variables exist that match the filters but are unreadable here, and a .env file written from this response would be missing them. Those keys need a grant from a project member. Filters by exact keys or a key prefix. With metadata_only, returns keys and metadata without decrypting values, and environment becomes optional. Value reads are recorded in the audit log.",
       inputSchema: {
         organization: organizationInput,
         project: z.string().describe("Project slug"),
@@ -248,21 +264,24 @@ export function registerMcpTools(server: McpServer): void {
           .optional()
           .describe("Return keys and metadata only, without values"),
       },
-      outputSchema: { variables: z.array(z.object(variableShape)) },
+      outputSchema: {
+        variables: z.array(z.object(variableShape)),
+        inaccessibleKeys: z.array(z.string()),
+      },
       annotations: { readOnlyHint: true },
     },
     (args, extra) =>
       run("envpilot_get_variables", extra.authInfo, async (b) =>
-        structured({
-          variables: await b.getVariables({
+        structured(
+          await b.getVariables({
             organization: args.organization,
             projectSlug: args.project,
             environment: args.environment,
             keys: args.keys,
             prefix: args.prefix,
             metadataOnly: args.metadata_only,
-          }),
-        })
+          })
+        )
       )
   );
 
@@ -283,13 +302,13 @@ export function registerMcpTools(server: McpServer): void {
     },
     (args, extra) =>
       run("envpilot_get_variable", extra.authInfo, async (b) => {
-        const rows = await b.getVariables({
+        const { variables } = await b.getVariables({
           organization: args.organization,
           projectSlug: args.project,
           environment: args.environment,
           keys: [args.key],
         });
-        return structured({ variable: rows[0] ?? null });
+        return structured({ variable: variables[0] ?? null });
       })
   );
 
@@ -460,9 +479,13 @@ export function registerMcpTools(server: McpServer): void {
         client_ref: clientRefInput,
       },
       outputSchema: draftResultShape,
+      // A create, not a replace, so destructiveHint is false. idempotentHint
+      // stays FALSE though: client_ref is optional, and a call without one
+      // creates a new draft every time, so advertising idempotency would be
+      // a promise this tool does not keep.
       annotations: {
         readOnlyHint: false,
-        destructiveHint: true,
+        destructiveHint: false,
         idempotentHint: false,
       },
     },
@@ -555,7 +578,7 @@ export function registerMcpTools(server: McpServer): void {
         description: z.string().optional().describe("What the variable is for"),
       },
       outputSchema: writeResultShape,
-      annotations: writeAnnotations,
+      annotations: createAnnotations,
     },
     (args, extra) =>
       run("envpilot_create_variable", extra.authInfo, async (b) =>
@@ -596,7 +619,7 @@ export function registerMcpTools(server: McpServer): void {
           .array(z.string())
           .describe("Every environment the changed variable covers"),
       },
-      annotations: writeAnnotations,
+      annotations: replaceAnnotations,
     },
     (args, extra) =>
       run("envpilot_update_variable", extra.authInfo, async (b) => {
@@ -736,7 +759,7 @@ export function registerMcpTools(server: McpServer): void {
         requestId: z.string().optional(),
         reviewUrl: z.string().optional(),
       },
-      annotations: writeAnnotations,
+      annotations: replaceAnnotations,
     },
     (args, extra) =>
       run("envpilot_upload_file", extra.authInfo, async (b) => {
@@ -852,7 +875,7 @@ export function registerMcpTools(server: McpServer): void {
         description: z.string().optional(),
       },
       outputSchema: writeResultShape,
-      annotations: writeAnnotations,
+      annotations: createAnnotations,
     },
     (args, extra) =>
       run("envpilot_create_account", extra.authInfo, async (b) =>

@@ -18,6 +18,8 @@ import {
   consumeRateLimit,
   throwForDenial,
   type Authorization,
+  summarizeProjectsWithinBudget,
+  VARIABLE_COUNT_CAP,
 } from "./helpers";
 import { open as openSealedFile, toBase64 } from "../files/crypto";
 import { get as blobStoreGet } from "../files/blobStore";
@@ -52,9 +54,6 @@ import { pool, VAULT_POOL_WIDTH } from "../../lib/pool";
 // cicd/pull.ts's _readScopedVariables exactly. A silent partial read would
 // let an integration "succeed" while missing secrets/accounts.
 const MAX_PULL_ROWS = MAX_PROJECT_FILES;
-// Mirrors projects/helpers.ts's listWithStatsCore VARIABLE_COUNT_CAP — a
-// bounded reactive-safe count, not an exact total for pathological projects.
-const VARIABLE_COUNT_CAP = 500;
 
 function requireResolvedProject(
   authorization: Extract<Authorization, { ok: true }>
@@ -111,37 +110,52 @@ export const _listScopedProjects = internalQuery({
     v.object({
       name: v.string(),
       slug: v.string(),
-      variableCount: v.number(),
+      // Omitted beyond the shared read budget. Not counted, never zero.
+      variableCount: v.optional(v.number()),
     })
   ),
   handler: async (ctx, args) => {
     // Workspaces are excluded at the index: an API key must never see one
     // listed as a project, and slug lookup returns null if one is targeted.
-    let projects = await activeProjectsQuery(
-      ctx.db,
-      args.organizationId
-    ).collect();
-
-    if (args.scopeProjects !== "all") {
-      const allowed = new Set(args.scopeProjects.map((id) => id as string));
-      projects = projects.filter((p) => allowed.has(p._id as string));
+    //
+    // Bounded like every other read on this surface. An unbounded collect()
+    // plus one take(500) per project meant a large organization blew the
+    // transaction read limit, and since there is no pagination here a key
+    // scoped to "all" could never enumerate reliably.
+    //
+    // The two scopes are resolved DIFFERENTLY on purpose. Taking a bounded
+    // page of the organization and then filtering to the key's scope would
+    // silently drop an authorized project that sorts past the bound, which
+    // is the exact "looks complete but isn't" failure this file exists to
+    // avoid. An explicit scope is therefore resolved by id, which is both
+    // exact and bounded by the scope list itself.
+    let projects: Doc<"projects">[];
+    if (args.scopeProjects === "all") {
+      const page = await activeProjectsQuery(ctx.db, args.organizationId).take(
+        MAX_PULL_ROWS + 1
+      );
+      if (page.length > MAX_PULL_ROWS) {
+        throw new ConvexError(
+          `Organization has more than ${MAX_PULL_ROWS} active projects — refusing a partial list. Contact support to raise the limit.`
+        );
+      }
+      projects = page;
+    } else {
+      // Deduplicated: a key whose scope list repeats an id would otherwise
+      // return that project twice and count it twice.
+      const resolved = await Promise.all(
+        [...new Set(args.scopeProjects)].map((id) => ctx.db.get(id))
+      );
+      projects = resolved.filter(
+        (project): project is Doc<"projects"> =>
+          project !== null &&
+          project.organizationId === args.organizationId &&
+          project.deletedAt === undefined &&
+          !isWorkspace(project)
+      );
     }
 
-    return await Promise.all(
-      projects.map(async (project) => {
-        const activeVariables = await ctx.db
-          .query("environmentVariables")
-          .withIndex("by_project_deleted", (q) =>
-            q.eq("projectId", project._id).eq("deletedAt", undefined)
-          )
-          .take(VARIABLE_COUNT_CAP);
-        return {
-          name: project.name,
-          slug: project.slug,
-          variableCount: activeVariables.length,
-        };
-      })
-    );
+    return await summarizeProjectsWithinBudget(ctx, projects);
   },
 });
 
@@ -421,13 +435,13 @@ export const listProjects = action({
     v.object({
       name: v.string(),
       slug: v.string(),
-      variableCount: v.number(),
+      variableCount: v.optional(v.number()),
     })
   ),
   handler: async (
     ctx,
     args
-  ): Promise<Array<{ name: string; slug: string; variableCount: number }>> => {
+  ): Promise<Array<{ name: string; slug: string; variableCount?: number }>> => {
     assertKeyFormat(args.token);
     const tokenHash = await hashToken(args.token);
     await consumeRateLimit(ctx, "apiMetadata", tokenHash);

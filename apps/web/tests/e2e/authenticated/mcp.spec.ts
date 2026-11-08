@@ -52,8 +52,10 @@ test.describe("MCP server (/api/mcp)", () => {
     const response = await request.get(
       "/.well-known/oauth-protected-resource/api/mcp"
     );
+    // 503 is the current answer when the OAuth variables are missing; 404
+    // was the old one, and a deployment can still be running it.
     test.skip(
-      response.status() === 404,
+      response.status() === 503 || response.status() === 404,
       "MCP_OAUTH_ISSUER / MCP_OAUTH_RESOURCE are not set on this deployment"
     );
     expect(response.status()).toBe(200);

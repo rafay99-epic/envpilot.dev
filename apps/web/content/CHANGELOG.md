@@ -15,6 +15,28 @@
 
 <!-- entry -->
 ---
+title: An incomplete read now says so, and a misconfigured MCP server admits it
+version: v1.74.0
+date: 2026-11-06
+types: [fix, security]
+---
+
+A correctness pass over the machine read paths. The theme is the same one as the last release: a request that cannot be answered properly should say so instead of returning something that looks fine.
+
+**`envpilot_get_variables` reports what it could not read.** Variables your role has no grant for were dropped before the response was built, so a short list was indistinguishable from a complete one and a `.env` written from it was quietly missing keys. The tool now returns `inaccessibleKeys` alongside `variables`: the key names only, never values, narrowed by the same filters you asked for. A non-empty value means the response is incomplete.
+
+**Listing projects no longer falls over in a large organization.** Each project was counted with its own 500-row read and no overall bound, so an organization with enough projects exceeded the database's per-query document limit and the first call an agent made answered `Server Error` with no explanation. Both the MCP and REST listings now spend one shared budget, and `variableCount` is omitted rather than reported as zero when the budget runs out. The REST listing also refuses loudly past a bound instead of reading every project unbounded.
+
+**A misconfigured MCP server admits it.** With `MCP_OAUTH_ISSUER` unset, the OAuth discovery document answered `404` while `/api/mcp` kept naming that exact URL in its `WWW-Authenticate` challenge, so a client was told where to sign in and then told nothing was there. It now answers `503` and names the missing variables.
+
+**Request parsing agrees with itself.** The `Authorization` scheme is matched case insensitively, per RFC 7235, so a client sending `bearer` no longer gets told its key is invalid. `metadata_only` and `metadataOnly` are both accepted with the usual truthy words. `?keys=,,,` no longer matches nothing and returns an empty success: an all-separator list now means no filter at all, so it returns every variable in the environment. The same is true of an empty `keys` array over MCP. A GitHub Action key can use the richer variables endpoint, which previously accepted only Docker keys and refused it outright.
+
+**Two authorization fixes.** Environment names are validated on every MCP write path. They were checked only in the web layer, while the Convex actions are public endpoints, so a name like `Production` was written straight through: protection matching is exact, so it never matched a protected `production` and the write applied instead of becoming a change request. Separately, a key minted before the per-surface field could claim any surface and thereby choose which plan gate it faced; those keys now have to satisfy the REST gate as well.
+
+Tool annotations were also corrected. A create is additive, and this surface has no delete tool at all, so marking every write destructive blocked agents configured to allow additive writes from all of them.
+
+<!-- entry -->
+---
 title: Install Envpilot from a plugin, a deeplink, the MCP registry or a devcontainer Feature
 version: v1.60.0
 date: 2026-11-06

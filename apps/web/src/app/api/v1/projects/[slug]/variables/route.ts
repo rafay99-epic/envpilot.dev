@@ -8,6 +8,7 @@ import {
   getBearerToken,
   getConvexUrl,
   mapPublicApiError,
+  parseMetadataOnly,
 } from "@/lib/public-api";
 import { buildDotenvContent } from "@/lib/dotenv-format";
 import {
@@ -56,15 +57,19 @@ export async function GET(request: Request, { params }: RouteParams) {
   // names its surface so authorize.ts checks that surface's tier gate. The
   // Docker image presents "docker" (gated on docker_image, NOT public_api).
   // An unrecognised value is dropped rather than trusted.
+  // github_action is accepted here as well as on /api/v1/files. Without it
+  // an Action-scoped key fell through to rest_api and got 403
+  // FORBIDDEN_SURFACE, so it could not use keys=, prefix= or format=env.
   const surfaceParam = searchParams.get("surface");
-  const surface = surfaceParam === "docker" ? surfaceParam : undefined;
+  const surface =
+    surfaceParam === "docker" || surfaceParam === "github_action"
+      ? surfaceParam
+      : undefined;
   const parsed = querySchema.safeParse({
     environment: searchParams.get("environment") ?? undefined,
     keys: searchParams.get("keys") ?? undefined,
     prefix: searchParams.get("prefix") ?? undefined,
-    metadataOnly: searchParams.has("metadata_only")
-      ? searchParams.get("metadata_only") === "true"
-      : undefined,
+    metadataOnly: parseMetadataOnly(searchParams),
     format: searchParams.get("format") ?? undefined,
   });
   if (!parsed.success) {
@@ -74,6 +79,11 @@ export async function GET(request: Request, { params }: RouteParams) {
     );
   }
   const { environment, keys, prefix, metadataOnly, format } = parsed.data;
+  const splitKeys = keys
+    ?.split(",")
+    .map((key) => key.trim())
+    .filter(Boolean);
+  const requestedKeys = splitKeys?.length ? splitKeys : undefined;
 
   // An unknown name used to be accepted and resolve to zero rows, so
   // `?environment=prod` answered 200 with an empty body, the Action logged
@@ -128,12 +138,10 @@ export async function GET(request: Request, { params }: RouteParams) {
         token,
         projectSlug: slug,
         environment,
-        keys: keys
-          ? keys
-              .split(",")
-              .map((k) => k.trim())
-              .filter(Boolean)
-          : undefined,
+        // An all-separator value like `?keys=,,,` filters to [], which is
+        // truthy, so the key set matched nothing and the response was 200
+        // with zero variables. Treat an empty result as "no filter".
+        keys: requestedKeys,
         prefix,
         metadataOnly,
         ...(surface ? { surface } : {}),

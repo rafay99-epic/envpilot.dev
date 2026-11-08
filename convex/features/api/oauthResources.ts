@@ -10,6 +10,10 @@ import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { createAuditLog } from "../../lib/audit";
 import {
+  ENVIRONMENT_LIST_TEXT,
+  unknownEnvironments,
+} from "../../lib/environments";
+import {
   getRoleProfile,
   isEnvironmentScopeAllowed,
   isSuspendedMembership,
@@ -115,12 +119,36 @@ async function deleteVaultObject(ctx: ActionCtx, vaultRef: string) {
     });
 }
 
+/**
+ * Refuse an environment name the platform does not have.
+ *
+ * The MCP tool schema carries a zod enum, but that lives in the Next.js layer
+ * and every action in this file is a PUBLIC Convex endpoint that any valid MCP
+ * token can call directly. An unknown name used to be written straight
+ * through, and because protection matching is exact, "Production" never
+ * matched a protected "production": the write APPLIED instead of becoming a
+ * change request, and landed a row no reader ever resolves.
+ */
+function assertKnownEnvironments(environments: readonly string[]): void {
+  const unknown = unknownEnvironments(environments);
+  if (unknown.length === 0) return;
+  const names = unknown.map((name) => `"${name}"`).join(", ");
+  throw new ConvexError(
+    `Unknown environment${unknown.length > 1 ? "s" : ""} ${names}. Valid environments: ${ENVIRONMENT_LIST_TEXT}.`
+  );
+}
+
 async function startWrite(
   ctx: ActionCtx,
-  token: string
+  token: string,
+  environments?: readonly string[]
 ): Promise<OAuthPrincipal> {
   const principal = await verifyOAuthToken(token);
   await consumeRateLimit(ctx, "mcpWrite", oauthRateKey(principal));
+  // After the rate limit on purpose, so a typo costs the caller quota. (The
+  // token is already verified above, so there is no unauthenticated prober to
+  // worry about either way.)
+  if (environments) assertKnownEnvironments(environments);
   return principal;
 }
 
@@ -139,7 +167,7 @@ export const createVariable = action({
   },
   returns: writeResultValidator,
   handler: async (ctx, args): Promise<WriteResult> => {
-    const principal = await startWrite(ctx, args.token);
+    const principal = await startWrite(ctx, args.token, args.environments);
     const target: ResolvedProject & { protectedEnvironments: string[] } =
       await ctx.runQuery(
         internal.features.api.oauthResources._preflightVariableCreate,
@@ -276,7 +304,7 @@ export const updateVariable = action({
     if (args.value === undefined && args.description === undefined) {
       throw new ConvexError("Pass a new value, a new description, or both");
     }
-    const principal = await startWrite(ctx, args.token);
+    const principal = await startWrite(ctx, args.token, [args.environment]);
     const target: ResolvedProject & {
       variableId: Id<"environmentVariables">;
       environments: string[];
@@ -635,6 +663,26 @@ export const uploadFile = action({
     | { status: "proposed"; requestId: Id<"changeRequests"> }
   > => {
     const principal = await verifyOAuthToken(args.token);
+    // This action verifies the token itself rather than going through
+    // startWrite, so the environment check is repeated here.
+    //
+    // A rejection has to cost quota. The fileUpload bucket is consumed inside
+    // uploadFileAs, so returning before it meant a malformed upload was free
+    // and could be repeated without limit.
+    //
+    // Precisely what this does: it charges the fileUpload BUCKET, keyed by the
+    // caller's OAuth identity (`oauth:<workosId>`). uploadFileAs keys the same
+    // bucket by the Convex user id, so these are two separate counters, not
+    // one shared allowance. That is enough for the goal here, which is that a
+    // rejected upload is no longer free to repeat, and a malformed upload does
+    // no vault or blob work, so letting it draw on its own counter costs
+    // nothing real. Charged on the rejection path only, so a valid upload is
+    // not billed on this counter at all.
+    const unknownEnvs = unknownEnvironments(args.environments);
+    if (unknownEnvs.length > 0) {
+      await consumeRateLimit(ctx, "fileUpload", oauthRateKey(principal));
+      assertKnownEnvironments(args.environments);
+    }
     const target: ResolvedProject & {
       path: string;
       environments: string[];
@@ -650,6 +698,24 @@ export const uploadFile = action({
         replace: args.replace ?? false,
       }
     );
+    // A replace persists the EXISTING row's environments, not the caller's
+    // (see _resolveUpload), so the resolved list is checked as well. A row
+    // written before this validation existed can hold an unknown name, and
+    // re-persisting it would keep a file no reader resolves and that
+    // protection matching never recognises.
+    if (target.environments !== args.environments) {
+      const unknown = unknownEnvironments(target.environments);
+      if (unknown.length > 0) {
+        throw new ConvexError(
+          `The existing file at "${target.path}" is stored against unknown environment${unknown.length > 1 ? "s" : ""} ${unknown
+            .map((name) => `"${name}"`)
+            .join(
+              ", "
+            )}. Fix that file in the dashboard before replacing it over MCP. Valid environments: ${ENVIRONMENT_LIST_TEXT}.`
+        );
+      }
+    }
+
     const content =
       args.encoding === "base64"
         ? args.content
@@ -949,7 +1015,7 @@ export const createAccount = action({
   },
   returns: writeResultValidator,
   handler: async (ctx, args): Promise<WriteResult> => {
-    const principal = await startWrite(ctx, args.token);
+    const principal = await startWrite(ctx, args.token, args.environments);
     const target: ResolvedProject & { protectedEnvironments: string[] } =
       await ctx.runQuery(
         internal.features.api.oauthResources._preflightAccountCreate,

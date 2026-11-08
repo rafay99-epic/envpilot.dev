@@ -135,6 +135,8 @@ export interface OrgGateContext {
   ownerId: Id<"users"> | null;
   /** Tier to actually resolve features against (accounts for an active grace period). */
   effectiveTier: string;
+  /** End of the grace period `effectiveTier` came from, or null when none applied. */
+  gracePeriodEndsAt: number | null;
 }
 
 /**
@@ -160,6 +162,7 @@ export async function resolveOrgGateContext(
       ownerTierName: "unlimited",
       ownerId: null,
       effectiveTier: "unlimited",
+      gracePeriodEndsAt: null,
     };
   }
 
@@ -170,17 +173,15 @@ export async function resolveOrgGateContext(
     .withIndex("by_user", (q) => q.eq("userId", ownerId))
     .first();
 
-  let effectiveTier = tierName;
-  if (grace?.isActive && grace.gracePeriodEnd > Date.now()) {
-    effectiveTier = grace.previousTier;
-  }
+  const inGrace = !!grace?.isActive && grace.gracePeriodEnd > Date.now();
 
   return {
     enforced: true,
     organizationId,
     ownerTierName: tierName,
     ownerId,
-    effectiveTier,
+    effectiveTier: inGrace ? grace.previousTier : tierName,
+    gracePeriodEndsAt: inGrace ? grace.gracePeriodEnd : null,
   };
 }
 

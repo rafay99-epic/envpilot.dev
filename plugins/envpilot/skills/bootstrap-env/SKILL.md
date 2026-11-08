@@ -70,16 +70,23 @@ The best outcome is not writing a file at all:
 
 ```bash
 envpilot run --no-cache -e development -p <project-slug> \
-  --require DATABASE_URL,STRIPE_SECRET_KEY -- <the project's dev command>
+  --require <keys this project actually reads> -- <the project's dev command>
 ```
 
 Three parts of that matter:
 
-- **`run` fails closed.** If a required secret is missing or cannot be
-  decrypted, it refuses to start the command rather than running with a gap.
-  `--allow-partial` turns that off; do not pass it.
+- **`run` fails closed.** If a required secret is missing from both the
+  project and the surrounding shell, or cannot be decrypted, it refuses to
+  start the command rather than running with a gap. An existing non-empty
+  shell variable satisfies `--require`, so a key already exported in your
+  environment will pass even when the project does not define it.
+  `--allow-partial` turns the refusal off; do not pass it.
 - **`--require`** lists the keys the code actually needs, so a missing one is
-  named up front instead of surfacing as a confusing runtime error.
+  named up front instead of surfacing as a confusing runtime error. Derive
+  that list from the repository, for example from `process.env.X` references
+  or a `.env.example`, and pass only keys this project really reads. Naming a
+  key the project does not define makes `run` refuse to start. Omit the flag
+  entirely rather than guess.
 - **`--no-cache`.** By default `run` writes a decrypted copy to
   `~/.config/envpilot/run-cache` at mode 0600. That is a real file on disk, so
   do not describe `run` as leaving nothing behind. `envpilot logout` purges it.
@@ -120,9 +127,32 @@ complete.
 **Do not hand-escape dotenv.** Quoting rules differ between parsers, and the
 shell idiom for a single quote inside a single-quoted string is not dotenv
 syntax; it corrupts the value in most parsers, including this product's own.
-If `envpilot export --format env` is available, use its output verbatim. If
-you must write the file yourself, use double quotes and escape `"` as `\"`
-and newlines as `\n` inside the value, and keep one key per line.
+
+If you got here and the CLI turns out to be available after all, go back to
+step 3a rather than writing the file from tool output. It covers `pull`
+properly, including the `--dry-run` check and the fact that `pull` has no
+refusal of its own. Do not use `envpilot export` for this: it prints the whole
+payload to stdout, which puts every secret in your transcript, which is the
+one thing this skill exists to avoid.
+
+Writing it yourself, then: one `KEY="value"` per line, double quoted, with
+every escape applied **in this order**. The order matters: escaping the
+backslash last would re-escape the backslashes the earlier steps introduced.
+
+1. `\` becomes `\\` (first, always)
+2. `"` becomes `\"`
+3. a newline becomes `\n`
+4. a carriage return becomes `\r`
+5. a tab becomes `\t`
+
+Escaping only the quote and the newline, which is the obvious half of this,
+corrupts any value containing a literal backslash: a Windows path or a regex
+is read back with `\n` as a newline rather than as the two characters that
+were stored.
+
+If a value holds anything else unprintable, do not try to encode it by hand.
+Say so and leave that key out rather than write a file whose value differs
+from what is stored.
 
 Write to `.env.local` when the framework prefers it (Next.js, Vite), otherwise
 `.env`. Confirm the path is gitignored before writing. If it is not, add it.

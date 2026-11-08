@@ -14,11 +14,33 @@
 
 import { sanitizeConvexError } from "@/lib/error-messages";
 
-/** Extract the bearer credential from an Authorization header, or null. */
+/**
+ * Parse the metadata-only flag.
+ *
+ * Two routes spelled it `metadata_only` and accepted only the literal
+ * "true"; a third spelled it `metadataOnly` and accepted "1" or "true", so
+ * `?metadata_only=1` parsed as false and then 400d asking for an
+ * environment. Both spellings and the usual truthy words work everywhere now.
+ */
+export function parseMetadataOnly(
+  params: URLSearchParams
+): boolean | undefined {
+  const raw = params.get("metadata_only") ?? params.get("metadataOnly");
+  if (raw === null) return undefined;
+  return ["1", "true", "yes", "on"].includes(raw.trim().toLowerCase());
+}
+
+/**
+ * The bearer token, or null.
+ *
+ * The scheme is matched case insensitively: RFC 7235 defines it that way, and
+ * a client sending `bearer envpk_...` used to get 401 MISSING_TOKEN and
+ * conclude its key was bad.
+ */
 export function getBearerToken(request: Request): string | null {
   const authorization = request.headers.get("authorization") ?? "";
-  if (!authorization.startsWith("Bearer ")) return null;
-  const token = authorization.slice("Bearer ".length).trim();
+  const match = /^bearer\s+(.+)$/i.exec(authorization.trim());
+  const token = match?.[1]?.trim();
   return token || null;
 }
 
@@ -106,7 +128,9 @@ export function mapPublicApiError(error: unknown): MappedPublicApiError {
       sentryFailureTag: "vault-decrypt",
     };
   }
-  if (/refusing a partial pull/i.test(message)) {
+  // Also matches the projects LISTING overflow, which is the same class of
+  // refusal with a different noun.
+  if (/refusing a partial (pull|list)/i.test(message)) {
     return {
       status: 422,
       code: "OVERFLOW",

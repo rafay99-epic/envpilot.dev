@@ -9,7 +9,11 @@ import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { createAuditLog } from "../../lib/audit";
 import { isSuspendedMembership } from "../../lib/authz";
-import { VALID_ENVIRONMENTS } from "../../lib/environments";
+import {
+  ENVIRONMENT_LIST_TEXT,
+  isValidEnvironment,
+  VALID_ENVIRONMENTS,
+} from "../../lib/environments";
 import {
   oauthRateKey,
   requireMcpGate,
@@ -19,7 +23,9 @@ import {
 } from "../../lib/mcpOAuth";
 import {
   checkBooleanFeature,
+  checkCountedLimit,
   checkNumericLimit,
+  countActiveKeysForSurface,
   countActiveProjects,
 } from "../featureRegistry/gates";
 import {
@@ -56,21 +62,30 @@ import {
   type DocSummary,
   type UpdatedDraft,
 } from "./docs";
-import { consumeRateLimit, normalizeClientRef } from "./helpers";
+import {
+  consumeRateLimit,
+  normalizeClientRef,
+  summarizeProjectsWithinBudget,
+} from "./helpers";
 
 const SEARCH_MAX_PROJECTS = 20;
 const SEARCH_MAX_RESULTS = 100;
 const SEARCH_ROW_BUDGET = 8000;
-const VARIABLE_COUNT_CAP = 500;
 
 const organizationArg = v.optional(v.string());
 
 const projectSummaryValidator = v.object({
   name: v.string(),
   slug: v.string(),
-  variableCount: v.number(),
+  /**
+   * Absent when the organization is large enough that counting every project
+   * would exceed the shared read budget. Absent means "not counted", never
+   * zero: reporting zero would be a sentinel, and the whole point is that the
+   * caller can tell the difference.
+   */
+  variableCount: v.optional(v.number()),
 });
-type ProjectSummary = { name: string; slug: string; variableCount: number };
+type ProjectSummary = { name: string; slug: string; variableCount?: number };
 
 const variableValidator = v.object({
   key: v.string(),
@@ -92,6 +107,14 @@ type ReadableVariables = {
   projectId: Id<"projects">;
   userId: Id<"users">;
   rows: Array<Omit<VariableRow, "value"> & { vaultRef: string }>;
+  /**
+   * Keys the caller can SEE but not read, with the environments they cover.
+   *
+   * Without this a filtered-out variable is indistinguishable from one that
+   * does not exist, so an agent writes a .env missing a key and the app fails
+   * later for an unrelated-looking reason. Names only, never values.
+   */
+  inaccessible: Array<{ key: string; environments: string[] }>;
 };
 
 const searchResultValidator = v.object({
@@ -152,7 +175,7 @@ async function readableVariables(
   ctx: QueryCtx,
   projectId: Id<"projects">,
   userId: Id<"users">
-): Promise<ReadableVariables["rows"]> {
+): Promise<Pick<ReadableVariables, "rows" | "inaccessible">> {
   const { variables, truncatedAt } = await listWithAccessCore(ctx, {
     projectId,
     userId,
@@ -162,19 +185,28 @@ async function readableVariables(
       `Project has more than ${truncatedAt} active variables — refusing a partial pull. Contact support to raise the limit.`
     );
   }
-  return variables.flatMap((variable) =>
-    variable.hasAccess && variable.vaultRef !== undefined
-      ? [
-          {
-            key: variable.key,
-            environments: variable.environments,
-            isSensitive: variable.isSensitive,
-            updatedAt: variable.updatedAt,
-            vaultRef: variable.vaultRef,
-          },
-        ]
-      : []
-  );
+  const rows: ReadableVariables["rows"] = [];
+  const inaccessible: ReadableVariables["inaccessible"] = [];
+  for (const variable of variables) {
+    if (variable.hasAccess && variable.vaultRef !== undefined) {
+      rows.push({
+        key: variable.key,
+        environments: variable.environments,
+        isSensitive: variable.isSensitive,
+        updatedAt: variable.updatedAt,
+        vaultRef: variable.vaultRef,
+      });
+      continue;
+    }
+    // The row-count truncation above is loud, but this filter was silent:
+    // a variable the caller lacks a grant for was simply dropped, so a
+    // short list looked exactly like a complete one.
+    inaccessible.push({
+      key: variable.key,
+      environments: variable.environments,
+    });
+  }
+  return { rows, inaccessible };
 }
 
 /**
@@ -202,6 +234,10 @@ const whoamiOrganizationValidator = v.object({
   slug: v.string(),
   name: v.string(),
   plan: v.string(),
+  gracePeriod: v.union(
+    v.object({ tier: v.string(), endsAt: v.string() }),
+    v.null()
+  ),
   enforcement: v.boolean(),
 });
 
@@ -241,6 +277,7 @@ type WhoamiOrganization = {
   slug: string;
   name: string;
   plan: string;
+  gracePeriod: { tier: string; endsAt: string } | null;
   enforcement: boolean;
 };
 
@@ -385,16 +422,54 @@ export const _whoami = internalQuery({
       }))
     );
 
-    const projectCount = await countActiveProjects(ctx.db, organization._id);
+    // checkCountedLimit, not checkNumericLimit: the count runs ONLY when the
+    // tier actually resolves to a number. whoami is the first call an agent
+    // makes, so an eager scan here would put a full active-projects count on
+    // the hottest metadata path for every Pro org and every deployment with
+    // enforcement off, to decide a limit that can never bind.
+    const now = Date.now();
+    const counters: Partial<
+      Record<(typeof WHOAMI_LIMITS)[number], () => Promise<number>>
+    > = {
+      max_projects: () => countActiveProjects(ctx.db, organization._id),
+      // Named in the description as the thing an agent checks before trying
+      // to mint a key, so the usage has to actually be there.
+      docker_image_limit: () =>
+        countActiveKeysForSurface(ctx.db, organization._id, "docker", now),
+      github_action_limit: () =>
+        countActiveKeysForSurface(
+          ctx.db,
+          organization._id,
+          "github_action",
+          now
+        ),
+    };
+
     const limits = await Promise.all(
       WHOAMI_LIMITS.map(async (key) => {
-        const used = key === "max_projects" ? projectCount : undefined;
-        const resolved = await checkNumericLimit(
+        const counter = counters[key];
+        if (!counter) {
+          const resolved = await checkNumericLimit(
+            ctx.db,
+            organization._id,
+            key,
+            0,
+            gateContext
+          );
+          return { key, limit: resolved.limit };
+        }
+        let used: number | undefined;
+        const resolved = await checkCountedLimit(
           ctx.db,
           organization._id,
           key,
-          used ?? 0,
-          gateContext
+          async (limit) => {
+            used = await counter();
+            return used;
+          },
+          gateContext,
+          // Report usage as it stands rather than asking "could I add one".
+          0
         );
         return { key, limit: resolved.limit, used };
       })
@@ -410,20 +485,34 @@ export const _whoami = internalQuery({
       protectedEnvironments: project.protection?.environments ?? [],
     }));
 
-    // The real plan, not a gate's tierName: when enforcement is off every
-    // gate resolves as "unlimited", which would have misreported a free org.
-    const { tierName } = await getOrgOwnerTier(
-      ctx.db,
-      organization._id,
-      organization
-    );
+    // `plan` is the tier the owner is on, which is what a person means by
+    // "plan". `gracePeriod` comes from the same grace row the features above
+    // were resolved with, so it is set exactly when they came from that
+    // tier. It cannot be inferred from plan vs effective tier: a revoked
+    // subscription keeps the paid tier in userTiers until grace ends, so the
+    // two are often equal during grace.
+    // With enforcement off the context carries no real tier ("unlimited"),
+    // so the stored one is read, and `enforcement: false` says it does not
+    // bind.
+    const plan = gateContext.enforced
+      ? gateContext.ownerTierName
+      : (await getOrgOwnerTier(ctx.db, organization._id, organization))
+          .tierName;
+    const gracePeriod =
+      gateContext.gracePeriodEndsAt === null
+        ? null
+        : {
+            tier: gateContext.effectiveTier,
+            endsAt: new Date(gateContext.gracePeriodEndsAt).toISOString(),
+          };
 
     return {
       ...base,
       organization: {
         slug: organization.slug,
         name: organization.name,
-        plan: tierName,
+        plan,
+        gracePeriod,
         enforcement: gateContext.enforced,
       },
       features,
@@ -457,21 +546,7 @@ export const _listProjects = internalQuery({
       args.organization
     );
     const projects = await visibleProjects(ctx, user._id, organization._id);
-    return await Promise.all(
-      projects.map(async (project) => {
-        const active = await ctx.db
-          .query("environmentVariables")
-          .withIndex("by_project_deleted", (q) =>
-            q.eq("projectId", project._id).eq("deletedAt", undefined)
-          )
-          .take(VARIABLE_COUNT_CAP);
-        return {
-          name: project.name,
-          slug: project.slug,
-          variableCount: active.length,
-        };
-      })
-    );
+    return await summarizeProjectsWithinBudget(ctx, projects);
   },
 });
 
@@ -485,13 +560,32 @@ export const getVariables = action({
     prefix: v.optional(v.string()),
     metadataOnly: v.optional(v.boolean()),
   },
-  returns: v.array(variableValidator),
-  handler: async (ctx, args): Promise<VariableRow[]> => {
+  returns: v.object({
+    variables: v.array(variableValidator),
+    inaccessibleKeys: v.array(v.string()),
+  }),
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ variables: VariableRow[]; inaccessibleKeys: string[] }> => {
     const principal = await verifyOAuthToken(args.token);
     const metadataOnly = args.metadataOnly ?? false;
     if (!metadataOnly && !args.environment) {
       throw new ConvexError(
         "Missing required param: environment (or pass metadata_only=true)"
+      );
+    }
+    // Validated here as well as by the tool layer's zod enum, because this
+    // action is public and a direct caller skips that layer. An unknown name
+    // matched no rows and answered with an empty list, which is the same
+    // silent-empty result the REST surface already refuses with
+    // UNKNOWN_ENVIRONMENT, and an agent would write an empty .env from it.
+    if (
+      args.environment !== undefined &&
+      !isValidEnvironment(args.environment)
+    ) {
+      throw new ConvexError(
+        `Unknown environment "${args.environment}". Valid environments: ${ENVIRONMENT_LIST_TEXT}.`
       );
     }
     await consumeRateLimit(
@@ -509,16 +603,30 @@ export const getVariables = action({
       }
     );
 
-    const keySet = args.keys ? new Set(args.keys) : null;
-    const filtered = readable.rows.filter(
-      (row) =>
-        (!args.environment || row.environments.includes(args.environment)) &&
-        (!keySet || keySet.has(row.key)) &&
-        (!args.prefix || row.key.startsWith(args.prefix))
-    );
+    // An EMPTY array means no filter, not "match nothing". A truthy [] built
+    // an empty Set and returned zero variables, the same bug the REST route
+    // had with `?keys=,,,`.
+    const keySet = args.keys?.length ? new Set(args.keys) : null;
+    const matches = (row: { key: string; environments: string[] }): boolean =>
+      (!args.environment || row.environments.includes(args.environment)) &&
+      (!keySet || keySet.has(row.key)) &&
+      (!args.prefix || row.key.startsWith(args.prefix));
+
+    const filtered = readable.rows.filter(matches);
+    // Narrowed by the same filters, so the caller is told about the keys it
+    // actually asked for rather than everything in the project.
+    // Deduplicated: the same key may exist on two active variables with
+    // disjoint environments, so without an environment filter both rows
+    // match and the name would appear twice.
+    const inaccessibleKeys = [
+      ...new Set(readable.inaccessible.filter(matches).map((row) => row.key)),
+    ];
 
     if (metadataOnly) {
-      return filtered.map(({ vaultRef: _vaultRef, ...row }) => row);
+      return {
+        variables: filtered.map(({ vaultRef: _vaultRef, ...row }) => row),
+        inaccessibleKeys,
+      };
     }
 
     const values = await pool(
@@ -549,7 +657,7 @@ export const getVariables = action({
       },
     });
 
-    return values;
+    return { variables: values, inaccessibleKeys };
   },
 });
 
@@ -571,7 +679,11 @@ export const _readVariables = internalQuery({
       organization._id,
       args.projectSlug
     );
-    const rows = await readableVariables(ctx, project._id, user._id);
+    const { rows, inaccessible } = await readableVariables(
+      ctx,
+      project._id,
+      user._id
+    );
     // An empty read may mean the project is not the user's at all: not
     // assigned and no variable grants. That reads as missing, before any
     // pull is recorded against it. Only empty reads pay for the check.
@@ -593,6 +705,7 @@ export const _readVariables = internalQuery({
       projectId: project._id,
       userId: user._id,
       rows,
+      inaccessible,
     };
   },
 });
