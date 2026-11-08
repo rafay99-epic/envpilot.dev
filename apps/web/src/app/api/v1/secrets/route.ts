@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  ENVIRONMENT_LIST_TEXT,
+  isValidEnvironment,
+} from "@convex/lib/environments";
 import { ConvexHttpClient } from "convex/browser";
 import * as Sentry from "@sentry/nextjs";
 import { api } from "@convex/_generated/api";
@@ -36,6 +40,18 @@ export async function GET(request: Request) {
   if (!environment) {
     return NextResponse.json(
       { error: "Missing required query param: environment" },
+      { status: 400 }
+    );
+  }
+  // An unknown name resolved to zero rows and answered 200 with an empty
+  // variables array, so the Action reported "pulled 0 variables" and the
+  // deploy continued with nothing set.
+  if (!isValidEnvironment(environment)) {
+    return NextResponse.json(
+      {
+        error: `Unknown environment "${environment}". Valid environments: ${ENVIRONMENT_LIST_TEXT}.`,
+        code: "UNKNOWN_ENVIRONMENT",
+      },
       { status: 400 }
     );
   }

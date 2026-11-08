@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  ENVIRONMENT_LIST_TEXT,
+  isValidEnvironment,
+} from "@convex/lib/environments";
 import { ConvexHttpClient } from "convex/browser";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
@@ -57,6 +61,16 @@ export async function GET(request: Request, { params }: RouteParams) {
     );
   }
   const { environment, metadataOnly } = parsed.data;
+
+  if (environment && !isValidEnvironment(environment)) {
+    return NextResponse.json(
+      {
+        error: `Unknown environment "${environment}". Valid environments: ${ENVIRONMENT_LIST_TEXT}.`,
+        code: "UNKNOWN_ENVIRONMENT",
+      },
+      { status: 400, headers }
+    );
+  }
 
   const convexUrl = getConvexUrl();
   if (!convexUrl) {

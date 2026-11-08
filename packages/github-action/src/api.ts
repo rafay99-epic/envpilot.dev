@@ -83,6 +83,61 @@ export interface PullFilesParams {
 }
 
 /**
+ * Per-request ceiling.
+ *
+ * `fetch` has no default timeout, so a stalled TLS handshake or a response
+ * body that never finishes blocked until the job's own 360-minute limit,
+ * burning a runner with nothing in the log to explain it.
+ */
+const REQUEST_TIMEOUT_MS = 120_000;
+
+/**
+ * Resolve the API base and refuse a plaintext scheme.
+ *
+ * The token rides in an `Authorization` header on every call, so an `http://`
+ * base URL puts a key that can read the whole project on the wire in clear.
+ * Loopback is allowed because that is how the local dev server is exercised.
+ */
+function baseUrl(apiUrl: string): URL {
+  const base = new URL(apiUrl);
+  const loopback = ["localhost", "127.0.0.1", "::1", "[::1]"];
+  if (base.protocol !== "https:" && !loopback.includes(base.hostname)) {
+    throw new Error(
+      `refusing to send the API key over ${base.protocol}// — set api-url to an https endpoint (got ${base.origin})`
+    );
+  }
+  return base;
+}
+
+/**
+ * One fetch with a timeout that explains itself.
+ *
+ * `AbortSignal.timeout` rejects with a bare "The operation was aborted due to
+ * timeout", which names neither the endpoint nor the limit, and the whole
+ * point of having a timeout is that the log says what stalled.
+ */
+async function fetchWithTimeout(url: URL, token: string): Promise<Response> {
+  try {
+    return await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    const name = (error as { name?: string } | undefined)?.name;
+    if (name === "TimeoutError" || name === "AbortError") {
+      throw new Error(
+        `request to ${url.pathname} timed out after ${REQUEST_TIMEOUT_MS / 1000}s`
+      );
+    }
+    throw error;
+  }
+}
+
+/**
  * Fetch a project's secret files.
  *
  * The API key must carry the `files` resource, which Envpilot never grants
@@ -92,7 +147,7 @@ export interface PullFilesParams {
 export async function pullFiles(
   params: PullFilesParams
 ): Promise<EnvpilotFilesResponse> {
-  const url = new URL("/api/v1/files", params.apiUrl);
+  const url = new URL("/api/v1/files", baseUrl(params.apiUrl));
   url.searchParams.set("environment", params.environment);
   url.searchParams.set("project", params.project);
   // Identify the surface so a github_action-scoped key authorizes here.
@@ -100,13 +155,7 @@ export async function pullFiles(
   if (params.metadataOnly) url.searchParams.set("metadataOnly", "1");
   for (const path of params.paths ?? []) url.searchParams.append("path", path);
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${params.token}`,
-      Accept: "application/json",
-    },
-  });
+  const response = await fetchWithTimeout(url, params.token);
 
   if (!response.ok) {
     throw new EnvpilotApiError(
@@ -141,16 +190,10 @@ async function errorMessage(response: Response): Promise<string> {
 export async function pullSecrets(
   params: PullSecretsParams
 ): Promise<EnvpilotSecretsResponse> {
-  const url = new URL("/api/v1/secrets", params.apiUrl);
+  const url = new URL("/api/v1/secrets", baseUrl(params.apiUrl));
   url.searchParams.set("environment", params.environment);
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${params.token}`,
-      Accept: "application/json",
-    },
-  });
+  const response = await fetchWithTimeout(url, params.token);
 
   if (!response.ok) {
     throw new EnvpilotApiError(

@@ -1323,9 +1323,11 @@ export async function rollbackCore(
 ) {
   const now = Date.now();
 
+  // ConvexError throughout: production Convex redacts a plain Error to
+  // "Server Error", so these never reached the person who triggered them.
   const variable = await ctx.db.get(args.variableId);
   if (!variable || variable.deletedAt) {
-    throw new Error("Variable not found");
+    throw new ConvexError("Variable not found");
   }
 
   const targetVersionRecord = await ctx.db
@@ -1336,12 +1338,12 @@ export async function rollbackCore(
     .first();
 
   if (!targetVersionRecord) {
-    throw new Error("Target version not found");
+    throw new ConvexError("Target version not found");
   }
 
   const project = await ctx.db.get(variable.projectId);
   if (!project) {
-    throw new Error("Project not found");
+    throw new ConvexError("Project not found");
   }
 
   // Authorization: owner only
@@ -1351,6 +1353,39 @@ export async function rollbackCore(
     project.organizationId,
     "org:rollback_variable"
   );
+
+  // A rollback REWRITES `environments` from the historical version, so it is
+  // a write path like any other and has to re-check per-environment key
+  // uniqueness. Without this, narrowing a variable to [development], letting
+  // someone else create a [production] twin of the same key, then rolling
+  // back to the version that spanned both leaves two active variables
+  // claiming production — and pull, extension sync and /api/v1/secrets then
+  // resolve that key nondeterministically.
+  //
+  // It runs BEFORE assertProtectedWrite on purpose. On a protected
+  // environment that check throws PROTECTED_ENVIRONMENT_CODE, the UI files a
+  // rollback change request, and approving it re-runs this function with
+  // viaRequestId. If the conflict were only caught after protection, it
+  // would surface at approval time instead, the apply would throw, and the
+  // request would sit pending with no way to apply it until the 30-day
+  // expiry. Checking first refuses an impossible rollback up front. This
+  // leaks nothing: assertOrgAction above already limits rollback to an
+  // actor whose role holds the rollback capability.
+  const envClashes = await findEnvironmentConflicts(ctx, {
+    projectId: variable.projectId,
+    key: variable.key,
+    // The PROPOSED state only, matching updateCore. Using the union of
+    // before and after would check environments the rollback REMOVES, so a
+    // clash the rollback itself resolves would block it. The union is still
+    // right for assertProtectedWrite below, which asks a different question:
+    // which protected environments does this write touch.
+    environments: targetVersionRecord.environments,
+    excludeVariableId: variable._id,
+    appliesTo: variable.appliesTo,
+  });
+  if (envClashes.length > 0) {
+    throw new ConvexError(environmentConflictMessage(variable.key, envClashes));
+  }
 
   await assertProtectedWrite(ctx, {
     project,

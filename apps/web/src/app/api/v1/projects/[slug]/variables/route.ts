@@ -10,6 +10,10 @@ import {
   mapPublicApiError,
 } from "@/lib/public-api";
 import { buildDotenvContent } from "@/lib/dotenv-format";
+import {
+  ENVIRONMENT_LIST_TEXT,
+  isValidEnvironment,
+} from "@convex/lib/environments";
 
 type RouteParams = { params: Promise<{ slug: string }> };
 
@@ -70,6 +74,19 @@ export async function GET(request: Request, { params }: RouteParams) {
     );
   }
   const { environment, keys, prefix, metadataOnly, format } = parsed.data;
+
+  // An unknown name used to be accepted and resolve to zero rows, so
+  // `?environment=prod` answered 200 with an empty body, the Action logged
+  // "pulled 0 variables" and the deploy carried on.
+  if (environment && !isValidEnvironment(environment)) {
+    return NextResponse.json(
+      {
+        error: `Unknown environment "${environment}". Valid environments: ${ENVIRONMENT_LIST_TEXT}.`,
+        code: "UNKNOWN_ENVIRONMENT",
+      },
+      { status: 400, headers }
+    );
+  }
 
   if (!metadataOnly && !environment) {
     return NextResponse.json(

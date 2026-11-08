@@ -114,9 +114,12 @@ async function requireCurrentUserId(ctx: ActionCtx): Promise<Id<"users">> {
       "Unauthenticated: no verified user identity on request"
     );
   }
-  const user = await ctx.runQuery(api.features.users.users.getByWorkosId, {
-    workosId: identity.subject,
-  });
+  const user = await ctx.runQuery(
+    internal.features.users.users._getByWorkosId,
+    {
+      workosId: identity.subject,
+    }
+  );
   if (!user) {
     throw new ConvexError("User not found");
   }
